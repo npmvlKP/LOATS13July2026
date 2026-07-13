@@ -1,0 +1,14 @@
+.venv/
+data/
+logs/
+__pycache__/
+*.pyc
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+*.log
+.git/
+dist/
+build/

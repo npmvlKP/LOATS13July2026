@@ -1,0 +1,25 @@
+# Python virtual environment
+.venv/
+.env
+secrets.env
+
+# Python cache files
+__pycache__/
+*.pyc
+
+# Data and logs
+data/
+logs/*.log
+
+# Python tool caches
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+
+# Coverage reports
+htmlcov/
+.coverage
+
+# IDE files
+.vscode/
+.idea/
