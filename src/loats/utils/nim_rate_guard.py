@@ -88,7 +88,7 @@ async def nim_call_with_backoff(
         The result of the API call
 
     Raises:
-        HTTPStatusError: If the API call fails after all retries
+        Exception: If the API call fails after all retries
     """
     _guard = NimRateGuard()
     delays = [30, 60, 120, 300]
@@ -109,3 +109,6 @@ async def nim_call_with_backoff(
                 await asyncio.sleep(wait_time)
                 continue
             raise
+
+    # This line should never be reached but satisfies mypy
+    raise RuntimeError("Unexpected error in nim_call_with_backoff")

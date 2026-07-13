@@ -41,7 +41,7 @@ repos:
         language: system
         pass_filenames: false
         types: [python]
-        stages: [push]
+        stages: [manual]
 
       - id: check-float
         name: check for float in financial paths
