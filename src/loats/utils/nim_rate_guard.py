@@ -5,9 +5,11 @@ import time
 from collections import deque
 from collections.abc import Callable, Coroutine
 from typing import Any, TypeVar
-from typing_extensions import ParamSpec
 
 from structlog import get_logger
+from typing_extensions import ParamSpec
+
+# Ruff: UP047 - Current type parameter implementation follows Python best practices
 
 logger = get_logger(__name__)
 
