@@ -4,13 +4,15 @@ import asyncio
 import time
 from collections import deque
 from collections.abc import Callable, Coroutine
-from typing import Any, TypeVar, cast
+from typing import Any, TypeVar
+from typing_extensions import ParamSpec
 
 from structlog import get_logger
 
 logger = get_logger(__name__)
 
 T = TypeVar("T")
+P = ParamSpec("P")
 
 
 class NimRateGuard:
@@ -71,10 +73,10 @@ class NimRateGuard:
 
 
 async def nim_call_with_backoff(
-    fn: Callable[..., Coroutine[Any, Any, T]],
-    *args: Any,
+    fn: Callable[P, Coroutine[Any, Any, T]],
+    *args: P.args,
     max_retries: int = 4,
-    **kwargs: Any,
+    **kwargs: P.kwargs,
 ) -> T:
     """Make a NVIDIA NIM API call with automatic rate limiting and backoff.
 
