@@ -24,3 +24,9 @@ htmlcov/
 # IDE files
 .vscode/
 .idea/
+
+# Generated files
+*.egg-info/
+*.log
+gitleaks-report.json
+htmlcov/

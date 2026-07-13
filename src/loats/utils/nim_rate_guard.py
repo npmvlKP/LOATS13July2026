@@ -4,7 +4,7 @@ import asyncio
 import time
 from collections import deque
 from collections.abc import Callable, Coroutine
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast
 
 from structlog import get_logger
 
