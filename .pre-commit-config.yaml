@@ -1,0 +1,33 @@
+# Pre-commit configuration for mechanical enforcement of G1-G5
+# This ensures no commit is possible with lint/type/security/secret failures
+
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.4.4
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy
+        entry: .venv\Scripts\mypy src/
+        language: system
+        args: [--strict]
+        pass_filenames: false
+        types: [python]
+
+      - id: bandit
+        name: bandit
+        entry: bandit
+        language: system
+        args: [-c, pyproject.toml, -r, src/]
+        types: [python]
+
+      - id: gitleaks
+        name: gitleaks
+        entry: gitleaks detect --source . --no-banner
+        language: system
+        pass_filenames: false

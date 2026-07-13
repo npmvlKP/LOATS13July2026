@@ -1,0 +1,15 @@
+# Gitleaks configuration for secret detection
+# This ensures no secrets are committed to the repository
+
+title = "gitleaks config"
+
+[extend]
+# Use the default gitleaks rules
+useDefault = true
+
+[allowlist]
+description = "Allowlisted files and patterns"
+paths = [
+    '''gitleaks\.toml''',
+    '''(.*?)(tests?|spec|test_.*?)\.py$''',
+]
