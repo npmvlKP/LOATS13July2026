@@ -1,33 +1,72 @@
-# Pre-commit configuration for mechanical enforcement of G1-G5
-# This ensures no commit is possible with lint/type/security/secret failures
+# Pre-commit configuration for mechanical enforcement of G1-G10 quality gates
+# This ensures no commit is possible with lint/type/security/secret/test failures
 
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.4.4
     hooks:
       - id: ruff
-        args: [--fix]
+        name: ruff lint
+        args: [--fix, --config=pyproject.toml]
       - id: ruff-format
+        name: ruff format
+        args: [--config=pyproject.toml]
 
   - repo: local
     hooks:
       - id: mypy
-        name: mypy
+        name: mypy type check
         entry: .venv\Scripts\mypy src/
         language: system
-        args: [--strict]
+        args: [--strict, --config-file=pyproject.toml]
         pass_filenames: false
         types: [python]
 
       - id: bandit
-        name: bandit
+        name: bandit security scan
         entry: bandit
         language: system
         args: [-c, pyproject.toml, -r, src/]
         types: [python]
 
       - id: gitleaks
-        name: gitleaks
-        entry: gitleaks detect --source . --no-banner
+        name: gitleaks secret scan
+        entry: gitleaks detect --source . --config .gitleaks.toml --no-banner
         language: system
         pass_filenames: false
+
+      - id: pytest
+        name: pytest unit tests
+        entry: pytest tests/unit/ -v --cov=src --cov-branch --cov-fail-under=80 -x
+        language: system
+        pass_filenames: false
+        types: [python]
+        stages: [push]
+
+      - id: check-float
+        name: check for float in financial paths
+        entry: python -c "import ast; import sys; from pathlib import Path; exit(1) if any('float(' in line for path in Path('src/').rglob('*.py') for line in path.read_text().splitlines()) else exit(0)"
+        language: system
+        pass_filenames: false
+        types: [python]
+
+      - id: check-naive-datetime
+        name: check for naive datetime
+        entry: python -c "import ast; import sys; from pathlib import Path; exit(1) if any('datetime.now()' in line and 'tz=' not in line for path in Path('src/').rglob('*.py') for line in path.read_text().splitlines()) else exit(0)"
+        language: system
+        pass_filenames: false
+        types: [python]
+
+      - id: check-print
+        name: check for print statements
+        entry: python -c "import ast; import sys; from pathlib import Path; exit(1) if any('print(' in line for path in Path('src/').rglob('*.py') for line in path.read_text().splitlines()) else exit(0)"
+        language: system
+        pass_filenames: false
+        types: [python]
+
+      - id: check-function-size
+        name: check function size
+        entry: python scripts/check_function_size.py
+        language: system
+        pass_filenames: false
+        types: [python]

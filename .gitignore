@@ -1,5 +1,6 @@
 # Python virtual environment
 .venv/
+LOATS13July2026/
 .env
 secrets.env
 
