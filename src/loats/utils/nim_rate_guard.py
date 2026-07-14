@@ -70,7 +70,10 @@ class NimRateGuard:
 
             self._timestamps.append(time.monotonic())
             self._last_call = time.monotonic()
-            logger.debug("NIM rate guard: acquired", current_calls=len(self._timestamps))
+            logger.debug(
+                "NIM rate guard: acquired",
+                current_calls=len(self._timestamps),
+            )
             return
 
 
@@ -102,7 +105,11 @@ async def nim_call_with_backoff(
         try:
             return await fn(*args, **kwargs)
         except Exception as e:
-            if hasattr(e, "response") and e.response.status_code == 429 and attempt < max_retries:
+            if (
+                hasattr(e, "response")
+                and e.response.status_code == 429
+                and attempt < max_retries
+            ):
                 wait_time = delays[attempt]
                 logger.warning(
                     "NIM API 429 error, retrying",

@@ -5,7 +5,7 @@ This configuration applies to the initial setup session only.
 
 ### Enabled Permissions (Setup Session)
 - ✅ Read files
-- ✅ Edit files  
+- ✅ Edit files
 - ✅ Execute safe commands
 - ✅ Use MCP servers
 

@@ -1,6 +1,6 @@
 # Test file to verify pre-commit hooks
 import os
-import sys
+
 
 def test_function():
     # This should trigger ruff and mypy checks
@@ -14,6 +14,7 @@ def test_function():
     api_key = "AKIAEXAMPLE1234567890"
 
     return x
+
 
 if __name__ == "__main__":
     test_function()

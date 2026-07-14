@@ -22,7 +22,7 @@ def check_function_size() -> int:
                     end = node.end_lineno
                     if end - start > max_lines:
                         print(
-                            f"{path}:{start} Function {node.name} too large ({end - start} lines)"
+                            f"{path}:{start} Function {node.name} too large ({end - start} lines)",
                         )
                         exit_code = 1
         except Exception as e:

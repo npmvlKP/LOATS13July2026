@@ -1,0 +1,22 @@
+# Core LOATS13July2026 dependencies
+pydantic>=2.10
+pydantic-settings>=2.7
+httpx>=0.28
+ta>=0.11
+py_vollib>=1.0.12
+numpy
+pandas
+scipy
+vaderSentiment>=3.3.2
+feedparser>=6.0
+structlog>=23.2
+python-telegram-bot>=20.7
+APScheduler>=3.10
+pytest
+pytest-asyncio
+pytest-cov
+ruff
+mypy
+bandit
+pip-audit
+pre-commit
