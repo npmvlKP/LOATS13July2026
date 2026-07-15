@@ -79,7 +79,7 @@ def db() -> Generator[Database, None, None]:
     db_instance = Database(
         db_path=test_settings.sqlite_db_path,
         audit_log_path=test_settings.audit_log_path,
-        retention_days=test_settings.retention_days,
+        retention_days=7,  # Short retention for testing cleanup
     )
 
     # Initialize the database
@@ -87,11 +87,14 @@ def db() -> Generator[Database, None, None]:
 
     yield db_instance
 
-    # Clean up
+    # Clean up - close connections and force garbage collection
+    # to release Windows file locks before removing temp directory
     db_instance.close()
+    import gc
     import shutil
 
-    shutil.rmtree(temp_dir)
+    gc.collect()
+    shutil.rmtree(temp_dir, ignore_errors=True)
 
 
 @pytest.fixture()

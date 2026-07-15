@@ -1,9 +1,10 @@
 """Pydantic settings for LOATS13July2026 configuration."""
 
 from decimal import Decimal
+from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, field_validator
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -13,12 +14,64 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
-        extra="forbid",
+        extra="ignore",  # Allow extra fields in .env without crashing
         frozen=True,
     )
 
+    # Environment Configuration
+    environment: Literal["development", "production", "test"] = Field(
+        "development",
+        description="Environment (development, production, test)",
+    )
+    sqlite_db_path: Path = Field(
+        Path("data/loats.db"),
+        description="Path to SQLite database file",
+    )
+    audit_log_path: Path = Field(
+        Path("data/audit.log"),
+        description="Path to audit log file",
+    )
+    retention_days: int = Field(
+        2555,  # 7 years
+        description="Number of days to retain data",
+    )
+
+    # Scan Intervals
+    ta_scan_interval: int = Field(
+        60,
+        description="Technical analysis scan interval in seconds",
+    )
+    sentiment_scan_interval: int = Field(
+        300,
+        description="Sentiment analysis scan interval in seconds",
+    )
+    signal_scan_interval: int = Field(
+        30,
+        description="Signal scan interval in seconds",
+    )
+
+    # Default Trading Parameters
+    default_symbol: str = Field(
+        "NIFTY",
+        description="Default trading symbol",
+    )
+    default_timeframe: str = Field(
+        "1min",
+        description="Default timeframe for analysis",
+    )
+    sentiment_threshold: float = Field(
+        0.05,
+        description="Sentiment threshold for signal generation",
+    )
+    request_timeout: float = Field(
+        30.0,
+        description="Request timeout in seconds",
+    )
+
     # OpenAlgo Configuration
-    openalgo_api_key: str = Field(..., min_length=1, description="OpenAlgo API key")
+    openalgo_api_key: SecretStr = Field(
+        ..., min_length=1, description="OpenAlgo API key"
+    )
     openalgo_base_url: str = Field(
         "http://127.0.0.1:5000",
         description="Base URL for OpenAlgo REST API",
@@ -27,6 +80,10 @@ class Settings(BaseSettings):
         "ANALYZE",
         description="OpenAlgo mode - ANALYZE only until all gates pass",
     )
+
+    # Telegram Configuration
+    telegram_bot_token: SecretStr = Field("", description="Telegram bot token")
+    telegram_chat_id: str = Field("", description="Telegram chat ID")
 
     # Trading Configuration
     nifty_lot_size: int = Field(
@@ -91,3 +148,54 @@ class Settings(BaseSettings):
     def validate_nim_gap(cls, v: Decimal) -> Decimal:
         """Ensure NIM gap has proper precision."""
         return v.quantize(Decimal("0.1"))
+
+    @field_validator("environment")
+    @classmethod
+    def validate_environment(cls, v: str) -> str:
+        """Validate environment value."""
+        if v not in ["development", "production", "test"]:
+            raise ValueError(
+                "Environment must be one of: development, production, test"
+            )
+        return v
+
+    @field_validator("retention_days")
+    @classmethod
+    def validate_retention_days(cls, v: int) -> int:
+        """Validate retention days."""
+        if v < 0:
+            raise ValueError("Retention days must be non-negative")
+        return v
+
+    @field_validator(
+        "ta_scan_interval", "sentiment_scan_interval", "signal_scan_interval"
+    )
+    @classmethod
+    def validate_scan_intervals(cls, v: int) -> int:
+        """Validate scan intervals."""
+        if v <= 0:
+            raise ValueError("Scan intervals must be positive")
+        return v
+
+    @field_validator("sentiment_threshold")
+    @classmethod
+    def validate_sentiment_threshold(cls, v: float) -> float:
+        """Validate sentiment threshold."""
+        if not 0 <= v <= 1:
+            raise ValueError("Sentiment threshold must be between 0 and 1")
+        return v
+
+    @field_validator("request_timeout")
+    @classmethod
+    def validate_request_timeout(cls, v: float) -> float:
+        """Validate request timeout."""
+        if v <= 0:
+            raise ValueError("Request timeout must be positive")
+        return v
+
+    def initialize(self) -> None:
+        """Initialize settings (placeholder method for backward compatibility)."""
+
+
+# Global settings instance
+settings = Settings()

@@ -12,6 +12,8 @@ secrets.env
 .venv/
 venv/
 ENV/
+/loats/
+LOATS13July2026/
 
 # Python cache and compiled files
 __pycache__/
@@ -50,3 +52,10 @@ gitleaks-report.json
 
 # Project specific
 LOATS13July2026/
+
+# Virtual environment config
+pyvenv.cfg
+
+# Forensic review docs (generated)
+FORENSIC_REVIEW.md
+FORMENSIC_REVIEW.md

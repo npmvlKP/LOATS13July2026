@@ -102,7 +102,9 @@ class TestDatabase:
 
         # Update trade
         updated_trade = Trade(
-            **sample_trade.model_dump(),
+            **sample_trade.model_dump(
+                exclude={"exit_price", "exit_time", "pnl", "status"}
+            ),
             exit_price=105.0,
             exit_time=datetime.now(),
             pnl=50.0,
@@ -126,7 +128,9 @@ class TestDatabase:
 
         # Create closed trade
         closed_trade = Trade(
-            **sample_trade.model_dump(),
+            **sample_trade.model_dump(
+                exclude={"trade_id", "exit_price", "exit_time", "pnl", "status"}
+            ),
             trade_id="trade_closed_123",
             exit_price=105.0,
             exit_time=datetime.now(),
@@ -167,7 +171,9 @@ class TestDatabase:
         # Create multiple signals
         for i in range(5):
             signal = Signal(
-                **sample_signal.model_dump(),
+                **sample_signal.model_dump(
+                    exclude={"signal_id", "timestamp", "strength"}
+                ),
                 signal_id=f"signal_{i}",
                 timestamp=datetime.now() - timedelta(minutes=i),
                 strength=0.8 - (i * 0.1),
@@ -325,7 +331,7 @@ class TestDatabase:
 
         # Store completed order
         completed_order = Order(
-            **sample_order.model_dump(),
+            **sample_order.model_dump(exclude={"order_id", "status"}),
             order_id="order_completed_123",
             status=OrderStatus.COMPLETED,
         )
@@ -350,7 +356,9 @@ class TestDatabase:
         db.create_trade(sample_trade)
         db.update_trade(
             Trade(
-                **sample_trade.model_dump(),
+                **sample_trade.model_dump(
+                    exclude={"exit_price", "exit_time", "pnl", "status"}
+                ),
                 exit_price=105.0,
                 exit_time=datetime.now(),
                 pnl=50.0,
@@ -405,7 +413,7 @@ class TestDatabase:
         """Test cleanup of old data."""
         # Create trade with old timestamp
         old_trade = Trade(
-            **sample_trade.model_dump(),
+            **sample_trade.model_dump(exclude={"trade_id", "entry_time"}),
             trade_id="old_trade_123",
             entry_time=datetime.now() - timedelta(days=8),  # Older than retention
         )
@@ -413,7 +421,7 @@ class TestDatabase:
 
         # Create recent trade
         recent_trade = Trade(
-            **sample_trade.model_dump(),
+            **sample_trade.model_dump(exclude={"trade_id", "entry_time"}),
             trade_id="recent_trade_123",
             entry_time=datetime.now(),
         )

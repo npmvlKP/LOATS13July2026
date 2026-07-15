@@ -5,6 +5,7 @@ Data models for LOATS13July2026 using Pydantic.
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
+from uuid import uuid4
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -118,6 +119,14 @@ class OptionContract(BaseModel):
     vega: float | None = None
     rho: float | None = None
 
+    @field_validator("last_price")
+    @classmethod
+    def validate_last_price(cls, v: float) -> float:
+        """Validate that last_price is non-negative."""
+        if v < 0:
+            raise ValueError("Option price cannot be negative")
+        return v
+
 
 class OptionChain(BaseModel):
     """Option chain model."""
@@ -178,7 +187,9 @@ class Trade(BaseModel):
     """Trade model for database storage."""
 
     trade_id: str = Field(
-        default_factory=lambda: f"trade_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
+        default_factory=lambda: (
+            f"trade_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}"
+        )
     )
     symbol: str
     quantity: int = Field(gt=0)
@@ -235,7 +246,9 @@ class Signal(BaseModel):
     """Trading signal model."""
 
     signal_id: str = Field(
-        default_factory=lambda: f"signal_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
+        default_factory=lambda: (
+            f"signal_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}"
+        )
     )
     symbol: str
     signal_type: SignalType
@@ -262,7 +275,9 @@ class AuditLogEntry(BaseModel):
     """Audit log entry model."""
 
     entry_id: str = Field(
-        default_factory=lambda: f"audit_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
+        default_factory=lambda: (
+            f"audit_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}_{uuid4().hex[:8]}"
+        )
     )
     timestamp: datetime
     action: str

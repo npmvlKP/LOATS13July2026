@@ -469,7 +469,9 @@ class TechnicalAnalysis:
         # Calculate price range
         highs = [h.high for h in historical_data]
         lows = [h.low for h in historical_data]
-        avg_range = sum(h - l for h, l in zip(highs, lows, strict=False)) / len(highs)
+        avg_range = sum(
+            high - low for high, low in zip(highs, lows, strict=False)
+        ) / len(highs)
 
         # Calculate recent volatility
         recent_high = max(h.high for h in historical_data[-5:])
