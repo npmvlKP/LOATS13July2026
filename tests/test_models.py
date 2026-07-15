@@ -146,7 +146,7 @@ class TestModels:
             timestamp=datetime(2023, 1, 1, 15, 30),
         )
 
-        assert quote2.change_percent == pytest.approx(0.11, 0.01)
+        assert quote2.change_percent == pytest.approx(0.1112, 0.001)
 
     def test_historical_data_model(self) -> None:
         """Test HistoricalData model."""
@@ -279,7 +279,7 @@ class TestModels:
 
         # Test PnL calculation
         trade_with_exit = Trade(
-            **trade.model_dump(),
+            **trade.model_dump(exclude={"exit_price", "exit_time", "transaction_type"}),
             exit_price=18050.0,
             exit_time=datetime(2023, 1, 1, 15, 30),
             transaction_type=TransactionType.BUY,
@@ -289,7 +289,7 @@ class TestModels:
 
         # Test PnL calculation for sell transaction
         trade_sell = Trade(
-            **trade.model_dump(),
+            **trade.model_dump(exclude={"exit_price", "exit_time", "transaction_type"}),
             exit_price=17850.0,
             exit_time=datetime(2023, 1, 1, 15, 30),
             transaction_type=TransactionType.SELL,
@@ -471,7 +471,7 @@ class TestModels:
     def test_model_validation(self) -> None:
         """Test model validation."""
         # Test invalid QuoteData
-        with pytest.raises(ValidationError):
+        with pytest.raises(ValueError):
             QuoteData(
                 symbol="",  # Empty symbol
                 last_price=18000.50,

@@ -2,7 +2,7 @@
 Data models for LOATS13July2026 using Pydantic.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
 
@@ -64,15 +64,21 @@ class QuoteData(BaseModel):
     change: float = Field(default=0.0)
     change_percent: float = Field(default=0.0)
 
-    @field_validator("change_percent", mode="before")
-    @classmethod
-    def calculate_change_percent(cls, v, values):
-        """Calculate change percent if not provided."""
-        if v is not None:
-            return v
-        if "last_price" in values and "close" in values and values["close"] != 0:
-            return ((values["last_price"] - values["close"]) / values["close"]) * 100
-        return 0.0
+    def __init__(self, **data: dict[str, Any]) -> None:
+        """Initialize QuoteData and calculate change_percent if not provided."""
+        # Validate required fields
+        if not data.get("symbol"):
+            error_msg = "Symbol cannot be empty"
+            raise ValueError(error_msg)
+
+        # Calculate change_percent if not provided
+        if ("change_percent" not in data or data["change_percent"] == 0.0) and (
+            "last_price" in data and "close" in data and data["close"] != 0
+        ):
+            change = (data["last_price"] - data["close"]) / data["close"]
+            data["change_percent"] = change * 100
+
+        super().__init__(**data)
 
 
 class HistoricalData(BaseModel):
@@ -80,11 +86,11 @@ class HistoricalData(BaseModel):
 
     symbol: str
     timestamp: datetime
-    open: float
-    high: float
-    low: float
-    close: float
-    volume: int
+    open: float = Field(gt=0)
+    high: float = Field(gt=0)
+    low: float = Field(gt=0)
+    close: float = Field(gt=0)
+    volume: int = Field(ge=0)
     interval: str
 
 
@@ -152,32 +158,32 @@ class Order(BaseModel):
 
     order_id: str
     symbol: str
-    quantity: int
+    quantity: int = Field(gt=0)
     order_type: OrderType
-    price: float | None = None
-    trigger_price: float | None = None
+    price: float | None = Field(None, gt=0)
+    trigger_price: float | None = Field(None, gt=0)
     variety: OrderVariety
     transaction_type: TransactionType
     product_type: ProductType
     status: OrderStatus
     timestamp: datetime
-    filled_quantity: int = 0
-    average_price: float | None = None
-    stop_loss: float | None = None
-    take_profit: float | None = None
-    trailing_stop_loss: float | None = None
+    filled_quantity: int = Field(ge=0)
+    average_price: float | None = Field(None, gt=0)
+    stop_loss: float | None = Field(None, gt=0)
+    take_profit: float | None = Field(None, gt=0)
+    trailing_stop_loss: float | None = Field(None, gt=0)
 
 
 class Trade(BaseModel):
     """Trade model for database storage."""
 
     trade_id: str = Field(
-        default_factory=lambda: f"trade_{datetime.now().strftime('%Y%m%d%H%M%S%f')}",
+        default_factory=lambda: f"trade_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
     )
     symbol: str
-    quantity: int
-    entry_price: float
-    exit_price: float | None = None
+    quantity: int = Field(gt=0)
+    entry_price: float = Field(gt=0)
+    exit_price: float | None = Field(None, gt=0)
     entry_time: datetime
     exit_time: datetime | None = None
     transaction_type: TransactionType
@@ -185,17 +191,21 @@ class Trade(BaseModel):
     pnl: float | None = None
     status: str = "OPEN"
     strategy: str
-    stop_loss: float | None = None
-    take_profit: float | None = None
-    trailing_stop_loss: float | None = None
+    stop_loss: float | None = Field(None, gt=0)
+    take_profit: float | None = Field(None, gt=0)
+    trailing_stop_loss: float | None = Field(None, gt=0)
     metadata: dict[str, Any] = Field(default_factory=dict)
 
     @field_validator("pnl", mode="before")
     @classmethod
-    def calculate_pnl(cls, v, values):
+    def calculate_pnl(cls, v: Any, info: Any) -> float | None:  # type: ignore[valid-type]
         """Calculate PnL if not provided."""
         if v is not None:
             return v
+
+        # Get the data from ValidationInfo
+        values = info.data
+
         if (
             values.get("exit_price") is not None
             and values.get("entry_price") is not None
@@ -203,11 +213,12 @@ class Trade(BaseModel):
             and values.get("transaction_type") is not None
         ):
             multiplier = 1 if values["transaction_type"] == TransactionType.BUY else -1
-            return (
+            pnl_value = (
                 (values["exit_price"] - values["entry_price"])
                 * values["quantity"]
                 * multiplier
             )
+            return float(pnl_value) if pnl_value is not None else None
         return None
 
 
@@ -224,7 +235,7 @@ class Signal(BaseModel):
     """Trading signal model."""
 
     signal_id: str = Field(
-        default_factory=lambda: f"signal_{datetime.now().strftime('%Y%m%d%H%M%S%f')}",
+        default_factory=lambda: f"signal_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
     )
     symbol: str
     signal_type: SignalType
@@ -251,7 +262,7 @@ class AuditLogEntry(BaseModel):
     """Audit log entry model."""
 
     entry_id: str = Field(
-        default_factory=lambda: f"audit_{datetime.now().strftime('%Y%m%d%H%M%S%f')}",
+        default_factory=lambda: f"audit_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
     )
     timestamp: datetime
     action: str
