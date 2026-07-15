@@ -3,7 +3,7 @@ Options module for LOATS13July2026.
 Implements IV calculation, Greeks, and Black-Scholes model.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 import numpy as np
 from py_vollib.black_scholes import black_scholes
@@ -90,15 +90,14 @@ class OptionsEngine:
                     rho=0.0,
                     implied_volatility=sigma,
                 )
-            else:
-                return Greeks(
-                    delta=-1.0 if S < K else 0.0,
-                    gamma=0.0,
-                    theta=0.0,
-                    vega=0.0,
-                    rho=0.0,
-                    implied_volatility=sigma,
-                )
+            return Greeks(
+                delta=-1.0 if S < K else 0.0,
+                gamma=0.0,
+                theta=0.0,
+                vega=0.0,
+                rho=0.0,
+                implied_volatility=sigma,
+            )
 
     def calculate_implied_volatility(
         self,
@@ -161,7 +160,7 @@ class OptionsEngine:
                 return float(iv)
             except Exception as e:
                 logger.error(f"Failed to calculate implied volatility: {e}")
-                raise ValueError(f"Could not calculate implied volatility: {e}")
+                raise ValueError(f"Could not calculate implied volatility: {e}") from e
 
     def calculate_black_scholes(
         self,
@@ -205,7 +204,7 @@ class OptionsEngine:
         Returns:
             Time to expiration in years
         """
-        now = datetime.now()
+        now = datetime.now(timezone.utc)
         days_to_expiry = (expiry - now).total_seconds() / (24 * 60 * 60)
         return days_to_expiry / 365.0
 
@@ -373,15 +372,14 @@ def calculate_greeks(
                 rho=0.0,
                 implied_volatility=sigma,
             )
-        else:
-            return Greeks(
-                delta=-1.0 if S < K else 0.0,
-                gamma=0.0,
-                theta=0.0,
-                vega=0.0,
-                rho=0.0,
-                implied_volatility=sigma,
-            )
+        return Greeks(
+            delta=-1.0 if S < K else 0.0,
+            gamma=0.0,
+            theta=0.0,
+            vega=0.0,
+            rho=0.0,
+            implied_volatility=sigma,
+        )
 
 
 def calculate_implied_volatility(
@@ -702,12 +700,12 @@ analysis = OptionsAnalysis()
 
 # Export functions
 __all__ = [
-    "OptionsEngine",
     "OptionsAnalysis",
+    "OptionsEngine",
+    "analysis",
     "calculate_greeks",
+    "calculate_historical_var",
     "calculate_implied_volatility",
     "calculate_var",
-    "calculate_historical_var",
     "options",
-    "analysis",
 ]

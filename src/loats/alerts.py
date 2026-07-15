@@ -4,7 +4,7 @@ Implements Telegram alerts and kill switch functionality.
 """
 
 import asyncio
-from datetime import datetime
+from datetime import datetime, timezone
 
 from telegram import Bot, Update  # type: ignore
 from telegram.ext import (  # type: ignore
@@ -114,7 +114,7 @@ class AlertSystem:
         # Check cooldown to avoid spamming
         if alert_type in self.alert_cooldown:
             if (
-                datetime.now() - self.alert_cooldown[alert_type]
+                datetime.now(timezone.utc) - self.alert_cooldown[alert_type]
             ).total_seconds() < self.cooldown_period:
                 logger.debug(f"Alert cooldown active for {alert_type}: {message}")
                 return False
@@ -131,7 +131,7 @@ class AlertSystem:
             )
 
             # Update cooldown
-            self.alert_cooldown[alert_type] = datetime.now()
+            self.alert_cooldown[alert_type] = datetime.now(timezone.utc)
             logger.info(f"Alert sent: {alert_type} - {message}")
             return True
 
@@ -150,7 +150,7 @@ class AlertSystem:
         Returns:
             Formatted message
         """
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
 
         if alert_type == "warning":
             return f"⚠️ <b>WARNING</b> | {timestamp}\n\n{message}"
@@ -449,7 +449,7 @@ class AlertSystem:
             message = (
                 "🚨 <b>KILL SWITCH ACTIVATED</b> 🚨\n\n"
                 f"<b>Reason:</b> {reason}\n"
-                f"<b>Timestamp:</b> {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+                f"<b>Timestamp:</b> {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')}\n\n"
                 "All open orders have been cancelled. No new orders will be placed."
             )
 
@@ -482,7 +482,7 @@ class AlertSystem:
             message = (
                 "✅ <b>KILL SWITCH DEACTIVATED</b> ✅\n\n"
                 f"<b>Reason:</b> {reason}\n"
-                f"<b>Timestamp:</b> {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+                f"<b>Timestamp:</b> {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')}\n\n"
                 "Trading activities can now resume."
             )
 
@@ -531,7 +531,7 @@ class AlertSystem:
             message = (
                 f"📊 <b>SYSTEM STATUS</b>\n\n"
                 f"<b>Status:</b> {status}\n"
-                f"<b>Timestamp:</b> {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+                f"<b>Timestamp:</b> {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')}"
             )
             await update.message.reply_text(message, parse_mode="HTML")
         except Exception as e:

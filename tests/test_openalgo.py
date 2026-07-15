@@ -26,17 +26,17 @@ from src.loats.openalgo import OpenAlgoClient
 class TestOpenAlgoClient:
     """Test suite for OpenAlgoClient."""
 
-    @pytest.fixture()
+    @pytest.fixture
     def client(self) -> OpenAlgoClient:
         """Create a test OpenAlgoClient instance."""
         return OpenAlgoClient()
 
-    @pytest.fixture()
+    @pytest.fixture
     def mock_httpx_client(self) -> MagicMock:
         """Create a mock httpx.Client."""
         return MagicMock(spec=httpx.Client)
 
-    @pytest.fixture()
+    @pytest.fixture
     def mock_response(self) -> MagicMock:
         """Create a mock httpx.Response."""
         response = MagicMock(spec=Response)

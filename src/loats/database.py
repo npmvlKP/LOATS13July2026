@@ -6,7 +6,7 @@ Implements SQLite database with audit trail and JSONL dual-write.
 import hashlib
 import json
 import sqlite3
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, TypeVar
 
@@ -294,7 +294,7 @@ class Database:
             new_state: State after the action
         """
         entry = AuditLogEntry(
-            timestamp=datetime.now(),
+            timestamp=datetime.now(timezone.utc),
             action=action,
             entity_type=entity_type,
             entity_id=entity_id,
@@ -339,7 +339,7 @@ class Database:
             conn.commit()
 
         # Write to JSONL file (append-only)
-        with open(self.audit_log_path, "a", encoding="utf-8") as f:
+        with Path(self.audit_log_path).open("a", encoding="utf-8") as f:
             f.write(json.dumps(entry_data) + "\n")
 
     def _cleanup_old_data(self) -> None:
@@ -347,7 +347,7 @@ class Database:
 
         Trades are filtered by entry_time, other tables by created_at.
         """
-        cutoff_date = datetime.now() - timedelta(days=self.retention_days)
+        cutoff_date = datetime.now(timezone.utc) - timedelta(days=self.retention_days)
         cutoff_str = cutoff_date.isoformat()
 
         with self._get_connection() as conn:
@@ -395,7 +395,7 @@ class Database:
         Returns:
             True if successful
         """
-        now = datetime.now().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
@@ -476,7 +476,7 @@ class Database:
         Returns:
             True if successful
         """
-        now = datetime.now().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
 
         # Get previous state for audit
         previous = self.get_trade(trade.trade_id)
@@ -568,7 +568,9 @@ class Database:
             quantity=row[2],
             entry_price=row[3],
             exit_price=row[4],
-            entry_time=datetime.fromisoformat(row[5]) if row[5] else datetime.now(),
+            entry_time=datetime.fromisoformat(row[5])
+            if row[5]
+            else datetime.now(timezone.utc),
             exit_time=datetime.fromisoformat(row[6]) if row[6] else None,
             transaction_type=TransactionType(row[7]),
             product_type=ProductType(row[8]),
@@ -595,7 +597,7 @@ class Database:
         Returns:
             True if successful
         """
-        now = datetime.now().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
@@ -680,7 +682,7 @@ class Database:
         Returns:
             True if successful
         """
-        now = datetime.now().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
         with self._get_connection() as conn:
             cursor = conn.cursor()
             for item in data:
@@ -771,7 +773,7 @@ class Database:
         Returns:
             True if successful
         """
-        now = datetime.now().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
@@ -851,7 +853,7 @@ class Database:
         Returns:
             True if successful
         """
-        now = datetime.now().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
@@ -930,7 +932,7 @@ class Database:
         Returns:
             True if successful
         """
-        now = datetime.now().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
@@ -995,7 +997,7 @@ class Database:
         Returns:
             True if successful
         """
-        now = datetime.now().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
@@ -1069,7 +1071,7 @@ class Database:
         Returns:
             True if successful
         """
-        now = datetime.now().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
@@ -1195,7 +1197,7 @@ class Database:
             True if all entries are valid, False if corruption is detected
         """
         try:
-            with open(self.audit_log_path, encoding="utf-8") as f:
+            with Path(self.audit_log_path).open(encoding="utf-8") as f:
                 for line in f:
                     line = line.strip()
                     if not line:

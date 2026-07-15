@@ -23,7 +23,7 @@ def run_command(command: list[str]) -> tuple[bool, str]:
         return result.returncode == 0, output
     except subprocess.TimeoutExpired:
         return False, "Command timed out"
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         return False, str(e)
 
 
@@ -34,7 +34,7 @@ def verify_virtual_environment() -> tuple[bool, str]:
         if "LOATS13July2026" in venv_path:
             return True, f"Virtual Environment: {venv_path}"
         return False, f"Incorrect virtual environment: {venv_path}"
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         return False, f"Virtual environment check failed: {e!s}"
 
 
@@ -44,9 +44,9 @@ def run_quick_check() -> int:
     src_dir = project_root / "src" / "loats"
     tests_dir = project_root / "tests"
 
-    print("ROCKET LOATS13July2026 Quick Health Check")  # noqa: T201
-    print("=" * 50)  # noqa: T201
-    print("Strictly following /loats protocol...\n")  # noqa: T201
+    print("ROCKET LOATS13July2026 Quick Health Check")
+    print("=" * 50)
+    print("Strictly following /loats protocol...\n")
 
     checks: list[tuple[str, object]] = [
         ("Virtual Environment", verify_virtual_environment),
@@ -96,48 +96,48 @@ def run_quick_check() -> int:
 
     results = []
     for check_name, check_func in checks:
-        print(f"CHECK {check_name}...", end=" ", flush=True)  # noqa: T201
+        print(f"CHECK {check_name}...", end=" ", flush=True)
         try:
             success, output = check_func()  # type: ignore[operator]
             if success:
-                print("PASS")  # noqa: T201
+                print("PASS")
                 results.append(True)
             elif (
                 check_name == "Type Safety" and "numpy" in output and "error:" in output
             ):
-                print("PASS (expected numpy warnings)")  # noqa: T201
+                print("PASS (expected numpy warnings)")
                 results.append(True)
             elif check_name == "Code Quality" and "UnicodeDecodeError" in output:
-                print("PASS (encoding issue, not code quality)")  # noqa: T201
+                print("PASS (encoding issue, not code quality)")
                 results.append(True)
             else:
-                print("FAIL")  # noqa: T201
-                print(f"   Error: {output.strip()[:100]}...")  # noqa: T201
+                print("FAIL")
+                print(f"   Error: {output.strip()[:100]}...")
                 results.append(False)
-        except Exception as e:  # noqa: BLE001
-            print("ERROR")  # noqa: T201
-            print(f"   Error: {e!s}")  # noqa: T201
+        except Exception as e:
+            print("ERROR")
+            print(f"   Error: {e!s}")
             results.append(False)
 
-    print("\n" + "=" * 50)  # noqa: T201
+    print("\n" + "=" * 50)
     passed = sum(results)
     total = len(results)
     health_score = passed / total * 100
 
-    print(  # noqa: T201
+    print(
         f"Quick Health Check Results: {passed}/{total} checks passed ({health_score:.1f}%)"
     )
 
     if health_score == 100:
-        print("PROJECT HEALTH: HEALTHY")  # noqa: T201
-        print("All /loats protocol requirements verified")  # noqa: T201
+        print("PROJECT HEALTH: HEALTHY")
+        print("All /loats protocol requirements verified")
         return 0
     if health_score >= 80:
-        print("PROJECT HEALTH: WARNING")  # noqa: T201
-        print("Some issues detected but core functionality intact")  # noqa: T201
+        print("PROJECT HEALTH: WARNING")
+        print("Some issues detected but core functionality intact")
         return 1
-    print("PROJECT HEALTH: UNHEALTHY")  # noqa: T201
-    print("Critical issues detected - requires immediate attention")  # noqa: T201
+    print("PROJECT HEALTH: UNHEALTHY")
+    print("Critical issues detected - requires immediate attention")
     return 2
 
 

@@ -14,7 +14,14 @@ from apscheduler.triggers.interval import IntervalTrigger
 from .config import settings
 from .database import db
 from .logging import get_logger
-from .models import Signal, SignalType
+from .models import (
+    FundsData,
+    HistoricalData,
+    Position,
+    QuoteData,
+    Signal,
+    SignalType,
+)
 from .openalgo import client as openalgo_client
 from .sentiment import sentiment
 from .ta import ta
@@ -498,7 +505,7 @@ class TradingScheduler:
             logger.debug("Checking market status")
 
             # Example: Check if market is open (9:15 AM to 3:30 PM IST)
-            now = datetime.now()
+            now = datetime.now(timezone.utc)
             market_open = now.hour > 9 or (now.hour == 9 and now.minute >= 15)
             market_closed = now.hour > 15 or (now.hour == 15 and now.minute >= 30)
 

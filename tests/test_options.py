@@ -25,12 +25,12 @@ from src.loats.options import (
 class TestOptionsAnalysis:
     """Test suite for OptionsAnalysis class."""
 
-    @pytest.fixture()
+    @pytest.fixture
     def options(self) -> OptionsAnalysis:
         """Create an OptionsAnalysis instance."""
         return OptionsAnalysis()
 
-    @pytest.fixture()
+    @pytest.fixture
     def sample_option_chain(self) -> dict:
         """Create sample option chain data for testing."""
         return {

@@ -2,11 +2,14 @@
 Pytest configuration and fixtures for LOATS13July2026.
 """
 
+from __future__ import annotations
+
 import os
 import tempfile
 from collections.abc import Generator
 from datetime import datetime
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -24,6 +27,9 @@ from src.loats.models import (
     TransactionType,
 )
 
+if TYPE_CHECKING:
+    from src.loats.config import Settings
+
 
 @pytest.fixture(autouse=True)
 def configure_test_logging() -> None:
@@ -33,8 +39,8 @@ def configure_test_logging() -> None:
     configure_logging(test_mode=True)
 
 
-@pytest.fixture()
-def test_settings() -> "Settings":
+@pytest.fixture
+def test_settings() -> Settings:
     """Create test settings with temporary paths."""
     from pydantic import SecretStr
 
@@ -54,7 +60,7 @@ def test_settings() -> "Settings":
         yield test_settings
 
 
-@pytest.fixture()
+@pytest.fixture
 def db() -> Generator[Database, None, None]:
     """Create a test database instance."""
     from pydantic import SecretStr
@@ -97,7 +103,7 @@ def db() -> Generator[Database, None, None]:
     shutil.rmtree(temp_dir, ignore_errors=True)
 
 
-@pytest.fixture()
+@pytest.fixture
 def sample_trade() -> Trade:
     """Create a sample trade for testing."""
     return Trade(
@@ -114,7 +120,7 @@ def sample_trade() -> Trade:
     )
 
 
-@pytest.fixture()
+@pytest.fixture
 def sample_order() -> Order:
     """Create a sample order for testing."""
     return Order(
@@ -132,7 +138,7 @@ def sample_order() -> Order:
     )
 
 
-@pytest.fixture()
+@pytest.fixture
 def sample_signal() -> Signal:
     """Create a sample signal for testing."""
     return Signal(
@@ -150,7 +156,7 @@ def sample_signal() -> Signal:
     )
 
 
-@pytest.fixture()
+@pytest.fixture
 def sample_historical_data() -> list[HistoricalData]:
     """Create sample historical data for testing."""
     return [

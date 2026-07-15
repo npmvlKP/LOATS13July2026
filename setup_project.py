@@ -11,6 +11,9 @@ import subprocess
 import sys
 from pathlib import Path
 
+# Use the current Python executable for running commands
+python_cmd = sys.executable
+
 
 def run_command(command, cwd=None, capture_output=True):
     """Run a shell command and return the result."""
@@ -61,7 +64,6 @@ def install_dependencies():
         print("❌ Virtual environment not found")
         return False
 
-    python_cmd = str(venv_path / "Scripts" / "python.exe")
     pip_cmd = str(venv_path / "Scripts" / "pip.exe")
 
     # Upgrade pip
@@ -96,8 +98,6 @@ def verify_installation():
     if not venv_path.exists():
         print("❌ Virtual environment not found")
         return False
-
-    python_cmd = str(venv_path / "Scripts" / "python.exe")
 
     # Check Python version
     code, stdout, stderr = run_command(f"{python_cmd} --version")
@@ -137,8 +137,6 @@ def run_basic_tests():
         print("❌ Virtual environment not found")
         return False
 
-    python_cmd = str(venv_path / "Scripts" / "python.exe")
-
     # Test basic TA functionality
     test_script = """
 from src.loats.ta import ta, calculate_rsi
@@ -171,7 +169,7 @@ print(f"✅ TA class initialization successful, got {len(indicators)} indicators
 print("✅ All basic functionality tests passed")
 """
 
-    with open("basic_test.py", "w") as f:
+    with Path("basic_test.py").open("w") as f:
         f.write(test_script)
 
     code, stdout, stderr = run_command(f"{python_cmd} basic_test.py")
@@ -180,7 +178,7 @@ print("✅ All basic functionality tests passed")
         print(f"Stderr: {stderr}")
 
     # Clean up
-    os.remove("basic_test.py")
+    Path("basic_test.py").unlink()
 
     return code == 0
 

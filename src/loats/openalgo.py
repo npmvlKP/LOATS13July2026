@@ -2,7 +2,7 @@
 OpenAlgo client implementation for LOATS13July2026.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 import httpx
@@ -167,7 +167,7 @@ class OpenAlgoClient:
             low=data.get("low", 0.0),
             close=data.get("close", 0.0),
             volume=data.get("volume", 0),
-            timestamp=datetime.now(),
+            timestamp=datetime.now(timezone.utc),
             change=data.get("change", 0.0),
             change_percent=data.get("change_percent", 0.0),
         )
@@ -176,7 +176,7 @@ class OpenAlgoClient:
         self, symbol: str, interval: str, data: dict[str, Any]
     ) -> HistoricalData:
         """Convert API response data to HistoricalData model."""
-        timestamp_str = data.get("timestamp", datetime.now().isoformat())
+        timestamp_str = data.get("timestamp", datetime.now(timezone.utc).isoformat())
         if isinstance(timestamp_str, str):
             timestamp = datetime.fromisoformat(timestamp_str)
         else:
@@ -208,7 +208,7 @@ class OpenAlgoClient:
 
     def _convert_to_order(self, data: dict[str, Any]) -> Order:
         """Convert API response data to Order model."""
-        timestamp_str = data.get("timestamp", datetime.now().isoformat())
+        timestamp_str = data.get("timestamp", datetime.now(timezone.utc).isoformat())
         if isinstance(timestamp_str, str):
             timestamp = datetime.fromisoformat(timestamp_str)
         else:

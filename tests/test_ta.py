@@ -18,12 +18,12 @@ from src.loats.ta import (
 class TestTechnicalAnalysis:
     """Test suite for TechnicalAnalysis class."""
 
-    @pytest.fixture()
+    @pytest.fixture
     def ta(self) -> TechnicalAnalysis:
         """Fixture for TechnicalAnalysis instance."""
         return TechnicalAnalysis()
 
-    @pytest.fixture()
+    @pytest.fixture
     def sample_data(self) -> list[HistoricalData]:
         """Fixture for sample historical data."""
         return [
@@ -79,7 +79,7 @@ class TestTechnicalAnalysis:
             ),
         ]
 
-    @pytest.fixture()
+    @pytest.fixture
     def sufficient_data(self) -> list[HistoricalData]:
         """Fixture for sufficient historical data (15+ points)."""
         base_time = datetime(2023, 1, 1, 9, 30, tzinfo=timezone.utc)

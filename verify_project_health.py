@@ -15,6 +15,9 @@ from src.loats.logging import get_logger
 
 logger = get_logger(__name__)
 
+# Use the current Python executable for running commands
+python_cmd = sys.executable
+
 
 def run_command(
     command: str, cwd: str | None = None, capture_output: bool = True
@@ -49,7 +52,6 @@ def verify_virtual_environment() -> bool:
     logger.info("Virtual environment found at: %s", venv_path.absolute())
 
     # Check Python version
-    python_cmd = str(venv_path / "Scripts" / "python.exe")
     code, stdout, stderr = run_command(f"{python_cmd} --version")
     if code != 0:
         logger.error("Failed to get Python version: %s", stderr)
@@ -72,7 +74,6 @@ def install_dependencies() -> bool:
     logger.info("Installing dependencies")
 
     venv_path = Path("loats13july2026")
-    python_cmd = str(venv_path / "Scripts" / "python.exe")
     pip_cmd = str(venv_path / "Scripts" / "pip.exe")
 
     # Install core dependencies
@@ -125,9 +126,6 @@ def run_tests() -> bool:
     """Run the test suite and verify coverage."""
     logger.info("Running tests")
 
-    venv_path = Path("loats13july2026")
-    python_cmd = str(venv_path / "Scripts" / "python.exe")
-
     # Run TA tests
     logger.info("Running TA tests...")
     code, stdout, stderr = run_command(f"{python_cmd} -m pytest tests/test_ta.py -v")
@@ -167,9 +165,6 @@ def run_quality_checks() -> bool:
     """Run quality checks (ruff, mypy, bandit)."""
     logger.info("Running quality checks")
 
-    venv_path = Path("loats13july2026")
-    python_cmd = str(venv_path / "Scripts" / "python.exe")
-
     # Run ruff check
     logger.info("Running ruff check...")
     code, stdout, stderr = run_command(f"{python_cmd} -m ruff check src/loats")
@@ -198,9 +193,6 @@ def verify_dependency_security() -> bool:
     """Verify dependency security with pip-audit."""
     logger.info("Verifying dependency security")
 
-    venv_path = Path("loats13july2026")
-    python_cmd = str(venv_path / "Scripts" / "python.exe")
-
     # Run pip-audit
     logger.info("Running pip-audit...")
     code, stdout, stderr = run_command(
@@ -218,9 +210,6 @@ def verify_dependency_security() -> bool:
 def verify_latency_requirements() -> bool:
     """Verify latency requirements for TA calculations."""
     logger.info("Verifying latency requirements")
-
-    venv_path = Path("loats13july2026")
-    python_cmd = str(venv_path / "Scripts" / "python.exe")
 
     # Create a latency test script
     latency_test_script = """

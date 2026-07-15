@@ -33,16 +33,6 @@ def configure_logging(test_mode: bool = False) -> None:
         structlog.processors.format_exc_info,
     ]
 
-    # Console-specific processors
-    console_processors = shared_processors + [
-        structlog.dev.ConsoleRenderer(colors=True),
-    ]
-
-    # File-specific processors
-    file_processors = shared_processors + [
-        structlog.processors.JSONRenderer(),
-    ]
-
     # Configure handlers
     handlers = {
         "default": {
