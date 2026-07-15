@@ -1,32 +1,52 @@
-# Python virtual environment
-.venv/
-LOATS13July2026/
+# LOATS13July2026 Project Ignore Rules
+# Created: 15-Jul-2026
+
+# Environment files
 .env
+.env.*
+!.env.example
+!.env.test
 secrets.env
 
-# Python cache files
+# Virtual environment
+.venv/
+venv/
+ENV/
+
+# Python cache and compiled files
 __pycache__/
-*.pyc
-
-# Data and logs
-data/
-logs/*.log
-
-# Python tool caches
+*.py[cod]
+*$py.class
 .mypy_cache/
 .pytest_cache/
 .ruff_cache/
 
-# Coverage reports
+# Data and logs
+data/
+logs/
+*.log
+
+# Coverage and test reports
 htmlcov/
 .coverage
+.coverage.*
+*.egg-info/
 
-# IDE files
+# IDE and editor files
 .vscode/
 .idea/
+*.swp
+*.swo
 
-# Generated files
-*.egg-info/
-*.log
+# Build and distribution files
+dist/
+build/
+*.egg
+
+# Git specific
+.git/
+.gitmodules
 gitleaks-report.json
-htmlcov/
+
+# Project specific
+LOATS13July2026/
