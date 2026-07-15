@@ -5,7 +5,7 @@ A lightweight, production-grade trading system using OpenAlgo APIs.
 """
 
 __version__ = "0.1.0"
-__all__ = ["settings", "configure_logging", "get_logger", "logger"]
+__all__ = ["configure_logging", "get_logger", "logger", "settings"]
 
 from .initialization import initialize_system
 from .logging import get_logger

@@ -154,12 +154,12 @@ class AlertSystem:
 
         if alert_type == "warning":
             return f"⚠️ <b>WARNING</b> | {timestamp}\n\n{message}"
-        elif alert_type == "error":
+        if alert_type == "error":
             return f"🚨 <b>ERROR</b> | {timestamp}\n\n{message}"
-        elif alert_type == "success":
+        if alert_type == "success":
             return f"✅ <b>SUCCESS</b> | {timestamp}\n\n{message}"
-        else:  # info
-            return f"ℹ️ <b>INFO</b> | {timestamp}\n\n{message}"
+        # info
+        return f"ℹ️ <b>INFO</b> | {timestamp}\n\n{message}"
 
     async def send_signal_alert(self, signal: Signal) -> bool:
         """

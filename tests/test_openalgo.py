@@ -99,19 +99,18 @@ class TestOpenAlgoClient:
 
         mock_httpx_client.post.return_value = mock_response
 
-        with patch("httpx.AsyncClient", return_value=mock_httpx_client):
-            with client:
-                result = await client.get_quotes(["NIFTY"])
+        with patch("httpx.AsyncClient", return_value=mock_httpx_client), client:
+            result = await client.get_quotes(["NIFTY"])
 
-                assert result["success"] is True
-                assert "NIFTY" in result["data"]
-                assert result["data"]["NIFTY"]["last_price"] == 18000.50
+            assert result["success"] is True
+            assert "NIFTY" in result["data"]
+            assert result["data"]["NIFTY"]["last_price"] == 18000.50
 
-                # Verify request was made correctly
-                mock_httpx_client.post.assert_called_once_with(
-                    "/api/v1/quotes",
-                    json={"symbols": ["NIFTY"]},
-                )
+            # Verify request was made correctly
+            mock_httpx_client.post.assert_called_once_with(
+                "/api/v1/quotes",
+                json={"symbols": ["NIFTY"]},
+            )
 
     @pytest.mark.asyncio()
     async def test_get_history(
@@ -146,29 +145,28 @@ class TestOpenAlgoClient:
 
         mock_httpx_client.post.return_value = mock_response
 
-        with patch("httpx.AsyncClient", return_value=mock_httpx_client):
-            with client:
-                result = await client.get_history(
-                    symbol="NIFTY",
-                    interval="1min",
-                    from_date="2023-01-01",
-                    to_date="2023-01-02",
-                )
+        with patch("httpx.AsyncClient", return_value=mock_httpx_client), client:
+            result = await client.get_history(
+                symbol="NIFTY",
+                interval="1min",
+                from_date="2023-01-01",
+                to_date="2023-01-02",
+            )
 
-                assert result["success"] is True
-                assert len(result["data"]) == 2
-                assert result["data"][0]["open"] == 17950.25
+            assert result["success"] is True
+            assert len(result["data"]) == 2
+            assert result["data"][0]["open"] == 17950.25
 
-                # Verify request was made correctly
-                mock_httpx_client.post.assert_called_once_with(
-                    "/api/v1/history",
-                    json={
-                        "symbol": "NIFTY",
-                        "interval": "1min",
-                        "from_date": "2023-01-01",
-                        "to_date": "2023-01-02",
-                    },
-                )
+            # Verify request was made correctly
+            mock_httpx_client.post.assert_called_once_with(
+                "/api/v1/history",
+                json={
+                    "symbol": "NIFTY",
+                    "interval": "1min",
+                    "from_date": "2023-01-01",
+                    "to_date": "2023-01-02",
+                },
+            )
 
     @pytest.mark.asyncio()
     async def test_get_option_chain(
@@ -205,23 +203,22 @@ class TestOpenAlgoClient:
 
         mock_httpx_client.post.return_value = mock_response
 
-        with patch("httpx.AsyncClient", return_value=mock_httpx_client):
-            with client:
-                result = await client.get_option_chain("NIFTY", "2023-01-26")
+        with patch("httpx.AsyncClient", return_value=mock_httpx_client), client:
+            result = await client.get_option_chain("NIFTY", "2023-01-26")
 
-                assert result["success"] is True
-                assert len(result["data"]["expiry_dates"]) == 2
-                assert len(result["data"]["options"]) == 1
-                assert result["data"]["options"][0]["symbol"] == "NIFTY23JAN18000CE"
+            assert result["success"] is True
+            assert len(result["data"]["expiry_dates"]) == 2
+            assert len(result["data"]["options"]) == 1
+            assert result["data"]["options"][0]["symbol"] == "NIFTY23JAN18000CE"
 
-                # Verify request was made correctly
-                mock_httpx_client.post.assert_called_once_with(
-                    "/api/v1/option_chain",
-                    json={
-                        "symbol": "NIFTY",
-                        "expiry": "2023-01-26",
-                    },
-                )
+            # Verify request was made correctly
+            mock_httpx_client.post.assert_called_once_with(
+                "/api/v1/option_chain",
+                json={
+                    "symbol": "NIFTY",
+                    "expiry": "2023-01-26",
+                },
+            )
 
     @pytest.mark.asyncio()
     async def test_get_position_book(
@@ -250,17 +247,16 @@ class TestOpenAlgoClient:
 
         mock_httpx_client.post.return_value = mock_response
 
-        with patch("httpx.AsyncClient", return_value=mock_httpx_client):
-            with client:
-                result = await client.get_position_book()
+        with patch("httpx.AsyncClient", return_value=mock_httpx_client), client:
+            result = await client.get_position_book()
 
-                assert result["success"] is True
-                assert len(result["data"]) == 1
-                assert result["data"][0]["symbol"] == "NIFTY"
-                assert result["data"][0]["pnl"] == 5050.0
+            assert result["success"] is True
+            assert len(result["data"]) == 1
+            assert result["data"][0]["symbol"] == "NIFTY"
+            assert result["data"][0]["pnl"] == 5050.0
 
-                # Verify request was made correctly
-                mock_httpx_client.post.assert_called_once_with("/api/v1/position_book")
+            # Verify request was made correctly
+            mock_httpx_client.post.assert_called_once_with("/api/v1/position_book")
 
     @pytest.mark.asyncio()
     async def test_get_funds(
@@ -283,16 +279,15 @@ class TestOpenAlgoClient:
 
         mock_httpx_client.post.return_value = mock_response
 
-        with patch("httpx.AsyncClient", return_value=mock_httpx_client):
-            with client:
-                result = await client.get_funds()
+        with patch("httpx.AsyncClient", return_value=mock_httpx_client), client:
+            result = await client.get_funds()
 
-                assert result["success"] is True
-                assert result["data"]["available_cash"] == 50000.0
-                assert result["data"]["total_equity"] == 50000.0
+            assert result["success"] is True
+            assert result["data"]["available_cash"] == 50000.0
+            assert result["data"]["total_equity"] == 50000.0
 
-                # Verify request was made correctly
-                mock_httpx_client.post.assert_called_once_with("/api/v1/funds")
+            # Verify request was made correctly
+            mock_httpx_client.post.assert_called_once_with("/api/v1/funds")
 
     @pytest.mark.asyncio()
     async def test_place_order(
@@ -313,41 +308,40 @@ class TestOpenAlgoClient:
 
         mock_httpx_client.post.return_value = mock_response
 
-        with patch("httpx.AsyncClient", return_value=mock_httpx_client):
-            with client:
-                result = await client.place_order(
-                    symbol="NIFTY",
-                    quantity=100,
-                    order_type=OrderType.LIMIT,
-                    price=18000.0,
-                    transaction_type=TransactionType.BUY,
-                    product_type=ProductType.MIS,
-                    variety=OrderVariety.REGULAR,
-                    stop_loss=17950.0,
-                    take_profit=18100.0,
-                    trailing_stop_loss=50.0,
-                )
+        with patch("httpx.AsyncClient", return_value=mock_httpx_client), client:
+            result = await client.place_order(
+                symbol="NIFTY",
+                quantity=100,
+                order_type=OrderType.LIMIT,
+                price=18000.0,
+                transaction_type=TransactionType.BUY,
+                product_type=ProductType.MIS,
+                variety=OrderVariety.REGULAR,
+                stop_loss=17950.0,
+                take_profit=18100.0,
+                trailing_stop_loss=50.0,
+            )
 
-                assert result["success"] is True
-                assert result["data"]["order_id"] == "order_12345"
-                assert result["data"]["status"] == "OPEN"
+            assert result["success"] is True
+            assert result["data"]["order_id"] == "order_12345"
+            assert result["data"]["status"] == "OPEN"
 
-                # Verify request was made correctly
-                mock_httpx_client.post.assert_called_once_with(
-                    "/api/v1/place_order",
-                    json={
-                        "symbol": "NIFTY",
-                        "quantity": 100,
-                        "order_type": "LIMIT",
-                        "price": 18000.0,
-                        "transaction_type": "BUY",
-                        "product_type": "MIS",
-                        "variety": "regular",
-                        "stop_loss": 17950.0,
-                        "take_profit": 18100.0,
-                        "trailing_stop_loss": 50.0,
-                    },
-                )
+            # Verify request was made correctly
+            mock_httpx_client.post.assert_called_once_with(
+                "/api/v1/place_order",
+                json={
+                    "symbol": "NIFTY",
+                    "quantity": 100,
+                    "order_type": "LIMIT",
+                    "price": 18000.0,
+                    "transaction_type": "BUY",
+                    "product_type": "MIS",
+                    "variety": "regular",
+                    "stop_loss": 17950.0,
+                    "take_profit": 18100.0,
+                    "trailing_stop_loss": 50.0,
+                },
+            )
 
     @pytest.mark.asyncio()
     async def test_place_smart_order(
@@ -368,42 +362,41 @@ class TestOpenAlgoClient:
 
         mock_httpx_client.post.return_value = mock_response
 
-        with patch("httpx.AsyncClient", return_value=mock_httpx_client):
-            with client:
-                result = await client.place_smart_order(
-                    symbol="NIFTY",
-                    quantity=100,
-                    order_type=OrderType.LIMIT,
-                    price=18000.0,
-                    transaction_type=TransactionType.BUY,
-                    product_type=ProductType.MIS,
-                    strategy="supertrend",
-                    stop_loss=17950.0,
-                    take_profit=18100.0,
-                    trailing_stop_loss=50.0,
-                    metadata={"key": "value"},
-                )
+        with patch("httpx.AsyncClient", return_value=mock_httpx_client), client:
+            result = await client.place_smart_order(
+                symbol="NIFTY",
+                quantity=100,
+                order_type=OrderType.LIMIT,
+                price=18000.0,
+                transaction_type=TransactionType.BUY,
+                product_type=ProductType.MIS,
+                strategy="supertrend",
+                stop_loss=17950.0,
+                take_profit=18100.0,
+                trailing_stop_loss=50.0,
+                metadata={"key": "value"},
+            )
 
-                assert result["success"] is True
-                assert result["data"]["order_id"] == "smart_order_12345"
+            assert result["success"] is True
+            assert result["data"]["order_id"] == "smart_order_12345"
 
-                # Verify request was made correctly
-                mock_httpx_client.post.assert_called_once_with(
-                    "/api/v1/place_smart_order",
-                    json={
-                        "symbol": "NIFTY",
-                        "quantity": 100,
-                        "order_type": "LIMIT",
-                        "price": 18000.0,
-                        "transaction_type": "BUY",
-                        "product_type": "MIS",
-                        "strategy": "supertrend",
-                        "stop_loss": 17950.0,
-                        "take_profit": 18100.0,
-                        "trailing_stop_loss": 50.0,
-                        "metadata": {"key": "value"},
-                    },
-                )
+            # Verify request was made correctly
+            mock_httpx_client.post.assert_called_once_with(
+                "/api/v1/place_smart_order",
+                json={
+                    "symbol": "NIFTY",
+                    "quantity": 100,
+                    "order_type": "LIMIT",
+                    "price": 18000.0,
+                    "transaction_type": "BUY",
+                    "product_type": "MIS",
+                    "strategy": "supertrend",
+                    "stop_loss": 17950.0,
+                    "take_profit": 18100.0,
+                    "trailing_stop_loss": 50.0,
+                    "metadata": {"key": "value"},
+                },
+            )
 
     @pytest.mark.asyncio()
     async def test_modify_order(
@@ -424,34 +417,33 @@ class TestOpenAlgoClient:
 
         mock_httpx_client.post.return_value = mock_response
 
-        with patch("httpx.AsyncClient", return_value=mock_httpx_client):
-            with client:
-                result = await client.modify_order(
-                    order_id="order_12345",
-                    quantity=150,
-                    order_type=OrderType.LIMIT,
-                    price=18050.0,
-                    stop_loss=18000.0,
-                    take_profit=18200.0,
-                    trailing_stop_loss=60.0,
-                )
+        with patch("httpx.AsyncClient", return_value=mock_httpx_client), client:
+            result = await client.modify_order(
+                order_id="order_12345",
+                quantity=150,
+                order_type=OrderType.LIMIT,
+                price=18050.0,
+                stop_loss=18000.0,
+                take_profit=18200.0,
+                trailing_stop_loss=60.0,
+            )
 
-                assert result["success"] is True
-                assert result["data"]["order_id"] == "order_12345"
+            assert result["success"] is True
+            assert result["data"]["order_id"] == "order_12345"
 
-                # Verify request was made correctly
-                mock_httpx_client.post.assert_called_once_with(
-                    "/api/v1/modify_order",
-                    json={
-                        "order_id": "order_12345",
-                        "quantity": 150,
-                        "order_type": "LIMIT",
-                        "price": 18050.0,
-                        "stop_loss": 18000.0,
-                        "take_profit": 18200.0,
-                        "trailing_stop_loss": 60.0,
-                    },
-                )
+            # Verify request was made correctly
+            mock_httpx_client.post.assert_called_once_with(
+                "/api/v1/modify_order",
+                json={
+                    "order_id": "order_12345",
+                    "quantity": 150,
+                    "order_type": "LIMIT",
+                    "price": 18050.0,
+                    "stop_loss": 18000.0,
+                    "take_profit": 18200.0,
+                    "trailing_stop_loss": 60.0,
+                },
+            )
 
     @pytest.mark.asyncio()
     async def test_cancel_order(
@@ -472,19 +464,18 @@ class TestOpenAlgoClient:
 
         mock_httpx_client.post.return_value = mock_response
 
-        with patch("httpx.AsyncClient", return_value=mock_httpx_client):
-            with client:
-                result = await client.cancel_order("order_12345")
+        with patch("httpx.AsyncClient", return_value=mock_httpx_client), client:
+            result = await client.cancel_order("order_12345")
 
-                assert result["success"] is True
-                assert result["data"]["order_id"] == "order_12345"
-                assert result["data"]["status"] == "CANCELLED"
+            assert result["success"] is True
+            assert result["data"]["order_id"] == "order_12345"
+            assert result["data"]["status"] == "CANCELLED"
 
-                # Verify request was made correctly
-                mock_httpx_client.post.assert_called_once_with(
-                    "/api/v1/cancel_order",
-                    json={"order_id": "order_12345"},
-                )
+            # Verify request was made correctly
+            mock_httpx_client.post.assert_called_once_with(
+                "/api/v1/cancel_order",
+                json={"order_id": "order_12345"},
+            )
 
     @pytest.mark.asyncio()
     async def test_get_order_status(
@@ -516,20 +507,19 @@ class TestOpenAlgoClient:
 
         mock_httpx_client.post.return_value = mock_response
 
-        with patch("httpx.AsyncClient", return_value=mock_httpx_client):
-            with client:
-                result = await client.get_order_status("order_12345")
+        with patch("httpx.AsyncClient", return_value=mock_httpx_client), client:
+            result = await client.get_order_status("order_12345")
 
-                assert result["success"] is True
-                assert len(result["data"]) == 1
-                assert result["data"][0]["order_id"] == "order_12345"
-                assert result["data"][0]["status"] == "COMPLETED"
+            assert result["success"] is True
+            assert len(result["data"]) == 1
+            assert result["data"][0]["order_id"] == "order_12345"
+            assert result["data"][0]["status"] == "COMPLETED"
 
-                # Verify request was made correctly
-                mock_httpx_client.post.assert_called_once_with(
-                    "/api/v1/order_status",
-                    json={"order_id": "order_12345"},
-                )
+            # Verify request was made correctly
+            mock_httpx_client.post.assert_called_once_with(
+                "/api/v1/order_status",
+                json={"order_id": "order_12345"},
+            )
 
     @pytest.mark.asyncio()
     async def test_error_handling(
@@ -544,12 +534,11 @@ class TestOpenAlgoClient:
         error_response.text = "Internal Server Error"
         mock_httpx_client.post.return_value = error_response
 
-        with patch("httpx.AsyncClient", return_value=mock_httpx_client):
-            with client:
-                result = await client.get_quotes(["NIFTY"])
+        with patch("httpx.AsyncClient", return_value=mock_httpx_client), client:
+            result = await client.get_quotes(["NIFTY"])
 
-                assert result["success"] is False
-                assert "HTTP error" in result["message"]
+            assert result["success"] is False
+            assert "HTTP error" in result["message"]
 
         # Test JSON decode error
         mock_response = MagicMock(spec=Response)
@@ -558,32 +547,29 @@ class TestOpenAlgoClient:
         mock_response.text = "Not JSON"
         mock_httpx_client.post.return_value = mock_response
 
-        with patch("httpx.AsyncClient", return_value=mock_httpx_client):
-            with client:
-                result = await client.get_quotes(["NIFTY"])
+        with patch("httpx.AsyncClient", return_value=mock_httpx_client), client:
+            result = await client.get_quotes(["NIFTY"])
 
-                assert result["success"] is False
-                assert "JSON decode error" in result["message"]
+            assert result["success"] is False
+            assert "JSON decode error" in result["message"]
 
         # Test timeout error
         mock_httpx_client.post.side_effect = asyncio.TimeoutError()
 
-        with patch("httpx.AsyncClient", return_value=mock_httpx_client):
-            with client:
-                result = await client.get_quotes(["NIFTY"])
+        with patch("httpx.AsyncClient", return_value=mock_httpx_client), client:
+            result = await client.get_quotes(["NIFTY"])
 
-                assert result["success"] is False
-                assert "Timeout error" in result["message"]
+            assert result["success"] is False
+            assert "Timeout error" in result["message"]
 
         # Test connection error
         mock_httpx_client.post.side_effect = httpx.ConnectError("Connection failed")
 
-        with patch("httpx.AsyncClient", return_value=mock_httpx_client):
-            with client:
-                result = await client.get_quotes(["NIFTY"])
+        with patch("httpx.AsyncClient", return_value=mock_httpx_client), client:
+            result = await client.get_quotes(["NIFTY"])
 
-                assert result["success"] is False
-                assert "Connection error" in result["message"]
+            assert result["success"] is False
+            assert "Connection error" in result["message"]
 
     @pytest.mark.asyncio()
     async def test_model_conversion(self, client: OpenAlgoClient) -> None:
@@ -704,17 +690,16 @@ class TestOpenAlgoClient:
 
         mock_httpx_client.post.return_value = mock_response
 
-        with patch("httpx.AsyncClient", return_value=mock_httpx_client):
-            with client:
-                result = await client.get_all_orders()
+        with patch("httpx.AsyncClient", return_value=mock_httpx_client), client:
+            result = await client.get_all_orders()
 
-                assert result["success"] is True
-                assert len(result["data"]) == 2
-                assert result["data"][0]["order_id"] == "order_12345"
-                assert result["data"][1]["status"] == "OPEN"
+            assert result["success"] is True
+            assert len(result["data"]) == 2
+            assert result["data"][0]["order_id"] == "order_12345"
+            assert result["data"][1]["status"] == "OPEN"
 
-                # Verify request was made correctly
-                mock_httpx_client.post.assert_called_once_with("/api/v1/all_orders")
+            # Verify request was made correctly
+            mock_httpx_client.post.assert_called_once_with("/api/v1/all_orders")
 
     @pytest.mark.asyncio()
     async def test_get_trade_book(
@@ -746,14 +731,13 @@ class TestOpenAlgoClient:
 
         mock_httpx_client.post.return_value = mock_response
 
-        with patch("httpx.AsyncClient", return_value=mock_httpx_client):
-            with client:
-                result = await client.get_trade_book()
+        with patch("httpx.AsyncClient", return_value=mock_httpx_client), client:
+            result = await client.get_trade_book()
 
-                assert result["success"] is True
-                assert len(result["data"]) == 1
-                assert result["data"][0]["trade_id"] == "trade_12345"
-                assert result["data"][0]["pnl"] == 10000.0
+            assert result["success"] is True
+            assert len(result["data"]) == 1
+            assert result["data"][0]["trade_id"] == "trade_12345"
+            assert result["data"][0]["pnl"] == 10000.0
 
-                # Verify request was made correctly
-                mock_httpx_client.post.assert_called_once_with("/api/v1/trade_book")
+            # Verify request was made correctly
+            mock_httpx_client.post.assert_called_once_with("/api/v1/trade_book")
