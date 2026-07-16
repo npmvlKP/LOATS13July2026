@@ -40,13 +40,13 @@ class AlertSystem:
         try:
             if not settings.telegram_bot_token.get_secret_value():
                 logger.warning(
-                    "Telegram bot token not configured. Alerts will not be sent.",
+                    "Telegram bot token not configured. Alerts will not be sent."
                 )
                 return
 
             if not settings.telegram_chat_id:
                 logger.warning(
-                    "Telegram chat ID not configured. Alerts will not be sent.",
+                    "Telegram chat ID not configured. Alerts will not be sent."
                 )
                 return
 
@@ -66,7 +66,7 @@ class AlertSystem:
 
             # Add message handler for text commands
             self.application.add_handler(
-                MessageHandler(filters.TEXT & ~filters.COMMAND, self._handle_message),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, self._handle_message)
             )
 
             logger.info("Telegram alert system initialized")
@@ -400,8 +400,7 @@ class AlertSystem:
 
             if not funds_data.get("data"):
                 return await self.send_system_alert(
-                    "No funds data available",
-                    "warning",
+                    "No funds data available", "warning"
                 )
 
             funds = funds_data["data"]
@@ -579,7 +578,7 @@ class AlertSystem:
 
             if success:
                 await update.message.reply_text(
-                    "✅ Kill switch deactivated successfully",
+                    "✅ Kill switch deactivated successfully"
                 )
             else:
                 await update.message.reply_text("❌ Failed to deactivate kill switch")
@@ -697,7 +696,7 @@ class AlertSystem:
                 await self._resume(update, context)
             else:
                 await update.message.reply_text(
-                    "ℹ️ I didn't understand that. Type /help for available commands.",
+                    "ℹ️ I didn't understand that. Type /help for available commands."
                 )
         except Exception as e:
             logger.error(f"Error handling message: {e}")
