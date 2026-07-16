@@ -27,7 +27,7 @@ logger = get_logger(__name__)
 class AlertSystem:
     """Alert system using Telegram bot for notifications and kill switch."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize AlertSystem."""
         self.bot: Bot | None = None
         self.application: Application | None = None
@@ -80,7 +80,9 @@ class AlertSystem:
         if self.application:
             try:
                 # Start polling in background
-                asyncio.create_task(self.application.run_polling())
+                asyncio.create_task(
+                    self.application.run_polling()
+                )  # type: ignore[arg-type]
                 logger.info("Telegram bot started")
             except Exception as e:
                 logger.error(f"Failed to start Telegram bot: {e}")
@@ -201,7 +203,8 @@ class AlertSystem:
                 f"<b>Type:</b> {signal.signal_type.value}\n"
                 f"<b>Strength:</b> {signal.strength:.2f}\n"
                 f"<b>Confidence:</b> {signal.confidence:.2f}\n"
-                f"<b>Timestamp:</b> {signal.timestamp.strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+                "<b>Timestamp:</b> "
+                f"{signal.timestamp.strftime('%Y-%m-%d %H:%M:%S')}\n\n"
                 f"<b>Indicators:</b>\n{indicators}\n\n"
                 f"<b>Metadata:</b>\n{metadata}"
             )
@@ -305,7 +308,10 @@ class AlertSystem:
             if trade.exit_price:
                 message += f"\n<b>Exit Price:</b> {trade.exit_price:.2f}"
             if trade.exit_time:
-                message += f"\n<b>Exit Time:</b> {trade.exit_time.strftime('%Y-%m-%d %H:%M:%S')}"
+                message += (
+                    f"\n<b>Exit Time:</b> "
+                    f"{trade.exit_time.strftime('%Y-%m-%d %H:%M:%S')}"
+                )
             if trade.pnl:
                 pnl_color = "green" if trade.pnl >= 0 else "red"
                 message += (
@@ -448,7 +454,8 @@ class AlertSystem:
             message = (
                 "🚨 <b>KILL SWITCH ACTIVATED</b> 🚨\n\n"
                 f"<b>Reason:</b> {reason}\n"
-                f"<b>Timestamp:</b> {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+                "<b>Timestamp:</b> "
+                f"{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')}\n\n"
                 "All open orders have been cancelled. No new orders will be placed."
             )
 
@@ -481,7 +488,8 @@ class AlertSystem:
             message = (
                 "✅ <b>KILL SWITCH DEACTIVATED</b> ✅\n\n"
                 f"<b>Reason:</b> {reason}\n"
-                f"<b>Timestamp:</b> {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+                "<b>Timestamp:</b> "
+                f"{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')}\n\n"
                 "Trading activities can now resume."
             )
 
@@ -517,7 +525,9 @@ class AlertSystem:
                 "/resume - Resume trading\n"
                 "/help - Show this help message"
             )
-            await update.message.reply_text(message, parse_mode="HTML")
+            await update.message.reply_text(
+                message, parse_mode="HTML"
+            )  # type: ignore[union-attr]
         except Exception as e:
             logger.error(f"Error in /start command: {e}")
 
@@ -530,7 +540,8 @@ class AlertSystem:
             message = (
                 f"📊 <b>SYSTEM STATUS</b>\n\n"
                 f"<b>Status:</b> {status}\n"
-                f"<b>Timestamp:</b> {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')}"
+                "<b>Timestamp:</b> "
+                f"{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')}"
             )
             await update.message.reply_text(message, parse_mode="HTML")
         except Exception as e:
@@ -656,7 +667,8 @@ class AlertSystem:
                 }.get(signal.signal_type, "ℹ️")
 
                 message += (
-                    f"{emoji} <b>{signal.signal_type.value}</b> | {signal.strength:.2f}\n"
+                    f"{emoji} <b>{signal.signal_type.value}</b> "
+                    f"| {signal.strength:.2f}\n"
                     f"<b>Time:</b> {signal.timestamp.strftime('%H:%M:%S')}\n"
                     f"<b>Indicators:</b> {len(signal.indicators)}\n\n"
                 )
@@ -696,7 +708,7 @@ class AlertSystem:
                 await self._resume(update, context)
             else:
                 await update.message.reply_text(
-                    "ℹ️ I didn't understand that. Type /help for available commands."
+                    "ℹ️ I didn't understand that. " "Type /help for available commands."
                 )
         except Exception as e:
             logger.error(f"Error handling message: {e}")
@@ -704,4 +716,4 @@ class AlertSystem:
 
 
 # Export default instance
-alerts = AlertSystem()
+alerts: AlertSystem = AlertSystem()  # type: ignore[no-untyped-call]
