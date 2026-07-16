@@ -6,8 +6,8 @@ Implements Telegram alerts and kill switch functionality.
 import asyncio
 from datetime import datetime, timezone
 
-from telegram import Bot, Update  # type: ignore
-from telegram.ext import (  # type: ignore
+from telegram import Bot, Update
+from telegram.ext import (
     Application,
     CommandHandler,
     ContextTypes,
