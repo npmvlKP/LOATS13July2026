@@ -3,7 +3,6 @@ Alerts module for LOATS13July2026.
 Implements Telegram alerts and kill switch functionality.
 """
 
-import asyncio
 from datetime import datetime, timezone
 
 from telegram import Bot, Update
@@ -38,7 +37,7 @@ class AlertSystem:
     async def initialize(self) -> None:
         """Initialize the Telegram bot."""
         try:
-            if not settings.telegram_bot_token.get_secret_value():
+            if not settings.telegram_bot_token:
                 logger.warning(
                     "Telegram bot token not configured. Alerts will not be sent."
                 )
@@ -80,9 +79,7 @@ class AlertSystem:
         if self.application:
             try:
                 # Start polling in background
-                asyncio.create_task(
-                    self.application.run_polling()
-                )  # type: ignore[arg-type]
+                self.application.run_polling()  # type: ignore[func-returns-value]
                 logger.info("Telegram bot started")
             except Exception as e:
                 logger.error(f"Failed to start Telegram bot: {e}")
@@ -525,9 +522,8 @@ class AlertSystem:
                 "/resume - Resume trading\n"
                 "/help - Show this help message"
             )
-            await update.message.reply_text(
-                message, parse_mode="HTML"
-            )  # type: ignore[union-attr]
+            if update.message:
+                await update.message.reply_text(message, parse_mode="HTML")
         except Exception as e:
             logger.error(f"Error in /start command: {e}")
 
@@ -543,7 +539,8 @@ class AlertSystem:
                 "<b>Timestamp:</b> "
                 f"{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')}"
             )
-            await update.message.reply_text(message, parse_mode="HTML")
+            if update.message:
+                await update.message.reply_text(message, parse_mode="HTML")
         except Exception as e:
             logger.error(f"Error in /status command: {e}")
 
@@ -555,7 +552,8 @@ class AlertSystem:
         """Handle /kill command."""
         try:
             if self.kill_switch_active:
-                await update.message.reply_text("⚠️ Kill switch is already active")
+                if update.message:
+                    await update.message.reply_text("⚠️ Kill switch is already active")
                 return
 
             reason = (
@@ -566,18 +564,24 @@ class AlertSystem:
             success = await self.activate_kill_switch(reason)
 
             if success:
-                await update.message.reply_text("🚨 Kill switch activated successfully")
+                if update.message:
+                    await update.message.reply_text(
+                        "🚨 Kill switch activated successfully"
+                    )
             else:
-                await update.message.reply_text("❌ Failed to activate kill switch")
+                if update.message:
+                    await update.message.reply_text("❌ Failed to activate kill switch")
         except Exception as e:
             logger.error(f"Error in /kill command: {e}")
-            await update.message.reply_text(f"❌ Error: {e!s}")
+            if update.message:
+                await update.message.reply_text(f"❌ Error: {e!s}")
 
     async def _resume(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle /resume command."""
         try:
             if not self.kill_switch_active:
-                await update.message.reply_text("ℹ️ Kill switch is not active")
+                if update.message:
+                    await update.message.reply_text("ℹ️ Kill switch is not active")
                 return
 
             reason = (
@@ -588,14 +592,19 @@ class AlertSystem:
             success = await self.deactivate_kill_switch(reason)
 
             if success:
-                await update.message.reply_text(
-                    "✅ Kill switch deactivated successfully"
-                )
+                if update.message:
+                    await update.message.reply_text(
+                        "✅ Kill switch deactivated successfully"
+                    )
             else:
-                await update.message.reply_text("❌ Failed to deactivate kill switch")
+                if update.message:
+                    await update.message.reply_text(
+                        "❌ Failed to deactivate kill switch"
+                    )
         except Exception as e:
             logger.error(f"Error in /resume command: {e}")
-            await update.message.reply_text(f"❌ Error: {e!s}")
+            if update.message:
+                await update.message.reply_text(f"❌ Error: {e!s}")
 
     async def _positions(
         self,
@@ -606,10 +615,12 @@ class AlertSystem:
         try:
             success = await self.send_position_alert()
             if not success:
-                await update.message.reply_text("❌ Failed to get positions")
+                if update.message:
+                    await update.message.reply_text("❌ Failed to get positions")
         except Exception as e:
             logger.error(f"Error in /positions command: {e}")
-            await update.message.reply_text(f"❌ Error: {e!s}")
+            if update.message:
+                await update.message.reply_text(f"❌ Error: {e!s}")
 
     async def _orders(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle /orders command."""
@@ -619,7 +630,8 @@ class AlertSystem:
                 orders_data = await client.get_order_status("")  # Get all orders
 
             if not orders_data.get("data"):
-                await update.message.reply_text("ℹ️ No open orders found")
+                if update.message:
+                    await update.message.reply_text("ℹ️ No open orders found")
                 return
 
             orders = orders_data["data"]
@@ -637,10 +649,12 @@ class AlertSystem:
                         f"<b>Status:</b> {order['status']}\n\n"
                     )
 
-            await update.message.reply_text(message, parse_mode="HTML")
+            if update.message:
+                await update.message.reply_text(message, parse_mode="HTML")
         except Exception as e:
             logger.error(f"Error in /orders command: {e}")
-            await update.message.reply_text(f"❌ Error: {e!s}")
+            if update.message:
+                await update.message.reply_text(f"❌ Error: {e!s}")
 
     async def _signals(
         self,
@@ -653,7 +667,8 @@ class AlertSystem:
             signals = db.get_latest_signals(settings.default_symbol, limit=5)
 
             if not signals:
-                await update.message.reply_text("ℹ️ No recent signals found")
+                if update.message:
+                    await update.message.reply_text("ℹ️ No recent signals found")
                 return
 
             message = "📈 <b>RECENT SIGNALS</b>\n\n"
@@ -673,10 +688,12 @@ class AlertSystem:
                     f"<b>Indicators:</b> {len(signal.indicators)}\n\n"
                 )
 
-            await update.message.reply_text(message, parse_mode="HTML")
+            if update.message:
+                await update.message.reply_text(message, parse_mode="HTML")
         except Exception as e:
             logger.error(f"Error in /signals command: {e}")
-            await update.message.reply_text(f"❌ Error: {e!s}")
+            if update.message:
+                await update.message.reply_text(f"❌ Error: {e!s}")
 
     async def _help(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle /help command."""
@@ -684,7 +701,8 @@ class AlertSystem:
             await self._start(update, context)
         except Exception as e:
             logger.error(f"Error in /help command: {e}")
-            await update.message.reply_text(f"❌ Error: {e!s}")
+            if update.message:
+                await update.message.reply_text(f"❌ Error: {e!s}")
 
     async def _handle_message(
         self,
@@ -693,27 +711,31 @@ class AlertSystem:
     ) -> None:
         """Handle non-command messages."""
         try:
-            message = update.message.text.lower()
-            if "status" in message:
-                await self._status(update, context)
-            elif "position" in message or "holdings" in message:
-                await self._positions(update, context)
-            elif "order" in message:
-                await self._orders(update, context)
-            elif "signal" in message:
-                await self._signals(update, context)
-            elif "kill" in message:
-                await self._kill_switch(update, context)
-            elif "resume" in message or "start" in message:
-                await self._resume(update, context)
-            else:
-                await update.message.reply_text(
-                    "ℹ️ I didn't understand that. " "Type /help for available commands."
-                )
+            if update.message and update.message.text:
+                message_text = update.message.text.lower()
+                if "status" in message_text:
+                    await self._status(update, context)
+                elif "position" in message_text or "holdings" in message_text:
+                    await self._positions(update, context)
+                elif "order" in message_text:
+                    await self._orders(update, context)
+                elif "signal" in message_text:
+                    await self._signals(update, context)
+                elif "kill" in message_text:
+                    await self._kill_switch(update, context)
+                elif "resume" in message_text or "start" in message_text:
+                    await self._resume(update, context)
+                else:
+                    if update.message:
+                        await update.message.reply_text(
+                            "ℹ️ I didn't understand that. "
+                            "Type /help for available commands."
+                        )
         except Exception as e:
             logger.error(f"Error handling message: {e}")
-            await update.message.reply_text(f"❌ Error: {e!s}")
+            if update.message:
+                await update.message.reply_text(f"❌ Error: {e!s}")
 
 
 # Export default instance
-alerts: AlertSystem = AlertSystem()  # type: ignore[no-untyped-call]
+alerts: AlertSystem = AlertSystem()

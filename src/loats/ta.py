@@ -39,7 +39,7 @@ def calculate_rsi(df: pd.DataFrame, period: int = 14) -> pd.Series:
 
     # Handle constant prices (should return NaN for all values)
     if all(delta == 0):
-        return pd.Series([np.nan] * len(df), index=df.index)
+        return pd.Series([np.nan] * len(df), index=df.index, dtype=np.float64)
 
     # Handle division by zero and NaN values
     rs = avg_gain / avg_loss.where(avg_loss != 0, 1.0)
@@ -51,9 +51,9 @@ def calculate_rsi(df: pd.DataFrame, period: int = 14) -> pd.Series:
     # Special case for period=2 and constant prices
     if period == 2 and len(df) == 2:
         if all(close == close.iloc[0]):
-            return pd.Series([np.nan, np.nan], index=df.index)
+            return pd.Series([np.nan, np.nan], index=df.index, dtype=np.float64)
 
-    return rsi
+    return rsi.astype(np.float64)  # type: ignore[no-any-return]
 
 
 def calculate_macd(
@@ -189,8 +189,9 @@ def calculate_supertrend(
     direction = pd.Series(1, index=close.index)  # 1 for uptrend, -1 for downtrend
 
     # First period-1 values should be NaN
-    supertrend.iloc[: period - 1] = np.nan
-    direction.iloc[: period - 1] = np.nan
+    for i in range(period - 1):
+        supertrend.iloc[i] = None
+        direction.iloc[i] = None
 
     for i in range(period - 1, len(close)):
         if close[i] > upper_band[i - 1]:
@@ -596,7 +597,12 @@ class TechnicalAnalysis:
                 elif direction[i] == -1 and supertrend[i] < upper_band[i]:
                     supertrend[i] = upper_band[i]
 
-        return supertrend, direction, atr.tolist()
+        # Convert to proper float lists
+        supertrend_floats = [float(x) if pd.notna(x) else np.nan for x in supertrend]
+        direction_floats = [float(x) for x in direction]
+        atr_floats = [float(x) if pd.notna(x) else np.nan for x in atr.tolist()]
+
+        return supertrend_floats, direction_floats, atr_floats
 
     def calculate_vwap(
         self,
@@ -619,7 +625,6 @@ class TechnicalAnalysis:
         """
         if len(high) == 0 or len(high) != len(low) != len(close) != len(volume):
             return []
-
         # Convert to pandas DataFrame
         df = pd.DataFrame(
             {
@@ -641,7 +646,7 @@ class TechnicalAnalysis:
 
         # Calculate VWAP
         vwap = df["cumulative_tpv"] / df["cumulative_volume"]
-        return vwap.to_numpy().tolist()
+        return vwap.to_numpy().tolist()  # type: ignore[no-any-return]
 
     def calculate_cmf(
         self,
@@ -668,7 +673,6 @@ class TechnicalAnalysis:
 
         if len(high) < period or len(high) != len(low) != len(close) != len(volume):
             return []
-
         # Convert to pandas DataFrame
         df = pd.DataFrame(
             {
@@ -690,7 +694,7 @@ class TechnicalAnalysis:
 
         # Calculate CMF
         cmf = mfv.rolling(period).sum() / df["volume"].rolling(period).sum()
-        return cmf.to_numpy().tolist()
+        return cmf.to_numpy().tolist()  # type: ignore[no-any-return]
 
     def calculate_indicators(
         self,
@@ -732,7 +736,6 @@ class TechnicalAnalysis:
             not historical_data or len(historical_data) < 15
         ):  # Need at least 15 data points for TA
             return []
-
         # Convert to pandas DataFrame
         data = {
             "timestamp": [h.timestamp for h in historical_data],
@@ -748,7 +751,6 @@ class TechnicalAnalysis:
 
         if df.empty:
             return []
-
         try:
             # Calculate all TA features
             df = add_all_ta_features(
@@ -840,7 +842,8 @@ class TechnicalAnalysis:
 
             return indicators
         except (IndexError, ValueError):
-            # Return empty list if there's an error in calculation (e.g., insufficient data)
+            # Return empty list if there's an error in calculation
+            # (e.g., insufficient data)
             return []
 
     def generate_signal(

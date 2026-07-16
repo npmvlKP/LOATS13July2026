@@ -232,13 +232,16 @@ class Database:
                 "CREATE INDEX IF NOT EXISTS idx_signals_symbol ON signals(symbol)",
             )
             cursor.execute(
-                "CREATE INDEX IF NOT EXISTS idx_signals_timestamp ON signals(timestamp)",
+                "CREATE INDEX IF NOT EXISTS idx_signals_timestamp "
+                "ON signals(timestamp)",
             )
             cursor.execute(
-                "CREATE INDEX IF NOT EXISTS idx_historical_symbol ON historical_data(symbol)",
+                "CREATE INDEX IF NOT EXISTS idx_historical_symbol "
+                "ON historical_data(symbol)",
             )
             cursor.execute(
-                "CREATE INDEX IF NOT EXISTS idx_historical_timestamp ON historical_data(timestamp)",
+                "CREATE INDEX IF NOT EXISTS idx_historical_timestamp "
+                "ON historical_data(timestamp)",
             )
             cursor.execute(
                 "CREATE INDEX IF NOT EXISTS idx_quotes_symbol ON quotes(symbol)",
@@ -260,7 +263,10 @@ class Database:
 
     def _model_to_dict(self, model: BaseModel) -> dict[str, Any]:
         """Convert Pydantic model to dictionary."""
-        return json.loads(model.model_dump_json())
+        result = json.loads(model.model_dump_json())
+        if not isinstance(result, dict):
+            raise TypeError(f"Expected dict from model_dump_json, got {type(result)}")
+        return result
 
     def _dict_to_model(self, data: dict[str, Any], model_class: type[T]) -> T:
         """Convert dictionary to Pydantic model."""
@@ -547,12 +553,14 @@ class Database:
             cursor = conn.cursor()
             if symbol:
                 cursor.execute(
-                    "SELECT * FROM trades WHERE status = 'OPEN' AND symbol = ? ORDER BY entry_time DESC",
+                    "SELECT * FROM trades WHERE status = 'OPEN' "
+                    "AND symbol = ? ORDER BY entry_time DESC",
                     (symbol,),
                 )
             else:
                 cursor.execute(
-                    "SELECT * FROM trades WHERE status = 'OPEN' ORDER BY entry_time DESC",
+                    "SELECT * FROM trades WHERE status = 'OPEN' "
+                    "ORDER BY entry_time DESC",
                 )
             rows = cursor.fetchall()
 
@@ -1095,12 +1103,14 @@ class Database:
             cursor = conn.cursor()
             if symbol:
                 cursor.execute(
-                    "SELECT * FROM orders WHERE status = 'OPEN' AND symbol = ? ORDER BY timestamp DESC",
+                    "SELECT * FROM orders WHERE status = 'OPEN' "
+                    "AND symbol = ? ORDER BY timestamp DESC",
                     (symbol,),
                 )
             else:
                 cursor.execute(
-                    "SELECT * FROM orders WHERE status = 'OPEN' ORDER BY timestamp DESC",
+                    "SELECT * FROM orders WHERE status = 'OPEN' "
+                    "ORDER BY timestamp DESC",
                 )
             rows = cursor.fetchall()
 
@@ -1108,17 +1118,9 @@ class Database:
 
     def _row_to_order(self, row: Any) -> Order:
         """Convert a database row to Order model."""
-        from src.loats.models import (
-            OrderStatus as OrderStatusEnum,
-        )
-        from src.loats.models import (
-            OrderType as OrderTypeEnum,
-        )
-        from src.loats.models import (
-            OrderVariety,
-            ProductType,
-            TransactionType,
-        )
+        from src.loats.models import OrderStatus as OrderStatusEnum
+        from src.loats.models import OrderType as OrderTypeEnum
+        from src.loats.models import OrderVariety, ProductType, TransactionType
 
         return Order(
             order_id=row[0],
@@ -1162,7 +1164,8 @@ class Database:
             cursor = conn.cursor()
             if entity_type:
                 cursor.execute(
-                    "SELECT * FROM audit_log WHERE entity_type = ? ORDER BY timestamp DESC LIMIT ?",
+                    "SELECT * FROM audit_log WHERE entity_type = ? "
+                    "ORDER BY timestamp DESC LIMIT ?",
                     (entity_type, limit),
                 )
             else:

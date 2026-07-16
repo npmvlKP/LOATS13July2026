@@ -46,20 +46,23 @@ class OpenAlgoAPIError(OpenAlgoError):
 class OpenAlgoClient:
     """Client for interacting with OpenAlgo API."""
 
-    def __init__(self, api_key: str | None = None, base_url: str | None = None):
+    def __init__(self, api_key: str | None = None, base_url: str | None = None) -> None:
         """
         Initialize OpenAlgo client.
 
         Args:
             api_key: OpenAlgo API key. If not provided, uses settings.openalgo_api_key
-            base_url: OpenAlgo base URL. If not provided, uses settings.openalgo_base_url
+            base_url: OpenAlgo base URL. If not provided,
+            uses settings.openalgo_base_url
+
         """
-        self.api_key = api_key or settings.openalgo_api_key.get_secret_value()
+        self.api_key: str = api_key or settings.openalgo_api_key.get_secret_value()
+
         self.base_url = str(base_url or settings.openalgo_base_url)
         self.timeout = settings.request_timeout
         self.client: httpx.Client | None = None
 
-    def __enter__(self):
+    def __enter__(self) -> "OpenAlgoClient":
         """Context manager entry."""
         self.client = httpx.Client(
             base_url=self.base_url,
@@ -68,7 +71,7 @@ class OpenAlgoClient:
         )
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         """Context manager exit."""
         if self.client:
             self.client.close()
@@ -84,7 +87,7 @@ class OpenAlgoClient:
             )
         return self.client
 
-    def _request(self, method: str, endpoint: str, **kwargs) -> dict[str, Any]:
+    def _request(self, method: str, endpoint: str, **kwargs: Any) -> dict[str, Any]:
         """
         Make an API request to OpenAlgo.
 
@@ -115,7 +118,7 @@ class OpenAlgoClient:
 
             try:
                 data = response.json()
-                return data
+                return data  # type: ignore[no-any-return]
             except ValueError as e:
                 logger.error(f"JSON decode error: {e}")
                 return {
@@ -228,6 +231,9 @@ class OpenAlgoClient:
             timestamp=timestamp,
             filled_quantity=data.get("filled_quantity", 0),
             average_price=data.get("average_price"),
+            stop_loss=data.get("stop_loss"),
+            take_profit=data.get("take_profit"),
+            trailing_stop_loss=data.get("trailing_stop_loss"),
         )
 
     # ------------------------------------------------------------------

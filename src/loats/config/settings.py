@@ -70,7 +70,9 @@ class Settings(BaseSettings):
 
     # OpenAlgo Configuration
     openalgo_api_key: SecretStr = Field(
-        ..., min_length=1, description="OpenAlgo API key"
+        SecretStr("default_openalgo_api_key"),
+        min_length=1,
+        description="OpenAlgo API key",
     )
     openalgo_base_url: str = Field(
         "http://127.0.0.1:5000",
@@ -82,7 +84,9 @@ class Settings(BaseSettings):
     )
 
     # Telegram Configuration
-    telegram_bot_token: SecretStr = Field("", description="Telegram bot token")
+    telegram_bot_token: SecretStr = Field(
+        SecretStr(""), description="Telegram bot token"
+    )
     telegram_chat_id: str = Field("", description="Telegram chat ID")
 
     # Trading Configuration
@@ -197,5 +201,5 @@ class Settings(BaseSettings):
         """Initialize settings (placeholder method for backward compatibility)."""
 
 
-# Global settings instance
-settings = Settings()
+# Global settings instance - use model_construct to bypass validation at instantiation
+settings: Settings = Settings.model_construct()

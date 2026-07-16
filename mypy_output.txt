@@ -1,0 +1,34 @@
+src\loats\ta.py:193: error: Unused "type: ignore" comment  [unused-ignore]
+src\loats\ta.py:194: error: Unused "type: ignore" comment  [unused-ignore]
+src\loats\ta.py:194: error: No overload variant of "__setitem__" of "_iLocIndexerSeries" matches argument types "int", "float"  [call-overload]
+src\loats\ta.py:194: note: Error code "call-overload" not covered by "type: ignore[index]" comment
+src\loats\ta.py:194: note: Possible overload variants:
+src\loats\ta.py:194: note:     def __setitem__(self, int, int | None, /) -> None
+src\loats\ta.py:194: note:     def __setitem__(self, Index[Any] | slice[Any, Any, Any] | ndarray[tuple[Any, ...], dtype[integer[Any]]] | list[int], int | IndexOpsMixin[int, Any] | None, /) -> None
+src\loats\ta.py:600: error: Unused "type: ignore" comment  [unused-ignore]
+src\loats\ta.py:600: error: Incompatible return value type (got "tuple[list[float], list[int], Any]", expected "tuple[list[float], list[float], list[float]]")  [return-value]
+src\loats\ta.py:600: note: Error code "return-value" not covered by "type: ignore[no-any-return]" comment
+src\loats\options.py:480: error: Missing type arguments for generic type "dict"  [type-arg]
+src\loats\options.py:499: error: Returning Any from function declared to return "float"  [no-any-return]
+src\loats\options.py:501: error: Missing type arguments for generic type "dict"  [type-arg]
+src\loats\options.py:540: error: Missing type arguments for generic type "dict"  [type-arg]
+src\loats\options.py:581: error: Missing type arguments for generic type "dict"  [type-arg]
+src\loats\options.py:615: error: Missing type arguments for generic type "dict"  [type-arg]
+src\loats\options.py:616: error: Missing type arguments for generic type "dict"  [type-arg]
+src\loats\openalgo.py:78: error: Function is missing a type annotation for one or more parameters  [no-untyped-def]
+src\loats\openalgo.py:125: error: Returning Any from function declared to return "dict[str, Any]"  [no-any-return]
+src\loats\scheduler.py:39: error: Missing type arguments for generic type "Task"  [type-arg]
+src\loats\scheduler.py:176: error: Incompatible types in "await" (actual type "dict[str, Any]", expected type "Awaitable[Any]")  [misc]
+src\loats\scheduler.py:207: error: Incompatible types in "await" (actual type "dict[str, Any]", expected type "Awaitable[Any]")  [misc]
+src\loats\scheduler.py:366: error: Incompatible types in "await" (actual type "dict[str, Any]", expected type "Awaitable[Any]")  [misc]
+src\loats\scheduler.py:372: error: Incompatible types in "await" (actual type "dict[str, Any]", expected type "Awaitable[Any]")  [misc]
+src\loats\scheduler.py:373: error: Incompatible types in "await" (actual type "dict[str, Any]", expected type "Awaitable[Any]")  [misc]
+src\loats\alerts.py:33: error: Missing type arguments for generic type "Application"  [type-arg]
+src\loats\alerts.py:83: error: Unused "type: ignore" comment  [unused-ignore]
+src\loats\alerts.py:368: error: Incompatible types in "await" (actual type "dict[str, Any]", expected type "Awaitable[Any]")  [misc]
+src\loats\alerts.py:403: error: Incompatible types in "await" (actual type "dict[str, Any]", expected type "Awaitable[Any]")  [misc]
+src\loats\alerts.py:446: error: Incompatible types in "await" (actual type "dict[str, Any]", expected type "Awaitable[Any]")  [misc]
+src\loats\alerts.py:449: error: Incompatible types in "await" (actual type "dict[str, Any]", expected type "Awaitable[Any]")  [misc]
+src\loats\alerts.py:627: error: Incompatible types in "await" (actual type "dict[str, Any]", expected type "Awaitable[Any]")  [misc]
+pyproject.toml: note: unused section(s): module = ['openalgo.*']
+Found 27 errors in 5 files (checked 15 source files)

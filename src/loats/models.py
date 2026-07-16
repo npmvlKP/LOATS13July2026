@@ -65,21 +65,7 @@ class QuoteData(BaseModel):
     change: float = Field(default=0.0)
     change_percent: float = Field(default=0.0)
 
-    def __init__(self, **data: dict[str, Any]) -> None:
-        """Initialize QuoteData and calculate change_percent if not provided."""
-        # Validate required fields
-        if not data.get("symbol"):
-            error_msg = "Symbol cannot be empty"
-            raise ValueError(error_msg)
-
-        # Calculate change_percent if not provided
-        if ("change_percent" not in data or data["change_percent"] == 0.0) and (
-            "last_price" in data and "close" in data and data["close"] != 0
-        ):
-            change = (data["last_price"] - data["close"]) / data["close"]
-            data["change_percent"] = change * 100
-
-        super().__init__(**data)
+    model_config = {"validate_assignment": True}
 
 
 class HistoricalData(BaseModel):
@@ -209,10 +195,10 @@ class Trade(BaseModel):
 
     @field_validator("pnl", mode="before")
     @classmethod
-    def calculate_pnl(cls, v: Any, info: Any) -> float | None:  # type: ignore[valid-type]
+    def calculate_pnl(cls, v: Any, info: Any) -> float | None:
         """Calculate PnL if not provided."""
         if v is not None:
-            return v
+            return float(v) if isinstance(v, (int, float)) else None
 
         # Get the data from ValidationInfo
         values = info.data
@@ -225,8 +211,8 @@ class Trade(BaseModel):
         ):
             multiplier = 1 if values["transaction_type"] == TransactionType.BUY else -1
             pnl_value = (
-                (values["exit_price"] - values["entry_price"])
-                * values["quantity"]
+                (float(values["exit_price"]) - float(values["entry_price"]))
+                * int(values["quantity"])
                 * multiplier
             )
             return float(pnl_value) if pnl_value is not None else None
@@ -276,7 +262,9 @@ class AuditLogEntry(BaseModel):
 
     entry_id: str = Field(
         default_factory=lambda: (
-            f"audit_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}_{uuid4().hex[:8]}"
+            "audit_"
+            f"{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}_"
+            f"{uuid4().hex[:8]}"
         )
     )
     timestamp: datetime

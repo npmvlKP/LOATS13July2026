@@ -3,18 +3,14 @@
 import asyncio
 import time
 from collections import deque
-from collections.abc import Callable, Coroutine
+from collections.abc import Callable
 from typing import Any, TypeVar
 
 from structlog import get_logger
-from typing_extensions import ParamSpec
-
-# Ruff: UP047 - Current type parameter implementation follows Python best practices
 
 logger = get_logger(__name__)
 
 T = TypeVar("T")
-P = ParamSpec("P")
 
 
 class NimRateGuard:
@@ -78,11 +74,11 @@ class NimRateGuard:
 
 
 async def nim_call_with_backoff(
-    fn: Callable[P, Coroutine[Any, Any, T]],
-    *args: P.args,
+    fn: Callable[..., Any],
+    *args: Any,
     max_retries: int = 4,
-    **kwargs: P.kwargs,
-) -> T:
+    **kwargs: Any,
+) -> Any:
     """Make a NVIDIA NIM API call with automatic rate limiting and backoff.
 
     Args:

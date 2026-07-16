@@ -85,7 +85,6 @@ class SentimentAnalyzer:
                     )
 
                     # Parse published date safely
-                    published_date: datetime
                     if hasattr(entry, "published_parsed"):
                         published_date = datetime(
                             *entry.published_parsed[:6],

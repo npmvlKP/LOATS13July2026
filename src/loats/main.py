@@ -16,7 +16,7 @@ from .scheduler import scheduler
 class TradingSystem:
     """Main trading system class."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize TradingSystem."""
         self.shutdown_event = asyncio.Event()
         self.running = False
@@ -85,7 +85,7 @@ class TradingSystem:
         for sig in (signal.SIGINT, signal.SIGTERM):
             loop.add_signal_handler(
                 sig,
-                lambda s=sig: asyncio.create_task(self._handle_shutdown_signal(s)),
+                lambda s=sig: asyncio.create_task(self._handle_shutdown_signal(s)),  # type: ignore[misc]
             )
 
         # Wait for shutdown event

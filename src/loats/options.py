@@ -4,12 +4,13 @@ Implements IV calculation, Greeks, and Black-Scholes model.
 """
 
 from datetime import datetime, timezone
+from typing import Any
 
 import numpy as np
 from py_vollib.black_scholes import black_scholes
 from py_vollib.black_scholes.greeks.analytical import delta, gamma, rho, theta, vega
 from py_vollib.ref_python.black_scholes.implied_volatility import implied_volatility
-from scipy.optimize import newton
+from scipy.optimize import newton  # type: ignore[import-untyped]
 
 from .logging import get_logger
 from .models import Greeks, OptionContract, OptionType
@@ -20,7 +21,7 @@ logger = get_logger(__name__)
 class OptionsEngine:
     """Options pricing and analysis engine."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize OptionsEngine."""
         self.risk_free_rate = 0.05  # Default risk-free rate (5%)
 
@@ -139,7 +140,7 @@ class OptionsEngine:
         try:
             # Use py_vollib's implied volatility function
             iv = implied_volatility(price, S, K, t, r, flag)
-            return iv
+            return float(iv)
         except Exception as e:
             logger.warning(
                 f"py_vollib IV calculation failed: {e}. Using fallback method.",
@@ -148,7 +149,7 @@ class OptionsEngine:
             # Fallback to Newton-Raphson method
             def objective_function(sigma: float) -> float:
                 """Objective function for Newton-Raphson: BS price - market price."""
-                return black_scholes(flag, S, K, t, r, sigma) - price
+                return float(black_scholes(flag, S, K, t, r, sigma)) - price
 
             try:
                 iv = newton(
@@ -192,7 +193,7 @@ class OptionsEngine:
         if t <= 0:
             t = 0.0001  # Small time to avoid division by zero
 
-        return black_scholes(flag, S, K, t, r, sigma)
+        return float(black_scholes(flag, S, K, t, r, sigma))
 
     def calculate_time_to_expiration(self, expiry: datetime) -> float:
         """
@@ -314,7 +315,7 @@ class OptionsEngine:
         """
         r = r or self.risk_free_rate
         parity = call_price - put_price - S + K * np.exp(-r * t)
-        return parity
+        return float(parity)
 
 
 def calculate_greeks(
@@ -413,7 +414,7 @@ def calculate_implied_volatility(
     try:
         # Use py_vollib's implied volatility function
         iv = implied_volatility(price, S, K, t, r, flag)
-        return iv
+        return float(iv)
     except Exception as e:
         logger.warning(f"Failed to calculate implied volatility: {e}")
         return 0.2  # Default reasonable volatility value
@@ -473,11 +474,13 @@ def calculate_historical_var(
 class OptionsAnalysis:
     """Options analysis class for portfolio-level calculations."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize OptionsAnalysis."""
         self.engine = OptionsEngine()
 
-    def get_atm_strike(self, option_chain: dict, underlying_price: float) -> float:
+    def get_atm_strike(
+        self, option_chain: dict[str, Any], underlying_price: float
+    ) -> float:
         """
         Get the at-the-money strike price.
 
@@ -496,9 +499,11 @@ class OptionsAnalysis:
 
         # Find the strike closest to the underlying price
         atm_strike = min(strikes, key=lambda x: abs(x - underlying_price))
-        return atm_strike
+        return float(atm_strike)
 
-    def analyze_option_chain(self, option_chain: dict, underlying_price: float) -> dict:
+    def analyze_option_chain(
+        self, option_chain: dict[str, Any], underlying_price: float
+    ) -> dict[str, Any]:
         """
         Analyze an option chain and return structured analysis.
 
@@ -537,7 +542,9 @@ class OptionsAnalysis:
             "volatility_analysis": volatility_analysis,
         }
 
-    def _calculate_open_interest_analysis(self, option_chain: dict) -> dict:
+    def _calculate_open_interest_analysis(
+        self, option_chain: dict[str, Any]
+    ) -> dict[str, Any]:
         """
         Calculate open interest analysis.
 
@@ -578,7 +585,9 @@ class OptionsAnalysis:
             "max_put_strike": max_put_strike,
         }
 
-    def _calculate_volatility_analysis(self, option_chain: dict) -> dict:
+    def _calculate_volatility_analysis(
+        self, option_chain: dict[str, Any]
+    ) -> dict[str, Any]:
         """
         Calculate volatility analysis.
 
@@ -612,8 +621,8 @@ class OptionsAnalysis:
         }
 
     def _calculate_option_metrics(
-        self, option_data: dict, underlying_price: float
-    ) -> dict:
+        self, option_data: dict[str, Any], underlying_price: float
+    ) -> dict[str, Any]:
         """
         Calculate option metrics.
 
@@ -668,21 +677,28 @@ class OptionsAnalysis:
 
         for contract in contracts:
             # Calculate Greeks for each contract
+            # Note: These attributes are added dynamically for portfolio calculations
+            underlying_price = getattr(contract, "underlying_price", 0.0)
+            time_to_expiration = getattr(contract, "time_to_expiration", 0.0)
+            risk_free_rate = getattr(contract, "risk_free_rate", 0.05)
+            volatility = getattr(contract, "volatility", 0.2)
+            quantity = getattr(contract, "quantity", 1)
+
             greeks = calculate_greeks(
-                S=contract.underlying_price,
+                S=underlying_price,
                 K=contract.strike_price,
-                t=contract.time_to_expiration,
-                r=contract.risk_free_rate,
-                sigma=contract.volatility,
+                t=time_to_expiration,
+                r=risk_free_rate,
+                sigma=volatility,
                 option_type=contract.option_type,
             )
 
             # Adjust for contract size
-            portfolio_delta += greeks.delta * contract.quantity
-            portfolio_gamma += greeks.gamma * contract.quantity
-            portfolio_vega += greeks.vega * contract.quantity
-            portfolio_theta += greeks.theta * contract.quantity
-            portfolio_rho += greeks.rho * contract.quantity
+            portfolio_delta += greeks.delta * quantity
+            portfolio_gamma += greeks.gamma * quantity
+            portfolio_vega += greeks.vega * quantity
+            portfolio_theta += greeks.theta * quantity
+            portfolio_rho += greeks.rho * quantity
 
         return Greeks(
             delta=portfolio_delta,
@@ -695,8 +711,8 @@ class OptionsAnalysis:
 
 
 # Export default instances
-options = OptionsEngine()
-analysis = OptionsAnalysis()
+options: OptionsEngine = OptionsEngine()
+analysis: OptionsAnalysis = OptionsAnalysis()
 
 # Export functions
 __all__ = [

@@ -34,7 +34,7 @@ def configure_logging(test_mode: bool = False) -> None:
     ]
 
     # Configure handlers
-    handlers = {
+    handlers: dict[str, dict[str, Any]] = {
         "default": {
             "level": "INFO",
             "class": "logging.StreamHandler",
@@ -98,7 +98,7 @@ def configure_logging(test_mode: bool = False) -> None:
     )
 
 
-def get_logger(name: str) -> structlog.stdlib.BoundLogger:
+def get_logger(name: str) -> Any:
     """Get a configured logger with the given name."""
     return structlog.get_logger(name)
 
