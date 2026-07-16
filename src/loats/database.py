@@ -568,9 +568,9 @@ class Database:
             quantity=row[2],
             entry_price=row[3],
             exit_price=row[4],
-            entry_time=datetime.fromisoformat(row[5])
-            if row[5]
-            else datetime.now(timezone.utc),
+            entry_time=(
+                datetime.fromisoformat(row[5]) if row[5] else datetime.now(timezone.utc)
+            ),
             exit_time=datetime.fromisoformat(row[6]) if row[6] else None,
             transaction_type=TransactionType(row[7]),
             product_type=ProductType(row[8]),

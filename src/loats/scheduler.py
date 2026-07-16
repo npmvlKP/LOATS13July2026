@@ -433,12 +433,16 @@ class TradingScheduler:
                 "ta_strength": ta_strength,
                 "sentiment_strength": sentiment_strength,
                 "current_price": current_price,
-                "position_size": position.get("data", [{}])[0].get("quantity", 0)
-                if position.get("data")
-                else 0,
-                "available_funds": funds.get("data", {}).get("available_cash", 0)
-                if funds.get("data")
-                else 0,
+                "position_size": (
+                    position.get("data", [{}])[0].get("quantity", 0)
+                    if position.get("data")
+                    else 0
+                ),
+                "available_funds": (
+                    funds.get("data", {}).get("available_cash", 0)
+                    if funds.get("data")
+                    else 0
+                ),
             }
 
             signal = Signal(
