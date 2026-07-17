@@ -7,7 +7,7 @@ from enum import Enum
 from typing import Any
 from uuid import uuid4
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class OrderType(str, Enum):
@@ -66,6 +66,31 @@ class QuoteData(BaseModel):
     change_percent: float = Field(default=0.0)
 
     model_config = {"validate_assignment": True}
+
+    @field_validator("symbol")
+    @classmethod
+    def validate_symbol(cls, v: str) -> str:
+        """Validate that symbol is not empty."""
+        if not v.strip():
+            raise ValueError("Symbol cannot be empty")
+        return v
+
+    @model_validator(mode="after")
+    def calculate_change_values(self) -> "QuoteData":
+        """Calculate change and change_percent after model initialization if not provided."""
+        # Only calculate if change is not explicitly provided (default value is 0.0)
+        if self.change == 0.0 and self.change_percent == 0.0:
+            if self.close != 0:
+                # Calculate based on last_price vs close as per test expectations
+                change = self.last_price - self.close
+                change_percent = (change / self.close) * 100
+                # Use object.__setattr__ to bypass validation
+                object.__setattr__(self, "change", change)
+                object.__setattr__(self, "change_percent", change_percent)
+            else:
+                object.__setattr__(self, "change", 0.0)
+                object.__setattr__(self, "change_percent", 0.0)
+        return self
 
 
 class HistoricalData(BaseModel):

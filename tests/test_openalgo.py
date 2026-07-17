@@ -2,25 +2,182 @@
 Tests for OpenAlgo client module.
 """
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
 from httpx import Response
 
-from src.loats.config import settings
+from src.loats.config.settings import settings
 from src.loats.models import (
     HistoricalData,
     Order,
     OrderStatus,
     OrderType,
-    OrderVariety,
     Position,
     ProductType,
     QuoteData,
     TransactionType,
 )
-from src.loats.openalgo import OpenAlgoClient
+from src.loats.openalgo import (
+    AsyncOpenAlgoClient,
+    OpenAlgoClient,
+    OpenAlgoError,
+)
+
+
+class TestAsyncOpenAlgoClient:
+    """Test suite for AsyncOpenAlgoClient."""
+
+    @pytest.fixture
+    def async_client(self) -> AsyncOpenAlgoClient:
+        """Create a test AsyncOpenAlgoClient instance."""
+        return AsyncOpenAlgoClient()
+
+    @pytest.fixture
+    def mock_async_httpx_client(self) -> AsyncMock:
+        """Create a mock httpx.AsyncClient."""
+        return AsyncMock(spec=httpx.AsyncClient)
+
+    @pytest.fixture
+    def mock_async_response(self) -> MagicMock:
+        """Create a mock httpx.Response."""
+        response = MagicMock(spec=Response)
+        response.status_code = 200
+        response.json.return_value = {
+            "success": True,
+            "message": "Success",
+            "data": {},
+        }
+        return response
+
+    async def test_initialization(self, async_client: AsyncOpenAlgoClient) -> None:
+        """Test AsyncOpenAlgoClient initialization."""
+        assert async_client.base_url == settings.openalgo_base_url
+        assert async_client.api_key == settings.openalgo_api_key.get_secret_value()
+        assert async_client.timeout == settings.request_timeout
+        assert async_client.client is None
+
+    async def test_enter_exit_context(self, async_client: AsyncOpenAlgoClient) -> None:
+        """Test async context manager enter and exit."""
+        with patch("httpx.AsyncClient") as mock_client_class:
+            mock_client = AsyncMock()
+            mock_client_class.return_value = mock_client
+
+            async with async_client:
+                assert async_client.client is not None
+                mock_client_class.assert_called_once_with(
+                    base_url=async_client.base_url,
+                    timeout=async_client.timeout,
+                    headers={"x-api-key": async_client.api_key},
+                )
+
+            mock_client.aclose.assert_called_once()
+            assert async_client.client is None
+
+    async def test_get_quotes(
+        self,
+        async_client: AsyncOpenAlgoClient,
+        mock_async_httpx_client: AsyncMock,
+        mock_async_response: AsyncMock,
+    ) -> None:
+        """Test get_quotes method."""
+        mock_async_response.json.return_value = {
+            "success": True,
+            "message": "Success",
+            "data": {
+                "NIFTY": {
+                    "last_price": 18000.50,
+                    "open": 17950.25,
+                    "high": 18050.75,
+                    "low": 17900.00,
+                    "close": 17980.50,
+                    "volume": 1000000,
+                    "change": 20.00,
+                    "change_percent": 0.11,
+                },
+            },
+        }
+
+        mock_async_httpx_client.post.return_value = mock_async_response
+
+        with patch.object(
+            async_client, "_ensure_client", return_value=mock_async_httpx_client
+        ):
+            result = await async_client.get_quotes(["NIFTY"])
+
+            assert result["success"] is True
+            assert "NIFTY" in result["data"]
+            assert result["data"]["NIFTY"]["last_price"] == 18000.50
+
+            # Verify request was made correctly
+            mock_async_httpx_client.post.assert_called_once_with(
+                "/api/v1/quotes",
+                json={"symbols": ["NIFTY"]},
+            )
+
+    async def test_error_handling(
+        self,
+        async_client: AsyncOpenAlgoClient,
+        mock_async_httpx_client: AsyncMock,
+    ) -> None:
+        """Test error handling in AsyncOpenAlgoClient."""
+        # Test HTTP error - should raise OpenAlgoAPIError
+        error_response = AsyncMock(spec=Response)
+        error_response.status_code = 500
+        error_response.text = "Internal Server Error"
+        mock_async_httpx_client.post.return_value = error_response
+
+        with patch.object(
+            async_client, "_ensure_client", return_value=mock_async_httpx_client
+        ):
+            with pytest.raises(Exception) as exc_info:  # Should raise OpenAlgoAPIError
+                await async_client._request(
+                    "POST", "quotes", json={"symbols": ["NIFTY"]}
+                )
+            assert "API Error 500" in str(exc_info.value)
+
+        # Test JSON decode error - should raise OpenAlgoError
+        mock_response = AsyncMock(spec=Response)
+        mock_response.status_code = 200
+        mock_response.json.side_effect = ValueError("Invalid JSON")
+        mock_response.text = "Not JSON"
+        mock_async_httpx_client.post.return_value = mock_response
+
+        with patch.object(
+            async_client, "_ensure_client", return_value=mock_async_httpx_client
+        ):
+            with pytest.raises(Exception) as exc_info:  # Should raise OpenAlgoError
+                await async_client._request(
+                    "POST", "quotes", json={"symbols": ["NIFTY"]}
+                )
+            assert "JSON decode error" in str(exc_info.value)
+
+        # Test timeout error - should raise OpenAlgoError
+        mock_async_httpx_client.post.side_effect = httpx.TimeoutException("Timeout")
+
+        with patch.object(
+            async_client, "_ensure_client", return_value=mock_async_httpx_client
+        ):
+            with pytest.raises(OpenAlgoError) as exc_info:
+                await async_client._request(
+                    "POST", "quotes", json={"symbols": ["NIFTY"]}
+                )
+            assert "Timeout error" in str(exc_info.value)
+
+        # Test connection error - should raise OpenAlgoError
+        mock_async_httpx_client.post.side_effect = httpx.ConnectError(
+            "Connection failed"
+        )
+
+        with patch.object(
+            async_client, "_ensure_client", return_value=mock_async_httpx_client
+        ):
+            with pytest.raises(OpenAlgoError) as exc_info:
+                await async_client._request(
+                    "POST", "quotes", json={"symbols": ["NIFTY"]}
+                )
+            assert "Connection error" in str(exc_info.value)
 
 
 class TestOpenAlgoClient:
@@ -310,7 +467,6 @@ class TestOpenAlgoClient:
                 price=18000.0,
                 transaction_type=TransactionType.BUY,
                 product_type=ProductType.MIS,
-                variety=OrderVariety.REGULAR,
                 stop_loss=17950.0,
                 take_profit=18100.0,
                 trailing_stop_loss=50.0,
@@ -517,7 +673,7 @@ class TestOpenAlgoClient:
         mock_httpx_client: MagicMock,
     ) -> None:
         """Test error handling in OpenAlgoClient."""
-        # Test HTTP error
+        # Test HTTP error - should return {success: False} envelope
         error_response = MagicMock(spec=Response)
         error_response.status_code = 500
         error_response.text = "Internal Server Error"
@@ -529,7 +685,7 @@ class TestOpenAlgoClient:
             assert result["success"] is False
             assert "HTTP error" in result["message"]
 
-        # Test JSON decode error
+        # Test JSON decode error - should return {success: False} envelope
         mock_response = MagicMock(spec=Response)
         mock_response.status_code = 200
         mock_response.json.side_effect = ValueError("Invalid JSON")
@@ -542,7 +698,7 @@ class TestOpenAlgoClient:
             assert result["success"] is False
             assert "JSON decode error" in result["message"]
 
-        # Test timeout error
+        # Test timeout error - should return {success: False} envelope
         mock_httpx_client.post.side_effect = httpx.TimeoutException("Timeout")
 
         with patch.object(client, "_ensure_client", return_value=mock_httpx_client):
@@ -551,7 +707,7 @@ class TestOpenAlgoClient:
             assert result["success"] is False
             assert "Timeout error" in result["message"]
 
-        # Test connection error
+        # Test connection error - should return {success: False} envelope
         mock_httpx_client.post.side_effect = httpx.ConnectError("Connection failed")
 
         with patch.object(client, "_ensure_client", return_value=mock_httpx_client):

@@ -1,6 +1,7 @@
 """Pydantic settings for LOATS13July2026 configuration."""
 
 from decimal import Decimal
+from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
@@ -201,5 +202,18 @@ class Settings(BaseSettings):
         """Initialize settings (placeholder method for backward compatibility)."""
 
 
-# Global settings instance - use model_construct to bypass validation at instantiation
-settings: Settings = Settings.model_construct()
+# Global settings instance - lazy initialization to avoid import-time validation errors
+
+
+@lru_cache(maxsize=1)
+def get_settings() -> Settings:
+    """Get the global settings instance with lazy initialization.
+
+    This avoids import-time validation errors on fresh checkouts by deferring
+    the actual Settings creation until first use.
+    """
+    return Settings()  # type: ignore[call-arg]
+
+
+# Alias for backward compatibility
+settings: Settings = get_settings()  # type: ignore[call-arg]

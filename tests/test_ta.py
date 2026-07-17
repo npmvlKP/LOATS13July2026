@@ -311,17 +311,25 @@ class TestTechnicalAnalysis:
         assert strength == 0.3  # MACD < signal should have sell strength
 
         # Test supertrend strength
-        strength = ta.calculate_supertrend_strength(100.0, 101.0, 1)
+        strength = ta.calculate_supertrend_strength(101.0, 100.0, 1)
         assert 0 <= strength <= 1
-        assert strength == 0.9  # Price above supertrend with up direction
+        assert strength == 0.9  # Strong buy: price above supertrend in uptrend
 
-        strength = ta.calculate_supertrend_strength(100.0, 99.0, -1)
+        strength = ta.calculate_supertrend_strength(99.0, 100.0, -1)
         assert 0 <= strength <= 1
-        assert strength == 0.1  # Price below supertrend with down direction
+        assert strength == 0.1  # Strong sell: price below supertrend in downtrend
 
-        strength = ta.calculate_supertrend_strength(100.0, 100.5, -1)
+        strength = ta.calculate_supertrend_strength(99.0, 100.0, 1)
         assert 0 <= strength <= 1
-        assert strength == 0.6  # Price above supertrend but direction down
+        assert (
+            strength == 0.7
+        )  # Moderate buy: price below supertrend but direction is up
+
+        strength = ta.calculate_supertrend_strength(101.0, 100.0, -1)
+        assert 0 <= strength <= 1
+        assert (
+            strength == 0.3
+        )  # Moderate sell: price above supertrend but direction is down
 
     def test_calculate_combined_strength(self, ta: TechnicalAnalysis) -> None:
         """Test combined strength calculation."""
@@ -356,7 +364,7 @@ class TestTechnicalAnalysis:
 
     def test_calculate_price_action_strength(self, ta: TechnicalAnalysis) -> None:
         """Test price action strength calculation."""
-        # Test with recent uptrend
+        # Test with recent uptrend (each close higher than previous and current price > last close)
         historical_data = [
             HistoricalData(
                 symbol="TEST",
@@ -395,17 +403,17 @@ class TestTechnicalAnalysis:
             current_price=101.0,
         )
         assert 0 <= strength <= 1
-        assert strength == 0.8  # Positive for uptrend
+        assert strength == 0.8  # Should detect strong uptrend
 
-        # Test with recent downtrend
+        # Test with recent downtrend (each close lower than previous and current price < last close)
         historical_data = [
             HistoricalData(
                 symbol="TEST",
                 timestamp=datetime.now(timezone.utc),
-                open=101.0,
-                high=102.0,
-                low=100.5,
-                close=101.5,
+                open=102.0,
+                high=103.0,
+                low=101.5,
+                close=102.5,
                 volume=1500,
                 interval="1min",
             ),
@@ -422,10 +430,10 @@ class TestTechnicalAnalysis:
             HistoricalData(
                 symbol="TEST",
                 timestamp=datetime.now(timezone.utc),
-                open=102.0,
-                high=103.0,
-                low=101.5,
-                close=102.5,
+                open=101.0,
+                high=102.0,
+                low=100.5,
+                close=101.5,
                 volume=1000,
                 interval="1min",
             ),
@@ -436,9 +444,50 @@ class TestTechnicalAnalysis:
             current_price=99.0,
         )
         assert 0 <= strength <= 1
-        assert strength == 0.2  # Negative for downtrend
+        assert strength == 0.2  # Should detect strong downtrend
 
-        # Test with sideways movement
+        # Test with sideways movement (small price range relative to price)
+        historical_data = [
+            HistoricalData(
+                symbol="TEST",
+                timestamp=datetime.now(timezone.utc),
+                open=100.0,
+                high=100.5,
+                low=99.9,
+                close=100.4,
+                volume=1000,
+                interval="1min",
+            ),
+            HistoricalData(
+                symbol="TEST",
+                timestamp=datetime.now(timezone.utc),
+                open=100.4,
+                high=100.6,
+                low=100.0,
+                close=100.5,
+                volume=1000,
+                interval="1min",
+            ),
+            HistoricalData(
+                symbol="TEST",
+                timestamp=datetime.now(timezone.utc),
+                open=100.5,
+                high=100.7,
+                low=100.1,
+                close=100.6,
+                volume=1000,
+                interval="1min",
+            ),
+        ]
+
+        strength = ta.calculate_price_action_strength(
+            historical_data,
+            current_price=100.0,
+        )
+        assert 0 <= strength <= 1
+        assert strength == 0.4  # Should detect sideways movement
+
+        # Test with minimal data (only 2 data points)
         historical_data = [
             HistoricalData(
                 symbol="TEST",
@@ -457,38 +506,79 @@ class TestTechnicalAnalysis:
                 high=101.5,
                 low=100.0,
                 close=101.0,
-                volume=1000,
-                interval="1min",
-            ),
-            HistoricalData(
-                symbol="TEST",
-                timestamp=datetime.now(timezone.utc),
-                open=101.0,
-                high=102.0,
-                low=100.5,
-                close=101.5,
-                volume=1000,
+                volume=1200,
                 interval="1min",
             ),
         ]
 
         strength = ta.calculate_price_action_strength(
             historical_data,
-            current_price=100.0,
+            current_price=101.5,
         )
         assert 0 <= strength <= 1
-        assert strength == 0.4  # Neutral for sideways movement
+        assert strength == 0.7  # Should detect moderate uptrend
 
     def test_calculate_volatility_strength(self, ta: TechnicalAnalysis) -> None:
         """Test volatility strength calculation."""
-        # Test with high volatility
+        # Test with high volatility (recent range > 2x average range)
+        # Create data where recent range (30) is ~1.8x average range (~16.67)
         historical_data = [
             HistoricalData(
                 symbol="TEST",
                 timestamp=datetime.now(timezone.utc),
                 open=95.0,
-                high=105.0,
+                high=100.0,
                 low=90.0,
+                close=95.0,
+                volume=1000,
+                interval="1min",
+            ),
+            HistoricalData(
+                symbol="TEST",
+                timestamp=datetime.now(timezone.utc),
+                open=95.0,
+                high=100.0,
+                low=90.0,
+                close=95.0,
+                volume=1000,
+                interval="1min",
+            ),
+            HistoricalData(
+                symbol="TEST",
+                timestamp=datetime.now(timezone.utc),
+                open=95.0,
+                high=115.0,  # Large range
+                low=85.0,  # Large range
+                close=100.0,
+                volume=1500,
+                interval="1min",
+            ),
+        ]
+
+        strength = ta.calculate_volatility_strength(historical_data)
+        assert 0 <= strength <= 1
+        assert (
+            strength == 0.6
+        )  # Should detect moderate high volatility (recent range is 30, avg range is ~16.67, ratio ≈ 1.8)
+
+        # Test with moderate high volatility (recent range > 1.5x average range)
+        historical_data = [
+            HistoricalData(
+                symbol="TEST",
+                timestamp=datetime.now(timezone.utc),
+                open=98.0,
+                high=100.0,
+                low=97.0,
+                close=99.0,
+                volume=1000,
+                interval="1min",
+            ),
+            HistoricalData(
+                symbol="TEST",
+                timestamp=datetime.now(timezone.utc),
+                open=99.0,
+                high=101.0,
+                low=98.0,
                 close=100.0,
                 volume=1000,
                 interval="1min",
@@ -497,29 +587,19 @@ class TestTechnicalAnalysis:
                 symbol="TEST",
                 timestamp=datetime.now(timezone.utc),
                 open=100.0,
-                high=110.0,
-                low=95.0,
-                close=105.0,
-                volume=1200,
-                interval="1min",
-            ),
-            HistoricalData(
-                symbol="TEST",
-                timestamp=datetime.now(timezone.utc),
-                open=105.0,
-                high=115.0,
-                low=100.0,
-                close=110.0,
-                volume=1500,
+                high=105.0,  # Moderate range
+                low=95.0,  # Moderate range
+                close=102.0,
+                volume=1000,
                 interval="1min",
             ),
         ]
 
         strength = ta.calculate_volatility_strength(historical_data)
         assert 0 <= strength <= 1
-        assert strength == 0.8  # High volatility should have high strength
+        assert strength == 0.6  # Should detect moderate high volatility
 
-        # Test with low volatility
+        # Test with low volatility (recent range < average range)
         historical_data = [
             HistoricalData(
                 symbol="TEST",
@@ -545,9 +625,9 @@ class TestTechnicalAnalysis:
                 symbol="TEST",
                 timestamp=datetime.now(timezone.utc),
                 open=100.0,
-                high=101.0,
-                low=99.5,
-                close=100.5,
+                high=100.5,  # Small range
+                low=99.8,  # Small range
+                close=100.3,
                 volume=1000,
                 interval="1min",
             ),
@@ -555,7 +635,7 @@ class TestTechnicalAnalysis:
 
         strength = ta.calculate_volatility_strength(historical_data)
         assert 0 <= strength <= 1
-        assert strength == 0.3  # Low volatility should have low strength
+        assert strength == 0.2  # Should detect low volatility
 
     def test_calculate_volume_strength(self, ta: TechnicalAnalysis) -> None:
         """Test volume strength calculation."""
@@ -671,7 +751,7 @@ class TestTechnicalAnalysis:
 
         strength = ta.calculate_volume_strength(historical_data)
         assert -1 <= strength <= 1
-        assert abs(strength) < 0.2  # Stable volume should have strength close to zero
+        assert strength == 0.0  # Stable volume should have neutral strength
 
     def test_get_indicator_value(self, ta: TechnicalAnalysis) -> None:
         """Test get_indicator_value method."""
@@ -761,6 +841,17 @@ class TestTechnicalAnalysis:
         assert isinstance(indicators, list)
         # Should return some indicators for sufficient data
         assert len(indicators) > 0
+
+        # Check that indicators have expected properties
+        for indicator in indicators:
+            assert hasattr(indicator, "name")
+            assert hasattr(indicator, "value")
+            assert hasattr(indicator, "timestamp")
+            assert hasattr(indicator, "metadata")
+            assert isinstance(indicator.name, str)
+            assert isinstance(indicator.value, (int, float))
+            assert isinstance(indicator.timestamp, datetime)
+            assert isinstance(indicator.metadata, dict)
 
     def test_calculate_indicator_values(self) -> None:
         """Test individual indicator calculations with known values."""

@@ -68,7 +68,9 @@ class OptionsEngine:
             # Calculate Greeks
             delta_val = delta(flag, S, K, t, r, sigma)
             gamma_val = gamma(flag, S, K, t, r, sigma)
-            theta_val = theta(flag, S, K, t, r, sigma) or 0.0  # Handle None values
+            theta_val = theta(flag, S, K, t, r, sigma)
+            if theta_val is None:
+                theta_val = 0.0
             vega_val = vega(flag, S, K, t, r, sigma)
             rho_val = rho(flag, S, K, t, r, sigma)
 
@@ -146,22 +148,22 @@ class OptionsEngine:
                 f"py_vollib IV calculation failed: {e}. Using fallback method.",
             )
 
-            # Fallback to Newton-Raphson method
-            def objective_function(sigma: float) -> float:
-                """Objective function for Newton-Raphson: BS price - market price."""
-                return float(black_scholes(flag, S, K, t, r, sigma)) - price
+        # Fallback to Newton-Raphson method
+        def objective_function(sigma: float) -> float:
+            """Objective function for Newton-Raphson: BS price - market price."""
+            return float(black_scholes(flag, S, K, t, r, sigma)) - price
 
-            try:
-                iv = newton(
-                    objective_function,
-                    x0=0.2,  # Initial guess
-                    maxiter=max_iter,
-                    tol=tolerance,
-                )
-                return float(iv)
-            except Exception as e:
-                logger.error(f"Failed to calculate implied volatility: {e}")
-                raise ValueError(f"Could not calculate implied volatility: {e}") from e
+        try:
+            iv = newton(
+                objective_function,
+                x0=0.2,  # Initial guess
+                maxiter=max_iter,
+                tol=tolerance,
+            )
+            return float(iv)
+        except Exception as e:
+            logger.error(f"Failed to calculate implied volatility: {e}")
+            raise ValueError(f"Could not calculate implied volatility: {e}") from e
 
     def calculate_black_scholes(
         self,
@@ -351,7 +353,9 @@ def calculate_greeks(
         delta_val = delta(flag, S, K, t, r, sigma)
         gamma_val = gamma(flag, S, K, t, r, sigma)
         vega_val = vega(flag, S, K, t, r, sigma)
-        theta_val = theta(flag, S, K, t, r, sigma) or 0.0  # Handle None values
+        theta_val = theta(flag, S, K, t, r, sigma)
+        if theta_val is None:
+            theta_val = 0.0
         rho_val = rho(flag, S, K, t, r, sigma)
 
         return Greeks(
@@ -659,12 +663,18 @@ class OptionsAnalysis:
     def calculate_portfolio_greeks(
         self,
         contracts: list[OptionContract],
+        underlying_price: float,
+        risk_free_rate: float | None = None,
+        volatility: float = 0.2,
     ) -> Greeks:
         """
         Calculate portfolio-level Greeks.
 
         Args:
             contracts: List of option contracts
+            underlying_price: Current price of the underlying asset
+            risk_free_rate: Risk-free interest rate (default: engine's risk_free_rate)
+            volatility: Volatility of the underlying asset (default: 0.2)
 
         Returns:
             Portfolio Greeks
@@ -675,23 +685,39 @@ class OptionsAnalysis:
         portfolio_theta = 0.0
         portfolio_rho = 0.0
 
-        for contract in contracts:
-            # Calculate Greeks for each contract
-            # Note: These attributes are added dynamically for portfolio calculations
-            underlying_price = getattr(contract, "underlying_price", 0.0)
-            time_to_expiration = getattr(contract, "time_to_expiration", 0.0)
-            risk_free_rate = getattr(contract, "risk_free_rate", 0.05)
-            volatility = getattr(contract, "volatility", 0.2)
-            quantity = getattr(contract, "quantity", 1)
+        # Use provided risk_free_rate or fall back to engine's default
+        r = risk_free_rate if risk_free_rate is not None else self.engine.risk_free_rate
 
+        for contract in contracts:
+            # Calculate time to expiration in years
+            t = self.engine.calculate_time_to_expiration(contract.expiry)
+
+            # Calculate Greeks for each contract
             greeks = calculate_greeks(
                 S=underlying_price,
                 K=contract.strike_price,
-                t=time_to_expiration,
-                r=risk_free_rate,
+                t=t,
+                r=r,
                 sigma=volatility,
                 option_type=contract.option_type,
             )
+
+            # Use contract's implied_volatility if available, otherwise use provided volatility
+            contract_volatility = contract.implied_volatility or volatility
+
+            # Recalculate greeks with contract-specific volatility if available
+            if contract.implied_volatility:
+                greeks = calculate_greeks(
+                    S=underlying_price,
+                    K=contract.strike_price,
+                    t=t,
+                    r=r,
+                    sigma=contract_volatility,
+                    option_type=contract.option_type,
+                )
+
+            # Use quantity of 1 if not specified (quantity is not part of OptionContract)
+            quantity = 1
 
             # Adjust for contract size
             portfolio_delta += greeks.delta * quantity
