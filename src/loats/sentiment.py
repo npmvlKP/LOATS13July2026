@@ -85,9 +85,15 @@ class SentimentAnalyzer:
                     )
 
                     # Parse published date safely
-                    if hasattr(entry, "published_parsed"):
+                    if hasattr(entry, "published_parsed") and entry.published_parsed:
+                        pp = entry.published_parsed
                         published_date = datetime(
-                            *entry.published_parsed[:6],
+                            pp[0],
+                            pp[1],
+                            pp[2],
+                            pp[3],
+                            pp[4],
+                            pp[5],
                             tzinfo=timezone.utc,
                         )
                     else:

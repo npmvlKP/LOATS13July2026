@@ -34,6 +34,9 @@ dev = [
     "pytest-cov>=5.0.0",
     "ruff>=0.5.0",
     "mypy>=1.10.0",
+    "black>=24.0.0",
+    "isort>=5.13.0",
+    "flake8>=7.0.0",
     "bandit>=1.7.0",
     "pip-audit>=2.7.0",
     "pre-commit>=3.7.0",
@@ -130,7 +133,10 @@ ignore = [
 "scripts/*" = ["INP001", "T201"]
 
 [tool.mypy]
-python_version = "3.10"
+# Runtime pinned to 3.12 in this venv; numpy>=2 ships PEP-695 `type` statements
+# in its bundled .pyi which require Python 3.12+ to parse. Keeping this aligned
+# with the interpreter avoids spurious syntax errors from third-party stubs.
+python_version = "3.12"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
@@ -176,3 +182,15 @@ omit = ["tests/*", "*/__init__.py"]
 
 [tool.bandit]
 skips = ["B101"]  # Skip assert_used
+
+[tool.black]
+# Pin target to current interpreter (3.12). Without this, recent Black
+# defaults to py315 and emits safety-check warnings on a 3.12 host. Line
+# length matches Ruff to keep formatting consistent.
+line-length = 88
+target-version = ["py312"]
+
+[tool.isort]
+profile = "black"
+line_length = 88
+known_first_party = ["loats"]
