@@ -4,6 +4,7 @@ Implements Telegram alerts and kill switch functionality.
 """
 
 from datetime import datetime, timezone
+from typing import Any
 
 from telegram import Bot, Update
 from telegram.ext import (
@@ -29,7 +30,7 @@ class AlertSystem:
     def __init__(self) -> None:
         """Initialize AlertSystem."""
         self.bot: Bot | None = None
-        self.application: Application | None = None
+        self.application: Any = None
         self.kill_switch_active = False
         self.alert_cooldown: dict[str, datetime] = {}
         self.cooldown_period = 300  # 5 minutes cooldown between duplicate alerts
@@ -79,7 +80,7 @@ class AlertSystem:
         if self.application:
             try:
                 # Start polling in background
-                self.application.run_polling()  # type: ignore[func-returns-value]
+                self.application.run_polling()
                 logger.info("Telegram bot started")
             except Exception as e:
                 logger.error(f"Failed to start Telegram bot: {e}")
@@ -363,8 +364,7 @@ class AlertSystem:
         """
         try:
             # Get current positions from OpenAlgo
-            with openalgo_client as client:
-                position_data = await client.get_position_book()
+            position_data = await openalgo_client.get_position_book()
 
             if not position_data.get("data"):
                 return await self.send_system_alert("No open positions found", "info")
@@ -398,8 +398,7 @@ class AlertSystem:
         """
         try:
             # Get current funds from OpenAlgo
-            with openalgo_client as client:
-                funds_data = await client.get_funds()
+            funds_data = await openalgo_client.get_funds()
 
             if not funds_data.get("data"):
                 return await self.send_system_alert(
@@ -441,11 +440,10 @@ class AlertSystem:
             logger.warning(f"Kill switch activated: {reason}")
 
             # Cancel all open orders
-            with openalgo_client as client:
-                orders = await client.get_order_status("")  # Get all orders
-                for order in orders.get("data", []):
-                    if order["status"] in ["OPEN", "PENDING"]:
-                        await client.cancel_order(order["order_id"])
+            orders = await openalgo_client.get_order_status("")  # Get all orders
+            for order in orders.get("data", []):
+                if order["status"] in ["OPEN", "PENDING"]:
+                    await openalgo_client.cancel_order(order["order_id"])
 
             # Send alert
             message = (
@@ -626,8 +624,7 @@ class AlertSystem:
         """Handle /orders command."""
         try:
             # Get open orders from OpenAlgo
-            with openalgo_client as client:
-                orders_data = await client.get_order_status("")  # Get all orders
+            orders_data = await openalgo_client.get_order_status("")  # Get all orders
 
             if not orders_data.get("data"):
                 if update.message:

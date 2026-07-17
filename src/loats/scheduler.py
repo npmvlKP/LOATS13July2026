@@ -29,7 +29,7 @@ class TradingScheduler:
         """Initialize TradingScheduler."""
         self.scheduler = AsyncIOScheduler()
         self.running = False
-        self.scan_tasks: dict[str, asyncio.Task] = {}
+        self.scan_tasks: dict[str, asyncio.Task[Any]] = {}
 
     async def initialize(self) -> None:
         """Initialize the scheduler and set up jobs."""
@@ -165,85 +165,84 @@ class TradingScheduler:
             timeframe = settings.default_timeframe
 
             # Get historical data from OpenAlgo
-            with openalgo_client as client:
-                history_data = await client.get_history(
-                    symbol=symbol,
-                    interval=timeframe,
-                    from_date=None,
-                    to_date=None,
+            history_data = await openalgo_client.get_history(
+                symbol=symbol,
+                interval=timeframe,
+                from_date=None,
+                to_date=None,
+            )
+
+            # Convert to HistoricalData objects
+            historical_data = []
+            for item in history_data.get("data", []):
+                historical_data.append(
+                    HistoricalData(
+                        symbol=symbol,
+                        timestamp=datetime.fromisoformat(item["timestamp"]),
+                        open=item["open"],
+                        high=item["high"],
+                        low=item["low"],
+                        close=item["close"],
+                        volume=item["volume"],
+                        interval=timeframe,
+                    ),
                 )
 
-                # Convert to HistoricalData objects
-                historical_data = []
-                for item in history_data.get("data", []):
-                    historical_data.append(
-                        HistoricalData(
-                            symbol=symbol,
-                            timestamp=datetime.fromisoformat(item["timestamp"]),
-                            open=item["open"],
-                            high=item["high"],
-                            low=item["low"],
-                            close=item["close"],
-                            volume=item["volume"],
-                            interval=timeframe,
-                        ),
+            # Store historical data
+            if historical_data:
+                db.store_historical_data(historical_data)
+
+                # Calculate indicators
+                indicators = ta.calculate_indicators(historical_data)
+
+                # Get current price
+                quotes = await openalgo_client.get_quotes([symbol])
+                current_price = (
+                    quotes.get("data", {}).get(symbol, {}).get("last_price", 0)
+                )
+
+                # Generate signal
+                signal_result = ta.generate_signal(indicators, current_price)
+                if signal_result:
+                    signal_type, strength = signal_result
+                    signal = Signal(
+                        symbol=symbol,
+                        signal_type=SignalType(signal_type),
+                        strength=strength,
+                        timestamp=datetime.now(timezone.utc),
+                        indicators={ind.name: ind.value for ind in indicators},
+                        confidence=strength,
+                        metadata={
+                            "scan_type": "ta",
+                            "timeframe": timeframe,
+                            "indicators_count": len(indicators),
+                        },
                     )
 
-                # Store historical data
-                if historical_data:
-                    db.store_historical_data(historical_data)
-
-                    # Calculate indicators
-                    indicators = ta.calculate_indicators(historical_data)
-
-                    # Get current price
-                    quotes = await client.get_quotes([symbol])
-                    current_price = (
-                        quotes.get("data", {}).get(symbol, {}).get("last_price", 0)
+                    # Store signal
+                    db.create_signal(signal)
+                    logger.info(
+                        "TA signal generated: %s with strength %.2f",
+                        signal_type,
+                        strength,
                     )
 
-                    # Generate signal
-                    signal_result = ta.generate_signal(indicators, current_price)
-                    if signal_result:
-                        signal_type, strength = signal_result
-                        signal = Signal(
+                    # Store quote
+                    quote_data = quotes.get("data", {}).get(symbol)
+                    if quote_data:
+                        quote = QuoteData(
                             symbol=symbol,
-                            signal_type=SignalType(signal_type),
-                            strength=strength,
+                            last_price=quote_data["last_price"],
+                            open=quote_data["open"],
+                            high=quote_data["high"],
+                            low=quote_data["low"],
+                            close=quote_data["close"],
+                            volume=quote_data["volume"],
                             timestamp=datetime.now(timezone.utc),
-                            indicators={ind.name: ind.value for ind in indicators},
-                            confidence=strength,
-                            metadata={
-                                "scan_type": "ta",
-                                "timeframe": timeframe,
-                                "indicators_count": len(indicators),
-                            },
+                            change=quote_data.get("change", 0),
+                            change_percent=quote_data.get("change_percent", 0),
                         )
-
-                        # Store signal
-                        db.create_signal(signal)
-                        logger.info(
-                            "TA signal generated: %s with strength %.2f",
-                            signal_type,
-                            strength,
-                        )
-
-                        # Store quote
-                        quote_data = quotes.get("data", {}).get(symbol)
-                        if quote_data:
-                            quote = QuoteData(
-                                symbol=symbol,
-                                last_price=quote_data["last_price"],
-                                open=quote_data["open"],
-                                high=quote_data["high"],
-                                low=quote_data["low"],
-                                close=quote_data["close"],
-                                volume=quote_data["volume"],
-                                timestamp=datetime.now(timezone.utc),
-                                change=quote_data.get("change", 0),
-                                change_percent=quote_data.get("change_percent", 0),
-                            )
-                            db.store_quote(quote)
+                        db.store_quote(quote)
 
         except Exception:
             logger.exception("Technical analysis scan failed")
@@ -355,41 +354,38 @@ class TradingScheduler:
             sentiment_signals = db.get_latest_signals(symbol, limit=1)
 
             # Get current market data
-            with openalgo_client as client:
-                quotes = await client.get_quotes([symbol])
-                current_price = (
-                    quotes.get("data", {}).get(symbol, {}).get("last_price", 0)
+            quotes = await openalgo_client.get_quotes([symbol])
+            current_price = quotes.get("data", {}).get(symbol, {}).get("last_price", 0)
+
+            # Get position and funds
+            position = await openalgo_client.get_position_book()
+            funds = await openalgo_client.get_funds()
+
+            # Store position and funds data
+            if position.get("data"):
+                for pos in position["data"]:
+                    if pos["symbol"] == symbol:
+                        pos_model = Position(
+                            symbol=pos["symbol"],
+                            quantity=pos["quantity"],
+                            average_price=pos["average_price"],
+                            last_price=pos["last_price"],
+                            pnl=pos["pnl"],
+                            product_type=pos["product_type"],
+                            buy_quantity=pos["buy_quantity"],
+                            sell_quantity=pos["sell_quantity"],
+                        )
+                        db.store_position(pos_model)
+
+            if funds.get("data"):
+                funds_model = FundsData(
+                    available_cash=funds["data"]["available_cash"],
+                    utilized_margin=funds["data"]["utilized_margin"],
+                    available_margin=funds["data"]["available_margin"],
+                    total_equity=funds["data"]["total_equity"],
+                    timestamp=datetime.now(timezone.utc),
                 )
-
-                # Get position and funds
-                position = await client.get_position_book()
-                funds = await client.get_funds()
-
-                # Store position and funds data
-                if position.get("data"):
-                    for pos in position["data"]:
-                        if pos["symbol"] == symbol:
-                            pos_model = Position(
-                                symbol=pos["symbol"],
-                                quantity=pos["quantity"],
-                                average_price=pos["average_price"],
-                                last_price=pos["last_price"],
-                                pnl=pos["pnl"],
-                                product_type=pos["product_type"],
-                                buy_quantity=pos["buy_quantity"],
-                                sell_quantity=pos["sell_quantity"],
-                            )
-                            db.store_position(pos_model)
-
-                if funds.get("data"):
-                    funds_model = FundsData(
-                        available_cash=funds["data"]["available_cash"],
-                        utilized_margin=funds["data"]["utilized_margin"],
-                        available_margin=funds["data"]["available_margin"],
-                        total_equity=funds["data"]["total_equity"],
-                        timestamp=datetime.now(timezone.utc),
-                    )
-                    db.store_funds(funds_model)
+                db.store_funds(funds_model)
 
             # Combine signals (simple average for this example)
             ta_strength = ta_signals[0].strength if ta_signals else 0
