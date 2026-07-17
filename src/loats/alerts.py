@@ -364,7 +364,7 @@ class AlertSystem:
         """
         try:
             # Get current positions from OpenAlgo
-            position_data = await openalgo_client.get_position_book()
+            position_data = openalgo_client.get_position_book()
 
             if not position_data.get("data"):
                 return await self.send_system_alert("No open positions found", "info")
@@ -398,7 +398,7 @@ class AlertSystem:
         """
         try:
             # Get current funds from OpenAlgo
-            funds_data = await openalgo_client.get_funds()
+            funds_data = openalgo_client.get_funds()
 
             if not funds_data.get("data"):
                 return await self.send_system_alert(
@@ -440,10 +440,10 @@ class AlertSystem:
             logger.warning(f"Kill switch activated: {reason}")
 
             # Cancel all open orders
-            orders = await openalgo_client.get_order_status("")  # Get all orders
+            orders = openalgo_client.get_order_status("")  # Get all orders
             for order in orders.get("data", []):
                 if order["status"] in ["OPEN", "PENDING"]:
-                    await openalgo_client.cancel_order(order["order_id"])
+                    openalgo_client.cancel_order(order["order_id"])
 
             # Send alert
             message = (
@@ -624,7 +624,7 @@ class AlertSystem:
         """Handle /orders command."""
         try:
             # Get open orders from OpenAlgo
-            orders_data = await openalgo_client.get_order_status("")  # Get all orders
+            orders_data = openalgo_client.get_order_status("")  # Get all orders
 
             if not orders_data.get("data"):
                 if update.message:

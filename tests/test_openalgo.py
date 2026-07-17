@@ -70,6 +70,7 @@ class TestOpenAlgoClient:
                 )
 
             mock_client.close.assert_called_once()
+            assert client.client is None
 
     def test_get_quotes(
         self,
@@ -97,7 +98,7 @@ class TestOpenAlgoClient:
 
         mock_httpx_client.post.return_value = mock_response
 
-        with patch("httpx.Client", return_value=mock_httpx_client), client:
+        with patch.object(client, "_ensure_client", return_value=mock_httpx_client):
             result = client.get_quotes(["NIFTY"])
 
             assert result["success"] is True
@@ -142,7 +143,7 @@ class TestOpenAlgoClient:
 
         mock_httpx_client.post.return_value = mock_response
 
-        with patch("httpx.Client", return_value=mock_httpx_client), client:
+        with patch.object(client, "_ensure_client", return_value=mock_httpx_client):
             result = client.get_history(
                 symbol="NIFTY",
                 interval="1min",
@@ -199,7 +200,7 @@ class TestOpenAlgoClient:
 
         mock_httpx_client.post.return_value = mock_response
 
-        with patch("httpx.Client", return_value=mock_httpx_client), client:
+        with patch.object(client, "_ensure_client", return_value=mock_httpx_client):
             result = client.get_option_chain("NIFTY", "2023-01-26")
 
             assert result["success"] is True
@@ -242,7 +243,7 @@ class TestOpenAlgoClient:
 
         mock_httpx_client.post.return_value = mock_response
 
-        with patch("httpx.Client", return_value=mock_httpx_client), client:
+        with patch.object(client, "_ensure_client", return_value=mock_httpx_client):
             result = client.get_position_book()
 
             assert result["success"] is True
@@ -273,7 +274,7 @@ class TestOpenAlgoClient:
 
         mock_httpx_client.post.return_value = mock_response
 
-        with patch("httpx.Client", return_value=mock_httpx_client), client:
+        with patch.object(client, "_ensure_client", return_value=mock_httpx_client):
             result = client.get_funds()
 
             assert result["success"] is True
@@ -301,7 +302,7 @@ class TestOpenAlgoClient:
 
         mock_httpx_client.post.return_value = mock_response
 
-        with patch("httpx.Client", return_value=mock_httpx_client), client:
+        with patch.object(client, "_ensure_client", return_value=mock_httpx_client):
             result = client.place_order(
                 symbol="NIFTY",
                 quantity=100,
@@ -354,7 +355,7 @@ class TestOpenAlgoClient:
 
         mock_httpx_client.post.return_value = mock_response
 
-        with patch("httpx.Client", return_value=mock_httpx_client), client:
+        with patch.object(client, "_ensure_client", return_value=mock_httpx_client):
             result = client.place_smart_order(
                 symbol="NIFTY",
                 quantity=100,
@@ -408,7 +409,7 @@ class TestOpenAlgoClient:
 
         mock_httpx_client.post.return_value = mock_response
 
-        with patch("httpx.Client", return_value=mock_httpx_client), client:
+        with patch.object(client, "_ensure_client", return_value=mock_httpx_client):
             result = client.modify_order(
                 order_id="order_12345",
                 quantity=150,
@@ -454,7 +455,7 @@ class TestOpenAlgoClient:
 
         mock_httpx_client.post.return_value = mock_response
 
-        with patch("httpx.Client", return_value=mock_httpx_client), client:
+        with patch.object(client, "_ensure_client", return_value=mock_httpx_client):
             result = client.cancel_order("order_12345")
 
             assert result["success"] is True
@@ -496,7 +497,7 @@ class TestOpenAlgoClient:
 
         mock_httpx_client.post.return_value = mock_response
 
-        with patch("httpx.Client", return_value=mock_httpx_client), client:
+        with patch.object(client, "_ensure_client", return_value=mock_httpx_client):
             result = client.get_order_status("order_12345")
 
             assert result["success"] is True
@@ -522,7 +523,7 @@ class TestOpenAlgoClient:
         error_response.text = "Internal Server Error"
         mock_httpx_client.post.return_value = error_response
 
-        with patch("httpx.Client", return_value=mock_httpx_client), client:
+        with patch.object(client, "_ensure_client", return_value=mock_httpx_client):
             result = client.get_quotes(["NIFTY"])
 
             assert result["success"] is False
@@ -535,7 +536,7 @@ class TestOpenAlgoClient:
         mock_response.text = "Not JSON"
         mock_httpx_client.post.return_value = mock_response
 
-        with patch("httpx.Client", return_value=mock_httpx_client), client:
+        with patch.object(client, "_ensure_client", return_value=mock_httpx_client):
             result = client.get_quotes(["NIFTY"])
 
             assert result["success"] is False
@@ -544,7 +545,7 @@ class TestOpenAlgoClient:
         # Test timeout error
         mock_httpx_client.post.side_effect = httpx.TimeoutException("Timeout")
 
-        with patch("httpx.Client", return_value=mock_httpx_client), client:
+        with patch.object(client, "_ensure_client", return_value=mock_httpx_client):
             result = client.get_quotes(["NIFTY"])
 
             assert result["success"] is False
@@ -553,7 +554,7 @@ class TestOpenAlgoClient:
         # Test connection error
         mock_httpx_client.post.side_effect = httpx.ConnectError("Connection failed")
 
-        with patch("httpx.Client", return_value=mock_httpx_client), client:
+        with patch.object(client, "_ensure_client", return_value=mock_httpx_client):
             result = client.get_quotes(["NIFTY"])
 
             assert result["success"] is False
@@ -676,7 +677,7 @@ class TestOpenAlgoClient:
 
         mock_httpx_client.post.return_value = mock_response
 
-        with patch("httpx.Client", return_value=mock_httpx_client), client:
+        with patch.object(client, "_ensure_client", return_value=mock_httpx_client):
             result = client.get_all_orders()
 
             assert result["success"] is True
@@ -716,7 +717,7 @@ class TestOpenAlgoClient:
 
         mock_httpx_client.post.return_value = mock_response
 
-        with patch("httpx.Client", return_value=mock_httpx_client), client:
+        with patch.object(client, "_ensure_client", return_value=mock_httpx_client):
             result = client.get_trade_book()
 
             assert result["success"] is True
