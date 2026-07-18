@@ -1,6 +1,6 @@
 # LOATS13July2026
 
-**L**atency-**O**ptimized **A**lgorithmic **T**rading **S**ystem for **13July2026** Expiry
+**L**atency-**O**ptimized **A**lgorithmic **T**rading **S**ystem **13July2026** Expiry
 
 Multi-factor, sentiment-driven, rule-based options analysis platform for OpenAlgo ANALYZE mode.
 
@@ -15,12 +15,12 @@ LOATS13July2026 is a high-performance options analysis platform that combines:
 - **Risk Management**
 - **Orchestration Layer**
 
-Designed for **ANALYZE mode only** with OpenAlgo REST API integration.
+Designed for **ANALYZE mode only** via OpenAlgo REST API integration.
 
 ## Key Features
 
-- **Strict Compliance**: SEBI algo regulations + NIST SP 800-53 + ISO 27001:2022
-- **Latency Optimized**: Strike <5ms, trail <1ms, orchestrator cycle <100ms
+- **Strict Compliance**: SEBI algo regulations, NIST 800-53, ISO 27001:2022
+- **Latency Optimized**: Strike selection <5ms, trail updates <1ms, orchestrator cycle <100ms
 - **Rate Limited**: Conservative NVIDIA NIM API usage (≤20 req/min, ≥3s gap)
 - **Type Safe**: Full mypy --strict compliance
 - **Security Focused**: Bandit, gitleaks, and comprehensive security scanning
@@ -30,24 +30,26 @@ Designed for **ANALYZE mode only** with OpenAlgo REST API integration.
 
 ```
 src/loats/
-├── sentiment/      # Sentiment analysis (VADER)
-├── ta_va/          # Technical and volume analysis
-├── strength/       # Strength calculation
-├── rules/          # Rule-based decision engine
-├── strike/         # Strike selection logic
-├── risk/           # Risk management
-├── orchestrator/   # Pipeline orchestration
-├── adapters/       # OpenAlgo adapter pattern
-├── config/         # Configuration management
-├── models/         # Data models
-└── utils/          # Utility functions (including NIM rate guard)
+├── config/             Configuration management
+├── utils/              Utility functions (including NIM rate guard)
+├── alerts.py           Alert management
+├── database.py         Database interaction
+├── initialization.py   Project initialization
+├── logging.py          Logging configuration
+├── main.py             Main entry point
+├── models.py           Data models
+├── openalgo.py         OpenAlgo adapter
+├── options.py          Options pricing & Greeks
+├── scheduler.py        Task scheduling
+├── sentiment.py        Sentiment analysis
+└── ta.py               Technical analysis
 ```
 
 ## Setup Instructions
 
 ### Prerequisites
 
-- Python 3.12+
+- Python 3.12
 - pip
 - Git
 
@@ -80,7 +82,7 @@ OPENALGO_MODE=ANALYZE
 Run all quality gates:
 
 ```powershell
-# Lint and format
+# Linting and formatting
 ruff check src/ tests/ --config pyproject.toml
 ruff format --check src/ tests/ --config pyproject.toml
 
@@ -88,20 +90,20 @@ ruff format --check src/ tests/ --config pyproject.toml
 mypy src/ --strict --config-file pyproject.toml
 
 # Security scanning
-bandit -r src/ -c pyproject.toml -q
+bandit -r src/ -c pyproject.toml
 
 # Secret scanning
 gitleaks detect --source . --config .gitleaks.toml --no-banner
 
 # Run tests
-pytest tests/unit/ tests/integration/ -v --cov=src --cov-branch --cov-fail-under=80 -x
+pytest tests/ --cov=src --cov-branch --cov-fail-under=80
 ```
 
 ## Development Principles
 
-1. **Stability > Security > Data Integrity > Performance**
+1. **Stability, Security, Data Integrity, and Performance**
 2. **No 500ms resting time** (SEBI 2018 dropped it)
-3. **Decimal-only finance** (No float in financial calculations)
+3. **Decimal-only finance** (No float for financial calculations)
 4. **IST-aware datetime** (No naive datetime)
 5. **Structured logging** (No print statements in src/)
 6. **Function size ≤100 LOC**
@@ -109,10 +111,10 @@ pytest tests/unit/ tests/integration/ -v --cov=src --cov-branch --cov-fail-under
 
 ## Compliance
 
-- **SEBI Algo Regulations**: Full compliance with Indian algorithmic trading regulations
-- **NIST SP 800-53**: Security and privacy controls
-- **ISO 27001:2022**: Information security management
-- **Audit Trail**: 7-year retention, append-only, SHA-256 chained
+- **SEBI Algo Regulations**: Full compliance with Indian algorithmic trading regulations.
+- **NIST 800-53**: Security and privacy controls.
+- **ISO 27001:2022**: Information security management.
+- **Audit Trail**: 7-year retention, append-only, SHA-256 chained.
 
 ## License
 

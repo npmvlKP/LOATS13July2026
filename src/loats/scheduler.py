@@ -1,7 +1,11 @@
-"""Scheduler module for LOATS13July2026 - Implements APScheduler for scan scheduling."""
+"""Scheduler module LOATS13July2026.
+
+Implements APScheduler scan scheduling.
+"""
 
 import asyncio
-from datetime import datetime, timezone
+import datetime
+from datetime import timezone
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -9,11 +13,11 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
+from . import db
 from .config import settings
-from .database import db
 from .logging import get_logger
 from .models import FundsData, HistoricalData, Position, QuoteData, Signal, SignalType
-from .openalgo import async_client as openalgo_client
+from .openalgo import async_client
 from .sentiment import sentiment
 from .ta import ta
 
@@ -29,17 +33,16 @@ class TradingScheduler:
         Returns:
             True if market is open, False otherwise
         """
-        # Use timezone from settings (should be Asia/Kolkata for IST)
+        # Use timezone settings (should be Asia/Kolkata for IST)
         tz = ZoneInfo(settings.timezone)
-        now = datetime.now(tz)
+        now = datetime.datetime.now(tz)
 
         # Check weekday (Monday=0, Sunday=6)
-        # Indian markets are open Monday to Friday
+        # Indian markets are open Monday-Friday
         if now.weekday() >= 5:  # Saturday (5) or Sunday (6)
             return False
 
         # Indian market hours: 9:15 AM to 3:30 PM IST
-        # Check if within market hours
         market_open_time = now.replace(hour=9, minute=15, second=0, microsecond=0)
         market_close_time = now.replace(hour=15, minute=30, second=0, microsecond=0)
 
@@ -52,7 +55,7 @@ class TradingScheduler:
         self.scan_tasks: dict[str, asyncio.Task[Any]] = {}
 
     async def initialize(self) -> None:
-        """Initialize the scheduler and set up jobs."""
+        """Initialize scheduler and set up jobs."""
         try:
             # Set up scheduler
             self.scheduler.configure(
@@ -60,12 +63,11 @@ class TradingScheduler:
                     "coalesce": True,
                     "max_instances": 1,
                     "misfire_grace_time": 30,
-                },
+                }
             )
 
             # Add jobs
             await self._add_jobs()
-
             logger.info("Trading scheduler initialized")
         except Exception:
             logger.exception("Failed to initialize scheduler")
@@ -139,16 +141,15 @@ class TradingScheduler:
         if self.running:
             try:
                 # Cancel all running scan tasks
-                for task_id, task in self.scan_tasks.items():
-                    try:
-                        if not task.done():
-                            task.cancel()
-                            try:
-                                await task
-                            except asyncio.CancelledError:
-                                pass
-                    except Exception:
-                        logger.exception("Error cancelling task %s", task_id)
+                for task_id, task in list(self.scan_tasks.items()):
+                    if not task.done():
+                        task.cancel()
+                        try:
+                            await task
+                        except asyncio.CancelledError:
+                            pass
+                        except Exception:
+                            logger.exception("Error cancelling task %s", task_id)
 
                 self.scheduler.shutdown(wait=False)
                 self.running = False
@@ -159,35 +160,31 @@ class TradingScheduler:
 
     async def run_ta_scan(self) -> None:
         """Run technical analysis scan."""
-        task_id = f"ta_scan_{datetime.now(timezone.utc).isoformat()}"
+        task_id = f"ta_scan_{datetime.datetime.now(timezone.utc).isoformat()}"
         try:
             # Create task and store reference
             task = asyncio.create_task(self._ta_scan_task())
             self.scan_tasks[task_id] = task
             await task
         except asyncio.CancelledError:
-            logger.info("TA scan task %s cancelled", task_id)
+            logger.info("TA scan task cancelled: %s", task_id)
         except Exception:
-            logger.exception("TA scan task %s failed", task_id)
+            logger.exception("TA scan task failed: %s", task_id)
         finally:
             self.scan_tasks.pop(task_id, None)
 
     async def _ta_scan_task(self) -> None:
         """Technical analysis scan task."""
-        start_time = datetime.now(timezone.utc)
+        start_time = datetime.datetime.now(timezone.utc)
         logger.info("Starting technical analysis scan")
-
         try:
             # Get default symbol
             symbol = settings.default_symbol
             timeframe = settings.default_timeframe
 
             # Get historical data from OpenAlgo
-            history_data = await openalgo_client.get_history(
-                symbol=symbol,
-                interval=timeframe,
-                from_date=None,
-                to_date=None,
+            history_data = await async_client.get_history(
+                symbol=symbol, interval=timeframe, from_date=None, to_date=None
             )
 
             # Convert to HistoricalData objects
@@ -196,25 +193,25 @@ class TradingScheduler:
                 historical_data.append(
                     HistoricalData(
                         symbol=symbol,
-                        timestamp=datetime.fromisoformat(item["timestamp"]),
+                        timestamp=datetime.datetime.fromisoformat(item["timestamp"]),
                         open=item["open"],
                         high=item["high"],
                         low=item["low"],
                         close=item["close"],
                         volume=item["volume"],
                         interval=timeframe,
-                    ),
+                    )
                 )
 
             # Store historical data
-            if historical_data:
-                db.store_historical_data(historical_data)
+            for hd in historical_data:
+                db.store_historical_data(hd)
 
             # Calculate indicators
             indicators = ta.calculate_indicators(historical_data)
 
             # Get current price
-            quotes = await openalgo_client.get_quotes([symbol])
+            quotes = await async_client.get_quotes([symbol])
             current_price = quotes.get("data", {}).get(symbol, {}).get("last_price", 0)
 
             # Generate signal
@@ -225,7 +222,7 @@ class TradingScheduler:
                     symbol=symbol,
                     signal_type=SignalType(signal_type),
                     strength=strength,
-                    timestamp=datetime.now(timezone.utc),
+                    timestamp=datetime.datetime.now(timezone.utc),
                     indicators={ind.name: ind.value for ind in indicators},
                     confidence=strength,
                     metadata={
@@ -238,9 +235,7 @@ class TradingScheduler:
                 # Store signal
                 db.create_signal(signal)
                 logger.info(
-                    "TA signal generated: %s with strength %.2f",
-                    signal_type,
-                    strength,
+                    "TA signal generated: %s, strength %.2f", signal_type, strength
                 )
 
             # Store quote
@@ -254,7 +249,7 @@ class TradingScheduler:
                     low=quote_data["low"],
                     close=quote_data["close"],
                     volume=quote_data["volume"],
-                    timestamp=datetime.now(timezone.utc),
+                    timestamp=datetime.datetime.now(timezone.utc),
                     change=quote_data.get("change", 0),
                     change_percent=quote_data.get("change_percent", 0),
                 )
@@ -263,34 +258,35 @@ class TradingScheduler:
         except Exception:
             logger.exception("Technical analysis scan failed")
         finally:
-            duration = (datetime.now(timezone.utc) - start_time).total_seconds()
+            duration = (
+                datetime.datetime.now(timezone.utc) - start_time
+            ).total_seconds()
             logger.info("Technical analysis scan completed in %.2fms", duration * 1000)
 
     async def run_sentiment_scan(self) -> None:
         """Run sentiment analysis scan."""
-        task_id = f"sentiment_scan_{datetime.now(timezone.utc).isoformat()}"
+        task_id = f"sentiment_scan_{datetime.datetime.now(timezone.utc).isoformat()}"
         try:
             # Create task and store reference
             task = asyncio.create_task(self._sentiment_scan_task())
             self.scan_tasks[task_id] = task
             await task
         except asyncio.CancelledError:
-            logger.info("Sentiment scan task %s cancelled", task_id)
+            logger.info("Sentiment scan task cancelled: %s", task_id)
         except Exception:
-            logger.exception("Sentiment scan task %s failed", task_id)
+            logger.exception("Sentiment scan task failed: %s", task_id)
         finally:
             self.scan_tasks.pop(task_id, None)
 
     async def _sentiment_scan_task(self) -> None:
         """Sentiment analysis scan task."""
-        start_time = datetime.now(timezone.utc)
+        start_time = datetime.datetime.now(timezone.utc)
         logger.info("Starting sentiment analysis scan")
-
         try:
             # Get default symbol
             symbol = settings.default_symbol
 
-            # Example RSS feeds - in production these would be configured
+            # Example RSS feeds (in production these would be configured)
             rss_feeds = [
                 "https://economictimes.indiatimes.com/markets/rssfeeds/1977021501.cms",
                 "https://www.moneycontrol.com/rss/latestnews.xml",
@@ -300,7 +296,7 @@ class TradingScheduler:
             # Analyze sentiment
             result = await sentiment.analyze_symbol_sentiment(symbol, rss_feeds)
 
-            # Store sentiment result in metadata
+            # Store sentiment result
             metadata = {
                 "scan_type": "sentiment",
                 "news_count": result.news_count,
@@ -311,9 +307,13 @@ class TradingScheduler:
             }
 
             # Create signal based on sentiment
-            signal_type = (
-                SignalType.BUY if result.sentiment_score > 0 else SignalType.SELL
-            )
+            if result.sentiment_score > 0:
+                signal_type = SignalType.BUY
+            elif result.sentiment_score < 0:
+                signal_type = SignalType.SELL
+            else:
+                signal_type = SignalType.NEUTRAL
+
             if abs(result.sentiment_score) < settings.sentiment_threshold:
                 signal_type = SignalType.NEUTRAL
 
@@ -321,7 +321,7 @@ class TradingScheduler:
                 symbol=symbol,
                 signal_type=signal_type,
                 strength=abs(result.sentiment_score),
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.datetime.now(timezone.utc),
                 indicators={"sentiment_score": result.sentiment_score},
                 confidence=abs(result.sentiment_score),
                 metadata=metadata,
@@ -330,7 +330,7 @@ class TradingScheduler:
             # Store signal
             db.create_signal(signal)
             logger.info(
-                "Sentiment signal generated: %s with score %.2f",
+                "Sentiment signal generated: %s, score %.2f",
                 signal_type,
                 result.sentiment_score,
             )
@@ -338,60 +338,60 @@ class TradingScheduler:
         except Exception:
             logger.exception("Sentiment analysis scan failed")
         finally:
-            duration = (datetime.now(timezone.utc) - start_time).total_seconds()
+            duration = (
+                datetime.datetime.now(timezone.utc) - start_time
+            ).total_seconds()
             logger.info("Sentiment analysis scan completed in %.2fms", duration * 1000)
 
     async def run_signal_generation(self) -> None:
         """Run signal generation scan."""
-        task_id = f"signal_generation_{datetime.now(timezone.utc).isoformat()}"
+        task_id = f"signal_generation_{datetime.datetime.now(timezone.utc).isoformat()}"
         try:
             # Create task and store reference
             task = asyncio.create_task(self._signal_generation_task())
             self.scan_tasks[task_id] = task
             await task
         except asyncio.CancelledError:
-            logger.info("Signal generation task %s cancelled", task_id)
+            logger.info("Signal generation task cancelled: %s", task_id)
         except Exception:
-            logger.exception("Signal generation task %s failed", task_id)
+            logger.exception("Signal generation task failed: %s", task_id)
         finally:
             self.scan_tasks.pop(task_id, None)
 
     async def _signal_generation_task(self) -> None:
         """Signal generation task."""
-        start_time = datetime.now(timezone.utc)
+        start_time = datetime.datetime.now(timezone.utc)
         logger.info("Starting signal generation scan")
-
         try:
             # Get default symbol
             symbol = settings.default_symbol
 
-            # Get latest TA and sentiment signals
+            # Get latest technical and sentiment signals
             ta_signals = db.get_latest_signals(symbol, limit=1)
             sentiment_signals = db.get_latest_signals(symbol, limit=1)
 
             # Get current market data
-            quotes = await openalgo_client.get_quotes([symbol])
+            quotes = await async_client.get_quotes([symbol])
             current_price = quotes.get("data", {}).get(symbol, {}).get("last_price", 0)
 
-            # Get position and funds
-            position = await openalgo_client.get_position_book()
-            funds = await openalgo_client.get_funds()
+            # Get current position and funds
+            position = await async_client.get_position_book()
+            funds = await async_client.get_funds()
 
             # Store position and funds data
             if position.get("data"):
                 for pos in position["data"]:
-                    if pos["symbol"] == symbol:
-                        pos_model = Position(
-                            symbol=pos["symbol"],
-                            quantity=pos["quantity"],
-                            average_price=pos["average_price"],
-                            last_price=pos["last_price"],
-                            pnl=pos["pnl"],
-                            product_type=pos["product_type"],
-                            buy_quantity=pos["buy_quantity"],
-                            sell_quantity=pos["sell_quantity"],
-                        )
-                        db.store_position(pos_model)
+                    pos_model = Position(
+                        symbol=pos["symbol"],
+                        quantity=pos["quantity"],
+                        average_price=pos["average_price"],
+                        last_price=pos["last_price"],
+                        pnl=pos["pnl"],
+                        product_type=pos["product_type"],
+                        buy_quantity=pos["buy_quantity"],
+                        sell_quantity=pos["sell_quantity"],
+                    )
+                    db.store_position(pos_model)
 
             if funds.get("data"):
                 funds_model = FundsData(
@@ -399,7 +399,7 @@ class TradingScheduler:
                     utilized_margin=funds["data"]["utilized_margin"],
                     available_margin=funds["data"]["available_margin"],
                     total_equity=funds["data"]["total_equity"],
-                    timestamp=datetime.now(timezone.utc),
+                    timestamp=datetime.datetime.now(timezone.utc),
                 )
                 db.store_funds(funds_model)
 
@@ -408,7 +408,6 @@ class TradingScheduler:
             sentiment_strength = (
                 sentiment_signals[0].strength if sentiment_signals else 0
             )
-
             combined_strength = (ta_strength + sentiment_strength) / 2
 
             # Determine signal type based on combined strength
@@ -427,10 +426,9 @@ class TradingScheduler:
                 indicators.update(
                     {
                         "sentiment_score": sentiment_signals[0].indicators.get(
-                            "sentiment_score",
-                            0,
-                        ),
-                    },
+                            "sentiment_score", 0
+                        )
+                    }
                 )
 
             metadata = {
@@ -438,23 +436,19 @@ class TradingScheduler:
                 "ta_strength": ta_strength,
                 "sentiment_strength": sentiment_strength,
                 "current_price": current_price,
-                "position_size": (
-                    position.get("data", [{}])[0].get("quantity", 0)
-                    if position.get("data")
-                    else 0
-                ),
-                "available_funds": (
-                    funds.get("data", {}).get("available_cash", 0)
-                    if funds.get("data")
-                    else 0
-                ),
+                "position_size": position.get("data", [{}])[0].get("quantity", 0)
+                if position.get("data")
+                else 0,
+                "available_funds": funds.get("data", {}).get("available_cash", 0)
+                if funds.get("data")
+                else 0,
             }
 
             signal = Signal(
                 symbol=symbol,
                 signal_type=signal_type,
                 strength=combined_strength,
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.datetime.now(timezone.utc),
                 indicators=indicators,
                 confidence=combined_strength,
                 metadata=metadata,
@@ -463,14 +457,14 @@ class TradingScheduler:
             # Store signal
             db.create_signal(signal)
             logger.info(
-                "Combined signal generated: %s with strength %.2f",
+                "Combined signal generated: %s, strength %.2f",
                 signal_type,
                 combined_strength,
             )
 
             # Store quote
-            if quotes.get("data", {}).get(symbol):
-                quote_data = quotes["data"][symbol]
+            quote_data = quotes.get("data", {}).get(symbol)
+            if quote_data:
                 quote = QuoteData(
                     symbol=symbol,
                     last_price=quote_data["last_price"],
@@ -479,7 +473,7 @@ class TradingScheduler:
                     low=quote_data["low"],
                     close=quote_data["close"],
                     volume=quote_data["volume"],
-                    timestamp=datetime.now(timezone.utc),
+                    timestamp=datetime.datetime.now(timezone.utc),
                     change=quote_data.get("change", 0),
                     change_percent=quote_data.get("change_percent", 0),
                 )
@@ -488,21 +482,25 @@ class TradingScheduler:
         except Exception:
             logger.exception("Signal generation scan failed")
         finally:
-            duration = (datetime.now(timezone.utc) - start_time).total_seconds()
+            duration = (
+                datetime.datetime.now(timezone.utc) - start_time
+            ).total_seconds()
             logger.info("Signal generation scan completed in %.2fms", duration * 1000)
 
     async def check_market_status(self) -> None:
         """Check market status and handle open/close events."""
-        task_id = f"market_status_check_{datetime.now(timezone.utc).isoformat()}"
+        task_id = (
+            f"market_status_check_{datetime.datetime.now(timezone.utc).isoformat()}"
+        )
         try:
             # Create task and store reference
             task = asyncio.create_task(self._market_status_check_task())
             self.scan_tasks[task_id] = task
             await task
         except asyncio.CancelledError:
-            logger.info("Market status check task %s cancelled", task_id)
+            logger.info("Market status check task cancelled: %s", task_id)
         except Exception:
-            logger.exception("Market status check task %s failed", task_id)
+            logger.exception("Market status check task failed: %s", task_id)
         finally:
             self.scan_tasks.pop(task_id, None)
 
@@ -512,11 +510,11 @@ class TradingScheduler:
             # Check market status considering IST timezone, weekdays, and holidays
             logger.debug("Checking market status")
 
-            # Use the market hours check method
+            # Use market hours check method
             if not self.is_market_open():
                 logger.debug("Market is closed (weekend, holiday, or closed hours)")
-                # Market is closed - pause frequent scans
-                # Safely remove jobs - handle race conditions where job may not exist
+                # Market closed, pause frequent scans
+                # Safely remove jobs and handle race conditions where job might not exist
                 if self.scheduler.get_job("ta_scan"):
                     try:
                         self.scheduler.remove_job("ta_scan")
@@ -539,7 +537,7 @@ class TradingScheduler:
                 return
 
             logger.debug("Market is open")
-            # Market is open - ensure all scans are running
+            # Market is open, ensure all scans are running
             if not self.scheduler.get_job("ta_scan"):
                 self.scheduler.add_job(
                     self.run_ta_scan,
@@ -561,29 +559,29 @@ class TradingScheduler:
                     id="signal_generation",
                     name="Signal Generation",
                 )
+
         except Exception:
             logger.exception("Market status check failed")
 
     async def run_data_cleanup(self) -> None:
         """Run data cleanup task."""
-        task_id = f"data_cleanup_{datetime.now(timezone.utc).isoformat()}"
+        task_id = f"data_cleanup_{datetime.datetime.now(timezone.utc).isoformat()}"
         try:
             # Create task and store reference
             task = asyncio.create_task(self._data_cleanup_task())
             self.scan_tasks[task_id] = task
             await task
         except asyncio.CancelledError:
-            logger.info("Data cleanup task %s cancelled", task_id)
+            logger.info("Data cleanup task cancelled: %s", task_id)
         except Exception:
-            logger.exception("Data cleanup task %s failed", task_id)
+            logger.exception("Data cleanup task failed: %s", task_id)
         finally:
             self.scan_tasks.pop(task_id, None)
 
     async def _data_cleanup_task(self) -> None:
         """Data cleanup task."""
-        start_time = datetime.now(timezone.utc)
+        start_time = datetime.datetime.now(timezone.utc)
         logger.info("Starting data cleanup")
-
         try:
             # Run database cleanup
             db._cleanup_old_data()
@@ -596,11 +594,12 @@ class TradingScheduler:
 
             # Optimize database
             db.vacuum()
-
         except Exception:
             logger.exception("Data cleanup failed")
         finally:
-            duration = (datetime.now(timezone.utc) - start_time).total_seconds()
+            duration = (
+                datetime.datetime.now(timezone.utc) - start_time
+            ).total_seconds()
             logger.info("Data cleanup completed in %.2fms", duration * 1000)
 
     async def run_once(self, job_id: str) -> None:
@@ -650,5 +649,5 @@ class TradingScheduler:
         return self.running
 
 
-# Export default instance
+# Export a default instance
 scheduler = TradingScheduler()

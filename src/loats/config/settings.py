@@ -15,59 +15,40 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
-        extra="ignore",  # Allow extra fields in .env without crashing
+        extra="ignore",
         frozen=True,
     )
 
     # Environment Configuration
     environment: Literal["development", "production", "test"] = Field(
-        "development",
-        description="Environment (development, production, test)",
+        "development", description="Environment (development, production, test)"
     )
     sqlite_db_path: Path = Field(
-        Path("data/loats.db"),
-        description="Path to SQLite database file",
+        Path("data/loats.db"), description="Path to SQLite database file"
     )
     audit_log_path: Path = Field(
-        Path("data/audit.log"),
-        description="Path to audit log file",
+        Path("data/audit.log"), description="Path to audit log file"
     )
     retention_days: int = Field(
-        2555,  # 7 years
-        description="Number of days to retain data",
+        2555, description="Number of days to retain data (7 years)"
     )
 
     # Scan Intervals
     ta_scan_interval: int = Field(
-        60,
-        description="Technical analysis scan interval in seconds",
+        60, description="Technical analysis scan interval in seconds"
     )
     sentiment_scan_interval: int = Field(
-        300,
-        description="Sentiment analysis scan interval in seconds",
+        300, description="Sentiment analysis scan interval in seconds"
     )
-    signal_scan_interval: int = Field(
-        30,
-        description="Signal scan interval in seconds",
-    )
+    signal_scan_interval: int = Field(30, description="Signal scan interval in seconds")
 
     # Default Trading Parameters
-    default_symbol: str = Field(
-        "NIFTY",
-        description="Default trading symbol",
-    )
-    default_timeframe: str = Field(
-        "1min",
-        description="Default timeframe for analysis",
-    )
+    default_symbol: str = Field("NIFTY", description="Default trading symbol")
+    default_timeframe: str = Field("1min", description="Default timeframe for analysis")
     sentiment_threshold: float = Field(
-        0.05,
-        description="Sentiment threshold for signal generation",
+        0.05, description="Sentiment threshold for signal generation"
     )
-    request_timeout: float = Field(
-        30.0,
-        description="Request timeout in seconds",
-    )
+    request_timeout: float = Field(30.0, description="Request timeout in seconds")
 
     # OpenAlgo Configuration
     openalgo_api_key: SecretStr = Field(
@@ -76,12 +57,10 @@ class Settings(BaseSettings):
         description="OpenAlgo API key",
     )
     openalgo_base_url: str = Field(
-        "http://127.0.0.1:5000",
-        description="Base URL for OpenAlgo REST API",
+        "http://127.0.0.1:5000", description="Base URL for OpenAlgo REST API"
     )
     openalgo_mode: Literal["ANALYZE", "LIVE"] = Field(
-        "ANALYZE",
-        description="OpenAlgo mode - ANALYZE only until all gates pass",
+        "ANALYZE", description="OpenAlgo mode (ANALYZE only until all gates pass)"
     )
 
     # Telegram Configuration
@@ -91,55 +70,38 @@ class Settings(BaseSettings):
     telegram_chat_id: str = Field("", description="Telegram chat ID")
 
     # Trading Configuration
-    nifty_lot_size: int = Field(
-        25,
-        description="NIFTY lot size (NSE Nov 2021)",
-    )
+    nifty_lot_size: int = Field(25, description="NIFTY lot size")
     max_order_value: Decimal = Field(
-        Decimal("200000.00"),
-        description="Maximum order value per order (Rs 2,00,000)",
+        Decimal("200000.00"), description="Maximum order value per order (Rs 2,00,000)"
     )
-    max_daily_orders: int = Field(
-        500,
-        description="Maximum orders per day (self-imposed limit)",
-    )
-    max_ops: int = Field(
-        3,
-        description="Maximum orders per second (self-imposed ≤3 OPS)",
-    )
+    max_daily_orders: int = Field(500, description="Maximum orders per day")
+    max_ops: int = Field(3, description="Maximum orders per second")
     circuit_limit_pct: Decimal = Field(
-        Decimal("0.05"),
-        description="Circuit limit percentage (±5%)",
+        Decimal("0.05"), description="Circuit limit percentage (+-5%)"
     )
 
     # Risk Management
     max_position_per_symbol: int = Field(
-        1000,
-        description="Maximum position per symbol",
+        1000, description="Maximum position per symbol"
     )
     max_total_exposure: Decimal = Field(
-        Decimal("1000000.00"),
-        description="Maximum total exposure",
+        Decimal("1000000.00"), description="Maximum total exposure"
     )
 
     # NVIDIA NIM Rate Limiting
     nim_max_requests_per_minute: int = Field(
-        20,
-        description="Maximum NVIDIA NIM requests per minute (conservative)",
+        20, description="Maximum NVIDIA NIM requests per minute"
     )
     nim_min_gap_seconds: Decimal = Field(
-        Decimal("3.0"),
-        description="Minimum gap between NVIDIA NIM requests (seconds)",
+        Decimal("3.0"), description="Minimum gap between NVIDIA NIM requests (seconds)"
     )
     nim_max_context_tokens: int = Field(
-        4096,
-        description="Maximum context tokens for NVIDIA NIM prompts",
+        4096, description="Maximum context tokens for NVIDIA NIM prompts"
     )
 
     # Timezone Configuration
     timezone: str = Field(
-        "Asia/Kolkata",
-        description="Timezone for all datetime operations",
+        "Asia/Kolkata", description="Timezone for all datetime operations"
     )
 
     @field_validator("max_order_value", "max_total_exposure", "circuit_limit_pct")
@@ -186,7 +148,7 @@ class Settings(BaseSettings):
     @classmethod
     def validate_sentiment_threshold(cls, v: float) -> float:
         """Validate sentiment threshold."""
-        if not 0 <= v <= 1:
+        if not (0 <= v <= 1):
             raise ValueError("Sentiment threshold must be between 0 and 1")
         return v
 
@@ -200,20 +162,19 @@ class Settings(BaseSettings):
 
     def initialize(self) -> None:
         """Initialize settings (placeholder method for backward compatibility)."""
+        pass
 
 
-# Global settings instance - lazy initialization to avoid import-time validation errors
-
-
+# Global settings instance with lazy initialization to avoid import-time validation errors
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
-    """Get the global settings instance with lazy initialization.
-
-    This avoids import-time validation errors on fresh checkouts by deferring
-    the actual Settings creation until first use.
+    """
+    Get global settings instance with lazy initialization.
+    Avoids import-time validation errors on fresh checkouts by
+    deferring actual Settings creation until first use.
     """
     return Settings()  # type: ignore[call-arg]
 
 
 # Alias for backward compatibility
-settings: Settings = get_settings()  # type: ignore[call-arg]
+settings: Settings = get_settings()

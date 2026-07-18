@@ -1,8 +1,16 @@
-Core LOATS13July2026 dependencies
-pydantic>=2.10pydantic-settings>=2.7httpx>=0.28ta>=0.11
-vollib>=1.0.1numpy
-pandasscipy
-vaderSentiment>=3.3.2feedparser>=6.0structlog>=23.2python-telegram-bot>=20.7APScheduler>=3.10
+pydantic>=2.10
+pydantic-settings>=2.7
+httpx>=0.28
+ta>=0.11
+vollib>=1.0.1
+numpy
+pandas
+scipy
+vaderSentiment>=3.3.2
+feedparser>=6.0
+structlog>=23.2
+python-telegram-bot>=20.7
+APScheduler>=3.10
 pytest
 pytest-asyncio
 pytest-cov

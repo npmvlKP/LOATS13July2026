@@ -41,7 +41,7 @@ class TradingSystem:
             logger.info("All system components initialized successfully")
 
         except Exception as e:
-            logger.error(f"Failed initialize trading system: {e}")
+            logger.error(f"Failed to initialize trading system: {e}")
             raise
 
     async def start(self) -> None:
@@ -72,35 +72,25 @@ class TradingSystem:
             await self._wait_for_shutdown()
 
         except Exception as e:
-            logger.error(f"Failed start trading system: {e}")
+            logger.error(f"Failed to start trading system: {e}")
             raise
 
     async def _wait_for_shutdown(self) -> None:
         """Wait for shutdown signal."""
-        # Set up signal handlers for graceful shutdown
+        # Set signal handlers for graceful shutdown
         loop = asyncio.get_running_loop()
-
-        if sys.platform == "win32":
-            # Windows: use add_signal_handler for SIGINT only
-            sig = signal.SIGINT
-            loop.add_signal_handler(
-                sig,
-                lambda: asyncio.create_task(self._handle_shutdown_signal(sig)),  # type: ignore[misc]
-            )
-        else:
+        if sys.platform != "win32":
             # Unix: add multiple signal handlers
-            loop.add_signal_handler(
-                signal.SIGINT,
-                lambda: asyncio.create_task(
-                    self._handle_shutdown_signal(signal.SIGINT)
-                ),  # type: ignore[misc]
-            )
-            loop.add_signal_handler(
-                signal.SIGTERM,
-                lambda: asyncio.create_task(
-                    self._handle_shutdown_signal(signal.SIGTERM)
-                ),  # type: ignore[misc]
-            )
+            for sig in (signal.SIGINT, signal.SIGTERM):
+                loop.add_signal_handler(
+                    sig,
+                    lambda sig=sig: asyncio.create_task(
+                        self._handle_shutdown_signal(sig)
+                    ),
+                )
+        else:
+            # Windows: add_signal_handler not fully supported all signals
+            pass
 
         # Wait for shutdown event
         await self.shutdown_event.wait()
