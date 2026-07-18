@@ -16,7 +16,7 @@ from telegram.ext import (
 )
 
 from .config import settings
-from .database import db
+from .database import Database
 from .logging import get_logger
 from .models import Order, Signal, SignalType, Trade
 from .openalgo import client as openalgo_client
@@ -661,7 +661,7 @@ class AlertSystem:
         """Handle /signals command."""
         try:
             # Get recent signals from database
-            signals = db.get_latest_signals(settings.default_symbol, limit=5)
+            signals = Database().get_latest_signals(settings.default_symbol, limit=5)
 
             if not signals:
                 if update.message:

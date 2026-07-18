@@ -344,7 +344,8 @@ class Database:
         cursor.execute(
             """
             INSERT INTO audit_log (
-                entry_id, timestamp, action, entity_type, entity_id, user, metadata, previous_state, new_state, sha256_hash, timestamp_ms
+            entry_id, timestamp, action, entity_type, entity_id, user, metadata,
+            previous_state, new_state, sha256_hash, timestamp_ms
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
             (
