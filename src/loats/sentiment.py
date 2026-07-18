@@ -1,10 +1,11 @@
 """
-Sentiment analysis module for LOATS13July2026.
+Sentiment analysis module LOATS13July2026.
 Implements RSS news sentiment analysis using Vader Sentiment.
 """
 
 import asyncio
 from datetime import datetime, timezone
+from typing import cast
 from urllib.parse import urlparse
 
 import feedparser
@@ -19,7 +20,7 @@ logger = get_logger(__name__)
 
 
 class SentimentAnalyzer:
-    """Sentiment analysis engine for news and social media."""
+    """Sentiment analysis engine news social media."""
 
     def __init__(self) -> None:
         """Initialize SentimentAnalyzer."""
@@ -28,22 +29,22 @@ class SentimentAnalyzer:
 
     def set_threshold(self, threshold: float) -> None:
         """
-        Set sentiment threshold for filtering.
+        Set sentiment threshold filtering.
 
         Args:
-            threshold: Sentiment threshold (absolute value)
+            threshold: Sentimentthreshold (absolute value)
         """
         self.threshold = threshold
 
     def analyze_text(self, text: str) -> tuple[float, str]:
         """
-        Analyze sentiment of a text string.
+        Analyze sentiment text string.
 
         Args:
-            text: Text to analyze
+            text: Text analyze
 
         Returns:
-            Tuple of (sentiment_score, sentiment_label)
+            Tupleof (sentiment_score, sentiment_label)
         """
         scores = self.analyzer.polarity_scores(text)
 
@@ -62,16 +63,16 @@ class SentimentAnalyzer:
 
     async def parse_rss_feed(self, url: str, max_items: int = 20) -> list[NewsItem]:
         """
-        Parse RSS feed and extract news items asynchronously.
-        Uses asyncio.to_thread() to offload blocking HTTP I/O from newspaper4k
-        to prevent blocking the event loop during sentiment scans.
+        Parse RSS feed extract news items asynchronously.
+        Usesasyncio.to_thread()offload blocking HTTP I/O newspaper4k
+        prevent blocking event loop during sentiment scans.
 
         Args:
             url: RSS feed URL
-            max_items: Maximum number of items to process
+            max_items: Maximum number items process
 
         Returns:
-            List of NewsItem objects
+            List NewsItem objects
         """
         try:
             feed = feedparser.parse(url)
@@ -79,8 +80,8 @@ class SentimentAnalyzer:
 
             for entry in feed.entries[:max_items]:
                 try:
-                    # Extract content asynchronously using asyncio.to_thread()
-                    # This offloads blocking newspaper4k HTTP I/O to thread pool
+                    # Extract content asynchronously usingasyncio.to_thread()
+                    # offloads blocking newspaper4k HTTP I/O thread pool
                     content = await asyncio.to_thread(
                         self._extract_article_content, entry.link
                     )
@@ -114,21 +115,22 @@ class SentimentAnalyzer:
                         sentiment_score=sentiment_score,
                         sentiment_label=sentiment_label,
                     )
+
                     news_items.append(news_item)
 
                 except Exception:
-                    logger.warning("Failed to process RSS item %s: %s", entry.link)
+                    logger.warning("Failed process RSS item %s: %s", entry.link)
                     continue
 
             return news_items
 
         except Exception:
-            logger.exception("Failed to parse RSS feed %s", url)
+            logger.exception("Failed parse RSS feed %s", url)
             return []
 
     def _extract_article_content(self, url: str) -> str:
         """
-        Extract article content from URL using newspaper4k.
+        Extract article content URL using newspaper4k.
 
         Args:
             url: Article URL
@@ -143,7 +145,7 @@ class SentimentAnalyzer:
             text = article.text
             return self.preprocess_text(text)
         except Exception:
-            logger.warning("Failed to extract article content %s: %s", url)
+            logger.warning("Failed extract article content %s: %s", url)
             return ""
 
     async def analyze_symbol_sentiment(
@@ -153,14 +155,14 @@ class SentimentAnalyzer:
         max_items: int = 20,
     ) -> SentimentAnalysisResult:
         """
-        Analyze sentiment for a specific symbol across multiple RSS feeds asynchronously.
-        Uses asyncio.gather() for concurrent RSS feed processing to improve throughput
-        while maintaining thread-safe blocking I/O via asyncio.to_thread().
+        Analyze sentiment specific symbol across multiple RSS feeds asynchronously.
+        Usesasyncio.gather()concurrent RSS feed processing improve throughput
+        while maintaining thread-safe blocking I/Oasyncio.to_thread().
 
         Args:
-            symbol: Symbol to analyze sentiment for
-            rss_urls: List of RSS feed URLs
-            max_items: Maximum number of items to process per feed
+            symbol: Symbol analyze sentiment
+            rss_urls: List RSS feed URLs
+            max_items: Maximum number items process per feed
 
         Returns:
             SentimentAnalysisResult object
@@ -170,27 +172,27 @@ class SentimentAnalyzer:
         negative_count = 0
         neutral_count = 0
 
-        # Process RSS feeds concurrently using asyncio.gather()
-        # Each parse_rss_feed() uses asyncio.to_thread() internally
+        # Process RSS feeds concurrently usingasyncio.gather()
+        # Eachparse_rss_feed()usesasyncio.to_thread()internally
         tasks = [self.parse_rss_feed(url, max_items) for url in rss_urls]
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
         for result in results:
             if isinstance(result, Exception):
-                logger.exception("Failed to process RSS feed: %s", result)
+                logger.exception("Failed process RSS feed: %s", result)
                 continue
-
-            news_items = result
+            # Type narrowing: after passing Exception check, result is list[NewsItem]
+            news_items = cast(list[NewsItem], result)
             all_news.extend(news_items)
 
-            # Count sentiment categories
-            for item in news_items:
-                if item.sentiment_label == "positive":
-                    positive_count += 1
-                elif item.sentiment_label == "negative":
-                    negative_count += 1
-                else:
-                    neutral_count += 1
+        # Count sentiment categories
+        for item in news_items:
+            if item.sentiment_label == "positive":
+                positive_count += 1
+            elif item.sentiment_label == "negative":
+                negative_count += 1
+            else:
+                neutral_count += 1
 
         # Calculate overall sentiment score
         if all_news:
@@ -206,7 +208,7 @@ class SentimentAnalyzer:
         else:
             label = "neutral"
 
-        # Sort news by absolute sentiment score (most extreme first)
+        # Sort news absolute sentimentscore (most extreme first)
         sorted_news = sorted(
             all_news,
             key=lambda x: abs(x.sentiment_score),
@@ -230,13 +232,13 @@ class SentimentAnalyzer:
         news_items: list[NewsItem],
     ) -> list[NewsItem]:
         """
-        Filter news items with significant sentiment.
+        Filter news items significant sentiment.
 
         Args:
-            news_items: List of NewsItem objects
+            news_items: List NewsItem objects
 
         Returns:
-            List of NewsItem objects with significant sentiment
+            List NewsItem objects significant sentiment
         """
         return [
             item for item in news_items if abs(item.sentiment_score) >= self.threshold
@@ -244,7 +246,7 @@ class SentimentAnalyzer:
 
     def preprocess_text(self, text: str) -> str:
         """
-        Preprocess text for sentiment analysis.
+        Preprocess text sentiment analysis.
 
         Args:
             text: Raw text
@@ -252,7 +254,7 @@ class SentimentAnalyzer:
         Returns:
             Preprocessed text
         """
-        # Basic preprocessing - expand as needed
+        # Basic preprocessing expand needed
         text = text.replace("\n", " ").replace("\r", " ")
         return " ".join(text.split())  # Remove extra whitespace
 
