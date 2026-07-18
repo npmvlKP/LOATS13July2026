@@ -79,7 +79,15 @@ def run_quick_check() -> int:
         (
             "Type Safety",
             lambda: run_command(
-                ["python", "-m", "mypy", "--strict", f"{src_dir}", "--no-error-summary"]
+                [
+                    "python",
+                    "-m",
+                    "mypy",
+                    "--strict",
+                    "--explicit-package-bases",
+                    f"{src_dir}",
+                    "--no-error-summary",
+                ]
             ),
         ),
         (
