@@ -1,5 +1,5 @@
 """
-Logging configuration for LOATS13July2026 using structlog.
+Logging configuration LOATS13July2026 using structlog.
 """
 
 import logging
@@ -12,10 +12,10 @@ from structlog.types import Processor
 
 
 def configure_logging(test_mode: bool = False) -> None:
-    """Configure structured logging with structlog.
+    """Configure structured logging for LOATS using structlog.
 
     Args:
-        test_mode: If True, disables file logging for test environments
+        test_mode: If True, disables file logging for test environments.
     """
     # Create logs directory if it doesn't exist (unless in test mode)
     if not test_mode:
@@ -33,13 +33,28 @@ def configure_logging(test_mode: bool = False) -> None:
         structlog.processors.format_exc_info,
     ]
 
+    # Configure structlog FIRST (before dictConfig)
+    # This ensures proper handler integration and allows
+    # ProcessorFormatter.wrap_for_formatter to work correctly
+    # for foreign records from stdlib loggers (httpx, apscheduler, etc.)
+    structlog.configure(
+        processors=shared_processors
+        + [
+            # Final processor: render to console
+            structlog.dev.ConsoleRenderer(colors=False),
+        ],
+        logger_factory=structlog.stdlib.LoggerFactory(),
+        wrapper_class=structlog.stdlib.BoundLogger,
+        cache_logger_on_first_use=True,
+    )
+
     # Configure handlers
     handlers: dict[str, dict[str, Any]] = {
         "default": {
             "level": "INFO",
             "class": "logging.StreamHandler",
             "formatter": "plain",
-        },
+        }
     }
 
     # Add file handler only if not in test mode
@@ -61,11 +76,15 @@ def configure_logging(test_mode: bool = False) -> None:
                 "()": structlog.stdlib.ProcessorFormatter,
                 "processor": structlog.dev.ConsoleRenderer(colors=False),
                 "foreign_pre_chain": shared_processors,
+                "keep_stack_info": True,
+                "use_get_message": False,
             },
             "json": {
                 "()": structlog.stdlib.ProcessorFormatter,
                 "processor": structlog.processors.JSONRenderer(),
                 "foreign_pre_chain": shared_processors,
+                "keep_stack_info": True,
+                "use_get_message": False,
             },
         },
         "handlers": handlers,
@@ -83,19 +102,9 @@ def configure_logging(test_mode: bool = False) -> None:
         },
     }
 
-    # Apply logging configuration
+    # Apply logging configuration AFTER structlog.configure
+    # This ensures handlers are set up properly with structlog integration
     logging.config.dictConfig(logging_config)
-
-    # Configure structlog
-    structlog.configure(
-        processors=shared_processors
-        + [
-            structlog.stdlib.ProcessorFormatter.wrap_for_formatter,
-        ],
-        logger_factory=structlog.stdlib.LoggerFactory(),
-        wrapper_class=structlog.stdlib.BoundLogger,
-        cache_logger_on_first_use=True,
-    )
 
 
 def get_logger(name: str) -> Any:
@@ -103,5 +112,5 @@ def get_logger(name: str) -> Any:
     return structlog.get_logger(name)
 
 
-# Initialize the default logger
+# Initialize default logger
 logger = get_logger("loats")
