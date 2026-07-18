@@ -454,7 +454,7 @@ class TestAlertSystem:
         with patch("src.loats.alerts.settings") as mock_settings:
             with patch("src.loats.alerts.openalgo_client") as mock_openalgo:
                 mock_settings.telegram_chat_id = "test_chat_id"
-                mock_openalgo.get_order_status.return_value = {"data": []}
+                mock_openalgo.get_all_orders.return_value = {"data": []}
                 mock_openalgo.cancel_order.return_value = {"success": True}
 
                 result = await alert_system.activate_kill_switch("Emergency stop")
@@ -469,7 +469,7 @@ class TestAlertSystem:
         with patch("src.loats.alerts.settings") as mock_settings:
             with patch("src.loats.alerts.openalgo_client") as mock_openalgo:
                 mock_settings.telegram_chat_id = "test_chat_id"
-                mock_openalgo.get_order_status.return_value = {
+                mock_openalgo.get_all_orders.return_value = {
                     "data": [
                         {"order_id": "order1", "status": "OPEN"},
                         {"order_id": "order2", "status": "PENDING"},
@@ -490,7 +490,7 @@ class TestAlertSystem:
     async def test_activate_kill_switch_exception(self, alert_system):
         """Test kill switch handles exceptions."""
         with patch("src.loats.alerts.openalgo_client") as mock_openalgo:
-            mock_openalgo.get_order_status.side_effect = Exception("API error")
+            mock_openalgo.get_all_orders.side_effect = Exception("API error")
 
             result = await alert_system.activate_kill_switch("Emergency stop")
 
@@ -667,7 +667,7 @@ class TestAlertSystem:
         with patch("src.loats.alerts.settings") as mock_settings:
             with patch("src.loats.alerts.openalgo_client") as mock_openalgo:
                 mock_settings.telegram_chat_id = "test_chat_id"
-                mock_openalgo.get_order_status.return_value = {"data": []}
+                mock_openalgo.get_all_orders.return_value = {"data": []}
                 mock_openalgo.cancel_order.return_value = {"success": True}
 
                 await alert_system._kill_switch(mock_update, mock_context)
@@ -739,7 +739,7 @@ class TestAlertSystem:
         mock_context = MagicMock()
 
         with patch("src.loats.alerts.openalgo_client") as mock_openalgo:
-            mock_openalgo.get_order_status.return_value = {"data": None}
+            mock_openalgo.get_all_orders.return_value = {"data": None}
 
             await alert_system._orders(mock_update, mock_context)
 
@@ -754,7 +754,7 @@ class TestAlertSystem:
         mock_context = MagicMock()
 
         with patch("src.loats.alerts.openalgo_client") as mock_openalgo:
-            mock_openalgo.get_order_status.return_value = {
+            mock_openalgo.get_all_orders.return_value = {
                 "data": [
                     {
                         "order_id": "order1",
