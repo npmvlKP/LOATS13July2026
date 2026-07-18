@@ -311,12 +311,12 @@ class Database:
         )
 
         # Calculate hash over the entry data WITHOUT the sha256_hash field
-        entry_data = self._model_to_dict(entry)
+        hash_data = self._model_to_dict(entry)
         # Remove sha256_hash (currently None) from the data used for hashing
-        hash_data = {k: v for k, v in entry_data.items() if k != "sha256_hash"}
+        hash_data.pop("sha256_hash", None)
         entry.sha256_hash = self._calculate_sha256(hash_data)
 
-        # Re-serialize with the hash set for JSONL
+        # Re-serialize the fully populated model (including hash) for JSONL
         entry_data = self._model_to_dict(entry)
 
         # Write to database
