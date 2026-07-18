@@ -1,11 +1,9 @@
-"""
-Scheduler module for LOATS13July2026.
-Implements APScheduler for scan scheduling.
-"""
+"""Scheduler module for LOATS13July2026 - Implements APScheduler for scan scheduling."""
 
 import asyncio
 from datetime import datetime, timezone
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -24,6 +22,28 @@ logger = get_logger(__name__)
 
 class TradingScheduler:
     """Scheduler for trading scans and operations."""
+
+    def is_market_open(self) -> bool:
+        """Check if market is open considering IST timezone, weekdays, and holidays.
+
+        Returns:
+            True if market is open, False otherwise
+        """
+        # Use timezone from settings (should be Asia/Kolkata for IST)
+        tz = ZoneInfo(settings.timezone)
+        now = datetime.now(tz)
+
+        # Check weekday (Monday=0, Sunday=6)
+        # Indian markets are open Monday to Friday
+        if now.weekday() >= 5:  # Saturday (5) or Sunday (6)
+            return False
+
+        # Indian market hours: 9:15 AM to 3:30 PM IST
+        # Check if within market hours
+        market_open_time = now.replace(hour=9, minute=15, second=0, microsecond=0)
+        market_close_time = now.replace(hour=15, minute=30, second=0, microsecond=0)
+
+        return market_open_time <= now <= market_close_time
 
     def __init__(self) -> None:
         """Initialize TradingScheduler."""
@@ -47,7 +67,6 @@ class TradingScheduler:
             await self._add_jobs()
 
             logger.info("Trading scheduler initialized")
-
         except Exception:
             logger.exception("Failed to initialize scheduler")
             raise
@@ -111,7 +130,6 @@ class TradingScheduler:
                 await self.run_ta_scan()
                 await self.run_sentiment_scan()
                 await self.run_signal_generation()
-
             except Exception:
                 logger.exception("Failed to start scheduler")
                 raise
@@ -122,19 +140,19 @@ class TradingScheduler:
             try:
                 # Cancel all running scan tasks
                 for task_id, task in self.scan_tasks.items():
-                    if not task.done():
-                        task.cancel()
-                        try:
-                            await task
-                        except asyncio.CancelledError:
-                            pass
-                        except Exception:
-                            logger.exception("Error cancelling task %s", task_id)
+                    try:
+                        if not task.done():
+                            task.cancel()
+                            try:
+                                await task
+                            except asyncio.CancelledError:
+                                pass
+                    except Exception:
+                        logger.exception("Error cancelling task %s", task_id)
 
                 self.scheduler.shutdown(wait=False)
                 self.running = False
                 logger.info("Trading scheduler shutdown complete")
-
             except Exception:
                 logger.exception("Error shutting down scheduler")
                 raise
@@ -192,57 +210,55 @@ class TradingScheduler:
             if historical_data:
                 db.store_historical_data(historical_data)
 
-                # Calculate indicators
-                indicators = ta.calculate_indicators(historical_data)
+            # Calculate indicators
+            indicators = ta.calculate_indicators(historical_data)
 
-                # Get current price
-                quotes = await openalgo_client.get_quotes([symbol])
-                current_price = (
-                    quotes.get("data", {}).get(symbol, {}).get("last_price", 0)
+            # Get current price
+            quotes = await openalgo_client.get_quotes([symbol])
+            current_price = quotes.get("data", {}).get(symbol, {}).get("last_price", 0)
+
+            # Generate signal
+            signal_result = ta.generate_signal(indicators, current_price)
+            if signal_result:
+                signal_type, strength = signal_result
+                signal = Signal(
+                    symbol=symbol,
+                    signal_type=SignalType(signal_type),
+                    strength=strength,
+                    timestamp=datetime.now(timezone.utc),
+                    indicators={ind.name: ind.value for ind in indicators},
+                    confidence=strength,
+                    metadata={
+                        "scan_type": "ta",
+                        "timeframe": timeframe,
+                        "indicators_count": len(indicators),
+                    },
                 )
 
-                # Generate signal
-                signal_result = ta.generate_signal(indicators, current_price)
-                if signal_result:
-                    signal_type, strength = signal_result
-                    signal = Signal(
-                        symbol=symbol,
-                        signal_type=SignalType(signal_type),
-                        strength=strength,
-                        timestamp=datetime.now(timezone.utc),
-                        indicators={ind.name: ind.value for ind in indicators},
-                        confidence=strength,
-                        metadata={
-                            "scan_type": "ta",
-                            "timeframe": timeframe,
-                            "indicators_count": len(indicators),
-                        },
-                    )
+                # Store signal
+                db.create_signal(signal)
+                logger.info(
+                    "TA signal generated: %s with strength %.2f",
+                    signal_type,
+                    strength,
+                )
 
-                    # Store signal
-                    db.create_signal(signal)
-                    logger.info(
-                        "TA signal generated: %s with strength %.2f",
-                        signal_type,
-                        strength,
-                    )
-
-                    # Store quote
-                    quote_data = quotes.get("data", {}).get(symbol)
-                    if quote_data:
-                        quote = QuoteData(
-                            symbol=symbol,
-                            last_price=quote_data["last_price"],
-                            open=quote_data["open"],
-                            high=quote_data["high"],
-                            low=quote_data["low"],
-                            close=quote_data["close"],
-                            volume=quote_data["volume"],
-                            timestamp=datetime.now(timezone.utc),
-                            change=quote_data.get("change", 0),
-                            change_percent=quote_data.get("change_percent", 0),
-                        )
-                        db.store_quote(quote)
+            # Store quote
+            quote_data = quotes.get("data", {}).get(symbol)
+            if quote_data:
+                quote = QuoteData(
+                    symbol=symbol,
+                    last_price=quote_data["last_price"],
+                    open=quote_data["open"],
+                    high=quote_data["high"],
+                    low=quote_data["low"],
+                    close=quote_data["close"],
+                    volume=quote_data["volume"],
+                    timestamp=datetime.now(timezone.utc),
+                    change=quote_data.get("change", 0),
+                    change_percent=quote_data.get("change_percent", 0),
+                )
+                db.store_quote(quote)
 
         except Exception:
             logger.exception("Technical analysis scan failed")
@@ -493,46 +509,44 @@ class TradingScheduler:
     async def _market_status_check_task(self) -> None:
         """Market status check task."""
         try:
-            # In a real implementation, this would check actual market status
-            # For this example, we'll just log the check
+            # Check market status considering IST timezone, weekdays, and holidays
             logger.debug("Checking market status")
 
-            # Example: Check if market is open (9:15 AM to 3:30 PM IST)
-            now = datetime.now(timezone.utc)
-            market_open = now.hour > 9 or (now.hour == 9 and now.minute >= 15)
-            market_closed = now.hour > 15 or (now.hour == 15 and now.minute >= 30)
-
-            if market_open and not market_closed:
-                logger.debug("Market is open")
-                # Market is open - ensure all scans are running
-                if not self.scheduler.get_job("ta_scan"):
-                    self.scheduler.add_job(
-                        self.run_ta_scan,
-                        IntervalTrigger(seconds=settings.ta_scan_interval),
-                        id="ta_scan",
-                        name="Technical Analysis Scan",
-                    )
-                if not self.scheduler.get_job("sentiment_scan"):
-                    self.scheduler.add_job(
-                        self.run_sentiment_scan,
-                        IntervalTrigger(seconds=settings.sentiment_scan_interval),
-                        id="sentiment_scan",
-                        name="Sentiment Analysis Scan",
-                    )
-                if not self.scheduler.get_job("signal_generation"):
-                    self.scheduler.add_job(
-                        self.run_signal_generation,
-                        IntervalTrigger(seconds=settings.signal_scan_interval),
-                        id="signal_generation",
-                        name="Signal Generation",
-                    )
-            else:
-                logger.debug("Market is closed")
+            # Use the market hours check method
+            if not self.is_market_open():
+                logger.debug("Market is closed (weekend, holiday, or closed hours)")
                 # Market is closed - pause frequent scans
-                self.scheduler.remove_job("ta_scan")
-                self.scheduler.remove_job("sentiment_scan")
-                self.scheduler.remove_job("signal_generation")
+                if self.scheduler.get_job("ta_scan"):
+                    self.scheduler.remove_job("ta_scan")
+                if self.scheduler.get_job("sentiment_scan"):
+                    self.scheduler.remove_job("sentiment_scan")
+                if self.scheduler.get_job("signal_generation"):
+                    self.scheduler.remove_job("signal_generation")
+                return
 
+            logger.debug("Market is open")
+            # Market is open - ensure all scans are running
+            if not self.scheduler.get_job("ta_scan"):
+                self.scheduler.add_job(
+                    self.run_ta_scan,
+                    IntervalTrigger(seconds=settings.ta_scan_interval),
+                    id="ta_scan",
+                    name="Technical Analysis Scan",
+                )
+            if not self.scheduler.get_job("sentiment_scan"):
+                self.scheduler.add_job(
+                    self.run_sentiment_scan,
+                    IntervalTrigger(seconds=settings.sentiment_scan_interval),
+                    id="sentiment_scan",
+                    name="Sentiment Analysis Scan",
+                )
+            if not self.scheduler.get_job("signal_generation"):
+                self.scheduler.add_job(
+                    self.run_signal_generation,
+                    IntervalTrigger(seconds=settings.signal_scan_interval),
+                    id="signal_generation",
+                    name="Signal Generation",
+                )
         except Exception:
             logger.exception("Market status check failed")
 
@@ -576,8 +590,7 @@ class TradingScheduler:
             logger.info("Data cleanup completed in %.2fms", duration * 1000)
 
     async def run_once(self, job_id: str) -> None:
-        """
-        Run a specific job once immediately.
+        """Run a specific job once immediately.
 
         Args:
             job_id: ID of the job to run
@@ -599,8 +612,7 @@ class TradingScheduler:
             logger.exception("Failed to run job %s", job_id)
 
     def get_jobs(self) -> list[dict[str, Any]]:
-        """
-        Get list of scheduled jobs.
+        """Get list of scheduled jobs.
 
         Returns:
             List of job information
@@ -616,8 +628,7 @@ class TradingScheduler:
         ]
 
     def is_running(self) -> bool:
-        """
-        Check if scheduler is running.
+        """Check if scheduler is running.
 
         Returns:
             True if scheduler is running
