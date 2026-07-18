@@ -1368,4 +1368,4 @@ class Database:
 
 # Create a module-level singleton instance
 # Database singleton removed to encourage proper dependency injection
-# instance = Database()
+db = Database()

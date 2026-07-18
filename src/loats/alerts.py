@@ -440,7 +440,7 @@ class AlertSystem:
             logger.warning(f"Kill switch activated: {reason}")
 
             # Cancel all open orders
-            orders = openalgo_client.get_order_status("")  # Get all orders
+            orders = openalgo_client.get_all_orders()  # Get all orders
             for order in orders.get("data", []):
                 if order["status"] in ["OPEN", "PENDING"]:
                     openalgo_client.cancel_order(order["order_id"])
@@ -624,7 +624,7 @@ class AlertSystem:
         """Handle /orders command."""
         try:
             # Get open orders from OpenAlgo
-            orders_data = openalgo_client.get_order_status("")  # Get all orders
+            orders_data = openalgo_client.get_all_orders()  # Get all orders
 
             if not orders_data.get("data"):
                 if update.message:

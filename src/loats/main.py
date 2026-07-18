@@ -1,6 +1,4 @@
-"""
-Main entry point for LOATS13July2026 trading system.
-"""
+"""Main entry point LOATS13July2026 trading system."""
 
 import asyncio
 import signal
@@ -32,7 +30,7 @@ class TradingSystem:
             # Initialize database
             db._initialize_database()
             if not db.verify_audit_log_integrity():
-                logger.warning("Audit log integrity check failed on initialization")
+                logger.warning("Audit log integrity check failed during initialization")
 
             # Initialize alert system
             await alerts.initialize()
@@ -43,13 +41,13 @@ class TradingSystem:
             logger.info("All system components initialized successfully")
 
         except Exception as e:
-            logger.error(f"Failed to initialize trading system: {e}")
+            logger.error(f"Failed initialize trading system: {e}")
             raise
 
     async def start(self) -> None:
-        """Start the trading system."""
+        """Start trading system."""
         if self.running:
-            logger.warning("Trading system is already running")
+            logger.warning("Trading system already running")
             return
 
         try:
@@ -74,7 +72,7 @@ class TradingSystem:
             await self._wait_for_shutdown()
 
         except Exception as e:
-            logger.error(f"Failed to start trading system: {e}")
+            logger.error(f"Failed start trading system: {e}")
             raise
 
     async def _wait_for_shutdown(self) -> None:
@@ -82,39 +80,40 @@ class TradingSystem:
         # Set up signal handlers for graceful shutdown
         loop = asyncio.get_running_loop()
 
-        if sys.platform != "win32":
-            for sig in (signal.SIGINT, signal.SIGTERM):
-                loop.add_signal_handler(
-                    sig,
-                    lambda s=sig: asyncio.create_task(self._handle_shutdown_signal(s)),  # type: ignore[misc]
-                )
-        else:
-            # Fallback for Windows: signal.signal is not async, so we just log and set the event.
-            # This is a simplification; a more robust solution might involve a separate thread
-            # or Windows-specific signal handling mechanisms if truly necessary for production.
-            logger.warning(
-                "Signal handlers for graceful shutdown are not supported on Windows. Using basic fallback."
+        if sys.platform == "win32":
+            # Windows: use add_signal_handler for SIGINT only
+            sig = signal.SIGINT
+            loop.add_signal_handler(
+                sig,
+                lambda: asyncio.create_task(self._handle_shutdown_signal(sig)),  # type: ignore[misc]
             )
-            for sig in (signal.SIGINT, signal.SIGTERM):
-                signal.signal(
-                    sig,
-                    lambda s=sig, frame=None: asyncio.create_task(
-                        self._handle_shutdown_signal(s)
-                    ),
-                )  # type: ignore[misc]
+        else:
+            # Unix: add multiple signal handlers
+            loop.add_signal_handler(
+                signal.SIGINT,
+                lambda: asyncio.create_task(
+                    self._handle_shutdown_signal(signal.SIGINT)
+                ),  # type: ignore[misc]
+            )
+            loop.add_signal_handler(
+                signal.SIGTERM,
+                lambda: asyncio.create_task(
+                    self._handle_shutdown_signal(signal.SIGTERM)
+                ),  # type: ignore[misc]
+            )
 
         # Wait for shutdown event
         await self.shutdown_event.wait()
 
-    async def _handle_shutdown_signal(self, signal: signal.Signals) -> None:
+    async def _handle_shutdown_signal(self, sig: signal.Signals) -> None:
         """Handle shutdown signal."""
-        logger.info(f"Received shutdown signal: {signal.name}")
+        logger.info(f"Received shutdown signal: {sig.name}")
         await self.shutdown()
 
     async def shutdown(self) -> None:
-        """Shutdown the trading system gracefully."""
+        """Shutdown trading system gracefully."""
         if not self.running:
-            logger.warning("Trading system is not running")
+            logger.warning("Trading system not running")
             return
 
         try:
@@ -122,7 +121,7 @@ class TradingSystem:
 
             # Send system shutdown alert
             await alerts.send_system_alert(
-                "LOATS13July2026 trading system is shutting down",
+                "LOATS13July2026 trading system shutting down",
                 "warning",
             )
 
@@ -137,7 +136,6 @@ class TradingSystem:
 
             self.running = False
             self.shutdown_event.set()
-
             logger.info("Trading system shutdown complete")
 
         except Exception as e:
@@ -166,9 +164,8 @@ class TradingSystem:
 
 
 async def main() -> None:
-    """Main entry point for the trading system."""
+    """Main entry point for trading system."""
     system = TradingSystem()
-
     try:
         # Initialize system
         await system.initialize()
