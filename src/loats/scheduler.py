@@ -516,12 +516,26 @@ class TradingScheduler:
             if not self.is_market_open():
                 logger.debug("Market is closed (weekend, holiday, or closed hours)")
                 # Market is closed - pause frequent scans
+                # Safely remove jobs - handle race conditions where job may not exist
                 if self.scheduler.get_job("ta_scan"):
-                    self.scheduler.remove_job("ta_scan")
+                    try:
+                        self.scheduler.remove_job("ta_scan")
+                    except Exception:
+                        logger.warning("Failed to remove ta_scan job", exc_info=True)
                 if self.scheduler.get_job("sentiment_scan"):
-                    self.scheduler.remove_job("sentiment_scan")
+                    try:
+                        self.scheduler.remove_job("sentiment_scan")
+                    except Exception:
+                        logger.warning(
+                            "Failed to remove sentiment_scan job", exc_info=True
+                        )
                 if self.scheduler.get_job("signal_generation"):
-                    self.scheduler.remove_job("signal_generation")
+                    try:
+                        self.scheduler.remove_job("signal_generation")
+                    except Exception:
+                        logger.warning(
+                            "Failed to remove signal_generation job", exc_info=True
+                        )
                 return
 
             logger.debug("Market is open")
