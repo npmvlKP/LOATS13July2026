@@ -3,7 +3,7 @@ Options module for LOATS13July2026.
 Implements calculation of Greeks, Black-Scholes model, and volatility analysis.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import numpy as np
@@ -160,7 +160,7 @@ class OptionsEngine:
         """
         Calculate time to expiration in years.
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         days_to_expiry = (expiry - now).total_seconds() / (24 * 60 * 60)
         return days_to_expiry / 365.0
 

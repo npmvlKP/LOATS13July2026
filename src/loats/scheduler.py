@@ -5,7 +5,6 @@ Implements APScheduler scan scheduling.
 
 import asyncio
 import datetime
-from datetime import timezone
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -160,7 +159,7 @@ class TradingScheduler:
 
     async def run_ta_scan(self) -> None:
         """Run technical analysis scan."""
-        task_id = f"ta_scan_{datetime.datetime.now(timezone.utc).isoformat()}"
+        task_id = f"ta_scan_{datetime.datetime.now(datetime.UTC).isoformat()}"
         try:
             # Create task and store reference
             task = asyncio.create_task(self._ta_scan_task())
@@ -175,7 +174,7 @@ class TradingScheduler:
 
     async def _ta_scan_task(self) -> None:
         """Technical analysis scan task."""
-        start_time = datetime.datetime.now(timezone.utc)
+        start_time = datetime.datetime.now(datetime.UTC)
         logger.info("Starting technical analysis scan")
         try:
             # Get default symbol
@@ -222,7 +221,7 @@ class TradingScheduler:
                     symbol=symbol,
                     signal_type=SignalType(signal_type),
                     strength=strength,
-                    timestamp=datetime.datetime.now(timezone.utc),
+                    timestamp=datetime.datetime.now(datetime.UTC),
                     indicators={ind.name: ind.value for ind in indicators},
                     confidence=strength,
                     metadata={
@@ -249,7 +248,7 @@ class TradingScheduler:
                     low=quote_data["low"],
                     close=quote_data["close"],
                     volume=quote_data["volume"],
-                    timestamp=datetime.datetime.now(timezone.utc),
+                    timestamp=datetime.datetime.now(datetime.UTC),
                     change=quote_data.get("change", 0),
                     change_percent=quote_data.get("change_percent", 0),
                 )
@@ -259,13 +258,13 @@ class TradingScheduler:
             logger.exception("Technical analysis scan failed")
         finally:
             duration = (
-                datetime.datetime.now(timezone.utc) - start_time
+                datetime.datetime.now(datetime.UTC) - start_time
             ).total_seconds()
             logger.info("Technical analysis scan completed in %.2fms", duration * 1000)
 
     async def run_sentiment_scan(self) -> None:
         """Run sentiment analysis scan."""
-        task_id = f"sentiment_scan_{datetime.datetime.now(timezone.utc).isoformat()}"
+        task_id = f"sentiment_scan_{datetime.datetime.now(datetime.UTC).isoformat()}"
         try:
             # Create task and store reference
             task = asyncio.create_task(self._sentiment_scan_task())
@@ -280,7 +279,7 @@ class TradingScheduler:
 
     async def _sentiment_scan_task(self) -> None:
         """Sentiment analysis scan task."""
-        start_time = datetime.datetime.now(timezone.utc)
+        start_time = datetime.datetime.now(datetime.UTC)
         logger.info("Starting sentiment analysis scan")
         try:
             # Get default symbol
@@ -321,7 +320,7 @@ class TradingScheduler:
                 symbol=symbol,
                 signal_type=signal_type,
                 strength=abs(result.sentiment_score),
-                timestamp=datetime.datetime.now(timezone.utc),
+                timestamp=datetime.datetime.now(datetime.UTC),
                 indicators={"sentiment_score": result.sentiment_score},
                 confidence=abs(result.sentiment_score),
                 metadata=metadata,
@@ -339,13 +338,13 @@ class TradingScheduler:
             logger.exception("Sentiment analysis scan failed")
         finally:
             duration = (
-                datetime.datetime.now(timezone.utc) - start_time
+                datetime.datetime.now(datetime.UTC) - start_time
             ).total_seconds()
             logger.info("Sentiment analysis scan completed in %.2fms", duration * 1000)
 
     async def run_signal_generation(self) -> None:
         """Run signal generation scan."""
-        task_id = f"signal_generation_{datetime.datetime.now(timezone.utc).isoformat()}"
+        task_id = f"signal_generation_{datetime.datetime.now(datetime.UTC).isoformat()}"
         try:
             # Create task and store reference
             task = asyncio.create_task(self._signal_generation_task())
@@ -360,7 +359,7 @@ class TradingScheduler:
 
     async def _signal_generation_task(self) -> None:
         """Signal generation task."""
-        start_time = datetime.datetime.now(timezone.utc)
+        start_time = datetime.datetime.now(datetime.UTC)
         logger.info("Starting signal generation scan")
         try:
             # Get default symbol
@@ -399,7 +398,7 @@ class TradingScheduler:
                     utilized_margin=funds["data"]["utilized_margin"],
                     available_margin=funds["data"]["available_margin"],
                     total_equity=funds["data"]["total_equity"],
-                    timestamp=datetime.datetime.now(timezone.utc),
+                    timestamp=datetime.datetime.now(datetime.UTC),
                 )
                 db.store_funds(funds_model)
 
@@ -448,7 +447,7 @@ class TradingScheduler:
                 symbol=symbol,
                 signal_type=signal_type,
                 strength=combined_strength,
-                timestamp=datetime.datetime.now(timezone.utc),
+                timestamp=datetime.datetime.now(datetime.UTC),
                 indicators=indicators,
                 confidence=combined_strength,
                 metadata=metadata,
@@ -473,7 +472,7 @@ class TradingScheduler:
                     low=quote_data["low"],
                     close=quote_data["close"],
                     volume=quote_data["volume"],
-                    timestamp=datetime.datetime.now(timezone.utc),
+                    timestamp=datetime.datetime.now(datetime.UTC),
                     change=quote_data.get("change", 0),
                     change_percent=quote_data.get("change_percent", 0),
                 )
@@ -483,14 +482,14 @@ class TradingScheduler:
             logger.exception("Signal generation scan failed")
         finally:
             duration = (
-                datetime.datetime.now(timezone.utc) - start_time
+                datetime.datetime.now(datetime.UTC) - start_time
             ).total_seconds()
             logger.info("Signal generation scan completed in %.2fms", duration * 1000)
 
     async def check_market_status(self) -> None:
         """Check market status and handle open/close events."""
         task_id = (
-            f"market_status_check_{datetime.datetime.now(timezone.utc).isoformat()}"
+            f"market_status_check_{datetime.datetime.now(datetime.UTC).isoformat()}"
         )
         try:
             # Create task and store reference
@@ -565,7 +564,7 @@ class TradingScheduler:
 
     async def run_data_cleanup(self) -> None:
         """Run data cleanup task."""
-        task_id = f"data_cleanup_{datetime.datetime.now(timezone.utc).isoformat()}"
+        task_id = f"data_cleanup_{datetime.datetime.now(datetime.UTC).isoformat()}"
         try:
             # Create task and store reference
             task = asyncio.create_task(self._data_cleanup_task())
@@ -580,7 +579,7 @@ class TradingScheduler:
 
     async def _data_cleanup_task(self) -> None:
         """Data cleanup task."""
-        start_time = datetime.datetime.now(timezone.utc)
+        start_time = datetime.datetime.now(datetime.UTC)
         logger.info("Starting data cleanup")
         try:
             # Run database cleanup
@@ -598,7 +597,7 @@ class TradingScheduler:
             logger.exception("Data cleanup failed")
         finally:
             duration = (
-                datetime.datetime.now(timezone.utc) - start_time
+                datetime.datetime.now(datetime.UTC) - start_time
             ).total_seconds()
             logger.info("Data cleanup completed in %.2fms", duration * 1000)
 

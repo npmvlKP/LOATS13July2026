@@ -1,6 +1,6 @@
 import hashlib
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from src.loats.database import Database
 from src.loats.models import AuditLogEntry
@@ -13,7 +13,7 @@ def test_audit_log_hash_integrity(db: Database):
     """
     # Create an entry
     entry = AuditLogEntry(
-        timestamp=datetime.now(timezone.utc),
+        timestamp=datetime.now(UTC),
         action="TEST_ACTION",
         entity_type="TEST_ENTITY",
         entity_id="123",

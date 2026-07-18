@@ -2,15 +2,15 @@
 Data models for LOATS13July2026 using Pydantic.
 """
 
-from datetime import datetime, timezone
-from enum import Enum
+from datetime import UTC, datetime
+from enum import StrEnum
 from typing import Any
 from uuid import uuid4
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 
-class OrderType(str, Enum):
+class OrderType(StrEnum):
     """Order type enumeration."""
 
     MARKET = "MARKET"
@@ -19,14 +19,14 @@ class OrderType(str, Enum):
     SL_M = "SL-M"  # Stop Loss Market
 
 
-class TransactionType(str, Enum):
+class TransactionType(StrEnum):
     """Transaction type enumeration."""
 
     BUY = "BUY"
     SELL = "SELL"
 
 
-class ProductType(str, Enum):
+class ProductType(StrEnum):
     """Product type enumeration."""
 
     MIS = "MIS"  # Intraday
@@ -34,14 +34,14 @@ class ProductType(str, Enum):
     CNC = "CNC"  # Cash and Carry
 
 
-class OrderVariety(str, Enum):
+class OrderVariety(StrEnum):
     """Order variety enumeration."""
 
     REGULAR = "regular"
     AMO = "amo"  # After Market Order
 
 
-class OrderStatus(str, Enum):
+class OrderStatus(StrEnum):
     """Order status enumeration."""
 
     OPEN = "OPEN"
@@ -119,7 +119,7 @@ class HistoricalData(BaseModel):
     interval: str
 
 
-class OptionType(str, Enum):
+class OptionType(StrEnum):
     """Option type enumeration."""
 
     CALL = "CE"
@@ -211,9 +211,7 @@ class Trade(BaseModel):
     """Trade model for database storage."""
 
     trade_id: str = Field(
-        default_factory=lambda: (
-            f"trade_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}"
-        )
+        default_factory=lambda: f"trade_{datetime.now(UTC).strftime('%Y%m%d%H%M%S%f')}"
     )
     symbol: str
     quantity: int = Field(gt=0)
@@ -259,7 +257,7 @@ class Trade(BaseModel):
         return None
 
 
-class SignalType(str, Enum):
+class SignalType(StrEnum):
     """Signal type enumeration."""
 
     BUY = "BUY"
@@ -272,9 +270,7 @@ class Signal(BaseModel):
     """Trading signal model."""
 
     signal_id: str = Field(
-        default_factory=lambda: (
-            f"signal_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}"
-        )
+        default_factory=lambda: f"signal_{datetime.now(UTC).strftime('%Y%m%d%H%M%S%f')}"
     )
     symbol: str
     signal_type: SignalType
@@ -302,9 +298,7 @@ class AuditLogEntry(BaseModel):
 
     entry_id: str = Field(
         default_factory=lambda: (
-            "audit_"
-            f"{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}_"
-            f"{uuid4().hex[:8]}"
+            f"audit_{datetime.now(UTC).strftime('%Y%m%d%H%M%S%f')}_{uuid4().hex[:8]}"
         )
     )
     timestamp: datetime

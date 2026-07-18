@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pandas as pd
 import pytest
@@ -29,7 +29,7 @@ class TestTechnicalAnalysis:
         return [
             HistoricalData(
                 symbol="TEST",
-                timestamp=datetime(2023, 1, 1, 9, 30, tzinfo=timezone.utc),
+                timestamp=datetime(2023, 1, 1, 9, 30, tzinfo=UTC),
                 open=100.0,
                 high=101.0,
                 low=99.5,
@@ -39,7 +39,7 @@ class TestTechnicalAnalysis:
             ),
             HistoricalData(
                 symbol="TEST",
-                timestamp=datetime(2023, 1, 1, 9, 31, tzinfo=timezone.utc),
+                timestamp=datetime(2023, 1, 1, 9, 31, tzinfo=UTC),
                 open=100.5,
                 high=101.5,
                 low=100.0,
@@ -49,7 +49,7 @@ class TestTechnicalAnalysis:
             ),
             HistoricalData(
                 symbol="TEST",
-                timestamp=datetime(2023, 1, 1, 9, 32, tzinfo=timezone.utc),
+                timestamp=datetime(2023, 1, 1, 9, 32, tzinfo=UTC),
                 open=101.0,
                 high=102.0,
                 low=100.5,
@@ -59,7 +59,7 @@ class TestTechnicalAnalysis:
             ),
             HistoricalData(
                 symbol="TEST",
-                timestamp=datetime(2023, 1, 1, 9, 33, tzinfo=timezone.utc),
+                timestamp=datetime(2023, 1, 1, 9, 33, tzinfo=UTC),
                 open=101.5,
                 high=102.5,
                 low=101.0,
@@ -69,7 +69,7 @@ class TestTechnicalAnalysis:
             ),
             HistoricalData(
                 symbol="TEST",
-                timestamp=datetime(2023, 1, 1, 9, 34, tzinfo=timezone.utc),
+                timestamp=datetime(2023, 1, 1, 9, 34, tzinfo=UTC),
                 open=102.0,
                 high=103.0,
                 low=101.5,
@@ -82,7 +82,7 @@ class TestTechnicalAnalysis:
     @pytest.fixture
     def sufficient_data(self) -> list[HistoricalData]:
         """Fixture for sufficient historical data (15+ points)."""
-        base_time = datetime(2023, 1, 1, 9, 30, tzinfo=timezone.utc)
+        base_time = datetime(2023, 1, 1, 9, 30, tzinfo=UTC)
         return [
             HistoricalData(
                 symbol="TEST",
@@ -128,8 +128,8 @@ class TestTechnicalAnalysis:
         constant_df = pd.DataFrame(
             {
                 "timestamp": [
-                    datetime(2023, 1, 1, 9, 30, tzinfo=timezone.utc),
-                    datetime(2023, 1, 1, 9, 31, tzinfo=timezone.utc),
+                    datetime(2023, 1, 1, 9, 30, tzinfo=UTC),
+                    datetime(2023, 1, 1, 9, 31, tzinfo=UTC),
                 ],
                 "open": [100.0, 100.0],
                 "high": [100.0, 100.0],
@@ -368,7 +368,7 @@ class TestTechnicalAnalysis:
         historical_data = [
             HistoricalData(
                 symbol="TEST",
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
                 open=99.0,
                 high=100.0,
                 low=98.5,
@@ -378,7 +378,7 @@ class TestTechnicalAnalysis:
             ),
             HistoricalData(
                 symbol="TEST",
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
                 open=99.5,
                 high=100.5,
                 low=99.0,
@@ -388,7 +388,7 @@ class TestTechnicalAnalysis:
             ),
             HistoricalData(
                 symbol="TEST",
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
                 open=100.0,
                 high=101.0,
                 low=99.5,
@@ -409,7 +409,7 @@ class TestTechnicalAnalysis:
         historical_data = [
             HistoricalData(
                 symbol="TEST",
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
                 open=102.0,
                 high=103.0,
                 low=101.5,
@@ -419,7 +419,7 @@ class TestTechnicalAnalysis:
             ),
             HistoricalData(
                 symbol="TEST",
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
                 open=101.5,
                 high=102.5,
                 low=101.0,
@@ -429,7 +429,7 @@ class TestTechnicalAnalysis:
             ),
             HistoricalData(
                 symbol="TEST",
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
                 open=101.0,
                 high=102.0,
                 low=100.5,
@@ -450,7 +450,7 @@ class TestTechnicalAnalysis:
         historical_data = [
             HistoricalData(
                 symbol="TEST",
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
                 open=100.0,
                 high=100.5,
                 low=99.9,
@@ -460,7 +460,7 @@ class TestTechnicalAnalysis:
             ),
             HistoricalData(
                 symbol="TEST",
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
                 open=100.4,
                 high=100.6,
                 low=100.0,
@@ -470,7 +470,7 @@ class TestTechnicalAnalysis:
             ),
             HistoricalData(
                 symbol="TEST",
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
                 open=100.5,
                 high=100.7,
                 low=100.1,
@@ -491,7 +491,7 @@ class TestTechnicalAnalysis:
         historical_data = [
             HistoricalData(
                 symbol="TEST",
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
                 open=100.0,
                 high=101.0,
                 low=99.5,
@@ -501,7 +501,7 @@ class TestTechnicalAnalysis:
             ),
             HistoricalData(
                 symbol="TEST",
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
                 open=100.5,
                 high=101.5,
                 low=100.0,
@@ -525,7 +525,7 @@ class TestTechnicalAnalysis:
         historical_data = [
             HistoricalData(
                 symbol="TEST",
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
                 open=95.0,
                 high=100.0,
                 low=90.0,
@@ -535,7 +535,7 @@ class TestTechnicalAnalysis:
             ),
             HistoricalData(
                 symbol="TEST",
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
                 open=95.0,
                 high=100.0,
                 low=90.0,
@@ -545,7 +545,7 @@ class TestTechnicalAnalysis:
             ),
             HistoricalData(
                 symbol="TEST",
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
                 open=95.0,
                 high=115.0,  # Large range
                 low=85.0,  # Large range
@@ -565,7 +565,7 @@ class TestTechnicalAnalysis:
         historical_data = [
             HistoricalData(
                 symbol="TEST",
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
                 open=98.0,
                 high=100.0,
                 low=97.0,
@@ -575,7 +575,7 @@ class TestTechnicalAnalysis:
             ),
             HistoricalData(
                 symbol="TEST",
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
                 open=99.0,
                 high=101.0,
                 low=98.0,
@@ -585,7 +585,7 @@ class TestTechnicalAnalysis:
             ),
             HistoricalData(
                 symbol="TEST",
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
                 open=100.0,
                 high=105.0,  # Moderate range
                 low=95.0,  # Moderate range
@@ -603,7 +603,7 @@ class TestTechnicalAnalysis:
         historical_data = [
             HistoricalData(
                 symbol="TEST",
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
                 open=99.0,
                 high=100.0,
                 low=98.5,
@@ -613,7 +613,7 @@ class TestTechnicalAnalysis:
             ),
             HistoricalData(
                 symbol="TEST",
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
                 open=99.5,
                 high=100.5,
                 low=99.0,
@@ -623,7 +623,7 @@ class TestTechnicalAnalysis:
             ),
             HistoricalData(
                 symbol="TEST",
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
                 open=100.0,
                 high=100.5,  # Small range
                 low=99.8,  # Small range
@@ -643,7 +643,7 @@ class TestTechnicalAnalysis:
         historical_data = [
             HistoricalData(
                 symbol="TEST",
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
                 open=100.0,
                 high=101.0,
                 low=99.5,
@@ -653,7 +653,7 @@ class TestTechnicalAnalysis:
             ),
             HistoricalData(
                 symbol="TEST",
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
                 open=100.5,
                 high=101.5,
                 low=100.0,
@@ -663,7 +663,7 @@ class TestTechnicalAnalysis:
             ),
             HistoricalData(
                 symbol="TEST",
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
                 open=101.0,
                 high=102.0,
                 low=100.5,
@@ -681,7 +681,7 @@ class TestTechnicalAnalysis:
         historical_data = [
             HistoricalData(
                 symbol="TEST",
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
                 open=100.0,
                 high=101.0,
                 low=99.5,
@@ -691,7 +691,7 @@ class TestTechnicalAnalysis:
             ),
             HistoricalData(
                 symbol="TEST",
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
                 open=100.5,
                 high=101.5,
                 low=100.0,
@@ -701,7 +701,7 @@ class TestTechnicalAnalysis:
             ),
             HistoricalData(
                 symbol="TEST",
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
                 open=101.0,
                 high=102.0,
                 low=100.5,
@@ -719,7 +719,7 @@ class TestTechnicalAnalysis:
         historical_data = [
             HistoricalData(
                 symbol="TEST",
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
                 open=100.0,
                 high=101.0,
                 low=99.5,
@@ -729,7 +729,7 @@ class TestTechnicalAnalysis:
             ),
             HistoricalData(
                 symbol="TEST",
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
                 open=100.5,
                 high=101.5,
                 low=100.0,
@@ -739,7 +739,7 @@ class TestTechnicalAnalysis:
             ),
             HistoricalData(
                 symbol="TEST",
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
                 open=101.0,
                 high=102.0,
                 low=100.5,
@@ -759,19 +759,19 @@ class TestTechnicalAnalysis:
             TAIndicator(
                 name="rsi",
                 value=25.0,
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
                 metadata={"timeframe": "1min"},
             ),
             TAIndicator(
                 name="macd",
                 value=1.5,
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
                 metadata={"timeframe": "1min"},
             ),
             TAIndicator(
                 name="supertrend",
                 value=100.5,
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
                 metadata={"timeframe": "1min"},
             ),
         ]
@@ -805,7 +805,7 @@ class TestTechnicalAnalysis:
         insufficient_data = [
             HistoricalData(
                 symbol="TEST",
-                timestamp=datetime(2023, 1, 1, 9, 30, tzinfo=timezone.utc),
+                timestamp=datetime(2023, 1, 1, 9, 30, tzinfo=UTC),
                 open=100.0,
                 high=101.0,
                 low=99.5,
@@ -815,7 +815,7 @@ class TestTechnicalAnalysis:
             ),
             HistoricalData(
                 symbol="TEST",
-                timestamp=datetime(2023, 1, 1, 9, 31, tzinfo=timezone.utc),
+                timestamp=datetime(2023, 1, 1, 9, 31, tzinfo=UTC),
                 open=100.5,
                 high=101.5,
                 low=100.0,
@@ -858,11 +858,11 @@ class TestTechnicalAnalysis:
         # Create test data with known values
         data = {
             "timestamp": [
-                datetime(2023, 1, 1, 9, 30, tzinfo=timezone.utc),
-                datetime(2023, 1, 1, 9, 31, tzinfo=timezone.utc),
-                datetime(2023, 1, 1, 9, 32, tzinfo=timezone.utc),
-                datetime(2023, 1, 1, 9, 33, tzinfo=timezone.utc),
-                datetime(2023, 1, 1, 9, 34, tzinfo=timezone.utc),
+                datetime(2023, 1, 1, 9, 30, tzinfo=UTC),
+                datetime(2023, 1, 1, 9, 31, tzinfo=UTC),
+                datetime(2023, 1, 1, 9, 32, tzinfo=UTC),
+                datetime(2023, 1, 1, 9, 33, tzinfo=UTC),
+                datetime(2023, 1, 1, 9, 34, tzinfo=UTC),
             ],
             "open": [100.0, 101.0, 102.0, 103.0, 104.0],
             "high": [101.0, 102.0, 103.0, 104.0, 105.0],
@@ -910,8 +910,8 @@ class TestTechnicalAnalysis:
         # Test with constant prices (should handle division by zero)
         data = {
             "timestamp": [
-                datetime(2023, 1, 1, 9, 30, tzinfo=timezone.utc),
-                datetime(2023, 1, 1, 9, 31, tzinfo=timezone.utc),
+                datetime(2023, 1, 1, 9, 30, tzinfo=UTC),
+                datetime(2023, 1, 1, 9, 31, tzinfo=UTC),
             ],
             "open": [100.0, 100.0],
             "high": [100.0, 100.0],
@@ -959,43 +959,43 @@ class TestTechnicalAnalysis:
             TAIndicator(
                 name="rsi",
                 value=25.0,  # Oversold
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
                 metadata={"timeframe": "1min"},
             ),
             TAIndicator(
                 name="macd",
                 value=1.5,  # MACD line
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
                 metadata={"timeframe": "1min"},
             ),
             TAIndicator(
                 name="macd_signal",
                 value=0.5,  # Signal line
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
                 metadata={"timeframe": "1min"},
             ),
             TAIndicator(
                 name="supertrend",
                 value=100.0,
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
                 metadata={"timeframe": "1min", "direction": "up"},
             ),
             TAIndicator(
                 name="supertrend_direction",
                 value=1.0,  # 1 for up
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
                 metadata={"timeframe": "1min"},
             ),
             TAIndicator(
                 name="vwap",
                 value=99.0,
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
                 metadata={"timeframe": "1min"},
             ),
             TAIndicator(
                 name="cmf",
                 value=0.2,  # Positive money flow
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
                 metadata={"timeframe": "1min"},
             ),
         ]
@@ -1010,43 +1010,43 @@ class TestTechnicalAnalysis:
             TAIndicator(
                 name="rsi",
                 value=75.0,  # Overbought
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
                 metadata={"timeframe": "1min"},
             ),
             TAIndicator(
                 name="macd",
                 value=0.5,  # MACD line
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
                 metadata={"timeframe": "1min"},
             ),
             TAIndicator(
                 name="macd_signal",
                 value=1.5,  # Signal line
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
                 metadata={"timeframe": "1min"},
             ),
             TAIndicator(
                 name="supertrend",
                 value=100.0,
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
                 metadata={"timeframe": "1min", "direction": "down"},
             ),
             TAIndicator(
                 name="supertrend_direction",
                 value=-1.0,  # -1 for down
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
                 metadata={"timeframe": "1min"},
             ),
             TAIndicator(
                 name="vwap",
                 value=101.0,
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
                 metadata={"timeframe": "1min"},
             ),
             TAIndicator(
                 name="cmf",
                 value=-0.2,  # Negative money flow
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
                 metadata={"timeframe": "1min"},
             ),
         ]
@@ -1070,7 +1070,7 @@ class TestTechnicalAnalysis:
             TAIndicator(
                 name="rsi",
                 value=25.0,
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
                 metadata={"timeframe": "1min"},
             ),
         ]

@@ -2,7 +2,7 @@
 Tests for portfolio Greeks calculation.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -21,7 +21,7 @@ class TestPortfolioGreeks:
     @pytest.fixture
     def sample_contracts(self) -> list[OptionContract]:
         """Create sample option contracts for testing."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         expiry = now + timedelta(days=30)
 
         return [

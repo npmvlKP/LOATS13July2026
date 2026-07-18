@@ -4,7 +4,7 @@ Implements RSS news sentiment analysis using Vader Sentiment.
 """
 
 import asyncio
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import cast
 from urllib.parse import urlparse
 
@@ -101,10 +101,10 @@ class SentimentAnalyzer:
                             pp[3],
                             pp[4],
                             pp[5],
-                            tzinfo=timezone.utc,
+                            tzinfo=UTC,
                         )
                     else:
-                        published_date = datetime.now(timezone.utc)
+                        published_date = datetime.now(UTC)
 
                     news_item = NewsItem(
                         title=entry.title,
@@ -217,7 +217,7 @@ class SentimentAnalyzer:
 
         return SentimentAnalysisResult(
             symbol=symbol,
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             sentiment_score=avg_score,
             sentiment_label=label,
             news_count=len(all_news),

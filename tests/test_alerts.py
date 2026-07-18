@@ -1,6 +1,6 @@
 """Tests for the alerts module."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -59,7 +59,7 @@ class TestAlertSystem:
             signal_type=SignalType.BUY,
             strength=0.85,
             confidence=0.92,
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             indicators={
                 "rsi": 65.4,
                 "macd": 12.3,
@@ -86,7 +86,7 @@ class TestAlertSystem:
             product_type=ProductType.MIS,
             status=OrderStatus.OPEN,
             filled_quantity=0,
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             stop_loss=18500.0,
             take_profit=18600.0,
             trailing_stop_loss=18520.0,
@@ -104,7 +104,7 @@ class TestAlertSystem:
             quantity=50,
             entry_price=18550.25,
             status="OPEN",
-            entry_time=datetime.now(timezone.utc),
+            entry_time=datetime.now(UTC),
             exit_price=None,
             exit_time=None,
             pnl=None,
@@ -283,7 +283,7 @@ class TestAlertSystem:
             signal_type=SignalType.SELL,
             strength=0.85,
             confidence=0.92,
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             indicators={"rsi": 65.4},
             metadata={},
         )
@@ -364,9 +364,9 @@ class TestAlertSystem:
             quantity=50,
             entry_price=18500.0,
             status="CLOSED",
-            entry_time=datetime.now(timezone.utc),
+            entry_time=datetime.now(UTC),
             exit_price=18600.0,
-            exit_time=datetime.now(timezone.utc),
+            exit_time=datetime.now(UTC),
             pnl=5000.0,
             stop_loss=18500.0,
             take_profit=18600.0,
@@ -392,9 +392,9 @@ class TestAlertSystem:
             quantity=50,
             entry_price=18600.0,
             status="CLOSED",
-            entry_time=datetime.now(timezone.utc),
+            entry_time=datetime.now(UTC),
             exit_price=18500.0,
-            exit_time=datetime.now(timezone.utc),
+            exit_time=datetime.now(UTC),
             pnl=-5000.0,
             stop_loss=18500.0,
             take_profit=18600.0,

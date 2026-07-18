@@ -7,7 +7,7 @@ import hashlib
 import json
 import sqlite3
 import threading
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, TypeVar
 
@@ -317,7 +317,7 @@ class Database:
             previous_state: State before action
             new_state: State after action
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         entry = AuditLogEntry(
             timestamp=now,
             action=action,
@@ -373,7 +373,7 @@ class Database:
         Clean data older than retention period.
         Trades are filtered by entry_time, other tables by created_at.
         """
-        cutoff_date = datetime.now(timezone.utc) - timedelta(days=self.retention_days)
+        cutoff_date = datetime.now(UTC) - timedelta(days=self.retention_days)
         cutoff_timestamp_ms = int(cutoff_date.timestamp() * 1000)
 
         conn = self._get_connection()
@@ -416,7 +416,7 @@ class Database:
         Returns:
             True if successful
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         now_iso = now.isoformat()
         now_ms = int(now.timestamp() * 1000)
 
@@ -511,7 +511,7 @@ class Database:
         Returns:
             True if successful
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         now_iso = now.isoformat()
         now_ms = int(now.timestamp() * 1000)
 
@@ -613,15 +613,15 @@ class Database:
 
         entry_time = None
         if row[20]:  # entry_time_ms
-            entry_time = datetime.fromtimestamp(row[20] / 1000, tz=timezone.utc)
+            entry_time = datetime.fromtimestamp(row[20] / 1000, tz=UTC)
         elif row[5]:  # entry_time (iso)
             entry_time = datetime.fromisoformat(row[5])
         else:
-            entry_time = datetime.now(timezone.utc)
+            entry_time = datetime.now(UTC)
 
         exit_time = None
         if row[21]:  # exit_time_ms
-            exit_time = datetime.fromtimestamp(row[21] / 1000, tz=timezone.utc)
+            exit_time = datetime.fromtimestamp(row[21] / 1000, tz=UTC)
         elif row[6]:  # exit_time (iso)
             exit_time = datetime.fromisoformat(row[6])
 
@@ -657,7 +657,7 @@ class Database:
         Returns:
             True if successful
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         now_iso = now.isoformat()
         now_ms = int(now.timestamp() * 1000)
         ts_ms = int(signal.timestamp.timestamp() * 1000)
@@ -722,7 +722,7 @@ class Database:
 
         timestamp = None
         if len(row) > 10 and row[10]:  # timestamp_ms
-            timestamp = datetime.fromtimestamp(row[10] / 1000, tz=timezone.utc)
+            timestamp = datetime.fromtimestamp(row[10] / 1000, tz=UTC)
         else:
             timestamp = datetime.fromisoformat(row[4])
 
@@ -750,7 +750,7 @@ class Database:
         Returns:
             True if successful
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         now_iso = now.isoformat()
         now_ms = int(now.timestamp() * 1000)
 
@@ -816,7 +816,7 @@ class Database:
         for row in rows:
             ts = None
             if row[8]:  # timestamp_ms
-                ts = datetime.fromtimestamp(row[8] / 1000, tz=timezone.utc)
+                ts = datetime.fromtimestamp(row[8] / 1000, tz=UTC)
             else:
                 ts = datetime.fromisoformat(row[1])
 
@@ -847,7 +847,7 @@ class Database:
         Returns:
             True if successful
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         now_iso = now.isoformat()
         now_ms = int(now.timestamp() * 1000)
         ts_ms = int(quote.timestamp.timestamp() * 1000)
@@ -905,7 +905,7 @@ class Database:
 
         ts = None
         if row[10]:  # timestamp_ms
-            ts = datetime.fromtimestamp(row[10] / 1000, tz=timezone.utc)
+            ts = datetime.fromtimestamp(row[10] / 1000, tz=UTC)
         else:
             ts = datetime.fromisoformat(row[7])
 
@@ -935,7 +935,7 @@ class Database:
         Returns:
             True if successful
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         now_iso = now.isoformat()
         now_ms = int(now.timestamp() * 1000)
 
@@ -1026,7 +1026,7 @@ class Database:
         Returns:
             True if successful
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         now_iso = now.isoformat()
         now_ms = int(now.timestamp() * 1000)
         ts_ms = int(funds.timestamp.timestamp() * 1000)
@@ -1074,7 +1074,7 @@ class Database:
 
         ts = None
         if row[5]:  # timestamp_ms
-            ts = datetime.fromtimestamp(row[5] / 1000, tz=timezone.utc)
+            ts = datetime.fromtimestamp(row[5] / 1000, tz=UTC)
         else:
             ts = datetime.fromisoformat(row[4])
 
@@ -1099,7 +1099,7 @@ class Database:
         Returns:
             True if successful
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         now_iso = now.isoformat()
         now_ms = int(now.timestamp() * 1000)
         ts_ms = int(order.timestamp.timestamp() * 1000)
@@ -1177,7 +1177,7 @@ class Database:
         Returns:
             True if successful
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         now_iso = now.isoformat()
         now_ms = int(now.timestamp() * 1000)
 
@@ -1225,7 +1225,7 @@ class Database:
 
         timestamp = None
         if len(row) > 20 and row[20]:  # timestamp_ms
-            timestamp = datetime.fromtimestamp(row[20] / 1000, tz=timezone.utc)
+            timestamp = datetime.fromtimestamp(row[20] / 1000, tz=UTC)
         else:
             timestamp = datetime.fromisoformat(row[10])
 
@@ -1282,7 +1282,7 @@ class Database:
         """Convert database row to AuditLogEntry model."""
         timestamp = None
         if len(row) > 10 and row[10]:  # timestamp_ms
-            timestamp = datetime.fromtimestamp(row[10] / 1000, tz=timezone.utc)
+            timestamp = datetime.fromtimestamp(row[10] / 1000, tz=UTC)
         else:
             timestamp = datetime.fromisoformat(row[1])
 

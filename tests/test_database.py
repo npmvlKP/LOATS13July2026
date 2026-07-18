@@ -2,7 +2,7 @@
 Tests for database module.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from src.loats.database import Database
 from src.loats.models import (
@@ -201,12 +201,10 @@ class TestDatabase:
             normalized_item = item.model_copy()
             if normalized_item.timestamp.tzinfo is None:
                 normalized_item.timestamp = normalized_item.timestamp.replace(
-                    tzinfo=timezone.utc
+                    tzinfo=UTC
                 )
             else:
-                normalized_item.timestamp = normalized_item.timestamp.astimezone(
-                    timezone.utc
-                )
+                normalized_item.timestamp = normalized_item.timestamp.astimezone(UTC)
             normalized_data.append(normalized_item)
 
         # Store historical data
@@ -214,8 +212,8 @@ class TestDatabase:
         assert result is True
 
         # Get historical data
-        start_date = datetime(2023, 1, 1, 9, 0, tzinfo=timezone.utc)
-        end_date = datetime(2023, 1, 1, 10, 0, tzinfo=timezone.utc)
+        start_date = datetime(2023, 1, 1, 9, 0, tzinfo=UTC)
+        end_date = datetime(2023, 1, 1, 10, 0, tzinfo=UTC)
         retrieved_data = db.get_historical_data("TEST", "1min", start_date, end_date)
 
         assert len(retrieved_data) == 3
