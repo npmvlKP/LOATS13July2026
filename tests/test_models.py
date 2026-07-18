@@ -148,6 +148,61 @@ class TestModels:
 
         assert quote2.change_percent == pytest.approx(0.1112, 0.001)
 
+    # H6 regression: an explicitly-provided change_percent of 0.0 must NOT be
+    # overwritten by the derived value, even when last_price != close. The
+    # previous implementation conflated "explicitly zero" with "not provided".
+    def test_quote_data_explicit_zero_change_percent_is_preserved(self) -> None:
+        """Explicit change_percent=0.0 is preserved (H6)."""
+        quote = QuoteData(
+            symbol="NIFTY",
+            last_price=18000.50,
+            open=17950.25,
+            high=18050.75,
+            low=17900.00,
+            close=17980.50,
+            volume=1000000,
+            timestamp=datetime(2023, 1, 1, 15, 30),
+            change=0.0,
+            change_percent=0.0,
+        )
+        # Explicit zeros must remain zeros; they are not "absent".
+        assert quote.change == 0.0
+        assert quote.change_percent == 0.0
+
+    # H6 regression: when neither change nor change_percent is provided, both
+    # are derived from last_price vs close (close != 0).
+    def test_quote_data_change_derived_when_not_provided(self) -> None:
+        """change and change_percent derived when not provided (H6)."""
+        quote = QuoteData(
+            symbol="NIFTY",
+            last_price=18000.50,
+            open=17950.25,
+            high=18050.75,
+            low=17900.00,
+            close=17980.50,
+            volume=1000000,
+            timestamp=datetime(2023, 1, 1, 15, 30),
+        )
+        assert quote.change == pytest.approx(20.0, abs=1e-9)
+        assert quote.change_percent == pytest.approx(0.1112, 0.001)
+
+    # H6 edge case: close == 0 must not raise (division guarded); change_percent
+    # stays at its default 0.0 and change is not derived.
+    def test_quote_data_close_zero_does_not_derive(self) -> None:
+        """close == 0 does not trigger derivation (avoid division by zero)."""
+        quote = QuoteData(
+            symbol="NIFTY",
+            last_price=18000.50,
+            open=17950.25,
+            high=18050.75,
+            low=17900.00,
+            close=0.0,
+            volume=1000000,
+            timestamp=datetime(2023, 1, 1, 15, 30),
+        )
+        assert quote.change_percent == 0.0
+        assert quote.change == 0.0
+
     def test_historical_data_model(self) -> None:
         """Test HistoricalData model."""
         data = HistoricalData(

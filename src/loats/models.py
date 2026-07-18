@@ -75,22 +75,35 @@ class QuoteData(BaseModel):
             raise ValueError("Symbol cannot be empty")
         return v
 
-    @model_validator(mode="after")
-    def calculate_change_values(self) -> "QuoteData":
-        """Calculate change and change_percent after model initialization if not provided."""
-        # Only calculate if change is not explicitly provided (default value is 0.0)
-        if self.change == 0.0 and self.change_percent == 0.0:
-            if self.close != 0:
-                # Calculate based on last_price vs close as per test expectations
-                change = self.last_price - self.close
-                change_percent = (change / self.close) * 100
-                # Use object.__setattr__ to bypass validation
-                object.__setattr__(self, "change", change)
-                object.__setattr__(self, "change_percent", change_percent)
-            else:
-                object.__setattr__(self, "change", 0.0)
-                object.__setattr__(self, "change_percent", 0.0)
-        return self
+    @model_validator(mode="before")
+    @classmethod
+    def _compute_change_percent(cls, data: Any) -> Any:
+        """Compute change_percent before validation if it was not provided.
+
+        Using ``mode="before"`` lets us distinguish "not provided" (the key is
+        absent from the input mapping) from "explicitly zero" (the caller passed
+        ``change_percent=0.0``). The previous ``mode="after"`` implementation
+        conflated these two cases and would overwrite an explicit zero with a
+        derived value, which is incorrect for unchanged instruments (H6).
+        """
+        if isinstance(data, dict):
+            close_raw = data.get("close")
+            # Only derive when close is a usable non-zero number and the
+            # caller did not explicitly pass change_percent.
+            if (
+                "change_percent" not in data
+                and isinstance(close_raw, (int, float))
+                and close_raw not in (0, None)
+                and "last_price" in data
+            ):
+                last_price = data["last_price"]
+                if isinstance(last_price, (int, float)):
+                    data["change_percent"] = (last_price - close_raw) / close_raw * 100
+                    # Likewise derive `change` only when not explicitly provided,
+                    # so an explicit 0.0 is preserved as "no change".
+                    if "change" not in data:
+                        data["change"] = last_price - close_raw
+        return data
 
 
 class HistoricalData(BaseModel):
