@@ -82,11 +82,26 @@ class TradingSystem:
         # Set up signal handlers for graceful shutdown
         loop = asyncio.get_running_loop()
 
-        for sig in (signal.SIGINT, signal.SIGTERM):
-            loop.add_signal_handler(
-                sig,
-                lambda s=sig: asyncio.create_task(self._handle_shutdown_signal(s)),  # type: ignore[misc]
+        if sys.platform != "win32":
+            for sig in (signal.SIGINT, signal.SIGTERM):
+                loop.add_signal_handler(
+                    sig,
+                    lambda s=sig: asyncio.create_task(self._handle_shutdown_signal(s)),  # type: ignore[misc]
+                )
+        else:
+            # Fallback for Windows: signal.signal is not async, so we just log and set the event.
+            # This is a simplification; a more robust solution might involve a separate thread
+            # or Windows-specific signal handling mechanisms if truly necessary for production.
+            logger.warning(
+                "Signal handlers for graceful shutdown are not supported on Windows. Using basic fallback."
             )
+            for sig in (signal.SIGINT, signal.SIGTERM):
+                signal.signal(
+                    sig,
+                    lambda s=sig, frame=None: asyncio.create_task(
+                        self._handle_shutdown_signal(s)
+                    ),
+                )  # type: ignore[misc]
 
         # Wait for shutdown event
         await self.shutdown_event.wait()
