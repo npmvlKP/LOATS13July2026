@@ -298,7 +298,7 @@ class TradingScheduler:
             ]
 
             # Analyze sentiment
-            result = sentiment.analyze_symbol_sentiment(symbol, rss_feeds)
+            result = await sentiment.analyze_symbol_sentiment(symbol, rss_feeds)
 
             # Store sentiment result in metadata
             metadata = {

@@ -3,6 +3,7 @@ Sentiment analysis module for LOATS13July2026.
 Implements RSS news sentiment analysis using Vader Sentiment.
 """
 
+import asyncio
 from datetime import datetime, timezone
 from urllib.parse import urlparse
 
@@ -59,9 +60,11 @@ class SentimentAnalyzer:
 
         return compound_score, label
 
-    def parse_rss_feed(self, url: str, max_items: int = 20) -> list[NewsItem]:
+    async def parse_rss_feed(self, url: str, max_items: int = 20) -> list[NewsItem]:
         """
-        Parse RSS feed and extract news items.
+        Parse RSS feed and extract news items asynchronously.
+        Uses asyncio.to_thread() to offload blocking HTTP I/O from newspaper4k
+        to prevent blocking the event loop during sentiment scans.
 
         Args:
             url: RSS feed URL
@@ -72,16 +75,19 @@ class SentimentAnalyzer:
         """
         try:
             feed = feedparser.parse(url)
-            news_items = []
+            news_items: list[NewsItem] = []
 
             for entry in feed.entries[:max_items]:
                 try:
-                    # Extract content using newspaper4k if available
-                    content = self._extract_article_content(entry.link)
+                    # Extract content asynchronously using asyncio.to_thread()
+                    # This offloads blocking newspaper4k HTTP I/O to thread pool
+                    content = await asyncio.to_thread(
+                        self._extract_article_content, entry.link
+                    )
 
                     # Analyze sentiment
                     sentiment_score, sentiment_label = self.analyze_text(
-                        f"{entry.title}. {content}",
+                        f"{entry.title}. {content}"
                     )
 
                     # Parse published date safely
@@ -110,8 +116,8 @@ class SentimentAnalyzer:
                     )
                     news_items.append(news_item)
 
-                except Exception as e:
-                    logger.warning("Failed to process RSS item %s: %s", entry.link, e)
+                except Exception:
+                    logger.warning("Failed to process RSS item %s: %s", entry.link)
                     continue
 
             return news_items
@@ -136,18 +142,20 @@ class SentimentAnalyzer:
             article.parse()
             text = article.text
             return self.preprocess_text(text)
-        except Exception as e:
-            logger.warning("Failed to extract article content from %s: %s", url, e)
+        except Exception:
+            logger.warning("Failed to extract article content %s: %s", url)
             return ""
 
-    def analyze_symbol_sentiment(
+    async def analyze_symbol_sentiment(
         self,
         symbol: str,
         rss_urls: list[str],
         max_items: int = 20,
     ) -> SentimentAnalysisResult:
         """
-        Analyze sentiment for a specific symbol across multiple RSS feeds.
+        Analyze sentiment for a specific symbol across multiple RSS feeds asynchronously.
+        Uses asyncio.gather() for concurrent RSS feed processing to improve throughput
+        while maintaining thread-safe blocking I/O via asyncio.to_thread().
 
         Args:
             symbol: Symbol to analyze sentiment for
@@ -157,28 +165,32 @@ class SentimentAnalyzer:
         Returns:
             SentimentAnalysisResult object
         """
-        all_news = []
+        all_news: list[NewsItem] = []
         positive_count = 0
         negative_count = 0
         neutral_count = 0
 
-        for url in rss_urls:
-            try:
-                news_items = self.parse_rss_feed(url, max_items)
-                all_news.extend(news_items)
+        # Process RSS feeds concurrently using asyncio.gather()
+        # Each parse_rss_feed() uses asyncio.to_thread() internally
+        tasks = [self.parse_rss_feed(url, max_items) for url in rss_urls]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
 
-                # Count sentiment categories
-                for item in news_items:
-                    if item.sentiment_label == "positive":
-                        positive_count += 1
-                    elif item.sentiment_label == "negative":
-                        negative_count += 1
-                    else:
-                        neutral_count += 1
-
-            except Exception:
-                logger.exception("Failed to process RSS feed %s", url)
+        for result in results:
+            if isinstance(result, Exception):
+                logger.exception("Failed to process RSS feed: %s", result)
                 continue
+
+            news_items = result
+            all_news.extend(news_items)
+
+            # Count sentiment categories
+            for item in news_items:
+                if item.sentiment_label == "positive":
+                    positive_count += 1
+                elif item.sentiment_label == "negative":
+                    negative_count += 1
+                else:
+                    neutral_count += 1
 
         # Calculate overall sentiment score
         if all_news:
@@ -240,7 +252,7 @@ class SentimentAnalyzer:
         Returns:
             Preprocessed text
         """
-        # Basic preprocessing - can be expanded as needed
+        # Basic preprocessing - expand as needed
         text = text.replace("\n", " ").replace("\r", " ")
         return " ".join(text.split())  # Remove extra whitespace
 
