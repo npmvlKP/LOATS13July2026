@@ -247,7 +247,9 @@ class Trade(BaseModel):
             and values.get("quantity") is not None
             and values.get("transaction_type") is not None
         ):
-            multiplier = 1 if values["transaction_type"] == TransactionType.BUY else -1
+            multiplier = (
+                1 if values["transaction_type"] in (TransactionType.BUY, "BUY") else -1
+            )
             pnl_value = (
                 (float(values["exit_price"]) - float(values["entry_price"]))
                 * int(values["quantity"])
