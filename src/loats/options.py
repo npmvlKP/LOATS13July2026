@@ -7,10 +7,10 @@ from datetime import datetime, timezone
 from typing import Any
 
 import numpy as np
-from py_vollib.black_scholes import black_scholes
-from py_vollib.black_scholes.greeks.analytical import delta, gamma, rho, theta, vega
-from py_vollib.ref_python.black_scholes.implied_volatility import implied_volatility
 from scipy.optimize import brentq, newton
+from vollib.black_scholes import black_scholes
+from vollib.black_scholes.greeks.analytical import delta, gamma, rho, theta, vega
+from vollib.ref_python.black_scholes.implied_volatility import implied_volatility
 
 # type: ignore[import-untyped]
 from .logging import get_logger
@@ -111,7 +111,7 @@ class OptionsEngine:
         try:
             return float(implied_volatility(price, S, K, t, r, flag))
         except Exception:
-            logger.warning("py_vollib calculation failed. Using fallback method.")
+            logger.warning("vollib calculation failed. Using fallback method.")
 
         def objective_function(sigma: float) -> float:
             return float(black_scholes(flag, S, K, t, r, sigma) - price)

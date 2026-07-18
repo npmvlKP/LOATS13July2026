@@ -5,8 +5,8 @@ Tests for options module.
 from datetime import datetime
 
 import pytest
-from py_vollib.black_scholes import black_scholes
-from py_vollib.black_scholes.implied_volatility import implied_volatility
+from vollib.black_scholes import black_scholes
+from vollib.black_scholes.implied_volatility import implied_volatility
 
 from src.loats.models import Greeks, OptionContract, OptionType
 from src.loats.options import (
@@ -178,8 +178,8 @@ class TestOptionsAnalysis:
         assert iv2 > 0
         assert iv2 < 1  # IV should be between 0 and 1
 
-        # Test with known values (should match py_vollib result)
-        # Using py_vollib directly to get expected IV
+        # Test with known values (should match vollib result)
+        # Using vollib directly to get expected IV
         expected_iv = implied_volatility(
             price=150.50,
             S=18000.0,
@@ -198,7 +198,7 @@ class TestOptionsAnalysis:
             option_type=OptionType.CALL,
         )
 
-        assert abs(iv3 - expected_iv) < 0.01  # Should be close to py_vollib result
+        assert abs(iv3 - expected_iv) < 0.01  # Should be close to vollib result
 
     def test_calculate_var(self) -> None:
         """Test calculate_var function."""
@@ -419,7 +419,7 @@ class TestOptionsAnalysis:
         assert metrics["extrinsic_value"] == 40.25  # 140.25 - 100.0
 
     def test_black_scholes_consistency(self, options: OptionsAnalysis) -> None:
-        """Test that our Black-Scholes implementation is consistent with py_vollib."""
+        """Test that our Black-Scholes implementation is consistent with vollib."""
         # Test parameters
         S = 18000.0  # Spot price
         K = 18000.0  # Strike price
@@ -427,7 +427,7 @@ class TestOptionsAnalysis:
         r = 0.05  # Risk-free rate
         sigma = 0.25  # Volatility
 
-        # Calculate call price using py_vollib
+        # Calculate call price using vollib
         expected_call_price = black_scholes(flag="c", S=S, K=K, t=t, r=r, sigma=sigma)
 
         # Calculate call price using our implementation
@@ -435,7 +435,7 @@ class TestOptionsAnalysis:
             S=S, K=K, t=t, sigma=sigma, option_type=OptionType.CALL
         )
 
-        # The calculated price should be very close to py_vollib
+        # The calculated price should be very close to vollib
         assert abs(calculated_call_price - expected_call_price) < 0.01
 
         # Test put option
