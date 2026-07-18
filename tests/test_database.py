@@ -2,7 +2,7 @@
 Tests for database module.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from src.loats.database import Database
 from src.loats.models import (
@@ -195,17 +195,32 @@ class TestDatabase:
         sample_historical_data: list[HistoricalData],
     ) -> None:
         """Test store and get historical data operations."""
+        # Normalize timestamps to UTC for comparison
+        normalized_data = []
+        for item in sample_historical_data:
+            normalized_item = item.model_copy()
+            if normalized_item.timestamp.tzinfo is None:
+                normalized_item.timestamp = normalized_item.timestamp.replace(
+                    tzinfo=timezone.utc
+                )
+            else:
+                normalized_item.timestamp = normalized_item.timestamp.astimezone(
+                    timezone.utc
+                )
+            normalized_data.append(normalized_item)
+
         # Store historical data
-        result = db.store_historical_data(sample_historical_data)
+        result = db.store_historical_data(normalized_data)
         assert result is True
 
         # Get historical data
-        start_date = datetime(2023, 1, 1, 9, 0)
-        end_date = datetime(2023, 1, 1, 10, 0)
+        start_date = datetime(2023, 1, 1, 9, 0, tzinfo=timezone.utc)
+        end_date = datetime(2023, 1, 1, 10, 0, tzinfo=timezone.utc)
         retrieved_data = db.get_historical_data("TEST", "1min", start_date, end_date)
 
         assert len(retrieved_data) == 3
-        assert retrieved_data[0].timestamp == sample_historical_data[0].timestamp
+        # Both should now be UTC-aware
+        assert retrieved_data[0].timestamp == normalized_data[0].timestamp
         assert retrieved_data[0].open == sample_historical_data[0].open
         assert retrieved_data[1].close == sample_historical_data[1].close
 

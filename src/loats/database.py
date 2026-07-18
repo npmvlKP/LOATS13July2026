@@ -1,6 +1,6 @@
 """
-Database module LOATS13July2026.
-Implements SQLite database audit trail JSONL dual-write.
+Database module for LOATS13July2026.
+Implements SQLite database with audit trail and JSONL dual-write.
 """
 
 import hashlib
@@ -33,7 +33,7 @@ T = TypeVar("T", bound=BaseModel)
 
 
 class Database:
-    """SQLite database audit trail functionality."""
+    """SQLite database with audit trail functionality."""
 
     def __init__(
         self,
@@ -49,8 +49,8 @@ class Database:
             audit_log_path: Path to audit log JSONL file
             retention_days: Number of days to retain data (defaults to settings)
         """
-        self.db_path = db_path or settings.sqlite_db_path
-        self.audit_log_path = audit_log_path or settings.audit_log_path
+        self.db_path = db_path or Path(settings.sqlite_db_path)
+        self.audit_log_path = audit_log_path or Path(settings.audit_log_path)
         self.retention_days = retention_days or settings.retention_days
         self._thread_local = threading.local()
 
@@ -104,7 +104,11 @@ class Database:
                 trailing_stop_loss REAL,
                 metadata TEXT,
                 created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL
+                updated_at TEXT NOT NULL,
+                created_at_ms INTEGER NOT NULL DEFAULT 0,
+                updated_at_ms INTEGER NOT NULL DEFAULT 0,
+                entry_time_ms INTEGER NOT NULL DEFAULT 0,
+                exit_time_ms INTEGER
             )
         """)
 
@@ -118,7 +122,9 @@ class Database:
                 indicators TEXT NOT NULL,
                 metadata TEXT,
                 confidence REAL,
-                created_at TEXT NOT NULL
+                created_at TEXT NOT NULL,
+                created_at_ms INTEGER NOT NULL DEFAULT 0,
+                timestamp_ms INTEGER NOT NULL DEFAULT 0
             )
         """)
 
@@ -133,7 +139,8 @@ class Database:
                 metadata TEXT,
                 previous_state TEXT,
                 new_state TEXT,
-                sha256_hash TEXT NOT NULL
+                sha256_hash TEXT NOT NULL,
+                timestamp_ms INTEGER NOT NULL DEFAULT 0
             )
         """)
 
@@ -149,6 +156,8 @@ class Database:
                 volume INTEGER NOT NULL,
                 interval TEXT NOT NULL,
                 created_at TEXT NOT NULL,
+                created_at_ms INTEGER NOT NULL DEFAULT 0,
+                timestamp_ms INTEGER NOT NULL DEFAULT 0,
                 UNIQUE(symbol, timestamp, interval)
             )
         """)
@@ -167,6 +176,8 @@ class Database:
                 change REAL NOT NULL,
                 change_percent REAL NOT NULL,
                 created_at TEXT NOT NULL,
+                created_at_ms INTEGER NOT NULL DEFAULT 0,
+                timestamp_ms INTEGER NOT NULL DEFAULT 0,
                 UNIQUE(symbol, timestamp)
             )
         """)
@@ -184,6 +195,8 @@ class Database:
                 sell_quantity INTEGER NOT NULL,
                 timestamp TEXT NOT NULL,
                 created_at TEXT NOT NULL,
+                created_at_ms INTEGER NOT NULL DEFAULT 0,
+                timestamp_ms INTEGER NOT NULL DEFAULT 0,
                 UNIQUE(symbol, timestamp)
             )
         """)
@@ -197,6 +210,8 @@ class Database:
                 total_equity REAL NOT NULL,
                 timestamp TEXT NOT NULL,
                 created_at TEXT NOT NULL,
+                created_at_ms INTEGER NOT NULL DEFAULT 0,
+                timestamp_ms INTEGER NOT NULL DEFAULT 0,
                 UNIQUE(timestamp)
             )
         """)
@@ -220,7 +235,10 @@ class Database:
                 take_profit REAL,
                 trailing_stop_loss REAL,
                 created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL
+                updated_at TEXT NOT NULL,
+                created_at_ms INTEGER NOT NULL DEFAULT 0,
+                updated_at_ms INTEGER NOT NULL DEFAULT 0,
+                timestamp_ms INTEGER NOT NULL DEFAULT 0
             )
         """)
 
@@ -249,7 +267,7 @@ class Database:
     def _get_connection(self) -> sqlite3.Connection:
         """
         Get database connection.
-        Ensures thread-local connection and sets PRAGMAs only once per connection.
+        Ensures thread-local connection sets PRAGMAs only once per connection.
         """
         if not hasattr(self._thread_local, "connection"):
             conn = sqlite3.connect(self.db_path)
@@ -258,7 +276,8 @@ class Database:
             conn.execute("PRAGMA temp_store=MEMORY")
             conn.execute("PRAGMA cache_size=-10000")  # 10MB cache
             self._thread_local.connection = conn
-        return self._thread_local.connection
+        conn_ref: sqlite3.Connection = self._thread_local.connection
+        return conn_ref
 
     def _model_to_dict(self, model: BaseModel) -> dict[str, Any]:
         """Convert Pydantic model to dictionary."""
@@ -272,7 +291,7 @@ class Database:
         return model_class(**data)
 
     def _calculate_sha256(self, data: dict[str, Any]) -> str:
-        """Calculate SHA-256 hash for a dictionary."""
+        """Calculate SHA-256 hash of a dictionary."""
         data_str = json.dumps(data, sort_keys=True)
         return hashlib.sha256(data_str.encode()).hexdigest()
 
@@ -298,8 +317,9 @@ class Database:
             previous_state: State before action
             new_state: State after action
         """
+        now = datetime.now(timezone.utc)
         entry = AuditLogEntry(
-            timestamp=datetime.now(timezone.utc),
+            timestamp=now,
             action=action,
             entity_type=entity_type,
             entity_id=entity_id,
@@ -309,9 +329,9 @@ class Database:
             new_state=new_state,
         )
 
-        # Calculate hash over entry data WITHOUT the sha256_hash field
+        # Calculate hash over entry data WITHOUT sha256_hash field
         hash_data = self._model_to_dict(entry)
-        # Remove sha256_hash (which is currently None) for data hashing
+        # Remove sha256_hash (which is currently None) for hashing
         hash_data.pop("sha256_hash", None)
         entry.sha256_hash = self._calculate_sha256(hash_data)
 
@@ -324,10 +344,8 @@ class Database:
         cursor.execute(
             """
             INSERT INTO audit_log (
-                entry_id, timestamp, action, entity_type, entity_id, user,
-                metadata, previous_state, new_state, sha256_hash
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                entry_id, timestamp, action, entity_type, entity_id, user, metadata, previous_state, new_state, sha256_hash, timestamp_ms
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
             (
                 entry.entry_id,
@@ -340,6 +358,7 @@ class Database:
                 json.dumps(entry.previous_state) if entry.previous_state else None,
                 json.dumps(entry.new_state) if entry.new_state else None,
                 entry.sha256_hash,
+                int(now.timestamp() * 1000),
             ),
         )
         conn.commit()
@@ -354,27 +373,34 @@ class Database:
         Trades are filtered by entry_time, other tables by created_at.
         """
         cutoff_date = datetime.now(timezone.utc) - timedelta(days=self.retention_days)
-        cutoff_str = cutoff_date.isoformat()
+        cutoff_timestamp_ms = int(cutoff_date.timestamp() * 1000)
 
         conn = self._get_connection()
         cursor = conn.cursor()
 
         # Delete old trades (by entry_time as the business timestamp)
-        cursor.execute("DELETE FROM trades WHERE entry_time < ?", (cutoff_str,))
+        cursor.execute(
+            "DELETE FROM trades WHERE entry_time_ms < ?", (cutoff_timestamp_ms,)
+        )
 
         # Delete old signals
-        cursor.execute("DELETE FROM signals WHERE created_at < ?", (cutoff_str,))
+        cursor.execute(
+            "DELETE FROM signals WHERE created_at_ms < ?", (cutoff_timestamp_ms,)
+        )
 
         # Delete old historical data
         cursor.execute(
-            "DELETE FROM historical_data WHERE created_at < ?", (cutoff_str,)
+            "DELETE FROM historical_data WHERE created_at_ms < ?",
+            (cutoff_timestamp_ms,),
         )
 
         # Delete old quotes
-        cursor.execute("DELETE FROM quotes WHERE created_at < ?", (cutoff_str,))
+        cursor.execute(
+            "DELETE FROM quotes WHERE created_at_ms < ?", (cutoff_timestamp_ms,)
+        )
 
         conn.commit()
-        logger.info(f"Cleaned data older than {cutoff_str}")
+        logger.info(f"Cleaned data older than {cutoff_timestamp_ms} ms epoch.")
 
     # -------------------------------------------------------------------------
     # Trade CRUD methods
@@ -382,26 +408,38 @@ class Database:
 
     def create_trade(self, trade: Trade) -> bool:
         """
-        Create a new trade record.
+        Create new trade record.
 
         Args:
             trade: Trade model instance
-
         Returns:
             True if successful
         """
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(timezone.utc)
+        now_iso = now.isoformat()
+        now_ms = int(now.timestamp() * 1000)
+
+        entry_time_ms = (
+            int(trade.entry_time.timestamp() * 1000)
+            if isinstance(trade.entry_time, datetime)
+            else 0
+        )
+        exit_time_ms = (
+            int(trade.exit_time.timestamp() * 1000)
+            if isinstance(trade.exit_time, datetime)
+            else None
+        )
+
         conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute(
             """
             INSERT INTO trades (
-                trade_id, symbol, quantity, entry_price, exit_price,
-                entry_time, exit_time, transaction_type, product_type,
-                pnl, status, strategy, stop_loss, take_profit,
-                trailing_stop_loss, metadata, created_at, updated_at
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                trade_id, symbol, quantity, entry_price, exit_price, entry_time, exit_time,
+                transaction_type, product_type, pnl, status, strategy, stop_loss,
+                take_profit, trailing_stop_loss, metadata, created_at, updated_at,
+                created_at_ms, updated_at_ms, entry_time_ms, exit_time_ms
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
             (
                 trade.trade_id,
@@ -409,12 +447,16 @@ class Database:
                 trade.quantity,
                 trade.entry_price,
                 trade.exit_price,
-                trade.entry_time.isoformat()
-                if isinstance(trade.entry_time, datetime)
-                else str(trade.entry_time),
-                trade.exit_time.isoformat()
-                if isinstance(trade.exit_time, datetime)
-                else trade.exit_time,
+                (
+                    trade.entry_time.isoformat()
+                    if isinstance(trade.entry_time, datetime)
+                    else str(trade.entry_time)
+                ),
+                (
+                    trade.exit_time.isoformat()
+                    if isinstance(trade.exit_time, datetime)
+                    else trade.exit_time
+                ),
                 trade.transaction_type.value,
                 trade.product_type.value,
                 trade.pnl,
@@ -424,8 +466,12 @@ class Database:
                 trade.take_profit,
                 trade.trailing_stop_loss,
                 json.dumps(trade.metadata) if trade.metadata else None,
-                now,
-                now,
+                now_iso,
+                now_iso,
+                now_ms,
+                now_ms,
+                entry_time_ms,
+                exit_time_ms,
             ),
         )
         conn.commit()
@@ -440,11 +486,10 @@ class Database:
 
     def get_trade(self, trade_id: str) -> Trade | None:
         """
-        Retrieve a trade by ID.
+        Retrieve trade by ID.
 
         Args:
             trade_id: Trade identifier
-
         Returns:
             Trade model or None if not found
         """
@@ -458,30 +503,42 @@ class Database:
 
     def update_trade(self, trade: Trade) -> bool:
         """
-        Update an existing trade record.
+        Update existing trade record.
 
         Args:
             trade: Trade model instance with updated fields
-
         Returns:
             True if successful
         """
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(timezone.utc)
+        now_iso = now.isoformat()
+        now_ms = int(now.timestamp() * 1000)
 
         # Get previous state for audit
         previous = self.get_trade(trade.trade_id)
         previous_state = self._model_to_dict(previous) if previous else None
 
+        entry_time_ms = (
+            int(trade.entry_time.timestamp() * 1000)
+            if isinstance(trade.entry_time, datetime)
+            else 0
+        )
+        exit_time_ms = (
+            int(trade.exit_time.timestamp() * 1000)
+            if isinstance(trade.exit_time, datetime)
+            else None
+        )
+
         conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute(
             """
-            UPDATE trades
-            SET symbol = ?, quantity = ?, entry_price = ?, exit_price = ?,
-                entry_time = ?, exit_time = ?, transaction_type = ?,
-                product_type = ?, pnl = ?, status = ?, strategy = ?,
-                stop_loss = ?, take_profit = ?, trailing_stop_loss = ?,
-                metadata = ?, updated_at = ?
+            UPDATE trades SET
+                symbol = ?, quantity = ?, entry_price = ?, exit_price = ?,
+                entry_time = ?, exit_time = ?, transaction_type = ?, product_type = ?,
+                pnl = ?, status = ?, strategy = ?, stop_loss = ?, take_profit = ?,
+                trailing_stop_loss = ?, metadata = ?, updated_at = ?,
+                updated_at_ms = ?, entry_time_ms = ?, exit_time_ms = ?
             WHERE trade_id = ?
         """,
             (
@@ -508,7 +565,10 @@ class Database:
                 trade.take_profit,
                 trade.trailing_stop_loss,
                 json.dumps(trade.metadata) if trade.metadata else None,
-                now,
+                now_iso,
+                now_ms,
+                entry_time_ms,
+                exit_time_ms,
                 trade.trade_id,
             ),
         )
@@ -529,7 +589,6 @@ class Database:
 
         Args:
             symbol: Optional symbol filter
-
         Returns:
             List of open Trade models
         """
@@ -544,7 +603,6 @@ class Database:
             cursor.execute(
                 "SELECT * FROM trades WHERE status = 'OPEN' ORDER BY entry_time DESC"
             )
-
         rows = cursor.fetchall()
         return [self._row_to_trade(row) for row in rows]
 
@@ -552,16 +610,28 @@ class Database:
         """Convert database row to Trade model."""
         from .models import ProductType, TransactionType
 
+        entry_time = None
+        if row[20]:  # entry_time_ms
+            entry_time = datetime.fromtimestamp(row[20] / 1000, tz=timezone.utc)
+        elif row[5]:  # entry_time (iso)
+            entry_time = datetime.fromisoformat(row[5])
+        else:
+            entry_time = datetime.now(timezone.utc)
+
+        exit_time = None
+        if row[21]:  # exit_time_ms
+            exit_time = datetime.fromtimestamp(row[21] / 1000, tz=timezone.utc)
+        elif row[6]:  # exit_time (iso)
+            exit_time = datetime.fromisoformat(row[6])
+
         return Trade(
             trade_id=row[0],
             symbol=row[1],
             quantity=row[2],
             entry_price=row[3],
             exit_price=row[4],
-            entry_time=datetime.fromisoformat(row[5])
-            if row[5]
-            else datetime.now(timezone.utc),
-            exit_time=datetime.fromisoformat(row[6]) if row[6] else None,
+            entry_time=entry_time,
+            exit_time=exit_time,
             transaction_type=TransactionType(row[7]),
             product_type=ProductType(row[8]),
             pnl=row[9],
@@ -579,24 +649,26 @@ class Database:
 
     def create_signal(self, signal: Signal) -> bool:
         """
-        Create a new signal record.
+        Create new signal record.
 
         Args:
             signal: Signal model instance
-
         Returns:
             True if successful
         """
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(timezone.utc)
+        now_iso = now.isoformat()
+        now_ms = int(now.timestamp() * 1000)
+        ts_ms = int(signal.timestamp.timestamp() * 1000)
+
         conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute(
             """
             INSERT INTO signals (
-                signal_id, symbol, signal_type, strength, timestamp,
-                indicators, metadata, confidence, created_at
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                signal_id, symbol, signal_type, strength, timestamp, indicators,
+                metadata, confidence, created_at, created_at_ms, timestamp_ms
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
             (
                 signal.signal_id,
@@ -607,7 +679,9 @@ class Database:
                 json.dumps(signal.indicators),
                 json.dumps(signal.metadata) if signal.metadata else None,
                 signal.confidence,
-                now,
+                now_iso,
+                now_ms,
+                ts_ms,
             ),
         )
         conn.commit()
@@ -627,7 +701,6 @@ class Database:
         Args:
             symbol: Symbol filter
             limit: Maximum number of signals to return
-
         Returns:
             List of Signal models ordered by timestamp descending
         """
@@ -646,12 +719,18 @@ class Database:
         """Convert database row to Signal model."""
         from .models import SignalType
 
+        timestamp = None
+        if len(row) > 10 and row[10]:  # timestamp_ms
+            timestamp = datetime.fromtimestamp(row[10] / 1000, tz=timezone.utc)
+        else:
+            timestamp = datetime.fromisoformat(row[4])
+
         return Signal(
             signal_id=row[0],
             symbol=row[1],
             signal_type=SignalType(row[2]),
             strength=row[3],
-            timestamp=datetime.fromisoformat(row[4]),
+            timestamp=timestamp,
             indicators=json.loads(row[5]) if row[5] else {},
             metadata=json.loads(row[6]) if row[6] else {},
             confidence=row[7],
@@ -667,20 +746,23 @@ class Database:
 
         Args:
             data: List of HistoricalData models
-
         Returns:
             True if successful
         """
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(timezone.utc)
+        now_iso = now.isoformat()
+        now_ms = int(now.timestamp() * 1000)
+
         conn = self._get_connection()
         cursor = conn.cursor()
         for item in data:
+            ts_ms = int(item.timestamp.timestamp() * 1000)
             cursor.execute(
                 """
                 INSERT OR REPLACE INTO historical_data (
-                    symbol, timestamp, open, high, low, close, volume, interval, created_at
-                )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    symbol, timestamp, open, high, low, close, volume, interval,
+                    created_at, created_at_ms, timestamp_ms
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
                 (
                     item.symbol,
@@ -691,7 +773,9 @@ class Database:
                     item.close,
                     item.volume,
                     item.interval,
-                    now,
+                    now_iso,
+                    now_ms,
+                    ts_ms,
                 ),
             )
         conn.commit()
@@ -708,35 +792,46 @@ class Database:
             interval: Time interval
             start_date: Start of date range
             end_date: End of date range
-
         Returns:
             List of HistoricalData models
         """
+        start_ms = int(start_date.timestamp() * 1000)
+        end_ms = int(end_date.timestamp() * 1000)
+
         conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute(
             """
-            SELECT symbol, timestamp, open, high, low, close, volume, interval
+            SELECT symbol, timestamp, open, high, low, close, volume, interval, timestamp_ms
             FROM historical_data
-            WHERE symbol = ? AND interval = ? AND timestamp >= ? AND timestamp <= ?
-            ORDER BY timestamp ASC
+            WHERE symbol = ? AND interval = ? AND timestamp_ms >= ? AND timestamp_ms <= ?
+            ORDER BY timestamp_ms ASC
         """,
-            (symbol, interval, start_date.isoformat(), end_date.isoformat()),
+            (symbol, interval, start_ms, end_ms),
         )
         rows = cursor.fetchall()
-        return [
-            HistoricalData(
-                symbol=row[0],
-                timestamp=datetime.fromisoformat(row[1]),
-                open=row[2],
-                high=row[3],
-                low=row[4],
-                close=row[5],
-                volume=row[6],
-                interval=row[7],
+
+        result = []
+        for row in rows:
+            ts = None
+            if row[8]:  # timestamp_ms
+                ts = datetime.fromtimestamp(row[8] / 1000, tz=timezone.utc)
+            else:
+                ts = datetime.fromisoformat(row[1])
+
+            result.append(
+                HistoricalData(
+                    symbol=row[0],
+                    timestamp=ts,
+                    open=row[2],
+                    high=row[3],
+                    low=row[4],
+                    close=row[5],
+                    volume=row[6],
+                    interval=row[7],
+                )
             )
-            for row in rows
-        ]
+        return result
 
     # -------------------------------------------------------------------------
     # Quote methods
@@ -744,24 +839,26 @@ class Database:
 
     def store_quote(self, quote: QuoteData) -> bool:
         """
-        Store a quote record.
+        Store quote record.
 
         Args:
             quote: QuoteData model instance
-
         Returns:
             True if successful
         """
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(timezone.utc)
+        now_iso = now.isoformat()
+        now_ms = int(now.timestamp() * 1000)
+        ts_ms = int(quote.timestamp.timestamp() * 1000)
+
         conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute(
             """
             INSERT OR REPLACE INTO quotes (
-                symbol, last_price, open, high, low, close, volume,
-                timestamp, change, change_percent, created_at
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                symbol, last_price, open, high, low, close, volume, timestamp,
+                change, change_percent, created_at, created_at_ms, timestamp_ms
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
             (
                 quote.symbol,
@@ -774,7 +871,9 @@ class Database:
                 quote.timestamp.isoformat(),
                 quote.change,
                 quote.change_percent,
-                now,
+                now_iso,
+                now_ms,
+                ts_ms,
             ),
         )
         conn.commit()
@@ -785,8 +884,7 @@ class Database:
         Get latest quote for a symbol.
 
         Args:
-            symbol: Symbol query
-
+            symbol: Symbol to query
         Returns:
             QuoteData model or None
         """
@@ -794,7 +892,8 @@ class Database:
         cursor = conn.cursor()
         cursor.execute(
             """
-            SELECT symbol, last_price, open, high, low, close, volume, timestamp, change, change_percent
+            SELECT symbol, last_price, open, high, low, close, volume, timestamp,
+                   change, change_percent, timestamp_ms
             FROM quotes WHERE symbol = ? ORDER BY timestamp DESC LIMIT 1
         """,
             (symbol,),
@@ -802,6 +901,13 @@ class Database:
         row = cursor.fetchone()
         if row is None:
             return None
+
+        ts = None
+        if row[10]:  # timestamp_ms
+            ts = datetime.fromtimestamp(row[10] / 1000, tz=timezone.utc)
+        else:
+            ts = datetime.fromisoformat(row[7])
+
         return QuoteData(
             symbol=row[0],
             last_price=row[1],
@@ -810,7 +916,7 @@ class Database:
             low=row[4],
             close=row[5],
             volume=row[6],
-            timestamp=datetime.fromisoformat(row[7]),
+            timestamp=ts,
             change=row[8],
             change_percent=row[9],
         )
@@ -825,26 +931,30 @@ class Database:
 
         Args:
             position: Position model instance
-
         Returns:
             True if successful
         """
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(timezone.utc)
+        now_iso = now.isoformat()
+        now_ms = int(now.timestamp() * 1000)
+
         # Handle potential missing timestamp in Pydantic model by ensuring a value
         ts = getattr(position, "timestamp", None)
         if ts is None:
-            ts = datetime.now(timezone.utc)
+            ts = now
+
         ts_str = ts.isoformat() if isinstance(ts, datetime) else str(ts)
+        ts_ms = int(ts.timestamp() * 1000) if isinstance(ts, datetime) else now_ms
 
         conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute(
             """
             INSERT OR REPLACE INTO positions (
-                symbol, quantity, average_price, last_price, pnl,
-                product_type, buy_quantity, sell_quantity, timestamp, created_at
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                symbol, quantity, average_price, last_price, pnl, product_type,
+                buy_quantity, sell_quantity, timestamp, created_at,
+                created_at_ms, timestamp_ms
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
             (
                 position.symbol,
@@ -856,7 +966,9 @@ class Database:
                 position.buy_quantity,
                 position.sell_quantity,
                 ts_str,
-                now,
+                now_iso,
+                now_ms,
+                ts_ms,
             ),
         )
         conn.commit()
@@ -867,8 +979,7 @@ class Database:
         Get latest position for a symbol.
 
         Args:
-            symbol: Symbol query
-
+            symbol: Symbol to query
         Returns:
             Position model or None
         """
@@ -878,7 +989,8 @@ class Database:
         cursor = conn.cursor()
         cursor.execute(
             """
-            SELECT symbol, quantity, average_price, last_price, pnl, product_type, buy_quantity, sell_quantity
+            SELECT symbol, quantity, average_price, last_price, pnl, product_type,
+                   buy_quantity, sell_quantity, timestamp_ms
             FROM positions WHERE symbol = ? ORDER BY timestamp DESC LIMIT 1
         """,
             (symbol,),
@@ -886,6 +998,9 @@ class Database:
         row = cursor.fetchone()
         if row is None:
             return None
+
+        # Note: Position model in models.py does NOT have a timestamp field.
+        # Adding it here would cause a validation error if not in the constructor.
         return Position(
             symbol=row[0],
             quantity=row[1],
@@ -895,8 +1010,6 @@ class Database:
             product_type=ProductType(row[5]),
             buy_quantity=row[6],
             sell_quantity=row[7],
-            # Note: The Position model in models.py does NOT have a timestamp field.
-            # Adding it here would cause validation error if we pass it to constructor.
         )
 
     # -------------------------------------------------------------------------
@@ -909,19 +1022,22 @@ class Database:
 
         Args:
             funds: FundsData model instance
-
         Returns:
             True if successful
         """
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(timezone.utc)
+        now_iso = now.isoformat()
+        now_ms = int(now.timestamp() * 1000)
+        ts_ms = int(funds.timestamp.timestamp() * 1000)
+
         conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute(
             """
             INSERT OR REPLACE INTO funds (
-                available_cash, utilized_margin, available_margin, total_equity, timestamp, created_at
-            )
-            VALUES (?, ?, ?, ?, ?, ?)
+                available_cash, utilized_margin, available_margin, total_equity,
+                timestamp, created_at, created_at_ms, timestamp_ms
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """,
             (
                 funds.available_cash,
@@ -929,7 +1045,9 @@ class Database:
                 funds.available_margin,
                 funds.total_equity,
                 funds.timestamp.isoformat(),
-                now,
+                now_iso,
+                now_ms,
+                ts_ms,
             ),
         )
         conn.commit()
@@ -945,18 +1063,26 @@ class Database:
         conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute("""
-            SELECT available_cash, utilized_margin, available_margin, total_equity, timestamp
+            SELECT available_cash, utilized_margin, available_margin, total_equity,
+                   timestamp, timestamp_ms
             FROM funds ORDER BY timestamp DESC LIMIT 1
         """)
         row = cursor.fetchone()
         if row is None:
             return None
+
+        ts = None
+        if row[5]:  # timestamp_ms
+            ts = datetime.fromtimestamp(row[5] / 1000, tz=timezone.utc)
+        else:
+            ts = datetime.fromisoformat(row[4])
+
         return FundsData(
             available_cash=row[0],
             utilized_margin=row[1],
             available_margin=row[2],
             total_equity=row[3],
-            timestamp=datetime.fromisoformat(row[4]),
+            timestamp=ts,
         )
 
     # -------------------------------------------------------------------------
@@ -965,15 +1091,18 @@ class Database:
 
     def store_order(self, order: Order) -> bool:
         """
-        Store an order record.
+        Store order record.
 
         Args:
             order: Order model instance
-
         Returns:
             True if successful
         """
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(timezone.utc)
+        now_iso = now.isoformat()
+        now_ms = int(now.timestamp() * 1000)
+        ts_ms = int(order.timestamp.timestamp() * 1000)
+
         conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute(
@@ -982,9 +1111,9 @@ class Database:
                 order_id, symbol, quantity, order_type, price, trigger_price,
                 variety, transaction_type, product_type, status, timestamp,
                 filled_quantity, average_price, stop_loss, take_profit,
-                trailing_stop_loss, created_at, updated_at
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                trailing_stop_loss, created_at, updated_at,
+                created_at_ms, updated_at_ms, timestamp_ms
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
             (
                 order.order_id,
@@ -1003,8 +1132,11 @@ class Database:
                 order.stop_loss,
                 order.take_profit,
                 order.trailing_stop_loss,
-                now,
-                now,
+                now_iso,
+                now_iso,
+                now_ms,
+                now_ms,
+                ts_ms,
             ),
         )
         conn.commit()
@@ -1019,11 +1151,10 @@ class Database:
 
     def get_order(self, order_id: str) -> Order | None:
         """
-        Get an order by ID.
+        Get order by ID.
 
         Args:
             order_id: Order identifier
-
         Returns:
             Order model or None
         """
@@ -1042,16 +1173,18 @@ class Database:
         Args:
             order_id: Order identifier
             status: New status value
-
         Returns:
             True if successful
         """
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(timezone.utc)
+        now_iso = now.isoformat()
+        now_ms = int(now.timestamp() * 1000)
+
         conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute(
-            "UPDATE orders SET status = ?, updated_at = ? WHERE order_id = ?",
-            (status, now, order_id),
+            "UPDATE orders SET status = ?, updated_at = ?, updated_at_ms = ? WHERE order_id = ?",
+            (status, now_iso, now_ms, order_id),
         )
         conn.commit()
         return True
@@ -1062,7 +1195,6 @@ class Database:
 
         Args:
             symbol: Optional symbol filter
-
         Returns:
             List of open Order models
         """
@@ -1077,7 +1209,6 @@ class Database:
             cursor.execute(
                 "SELECT * FROM orders WHERE status = 'OPEN' ORDER BY timestamp DESC"
             )
-
         rows = cursor.fetchall()
         return [self._row_to_order(row) for row in rows]
 
@@ -1091,6 +1222,12 @@ class Database:
             TransactionType,
         )
 
+        timestamp = None
+        if len(row) > 20 and row[20]:  # timestamp_ms
+            timestamp = datetime.fromtimestamp(row[20] / 1000, tz=timezone.utc)
+        else:
+            timestamp = datetime.fromisoformat(row[10])
+
         return Order(
             order_id=row[0],
             symbol=row[1],
@@ -1102,7 +1239,7 @@ class Database:
             transaction_type=TransactionType(row[7]),
             product_type=ProductType(row[8]),
             status=OrderStatus(row[9]),
-            timestamp=datetime.fromisoformat(row[10]),
+            timestamp=timestamp,
             filled_quantity=row[11],
             average_price=row[12],
             stop_loss=row[13],
@@ -1123,7 +1260,6 @@ class Database:
         Args:
             entity_type: Optional entity type filter
             limit: Maximum number of entries
-
         Returns:
             List of AuditLogEntry models
         """
@@ -1138,15 +1274,20 @@ class Database:
             cursor.execute(
                 "SELECT * FROM audit_log ORDER BY timestamp DESC LIMIT ?", (limit,)
             )
-
         rows = cursor.fetchall()
         return [self._row_to_audit_entry(row) for row in rows]
 
     def _row_to_audit_entry(self, row: Any) -> AuditLogEntry:
         """Convert database row to AuditLogEntry model."""
+        timestamp = None
+        if len(row) > 10 and row[10]:  # timestamp_ms
+            timestamp = datetime.fromtimestamp(row[10] / 1000, tz=timezone.utc)
+        else:
+            timestamp = datetime.fromisoformat(row[1])
+
         return AuditLogEntry(
             entry_id=row[0],
-            timestamp=datetime.fromisoformat(row[1]),
+            timestamp=timestamp,
             action=row[2],
             entity_type=row[3],
             entity_id=row[4],
@@ -1160,9 +1301,8 @@ class Database:
     def verify_audit_log_integrity(self) -> bool:
         """
         Verify integrity of audit log by checking SHA-256 hashes.
-
         Returns:
-            True if all entries are valid, False if corruption is detected
+            True if all entries are valid, False if corruption detected
         """
         try:
             with Path(self.audit_log_path).open(encoding="utf-8") as f:
@@ -1191,26 +1331,24 @@ class Database:
 
     def get_dataframe(self, query: str, params: tuple[Any, ...] = ()) -> pd.DataFrame:
         """
-        Execute a query and return results as a pandas DataFrame.
+        Execute query and return results as pandas DataFrame.
 
         Args:
             query: SQL query string
             params: Query parameters
-
         Returns:
-            pandas DataFrame of query results
+            pandas DataFrame with query results
         """
         conn = self._get_connection()
         return pd.read_sql_query(query, conn, params=params)
 
     def execute_query(self, query: str, params: tuple[Any, ...] = ()) -> bool:
         """
-        Execute a write query (INSERT/UPDATE/DELETE/CREATE).
+        Execute write query (INSERT/UPDATE/DELETE/CREATE).
 
         Args:
             query: SQL query string
             params: Query parameters
-
         Returns:
             True if successful
         """
@@ -1221,7 +1359,7 @@ class Database:
         return True
 
     def close(self) -> None:
-        """Close database connection for the current thread."""
+        """Close database connection for current thread."""
         if hasattr(self._thread_local, "connection"):
             self._thread_local.connection.close()
             del self._thread_local.connection
