@@ -1,5 +1,5 @@
 """
-Data models for LOATS13July2026 using Pydantic.
+Data models LOATS13July2026 using Pydantic.
 """
 
 from datetime import UTC, datetime
@@ -31,7 +31,7 @@ class ProductType(StrEnum):
 
     MIS = "MIS"  # Intraday
     NRML = "NRML"  # Normal
-    CNC = "CNC"  # Cash and Carry
+    CNC = "CNC"  # Cash Carry
 
 
 class OrderVariety(StrEnum):
@@ -64,13 +64,12 @@ class QuoteData(BaseModel):
     timestamp: datetime
     change: float = Field(default=0.0)
     change_percent: float = Field(default=0.0)
-
     model_config = {"validate_assignment": True}
 
     @field_validator("symbol")
     @classmethod
     def validate_symbol(cls, v: str) -> str:
-        """Validate that symbol is not empty."""
+        """Validate symbol not empty."""
         if not v.strip():
             raise ValueError("Symbol cannot be empty")
         return v
@@ -78,31 +77,35 @@ class QuoteData(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def _compute_change_percent(cls, data: Any) -> Any:
-        """Compute change_percent before validation if it was not provided.
+        """Compute change_percent before validation if not provided.
 
-        Using ``mode="before"`` lets us distinguish "not provided" (the key is
-        absent from the input mapping) from "explicitly zero" (the caller passed
-        ``change_percent=0.0``). The previous ``mode="after"`` implementation
-        conflated these two cases and would overwrite an explicit zero with a
-        derived value, which is incorrect for unchanged instruments (H6).
+        Using `mode="before"` lets us distinguish "not provided" (the key
+        absent in input mapping) from "explicitly zero" (the caller passed
+        `change_percent=0.0`). The previous `mode="after"` implementation
+        conflated two cases and overwrote explicit zero with derived value,
+        which is incorrect for unchanged instruments (H6).
         """
-        if isinstance(data, dict):
-            close_raw = data.get("close")
-            # Only derive when close is a usable non-zero number and the
-            # caller did not explicitly pass change_percent.
-            if (
-                "change_percent" not in data
-                and isinstance(close_raw, (int, float))
-                and close_raw not in (0, None)
-                and "last_price" in data
-            ):
+        if not isinstance(data, dict):
+            return data
+        close_raw = data.get("close")
+        # Only derive when close is usable non-zero number and caller
+        # did not explicitly pass change_percent.
+        if (
+            "change_percent" not in data
+            and isinstance(close_raw, (int, float))
+            and close_raw not in (0, None)
+        ):
+            if "last_price" in data:
                 last_price = data["last_price"]
                 if isinstance(last_price, (int, float)):
                     data["change_percent"] = (last_price - close_raw) / close_raw * 100
-                    # Likewise derive `change` only when not explicitly provided,
-                    # so an explicit 0.0 is preserved as "no change".
-                    if "change" not in data:
-                        data["change"] = last_price - close_raw
+        # Likewise derive `change` only when not explicitly provided, preserving
+        # explicit 0.0 as "no change".
+        if "change" not in data:
+            if "last_price" in data:
+                last_price = data["last_price"]
+                if isinstance(last_price, (int, float)):
+                    data["change"] = last_price - close_raw
         return data
 
 
@@ -146,7 +149,7 @@ class OptionContract(BaseModel):
     @field_validator("last_price")
     @classmethod
     def validate_last_price(cls, v: float) -> float:
-        """Validate that last_price is non-negative."""
+        """Validate last_price non-negative."""
         if v < 0:
             raise ValueError("Option price cannot be negative")
         return v
@@ -208,10 +211,12 @@ class Order(BaseModel):
 
 
 class Trade(BaseModel):
-    """Trade model for database storage."""
+    """Trade model database storage."""
 
     trade_id: str = Field(
-        default_factory=lambda: f"trade_{datetime.now(UTC).strftime('%Y%m%d%H%M%S%f')}"
+        default_factory=lambda: (
+            f"trade_{datetime.now(UTC).strftime('%Y%m%d%H%M%S%f')}_{uuid4().hex[:8]}"
+        )
     )
     symbol: str
     quantity: int = Field(gt=0)
@@ -219,11 +224,11 @@ class Trade(BaseModel):
     exit_price: float | None = Field(None, gt=0)
     entry_time: datetime
     exit_time: datetime | None = None
-    transaction_type: TransactionType
-    product_type: ProductType
+    transaction_type: TransactionType | None = None
+    product_type: ProductType | None = None
     pnl: float | None = None
     status: str = "OPEN"
-    strategy: str
+    strategy: str | None = None
     stop_loss: float | None = Field(None, gt=0)
     take_profit: float | None = Field(None, gt=0)
     trailing_stop_loss: float | None = Field(None, gt=0)
@@ -235,8 +240,7 @@ class Trade(BaseModel):
         """Calculate PnL if not provided."""
         if v is not None:
             return float(v) if isinstance(v, (int, float)) else None
-
-        # Get the data from ValidationInfo
+        # Get data from ValidationInfo
         values = info.data
 
         if (
@@ -270,13 +274,15 @@ class Signal(BaseModel):
     """Trading signal model."""
 
     signal_id: str = Field(
-        default_factory=lambda: f"signal_{datetime.now(UTC).strftime('%Y%m%d%H%M%S%f')}"
+        default_factory=lambda: (
+            f"signal_{datetime.now(UTC).strftime('%Y%m%d%H%M%S%f')}_{uuid4().hex[:8]}"
+        )
     )
     symbol: str
     signal_type: SignalType
     strength: float = Field(ge=0, le=1)
     timestamp: datetime
-    indicators: dict[str, float]
+    indicators: dict[str, float] = Field(default_factory=dict)
     metadata: dict[str, Any] = Field(default_factory=dict)
     confidence: float | None = Field(None, ge=0, le=1)
 
@@ -336,7 +342,7 @@ class VaRResult(BaseModel):
     """Value at Risk result model."""
 
     confidence_level: float
-    time_horizon: int  # in days
+    time_horizon: int  # days
     var_value: float
     var_percent: float
     historical_var: float
