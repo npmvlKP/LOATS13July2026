@@ -3,7 +3,7 @@ name = "loats13july2026"
 version = "0.1.0"
 description = "Lite OpenAlgo Trading System"
 authors = [
-    {name = "npmvlKP", email = "your.email@example.com"},
+    {name = "npmvlKP", email = "npmvlKP@gmail.com"},
 ]
 readme = "README.md"
 requires-python = ">=3.12"
