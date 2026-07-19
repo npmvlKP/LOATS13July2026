@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check function size in Python files to ensure no function exceeds 100 lines."""
+"""Check function size Python files ensure function exceeds 100 lines."""
 
 import ast
 import sys
@@ -7,33 +7,31 @@ from pathlib import Path
 
 
 def check_function_size() -> int:
-    """Check function size in all Python files in src/ directory.
-
-    Phase-00: max_lines set to 200 (temporary).
-    §4.1 target is ≤100 LOC; large functions (_initialize_database,
-    calculate_indicators) will be refactored in Phase 01-02.
+    """Check function size all Python files src/ directory.
+    Phase-00: max_lines set 200 (temporary).
+    4.1 target ≤100 LOC; large functions (_initialize_database,
+    calculate_indicators) refactored Phase 01-02.
     """
     max_lines = 200
     exit_code = 0
-
-    for path in Path("src/").rglob("*.py"):
-        try:
-            content = path.read_text(encoding="utf-8")
+    src = Path(__file__).parent.parent / "src"
+    path = src.rglob("*.py")
+    try:
+        for file in path:
+            content = file.read_text(encoding="utf-8")
             tree = ast.parse(content)
-
             for node in ast.walk(tree):
                 if isinstance(node, ast.FunctionDef):
                     start = node.lineno
                     end = node.end_lineno
                     if end - start > max_lines:
                         print(
-                            f"{path}:{start} Function {node.name} too large ({end - start} lines)",
+                            f"{file}:{start} Function {node.name} large ({end - start} lines)"
                         )
                         exit_code = 1
-        except Exception as e:
-            print(f"Error processing {path}: {e}")
-            exit_code = 1
-
+    except Exception as e:
+        print(f"Error processing {file}: {e}")
+        exit_code = 1
     return exit_code
 
 
