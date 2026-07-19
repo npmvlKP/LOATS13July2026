@@ -181,6 +181,10 @@ addopts = "-v"
 source = ["src"]
 omit = ["tests/*", "*/__init__.py"]
 
+[tool.coverage.report]
+fail_under = 60
+show_missing = true
+
 [tool.bandit]
 skips = ["B101"] # Skip assert_used
 

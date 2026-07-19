@@ -386,4 +386,6 @@ class TechnicalAnalysis:
         return ("NEUTRAL", 0.5)
 
 
+# Module-level singleton instance (alias `ta` for convenience)
 technical_analysis = TechnicalAnalysis()
+ta = technical_analysis
