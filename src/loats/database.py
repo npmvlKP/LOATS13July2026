@@ -458,8 +458,8 @@ class Database:
                     if isinstance(trade.exit_time, datetime)
                     else trade.exit_time
                 ),
-                trade.transaction_type.value,
-                trade.product_type.value,
+            trade.transaction_type.value if trade.transaction_type else None,
+            trade.product_type.value if trade.product_type else None,
                 trade.pnl,
                 trade.status,
                 trade.strategy,
@@ -557,8 +557,8 @@ class Database:
                     if isinstance(trade.exit_time, datetime)
                     else trade.exit_time
                 ),
-                trade.transaction_type.value,
-                trade.product_type.value,
+            trade.transaction_type.value if trade.transaction_type else None,
+            trade.product_type.value if trade.product_type else None,
                 trade.pnl,
                 trade.status,
                 trade.strategy,

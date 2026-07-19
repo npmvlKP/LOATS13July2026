@@ -423,12 +423,12 @@ class TestDatabase:
         assert result is False
 
     def test_cleanup_old_data(self, db: Database, sample_trade: Trade) -> None:
-        """Test cleanup of old data."""
+        """Test cleanup old data."""
         # Create trade with old timestamp
         old_trade = Trade(
             **sample_trade.model_dump(exclude={"trade_id", "entry_time"}),
             trade_id="old_trade_123",
-            entry_time=datetime.now() - timedelta(days=8),  # Older than retention
+            entry_time=datetime.now() - timedelta(days=31)
         )
         db.create_trade(old_trade)
 
@@ -436,7 +436,7 @@ class TestDatabase:
         recent_trade = Trade(
             **sample_trade.model_dump(exclude={"trade_id", "entry_time"}),
             trade_id="recent_trade_123",
-            entry_time=datetime.now(),
+            entry_time=datetime.now()
         )
         db.create_trade(recent_trade)
 

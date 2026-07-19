@@ -86,7 +86,7 @@ def db() -> Generator[Database, None, None]:
         db_path=test_settings.sqlite_db_path,
         audit_log_path=test_settings.audit_log_path,
     )
-    db_instance.retention_days = 7  # Short retention for testing cleanup
+    db_instance.retention_days = 30  # Short retention for testing cleanup
 
     # Initialize the database
     db_instance._initialize_database()

@@ -1,2 +1,10 @@
 import logging
-class Modules: def__init__(self)self.loggerlogging.getLogger(__name__) defload(self)DO: implement module loading logic pass
+
+
+class Modules:
+    def __init__(self) -> None:
+        self.logger = logging.getLogger(__name__)
+
+    def load(self) -> None:
+        # TODO: implement module loading logic
+        pass

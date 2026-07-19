@@ -1,1 +1,34 @@
-import logging typing import Any, Optional class BaseAdapter:def__init__(self)self.loggerlogging.getLogger(__name__) defconnect(self)bool: """Establish connection.""" return True defdisconnect(self)None: """Close connection.""" pass defsend(self, data: Any)Optional[Any]: """Send data.""" return None defreceive(self)Optional[Any]: """Receive data.""" return None class OpenAlgoAdapter(BaseAdapter):def__init__(self, base_url: str, api_key: str)super().__init__() self.base_urlbase_url self.api_keyapi_key defsend(self, data: Any)Optional[Any]: """Send order to OpenAlgo.""" self.logger.info(f"Sending to {self.base_url}") return None
+import logging
+from typing import Any
+
+
+class BaseAdapter:
+    def __init__(self) -> None:
+        self.logger = logging.getLogger(__name__)
+
+    def connect(self) -> bool:
+        """Establish connection."""
+        return True
+
+    def disconnect(self) -> None:
+        """Close connection."""
+        pass
+
+    def send(self, data: Any) -> Any | None:
+        """Send data."""
+        return None
+
+    def receive(self) -> Any | None:
+        """Receive data."""
+        return None
+
+class OpenAlgoAdapter(BaseAdapter):
+    def __init__(self, base_url: str, api_key: str) -> None:
+        super().__init__()
+        self.base_url = base_url
+        self.api_key = api_key
+
+    def send(self, data: Any) -> Any | None:
+        """Send order OpenAlgo."""
+        self.logger.info(f"Sending {self.base_url}")
+        return None

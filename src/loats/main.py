@@ -62,7 +62,7 @@ class TradingSystem:
             # Send system startup alert
             await alerts.send_system_alert(
                 "LOATS13July2026 trading system started successfully",
-                "success",
+                "success"
             )
 
             self.running = True
@@ -77,20 +77,20 @@ class TradingSystem:
 
     async def _wait_for_shutdown(self) -> None:
         """Wait for shutdown signal."""
-        # Set signal handlers for graceful shutdown
         loop = asyncio.get_running_loop()
+
+        def signal_handler(sig, frame):
+            logger.info(f"Received signal: {sig}")
+            loop.call_soon_threadsafe(self.shutdown_event.set)
+
         if sys.platform != "win32":
             # Unix: add multiple signal handlers
             for sig in (signal.SIGINT, signal.SIGTERM):
-                loop.add_signal_handler(
-                    sig,
-                    lambda sig=sig: asyncio.create_task(
-                        self._handle_shutdown_signal(sig)
-                    ),
-                )
+                loop.add_signal_handler(sig, lambda s=sig: asyncio.create_task(self._handle_shutdown_signal(s)))
         else:
-            # Windows: add_signal_handler not fully supported all signals
-            pass
+            # Windows: use signal.signal
+            signal.signal(signal.SIGINT, signal_handler)
+            signal.signal(signal.SIGTERM, signal_handler)
 
         # Wait for shutdown event
         await self.shutdown_event.wait()
@@ -112,7 +112,7 @@ class TradingSystem:
             # Send system shutdown alert
             await alerts.send_system_alert(
                 "LOATS13July2026 trading system shutting down",
-                "warning",
+                "warning"
             )
 
             # Shutdown scheduler
@@ -152,9 +152,8 @@ class TradingSystem:
             logger.error(f"Error running scans: {e}")
             raise
 
-
 async def main() -> None:
-    """Main entry point for trading system."""
+    """Main entry point for the trading system."""
     system = TradingSystem()
     try:
         # Initialize system
@@ -167,7 +166,6 @@ async def main() -> None:
         logger.error(f"Trading system failed: {e}")
         await system.shutdown()
         sys.exit(1)
-
 
 if __name__ == "__main__":
     try:

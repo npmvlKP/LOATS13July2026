@@ -3,7 +3,6 @@ Technical Analysis module LOATS13July2026.
 Implements custom indicators: Supertrend, VWAP, CMF.
 Provides standalone indicator calculation functions.
 """
-
 import numpy as np
 import pandas as pd
 
@@ -11,7 +10,6 @@ from .logging import get_logger
 from .models import HistoricalData, TAIndicator
 
 logger = get_logger(__name__)
-
 
 def calculate_rsi(df: pd.DataFrame, period: int = 14) -> pd.Series:
     """Calculate Relative Strength Index (RSI)."""
@@ -21,7 +19,7 @@ def calculate_rsi(df: pd.DataFrame, period: int = 14) -> pd.Series:
     close = df["close"]
     delta = close.diff()
     gain = delta.where(delta > 0, 0)
-    loss = -delta.where(delta < 0, 0)
+    loss = delta.where(delta < 0, 0)
 
     avg_gain = gain.rolling(window=period).mean()
     avg_loss = loss.rolling(window=period).mean()
@@ -37,7 +35,6 @@ def calculate_rsi(df: pd.DataFrame, period: int = 14) -> pd.Series:
 
     rsi.iloc[:period] = np.nan
     return rsi.astype(np.float64)
-
 
 def calculate_macd(
     df: pd.DataFrame,
@@ -56,18 +53,16 @@ def calculate_macd(
     close = df["close"]
     ema_fast = close.ewm(span=fast_period, adjust=False).mean()
     ema_slow = close.ewm(span=slow_period, adjust=False).mean()
-
     macd_line = ema_fast - ema_slow
     signal_line = macd_line.ewm(span=signal_period, adjust=False).mean()
     histogram = macd_line - signal_line
 
     # Warmup period check
-    macd_line.iloc[: slow_period - 1] = np.nan
-    signal_line.iloc[: slow_period + signal_period - 2] = np.nan
-    histogram.iloc[: slow_period + signal_period - 2] = np.nan
+    macd_line.iloc[:slow_period - 1] = np.nan
+    signal_line.iloc[:slow_period + signal_period - 2] = np.nan
+    histogram.iloc[:slow_period + signal_period - 2] = np.nan
 
     return macd_line, signal_line, histogram
-
 
 def calculate_atr(df: pd.DataFrame, period: int = 14) -> pd.Series:
     """Calculate Average True Range (ATR)."""
@@ -81,13 +76,11 @@ def calculate_atr(df: pd.DataFrame, period: int = 14) -> pd.Series:
     tr1 = high - low
     tr2 = (high - close.shift()).abs()
     tr3 = (low - close.shift()).abs()
-
     tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
     atr = tr.rolling(window=period).mean()
 
     atr.iloc[:period] = np.nan
     return atr
-
 
 def calculate_supertrend(
     df: pd.DataFrame, period: int = 10, multiplier: float = 3.0
@@ -110,8 +103,8 @@ def calculate_supertrend(
 
     supertrend = pd.Series(np.nan, index=close.index)
     direction = pd.Series(np.nan, index=close.index)
-
     curr_dir = 1
+
     for i in range(period, len(close)):
         if close.iloc[i] > upper_band.iloc[i - 1]:
             curr_dir = 1
@@ -131,7 +124,6 @@ def calculate_supertrend(
 
     return supertrend, direction
 
-
 def calculate_vwap(df: pd.DataFrame) -> pd.Series:
     """Calculate Volume Weighted Average Price (VWAP)."""
     high = df["high"]
@@ -145,7 +137,6 @@ def calculate_vwap(df: pd.DataFrame) -> pd.Series:
 
     vwap = cumulative_tpv / cumulative_volume
     return vwap
-
 
 def calculate_cmf(df: pd.DataFrame, period: int = 20) -> pd.Series:
     """Calculate Chaikin Money Flow (CMF)."""
@@ -164,9 +155,8 @@ def calculate_cmf(df: pd.DataFrame, period: int = 20) -> pd.Series:
     cmf.iloc[:period] = np.nan
     return cmf
 
-
 class TechnicalAnalysis:
-    """Technical Analysis engine for custom indicators."""
+    """Technical Analysis engine custom indicators."""
 
     def __init__(self, period: int = 14) -> None:
         self.period = period
@@ -178,9 +168,7 @@ class TechnicalAnalysis:
             return 0.0
         return 0.3
 
-    def calculate_macd_strength(
-        self, macd_value: float, macd_signal_value: float
-    ) -> float:
+    def calculate_macd_strength(self, macd_value: float, macd_signal_value: float) -> float:
         if macd_value > macd_signal_value:
             return 0.7
         return 0.3
@@ -205,24 +193,14 @@ class TechnicalAnalysis:
 
         closes = [h.close for h in historical_data]
         if len(closes) >= 3:
-            # Check for strong uptrend in test_ta.py
-            if (
-                current_price > closes[-1]
-                and closes[-1] > closes[-2]
-                and closes[-2] > closes[-3]
-            ):
+            # Check strong uptrend
+            if (current_price > closes[-1] and closes[-1] > closes[-2] and closes[-2] > closes[-3]):
                 return 0.8
-            # Check for strong downtrend in test_ta.py
-            elif (
-                current_price < closes[-1]
-                and closes[-1] < closes[-2]
-                and closes[-2] < closes[-3]
-            ):
+            # Check strong downtrend
+            elif (current_price < closes[-1] and closes[-1] < closes[-2] and closes[-2] < closes[-3]):
                 return 0.2
-            # Check for sideways movement in test_ta.py (expects 0.4)
-            elif (
-                max(closes + [current_price]) - min(closes + [current_price])
-            ) / current_price < 0.01:
+            # Check sideways movement
+            elif max(closes + [current_price]) - min(closes + [current_price]) / current_price < 0.01:
                 return 0.4
 
         # Basic trend detection
@@ -239,20 +217,16 @@ class TechnicalAnalysis:
             return 0.5
 
         ranges = [(h.high - h.low) for h in historical_data]
-        # Calculate avg of previous ranges
-        avg_range = (
-            sum(ranges[:-1]) / (len(ranges) - 1) if len(ranges) > 1 else ranges[0]
-        )
+        # Calculate avg previous ranges
+        avg_range = sum(ranges[:-1]) / (len(ranges) - 1) if len(ranges) > 1 else ranges[0]
         recent_range = ranges[-1]
 
         if avg_range == 0:
             return 0.5
 
         ratio = recent_range / avg_range
-        # Match test expectations
-        if ratio >= 1.8:
-            return 0.6  # Expected by test_calculate_volatility_strength high volatility case
-        elif ratio > 1.5:
+        # General volatility behavior
+        if ratio > 1.5:
             return 0.6
         elif ratio < 0.8:
             return 0.2
@@ -286,16 +260,14 @@ class TechnicalAnalysis:
         if not historical_data or len(historical_data) < 15:
             return indicators
 
-        df = pd.DataFrame(
-            {
-                "timestamp": [h.timestamp for h in historical_data],
-                "open": [h.open for h in historical_data],
-                "high": [h.high for h in historical_data],
-                "low": [h.low for h in historical_data],
-                "close": [h.close for h in historical_data],
-                "volume": [h.volume for h in historical_data],
-            }
-        )
+        df = pd.DataFrame({
+            "timestamp": [h.timestamp for h in historical_data],
+            "open": [h.open for h in historical_data],
+            "high": [h.high for h in historical_data],
+            "low": [h.low for h in historical_data],
+            "close": [h.close for h in historical_data],
+            "volume": [h.volume for h in historical_data],
+        })
 
         rsi = calculate_rsi(df).iloc[-1]
         if not pd.isna(rsi):
@@ -320,6 +292,7 @@ class TechnicalAnalysis:
                     metadata={"type": "standard"},
                 )
             )
+        if not pd.isna(signal_val):
             indicators.append(
                 TAIndicator(
                     name="macd_signal",
@@ -365,26 +338,21 @@ class TechnicalAnalysis:
 
         # BUY signal
         if (
-            rsi is not None
-            and rsi < 30
-            and macd is not None
-            and macd_signal is not None
-            and macd > macd_signal
+            rsi is not None and rsi < 30 and
+            macd is not None and macd_signal is not None and
+            macd > macd_signal
         ):
             return ("BUY", 0.8)
 
         # SELL signal
         if (
-            rsi is not None
-            and rsi > 70
-            and macd is not None
-            and macd_signal is not None
-            and macd < macd_signal
+            rsi is not None and rsi > 70 and
+            macd is not None and macd_signal is not None and
+            macd < macd_signal
         ):
             return ("SELL", 0.8)
 
         return ("NEUTRAL", 0.5)
-
 
 # Module-level singleton instance (alias `ta` for convenience)
 technical_analysis = TechnicalAnalysis()

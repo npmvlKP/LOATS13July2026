@@ -1,8 +1,7 @@
 """
-Alerts module for LOATS13July2026.
-Implements Telegram alerts and kill switch functionality.
+Alerts module LOATS13July2026.
+Implements Telegram alerts kill switch functionality.
 """
-
 from datetime import UTC, datetime
 from typing import Any
 
@@ -19,35 +18,29 @@ from .config import settings
 from .database import Database
 from .logging import get_logger
 from .models import Order, Signal, SignalType, Trade
-from .openalgo import client as openalgo_client
+from .openalgo import async_client
 
 logger = get_logger(__name__)
 
-
 class AlertSystem:
-    """Alert system using Telegram bot for notifications and kill switch."""
+    """Alert system using Telegram bot notifications kill switch."""
 
     def __init__(self) -> None:
         """Initialize AlertSystem."""
         self.bot: Bot | None = None
-        self.application: Any = None
+        self.application: Any | None = None
         self.kill_switch_active = False
         self.alert_cooldown: dict[str, datetime] = {}
         self.cooldown_period = 300  # 5 minutes cooldown between duplicate alerts
 
     async def initialize(self) -> None:
-        """Initialize the Telegram bot."""
+        """Initialize Telegram bot."""
         try:
             if not settings.telegram_bot_token:
-                logger.warning(
-                    "Telegram bot token not configured. Alerts will not be sent."
-                )
+                logger.warning("Telegram bot token not configured. Alerts not sent.")
                 return
-
             if not settings.telegram_chat_id:
-                logger.warning(
-                    "Telegram chat ID not configured. Alerts will not be sent."
-                )
+                logger.warning("Telegram chat not configured. Alerts not sent.")
                 return
 
             # Initialize Telegram bot
@@ -64,63 +57,62 @@ class AlertSystem:
             self.application.add_handler(CommandHandler("signals", self._signals))
             self.application.add_handler(CommandHandler("help", self._help))
 
-            # Add message handler for text commands
+            # Add message handler text commands
             self.application.add_handler(
                 MessageHandler(filters.TEXT & ~filters.COMMAND, self._handle_message)
             )
-
             logger.info("Telegram alert system initialized")
-
         except Exception as e:
-            logger.error(f"Failed to initialize Telegram bot: {e}")
+            logger.error(f"Failed initialize Telegram bot: {e}")
             raise
 
     async def start(self) -> None:
-        """Start the Telegram bot."""
-        if self.application:
-            try:
-                # Start polling in background
-                self.application.run_polling()
-                logger.info("Telegram bot started")
-            except Exception as e:
-                logger.error(f"Failed to start Telegram bot: {e}")
-                raise
+        """Start Telegram bot."""
+        if not self.application:
+            return
+        try:
+            # Start polling background
+            await self.application.run_polling()
+            logger.info("Telegram bot started")
+        except Exception as e:
+            logger.error(f"Failed start Telegram bot: {e}")
+            raise
 
     async def shutdown(self) -> None:
-        """Shutdown the Telegram bot."""
-        if self.application:
-            try:
-                await self.application.shutdown()
-                logger.info("Telegram bot shutdown complete")
-            except Exception as e:
-                logger.error(f"Error shutting down Telegram bot: {e}")
-                raise
+        """Shutdown Telegram bot."""
+        if not self.application:
+            return
+        try:
+            await self.application.shutdown()
+            logger.info("Telegram bot shutdown complete")
+        except Exception as e:
+            logger.error(f"Error shutting down Telegram bot: {e}")
+            raise
 
     async def send_alert(self, message: str, alert_type: str = "info") -> bool:
         """
-        Send an alert via Telegram.
-
+        Send alert Telegram.
         Args:
             message: Alert message
-            alert_type: Type of alert (info, warning, error, success)
-
+            alert_type: Typealert (info, warning, error, success)
         Returns:
-            True if alert was sent successfully, False otherwise
+            True alert sent successfully, False otherwise
         """
         if not self.bot or not settings.telegram_chat_id:
-            logger.debug(f"Alert not sent (bot not configured): {message}")
+            logger.debug(f"Alert notsent (bot not configured){message}")
             return False
 
-        # Check cooldown to avoid spamming
-        if alert_type in self.alert_cooldown:
-            if (
-                datetime.now(UTC) - self.alert_cooldown[alert_type]
-            ).total_seconds() < self.cooldown_period:
-                logger.debug(f"Alert cooldown active for {alert_type}: {message}")
-                return False
+        # Check cooldown avoid spamming
+        if (
+            alert_type in self.alert_cooldown
+            and (datetime.now(UTC) - self.alert_cooldown[alert_type]).total_seconds()
+            < self.cooldown_period
+        ):
+            logger.debug(f"Alert cooldown active {alert_type}: {message}")
+            return False
 
         try:
-            # Format message based on alert type
+            # Format message based alert type
             formatted_message = self._format_alert_message(message, alert_type)
 
             # Send message
@@ -132,47 +124,41 @@ class AlertSystem:
 
             # Update cooldown
             self.alert_cooldown[alert_type] = datetime.now(UTC)
-            logger.info(f"Alert sent: {alert_type} - {message}")
+            logger.info(f"Alert sent: {alert_type} {message}")
             return True
-
         except Exception as e:
-            logger.error(f"Failed to send alert: {e}")
+            logger.error(f"Failed send alert: {e}")
             return False
 
     def _format_alert_message(self, message: str, alert_type: str) -> str:
         """
-        Format alert message with appropriate styling.
-
+        Format alert message appropriate styling.
         Args:
             message: Original message
-            alert_type: Type of alert
-
+            alert_type: Type alert
         Returns:
             Formatted message
         """
         timestamp = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S")
-
         if alert_type == "warning":
-            return f"⚠️ <b>WARNING</b> | {timestamp}\n\n{message}"
-        if alert_type == "error":
-            return f"🚨 <b>ERROR</b> | {timestamp}\n\n{message}"
-        if alert_type == "success":
-            return f"✅ <b>SUCCESS</b> | {timestamp}\n\n{message}"
-        # info
-        return f"ℹ️ <b>INFO</b> | {timestamp}\n\n{message}"
+            return f"⚠️ <b>WARNING</b> {timestamp}\n\n{message}"
+        elif alert_type == "error":
+            return f"🚨 <b>ERROR</b> {timestamp}\n\n{message}"
+        elif alert_type == "success":
+            return f"✅ <b>SUCCESS</b> {timestamp}\n\n{message}"
+        else:
+            return f"ℹ️ <b>INFO</b> {timestamp}\n\n{message}"
 
     async def send_signal_alert(self, signal: Signal) -> bool:
         """
-        Send alert for a trading signal.
-
+        Send alert trading signal.
         Args:
             signal: Signal object
-
         Returns:
-            True if alert was sent successfully
+            True alert sent successfully
         """
         try:
-            # Determine alert type based on signal
+            # Determine alert type based signal
             if signal.signal_type == SignalType.BUY:
                 alert_type = "success"
                 emoji = "🟢"
@@ -185,14 +171,16 @@ class AlertSystem:
 
             # Format indicators
             indicators = "\n".join(
-                f"  • {name}: {value:.4f}" for name, value in signal.indicators.items()
+                [f"{name}: {value:.4f}" for name, value in signal.indicators.items()]
             )
 
             # Format metadata
             metadata = "\n".join(
-                f"  • {key}: {value}"
-                for key, value in signal.metadata.items()
-                if key != "indicators_count"
+                [
+                    f"{key}: {value}"
+                    for key, value in signal.metadata.items()
+                    if key != "indicators_count"
+                ]
             )
 
             message = (
@@ -201,31 +189,27 @@ class AlertSystem:
                 f"<b>Type:</b> {signal.signal_type.value}\n"
                 f"<b>Strength:</b> {signal.strength:.2f}\n"
                 f"<b>Confidence:</b> {signal.confidence:.2f}\n"
-                "<b>Timestamp:</b> "
-                f"{signal.timestamp.strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+                f"<b>Timestamp:</b> {signal.timestamp.strftime('%Y-%m-%d %H:%M:%S')}\n\n"
                 f"<b>Indicators:</b>\n{indicators}\n\n"
                 f"<b>Metadata:</b>\n{metadata}"
             )
 
             return await self.send_alert(message, alert_type)
-
         except Exception as e:
-            logger.error(f"Failed to format signal alert: {e}")
+            logger.error(f"Failed format signal alert: {e}")
             return False
 
     async def send_order_alert(self, order: Order, action: str = "created") -> bool:
         """
-        Send alert for an order.
-
+        Send alert order.
         Args:
             order: Order object
-            action: Action performed (created, filled, cancelled, etc.)
-
+            action: Actionperformed (created, filled, cancelled, etc.)
         Returns:
-            True if alert was sent successfully
+            True alert sent successfully
         """
         try:
-            # Determine alert type based on action and order status
+            # Determine alert type based action
             if action == "filled":
                 alert_type = "success"
                 emoji = "🎯"
@@ -246,7 +230,7 @@ class AlertSystem:
                 f"<b>Type:</b> {order.order_type.value}\n"
                 f"<b>Transaction:</b> {order.transaction_type.value}\n"
                 f"<b>Quantity:</b> {order.quantity}\n"
-                f"<b>Price:</b> {order.price or 'MARKET'}\n"
+                f"<b>Price:</b> {order.price if order.price else 'MARKET'}\n"
                 f"<b>Status:</b> {order.status.value}\n"
                 f"<b>Filled:</b> {order.filled_quantity}/{order.quantity}\n"
                 f"<b>Timestamp:</b> {order.timestamp.strftime('%Y-%m-%d %H:%M:%S')}"
@@ -260,25 +244,22 @@ class AlertSystem:
                 message += f"\n<b>Trailing Stop:</b> {order.trailing_stop_loss}"
 
             return await self.send_alert(message, alert_type)
-
         except Exception as e:
-            logger.error(f"Failed to format order alert: {e}")
+            logger.error(f"Failed format order alert: {e}")
             return False
 
     async def send_trade_alert(self, trade: Trade, action: str = "opened") -> bool:
         """
-        Send alert for a trade.
-
+        Send alert trade.
         Args:
             trade: Trade object
-            action: Action performed (opened, closed, updated)
-
+            action: Actionperformed (opened, closed, updated)
         Returns:
-            True if alert was sent successfully
+            True alert sent successfully
         """
         try:
-            # Determine alert type based on action and trade status
-            if action == "closed" and trade.pnl and trade.pnl > 0:
+            # Determine alert type based action
+            if action == "closed" and trade.pnl and trade.pnl >= 0:
                 alert_type = "success"
                 emoji = "💰"
             elif action == "closed" and trade.pnl and trade.pnl < 0:
@@ -306,16 +287,10 @@ class AlertSystem:
             if trade.exit_price:
                 message += f"\n<b>Exit Price:</b> {trade.exit_price:.2f}"
             if trade.exit_time:
-                message += (
-                    f"\n<b>Exit Time:</b> "
-                    f"{trade.exit_time.strftime('%Y-%m-%d %H:%M:%S')}"
-                )
+                message += f"\n<b>Exit Time:</b> {trade.exit_time.strftime('%Y-%m-%d %H:%M:%S')}"
             if trade.pnl:
                 pnl_color = "green" if trade.pnl >= 0 else "red"
-                message += (
-                    f"\n<b>PnL:</b> <span color='{pnl_color}'>{trade.pnl:.2f}</span>"
-                )
-
+                message += f"\n<b>PnL:</b> <span color='{pnl_color}'>{trade.pnl:.2f}</span>"
             if trade.stop_loss:
                 message += f"\n<b>Stop Loss:</b> {trade.stop_loss:.2f}"
             if trade.take_profit:
@@ -324,21 +299,18 @@ class AlertSystem:
                 message += f"\n<b>Trailing Stop:</b> {trade.trailing_stop_loss:.2f}"
 
             return await self.send_alert(message, alert_type)
-
         except Exception as e:
-            logger.error(f"Failed to format trade alert: {e}")
+            logger.error(f"Failed format trade alert: {e}")
             return False
 
     async def send_system_alert(self, message: str, alert_type: str = "info") -> bool:
         """
         Send system-level alert.
-
         Args:
             message: Alert message
-            alert_type: Type of alert
-
+            alert_type: Type alert
         Returns:
-            True if alert was sent successfully
+            True alert sent successfully
         """
         try:
             header = {
@@ -347,31 +319,26 @@ class AlertSystem:
                 "success": "✅ SYSTEM UPDATE",
                 "info": "ℹ️ SYSTEM INFO",
             }.get(alert_type, "ℹ️ SYSTEM ALERT")
-
             full_message = f"{header}\n\n{message}"
             return await self.send_alert(full_message, alert_type)
-
         except Exception as e:
-            logger.error(f"Failed to format system alert: {e}")
+            logger.error(f"Failed format system alert: {e}")
             return False
 
     async def send_position_alert(self) -> bool:
         """
-        Send alert with current positions.
-
+        Send alert current positions.
         Returns:
-            True if alert was sent successfully
+            True alert sent successfully
         """
         try:
-            # Get current positions from OpenAlgo
-            position_data = openalgo_client.get_position_book()
-
+            # Get current positions OpenAlgo
+            position_data = await async_client.get_position_book()
             if not position_data.get("data"):
                 return await self.send_system_alert("No open positions found", "info")
 
             positions = position_data["data"]
             message = "📊 <b>CURRENT POSITIONS</b>\n\n"
-
             for pos in positions:
                 pnl_color = "green" if pos["pnl"] >= 0 else "red"
                 message += (
@@ -384,31 +351,25 @@ class AlertSystem:
                 )
 
             return await self.send_alert(message, "info")
-
         except Exception as e:
-            logger.error(f"Failed to get positions for alert: {e}")
+            logger.error(f"Failed get positions alert: {e}")
             return False
 
     async def send_funds_alert(self) -> bool:
         """
-        Send alert with current funds.
-
+        Send alert current funds.
         Returns:
-            True if alert was sent successfully
+            True alert sent successfully
         """
         try:
-            # Get current funds from OpenAlgo
-            funds_data = openalgo_client.get_funds()
-
+            # Get current funds OpenAlgo
+            funds_data = await async_client.get_funds()
             if not funds_data.get("data"):
-                return await self.send_system_alert(
-                    "No funds data available", "warning"
-                )
+                return await self.send_system_alert("No funds data available", "warning")
 
             funds = funds_data["data"]
-            message = "💵 <b>ACCOUNT FUNDS</b>\n\n"
-
-            message += (
+            message = (
+                "💵 <b>ACCOUNT FUNDS</b>\n\n"
                 f"<b>Available Cash:</b> {funds['available_cash']:.2f}\n"
                 f"<b>Utilized Margin:</b> {funds['utilized_margin']:.2f}\n"
                 f"<b>Available Margin:</b> {funds['available_margin']:.2f}\n"
@@ -416,23 +377,20 @@ class AlertSystem:
             )
 
             return await self.send_alert(message, "info")
-
         except Exception as e:
-            logger.error(f"Failed to get funds for alert: {e}")
+            logger.error(f"Failed get funds alert: {e}")
             return False
 
     async def activate_kill_switch(self, reason: str = "Manual activation") -> bool:
         """
-        Activate the kill switch to stop all trading activities.
-
+        Activate kill switch stop all trading activities.
         Args:
-            reason: Reason for activation
-
+            reason: Reason activation
         Returns:
-            True if kill switch was activated successfully
+            True kill switch activated successfully
         """
         if self.kill_switch_active:
-            logger.warning("Kill switch already active")
+            logger.warning("Kill switch active")
             return False
 
         try:
@@ -440,36 +398,33 @@ class AlertSystem:
             logger.warning(f"Kill switch activated: {reason}")
 
             # Cancel all open orders
-            orders = openalgo_client.get_all_orders()  # Get all orders
-            for order in orders.get("data", []):
+            orders_data = await async_client.get_all_orders()
+            orders = orders_data.get("data", [])
+            for order in orders:
                 if order["status"] in ["OPEN", "PENDING"]:
-                    openalgo_client.cancel_order(order["order_id"])
+                    await async_client.cancel_order(order["order_id"])
 
             # Send alert
             message = (
                 "🚨 <b>KILL SWITCH ACTIVATED</b> 🚨\n\n"
                 f"<b>Reason:</b> {reason}\n"
-                "<b>Timestamp:</b> "
-                f"{datetime.now(UTC).strftime('%Y-%m-%d %H:%M:%S')}\n\n"
-                "All open orders have been cancelled. No new orders will be placed."
+                f"<b>Timestamp:</b> {datetime.now(UTC).strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+                "All open orders cancelled. new orders placed."
             )
 
             return await self.send_alert(message, "error")
-
         except Exception as e:
-            logger.error(f"Failed to activate kill switch: {e}")
+            logger.error(f"Failed activate kill switch: {e}")
             self.kill_switch_active = False
             return False
 
     async def deactivate_kill_switch(self, reason: str = "Manual deactivation") -> bool:
         """
-        Deactivate the kill switch to resume trading activities.
-
+        Deactivate kill switch resume trading activities.
         Args:
-            reason: Reason for deactivation
-
+            reason: Reason deactivation
         Returns:
-            True if kill switch was deactivated successfully
+            True kill switch deactivated successfully
         """
         if not self.kill_switch_active:
             logger.warning("Kill switch not active")
@@ -481,159 +436,131 @@ class AlertSystem:
 
             # Send alert
             message = (
-                "✅ <b>KILL SWITCH DEACTIVATED</b> ✅\n\n"
+                "<b>KILL SWITCH DEACTIVATED</b> ✅\n\n"
                 f"<b>Reason:</b> {reason}\n"
-                "<b>Timestamp:</b> "
-                f"{datetime.now(UTC).strftime('%Y-%m-%d %H:%M:%S')}\n\n"
-                "Trading activities can now resume."
+                f"<b>Timestamp:</b> {datetime.now(UTC).strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+                "Trading activities now resume."
             )
 
             return await self.send_alert(message, "success")
-
         except Exception as e:
-            logger.error(f"Failed to deactivate kill switch: {e}")
+            logger.error(f"Failed deactivate kill switch: {e}")
             return False
 
     def is_kill_switch_active(self) -> bool:
         """
-        Check if kill switch is active.
-
+        Check kill switch active.
         Returns:
-            True if kill switch is active
+            True kill switch active
         """
         return self.kill_switch_active
 
     # Telegram command handlers
 
     async def _start(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-        """Handle /start command."""
+        """Handle /startcommand."""
         try:
             message = (
                 "📈 <b>LOATS13July2026 Trading System</b> 📈\n\n"
-                "Welcome to the LOATS trading system alert bot!\n\n"
+                "Welcome LOATS trading system alert bot!\n\n"
                 "Available commands:\n"
-                "/status - System status\n"
-                "/positions - Current positions\n"
-                "/orders - Open orders\n"
-                "/signals - Recent signals\n"
-                "/kill - Activate kill switch\n"
-                "/resume - Resume trading\n"
-                "/help - Show this help message"
+                "/status System status\n"
+                "/positions Current positions\n"
+                "/orders Open orders\n"
+                "/signals Recent signals\n"
+                "/kill Activate kill switch\n"
+                "/resume Resume trading\n"
+                "/help Show help message"
             )
+
             if update.message:
                 await update.message.reply_text(message, parse_mode="HTML")
         except Exception as e:
-            logger.error(f"Error in /start command: {e}")
+            logger.error(f"Error /startcommand: {e}")
 
     async def _status(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-        """Handle /status command."""
+        """Handle /statuscommand."""
         try:
-            status = (
-                "🟢 ACTIVE" if not self.kill_switch_active else "🔴 KILL SWITCH ACTIVE"
-            )
+            status = "🟢 ACTIVE" if not self.kill_switch_active else "🔴 KILL SWITCH ACTIVE"
             message = (
-                f"📊 <b>SYSTEM STATUS</b>\n\n"
+                "📊 <b>SYSTEM STATUS</b>\n\n"
                 f"<b>Status:</b> {status}\n"
-                "<b>Timestamp:</b> "
-                f"{datetime.now(UTC).strftime('%Y-%m-%d %H:%M:%S')}"
+                f"<b>Timestamp:</b> {datetime.now(UTC).strftime('%Y-%m-%d %H:%M:%S')}"
             )
+
             if update.message:
                 await update.message.reply_text(message, parse_mode="HTML")
         except Exception as e:
-            logger.error(f"Error in /status command: {e}")
+            logger.error(f"Error /statuscommand: {e}")
 
-    async def _kill_switch(
-        self,
-        update: Update,
-        context: ContextTypes.DEFAULT_TYPE,
-    ) -> None:
-        """Handle /kill command."""
+    async def _kill_switch(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Handle /killcommand."""
         try:
             if self.kill_switch_active:
                 if update.message:
-                    await update.message.reply_text("⚠️ Kill switch is already active")
+                    await update.message.reply_text("⚠️ Kill switch active")
                 return
 
-            reason = (
-                " ".join(context.args)
-                if context.args
-                else "Manual activation via Telegram"
-            )
+            reason = " ".join(context.args) if context.args else "Manual activation Telegram"
             success = await self.activate_kill_switch(reason)
 
             if success:
                 if update.message:
-                    await update.message.reply_text(
-                        "🚨 Kill switch activated successfully"
-                    )
+                    await update.message.reply_text("🚨 Kill switch activated successfully")
             else:
                 if update.message:
-                    await update.message.reply_text("❌ Failed to activate kill switch")
+                    await update.message.reply_text("Failed activate kill switch")
         except Exception as e:
-            logger.error(f"Error in /kill command: {e}")
+            logger.error(f"Error /killcommand: {e}")
             if update.message:
-                await update.message.reply_text(f"❌ Error: {e!s}")
+                await update.message.reply_text(f"❌Error: {e!s}")
 
     async def _resume(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-        """Handle /resume command."""
+        """Handle /resumecommand."""
         try:
             if not self.kill_switch_active:
                 if update.message:
-                    await update.message.reply_text("ℹ️ Kill switch is not active")
+                    await update.message.reply_text("ℹ️ Kill switch not active")
                 return
 
-            reason = (
-                " ".join(context.args)
-                if context.args
-                else "Manual deactivation via Telegram"
-            )
+            reason = " ".join(context.args) if context.args else "Manual deactivation Telegram"
             success = await self.deactivate_kill_switch(reason)
 
             if success:
                 if update.message:
-                    await update.message.reply_text(
-                        "✅ Kill switch deactivated successfully"
-                    )
+                    await update.message.reply_text("Kill switch deactivated successfully")
             else:
                 if update.message:
-                    await update.message.reply_text(
-                        "❌ Failed to deactivate kill switch"
-                    )
+                    await update.message.reply_text("Failed deactivate kill switch")
         except Exception as e:
-            logger.error(f"Error in /resume command: {e}")
+            logger.error(f"Error /resumecommand: {e}")
             if update.message:
-                await update.message.reply_text(f"❌ Error: {e!s}")
+                await update.message.reply_text(f"❌Error: {e!s}")
 
-    async def _positions(
-        self,
-        update: Update,
-        context: ContextTypes.DEFAULT_TYPE,
-    ) -> None:
-        """Handle /positions command."""
+    async def _positions(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Handle /positionscommand."""
         try:
             success = await self.send_position_alert()
             if not success:
                 if update.message:
-                    await update.message.reply_text("❌ Failed to get positions")
+                    await update.message.reply_text("Failed get positions")
         except Exception as e:
-            logger.error(f"Error in /positions command: {e}")
+            logger.error(f"Error /positionscommand: {e}")
             if update.message:
-                await update.message.reply_text(f"❌ Error: {e!s}")
+                await update.message.reply_text(f"❌Error: {e!s}")
 
     async def _orders(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-        """Handle /orders command."""
+        """Handle /orderscommand."""
         try:
-            # Get open orders from OpenAlgo
-            orders_data = openalgo_client.get_all_orders()  # Get all orders
-
+            # Get open orders OpenAlgo
+            orders_data = await async_client.get_all_orders()
             if not orders_data.get("data"):
                 if update.message:
-                    await update.message.reply_text("ℹ️ No open orders found")
+                    await update.message.reply_text("ℹ️ open orders found")
                 return
 
             orders = orders_data["data"]
             message = "📋 <b>OPEN ORDERS</b>\n\n"
-
             for order in orders:
                 if order["status"] in ["OPEN", "PENDING"]:
                     message += (
@@ -649,27 +576,21 @@ class AlertSystem:
             if update.message:
                 await update.message.reply_text(message, parse_mode="HTML")
         except Exception as e:
-            logger.error(f"Error in /orders command: {e}")
+            logger.error(f"Error /orderscommand: {e}")
             if update.message:
-                await update.message.reply_text(f"❌ Error: {e!s}")
+                await update.message.reply_text(f"❌Error: {e!s}")
 
-    async def _signals(
-        self,
-        update: Update,
-        context: ContextTypes.DEFAULT_TYPE,
-    ) -> None:
-        """Handle /signals command."""
+    async def _signals(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Handle /signalscommand."""
         try:
-            # Get recent signals from database
+            # Get recent signals database
             signals = Database().get_latest_signals(settings.default_symbol, limit=5)
-
             if not signals:
                 if update.message:
-                    await update.message.reply_text("ℹ️ No recent signals found")
+                    await update.message.reply_text("ℹ️ recent signals found")
                 return
 
             message = "📈 <b>RECENT SIGNALS</b>\n\n"
-
             for signal in signals:
                 emoji = {
                     SignalType.BUY: "🟢",
@@ -677,10 +598,8 @@ class AlertSystem:
                     SignalType.HOLD: "⚪",
                     SignalType.NEUTRAL: "⚪",
                 }.get(signal.signal_type, "ℹ️")
-
                 message += (
-                    f"{emoji} <b>{signal.signal_type.value}</b> "
-                    f"| {signal.strength:.2f}\n"
+                    f"{emoji} <b>{signal.signal_type.value}</b> {signal.strength:.2f}\n"
                     f"<b>Time:</b> {signal.timestamp.strftime('%H:%M:%S')}\n"
                     f"<b>Indicators:</b> {len(signal.indicators)}\n\n"
                 )
@@ -688,24 +607,20 @@ class AlertSystem:
             if update.message:
                 await update.message.reply_text(message, parse_mode="HTML")
         except Exception as e:
-            logger.error(f"Error in /signals command: {e}")
+            logger.error(f"Error /signalscommand: {e}")
             if update.message:
-                await update.message.reply_text(f"❌ Error: {e!s}")
+                await update.message.reply_text(f"❌Error: {e!s}")
 
     async def _help(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-        """Handle /help command."""
+        """Handle /helpcommand."""
         try:
             await self._start(update, context)
         except Exception as e:
-            logger.error(f"Error in /help command: {e}")
+            logger.error(f"Error /helpcommand: {e}")
             if update.message:
-                await update.message.reply_text(f"❌ Error: {e!s}")
+                await update.message.reply_text(f"❌Error: {e!s}")
 
-    async def _handle_message(
-        self,
-        update: Update,
-        context: ContextTypes.DEFAULT_TYPE,
-    ) -> None:
+    async def _handle_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle non-command messages."""
         try:
             if update.message and update.message.text:
@@ -725,14 +640,12 @@ class AlertSystem:
                 else:
                     if update.message:
                         await update.message.reply_text(
-                            "ℹ️ I didn't understand that. "
-                            "Type /help for available commands."
+                            "ℹ️ didn't understand that. Type /helpavailable commands."
                         )
         except Exception as e:
             logger.error(f"Error handling message: {e}")
             if update.message:
-                await update.message.reply_text(f"❌ Error: {e!s}")
-
+                await update.message.reply_text(f"❌Error: {e!s}")
 
 # Export default instance
-alerts: AlertSystem = AlertSystem()
+alerts = AlertSystem()
