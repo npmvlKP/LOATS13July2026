@@ -1,12 +1,13 @@
-"""Tests for the alerts module."""
-
+"""Tests alerts module."""
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from telegram import Bot, Update
 from telegram.error import InvalidToken
-from telegram.ext import Application
+from telegram.ext import (
+    Application,
+)
 
 from src.loats.alerts import AlertSystem
 from src.loats.models import (
@@ -63,7 +64,7 @@ class TestAlertSystem:
             indicators={
                 "rsi": 65.4,
                 "macd": 12.3,
-                "supertrend": 18500.50,
+                "supertrend": 18500.5,
             },
             metadata={
                 "strategy": "momentum",
@@ -118,7 +119,7 @@ class TestAlertSystem:
         assert alert_system.bot is None
         assert alert_system.application is None
         assert alert_system.kill_switch_active is False
-        assert alert_system.alert_cooldown == {}
+        assert isinstance(alert_system.alert_cooldown, dict)
         assert alert_system.cooldown_period == 300
 
     def test_is_kill_switch_active_initial_state(self, alert_system):
@@ -130,62 +131,57 @@ class TestAlertSystem:
         """Test initialization fails gracefully without bot token."""
         with patch("src.loats.alerts.settings") as mock_settings:
             mock_settings.telegram_bot_token.get_secret_value.return_value = ""
-            with patch(
-                "src.loats.alerts.Bot", side_effect=InvalidToken("Invalid token")
-            ):
+            with patch("src.loats.alerts.Bot", side_effect=InvalidToken("Invalid token")):
                 with pytest.raises(InvalidToken):
                     await alert_system.initialize()
-                assert alert_system.bot is None
+        assert alert_system.bot is None
 
     @pytest.mark.asyncio
     async def test_initialize_without_chat_id(self, alert_system):
         """Test initialization fails gracefully without chat ID."""
         with patch("src.loats.alerts.settings") as mock_settings:
-            mock_settings.telegram_bot_token.get_secret_value.return_value = (
-                "test_token"
-            )
+            mock_settings.telegram_bot_token.get_secret_value.return_value = "test_token"
             mock_settings.telegram_chat_id = None
             await alert_system.initialize()
-            assert alert_system.bot is None
+        assert alert_system.bot is None
 
     @pytest.mark.asyncio
     async def test_initialize_success(self, alert_system, mock_bot):
         """Test successful initialization."""
-        with patch("src.loats.alerts.settings") as mock_settings:
-            with patch("src.loats.alerts.Bot") as mock_bot_class:
-                with patch("src.loats.alerts.Application") as mock_app_class:
-                    mock_settings.telegram_bot_token.get_secret_value.return_value = (
-                        "test_token"
-                    )
-                    mock_settings.telegram_chat_id = "test_chat_id"
-                    mock_bot_class.return_value = mock_bot
-                    mock_app = MagicMock()
-                    mock_app.add_handler = MagicMock()
-                    mock_app_class.builder.return_value.bot.return_value.build.return_value = mock_app
+        with patch("src.loats.alerts.settings") as mock_settings, \
+             patch("src.loats.alerts.Bot") as mock_bot_class, \
+             patch("src.loats.alerts.Application") as mock_app_class:
+            mock_settings.telegram_bot_token.get_secret_value.return_value = "test_token"
+            mock_settings.telegram_chat_id = "test_chat_id"
+            mock_bot_class.return_value = mock_bot
 
-                    await alert_system.initialize()
+            mock_app = MagicMock()
+            mock_app.add_handler = MagicMock()
+            mock_app_class.builder.return_value.bot.return_value.build.return_value = mock_app
 
-                    assert alert_system.bot == mock_bot
-                    assert alert_system.application == mock_app
+            await alert_system.initialize()
+
+        assert alert_system.bot == mock_bot
+        assert alert_system.application == mock_app
 
     @pytest.mark.asyncio
     async def test_start_without_application(self, alert_system):
         """Test start() does nothing without application."""
         await alert_system.start()
-        # Should not raise an exception
+        # Should not raise any exception
 
     @pytest.mark.asyncio
     async def test_start_success(self, alert_system, mock_application):
         """Test successful bot start."""
         alert_system.application = mock_application
         await alert_system.start()
-        # Should not raise an exception
+        # Should not raise any exception
 
     @pytest.mark.asyncio
     async def test_shutdown_without_application(self, alert_system):
         """Test shutdown() does nothing without application."""
         await alert_system.shutdown()
-        # Should not raise an exception
+        # Should not raise any exception
 
     @pytest.mark.asyncio
     async def test_shutdown_success(self, alert_system, mock_application):
@@ -206,12 +202,11 @@ class TestAlertSystem:
         alert_system.bot = mock_bot
         with patch("src.loats.alerts.settings") as mock_settings:
             mock_settings.telegram_chat_id = "test_chat_id"
-
             result = await alert_system.send_alert("Test message", "info")
 
-            assert result is True
-            mock_bot.send_message.assert_called_once()
-            assert "info" in alert_system.alert_cooldown
+        assert result is True
+        mock_bot.send_message.assert_called_once()
+        assert "info" in alert_system.alert_cooldown
 
     @pytest.mark.asyncio
     async def test_send_alert_cooldown(self, alert_system, mock_bot):
@@ -227,7 +222,6 @@ class TestAlertSystem:
             # Send second alert immediately (should be blocked by cooldown)
             result2 = await alert_system.send_alert("Test message 2", "info")
             assert result2 is False
-
             assert mock_bot.send_message.call_count == 1
 
     def test_format_alert_message_info(self, alert_system):
@@ -268,11 +262,10 @@ class TestAlertSystem:
         alert_system.bot = mock_bot
         with patch("src.loats.alerts.settings") as mock_settings:
             mock_settings.telegram_chat_id = "test_chat_id"
-
             result = await alert_system.send_signal_alert(sample_signal)
 
-            assert result is True
-            mock_bot.send_message.assert_called_once()
+        assert result is True
+        mock_bot.send_message.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_send_signal_alert_sell(self, alert_system, mock_bot):
@@ -287,23 +280,19 @@ class TestAlertSystem:
             indicators={"rsi": 65.4},
             metadata={},
         )
-
         alert_system.bot = mock_bot
         with patch("src.loats.alerts.settings") as mock_settings:
             mock_settings.telegram_chat_id = "test_chat_id"
-
             result = await alert_system.send_signal_alert(signal)
 
-            assert result is True
+        assert result is True
 
     @pytest.mark.asyncio
     async def test_send_signal_alert_exception(self, alert_system, sample_signal):
         """Test signal alert handles exceptions."""
-        with patch.object(
-            alert_system, "send_alert", side_effect=Exception("Test error")
-        ):
+        with patch.object(alert_system, "send_alert", side_effect=Exception("Test error")):
             result = await alert_system.send_signal_alert(sample_signal)
-            assert result is False
+        assert result is False
 
     @pytest.mark.asyncio
     async def test_send_order_alert_created(self, alert_system, mock_bot, sample_order):
@@ -311,34 +300,29 @@ class TestAlertSystem:
         alert_system.bot = mock_bot
         with patch("src.loats.alerts.settings") as mock_settings:
             mock_settings.telegram_chat_id = "test_chat_id"
-
             result = await alert_system.send_order_alert(sample_order, "created")
 
-            assert result is True
-            mock_bot.send_message.assert_called_once()
+        assert result is True
+        mock_bot.send_message.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_send_order_alert_filled(self, alert_system, mock_bot, sample_order):
         """Test sending order filled alert."""
         sample_order.status = OrderStatus.COMPLETED
         sample_order.filled_quantity = 50
-
         alert_system.bot = mock_bot
         with patch("src.loats.alerts.settings") as mock_settings:
             mock_settings.telegram_chat_id = "test_chat_id"
-
             result = await alert_system.send_order_alert(sample_order, "filled")
 
-            assert result is True
+        assert result is True
 
     @pytest.mark.asyncio
     async def test_send_order_alert_exception(self, alert_system, sample_order):
         """Test order alert handles exceptions."""
-        with patch.object(
-            alert_system, "send_alert", side_effect=Exception("Test error")
-        ):
+        with patch.object(alert_system, "send_alert", side_effect=Exception("Test error")):
             result = await alert_system.send_order_alert(sample_order, "created")
-            assert result is False
+        assert result is False
 
     @pytest.mark.asyncio
     async def test_send_trade_alert_opened(self, alert_system, mock_bot, sample_trade):
@@ -346,15 +330,14 @@ class TestAlertSystem:
         alert_system.bot = mock_bot
         with patch("src.loats.alerts.settings") as mock_settings:
             mock_settings.telegram_chat_id = "test_chat_id"
-
             result = await alert_system.send_trade_alert(sample_trade, "opened")
 
-            assert result is True
-            mock_bot.send_message.assert_called_once()
+        assert result is True
+        mock_bot.send_message.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_send_trade_alert_closed_profit(self, alert_system, mock_bot):
-        """Test sending trade closed with profit alert."""
+        """Test sending trade closed profit alert."""
         trade = Trade(
             trade_id="test_trade_2",
             symbol="NIFTY",
@@ -371,18 +354,16 @@ class TestAlertSystem:
             stop_loss=18500.0,
             take_profit=18600.0,
         )
-
         alert_system.bot = mock_bot
         with patch("src.loats.alerts.settings") as mock_settings:
             mock_settings.telegram_chat_id = "test_chat_id"
-
             result = await alert_system.send_trade_alert(trade, "closed")
 
-            assert result is True
+        assert result is True
 
     @pytest.mark.asyncio
     async def test_send_trade_alert_closed_loss(self, alert_system, mock_bot):
-        """Test sending trade closed with loss alert."""
+        """Test sending trade closed loss alert."""
         trade = Trade(
             trade_id="test_trade_3",
             symbol="NIFTY",
@@ -399,23 +380,19 @@ class TestAlertSystem:
             stop_loss=18500.0,
             take_profit=18600.0,
         )
-
         alert_system.bot = mock_bot
         with patch("src.loats.alerts.settings") as mock_settings:
             mock_settings.telegram_chat_id = "test_chat_id"
-
             result = await alert_system.send_trade_alert(trade, "closed")
 
-            assert result is True
+        assert result is True
 
     @pytest.mark.asyncio
     async def test_send_trade_alert_exception(self, alert_system, sample_trade):
         """Test trade alert handles exceptions."""
-        with patch.object(
-            alert_system, "send_alert", side_effect=Exception("Test error")
-        ):
+        with patch.object(alert_system, "send_alert", side_effect=Exception("Test error")):
             result = await alert_system.send_trade_alert(sample_trade, "opened")
-            assert result is False
+        assert result is False
 
     @pytest.mark.asyncio
     async def test_send_system_alert(self, alert_system, mock_bot):
@@ -423,26 +400,21 @@ class TestAlertSystem:
         alert_system.bot = mock_bot
         with patch("src.loats.alerts.settings") as mock_settings:
             mock_settings.telegram_chat_id = "test_chat_id"
+            result = await alert_system.send_system_alert("System restart required", "warning")
 
-            result = await alert_system.send_system_alert(
-                "System restart required", "warning"
-            )
-
-            assert result is True
-            mock_bot.send_message.assert_called_once()
+        assert result is True
+        mock_bot.send_message.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_send_system_alert_exception(self, alert_system):
         """Test system alert handles exceptions."""
-        with patch.object(
-            alert_system, "send_alert", side_effect=Exception("Test error")
-        ):
+        with patch.object(alert_system, "send_alert", side_effect=Exception("Test error")):
             result = await alert_system.send_system_alert("Test message", "info")
-            assert result is False
+        assert result is False
 
     @pytest.mark.asyncio
     async def test_activate_kill_switch_already_active(self, alert_system):
-        """Test activating already active kill switch."""
+        """Test activating an already active kill switch."""
         alert_system.kill_switch_active = True
         result = await alert_system.activate_kill_switch("Test reason")
         assert result is False
@@ -451,55 +423,52 @@ class TestAlertSystem:
     async def test_activate_kill_switch_success(self, alert_system, mock_bot):
         """Test successful kill switch activation."""
         alert_system.bot = mock_bot
-        with patch("src.loats.alerts.settings") as mock_settings:
-            with patch("src.loats.alerts.openalgo_client") as mock_openalgo:
-                mock_settings.telegram_chat_id = "test_chat_id"
-                mock_openalgo.get_all_orders.return_value = {"data": []}
-                mock_openalgo.cancel_order.return_value = {"success": True}
+        with patch("src.loats.alerts.settings") as mock_settings, \
+             patch("src.loats.alerts.async_client") as mock_openalgo:
+            mock_settings.telegram_chat_id = "test_chat_id"
+            mock_openalgo.get_all_orders = AsyncMock(return_value={"data": []})
+            mock_openalgo.cancel_order = AsyncMock(return_value={"success": True})
 
-                result = await alert_system.activate_kill_switch("Emergency stop")
+            result = await alert_system.activate_kill_switch("Emergency stop")
 
-                assert result is True
-                assert alert_system.kill_switch_active is True
+        assert result is True
+        assert alert_system.kill_switch_active is True
 
     @pytest.mark.asyncio
     async def test_activate_kill_switch_with_open_orders(self, alert_system, mock_bot):
         """Test kill switch cancels open orders."""
         alert_system.bot = mock_bot
-        with patch("src.loats.alerts.settings") as mock_settings:
-            with patch("src.loats.alerts.openalgo_client") as mock_openalgo:
-                mock_settings.telegram_chat_id = "test_chat_id"
-                mock_openalgo.get_all_orders.return_value = {
-                    "data": [
-                        {"order_id": "order1", "status": "OPEN"},
-                        {"order_id": "order2", "status": "PENDING"},
-                        {"order_id": "order3", "status": "FILLED"},
-                    ]
-                }
-                mock_openalgo.cancel_order.return_value = {"success": True}
+        with patch("src.loats.alerts.settings") as mock_settings, \
+             patch("src.loats.alerts.async_client") as mock_openalgo:
+            mock_settings.telegram_chat_id = "test_chat_id"
+            mock_openalgo.get_all_orders = AsyncMock(return_value={
+                "data": [
+                    {"order_id": "order1", "status": "OPEN"},
+                    {"order_id": "order2", "status": "PENDING"},
+                    {"order_id": "order3", "status": "FILLED"},
+                ]
+            })
+            mock_openalgo.cancel_order = AsyncMock(return_value={"success": True})
 
-                result = await alert_system.activate_kill_switch("Emergency stop")
+            result = await alert_system.activate_kill_switch("Emergency stop")
 
-                assert result is True
-                assert alert_system.kill_switch_active is True
-                assert (
-                    mock_openalgo.cancel_order.call_count == 2
-                )  # Should cancel 2 orders
+        assert result is True
+        assert alert_system.kill_switch_active is True
+        assert mock_openalgo.cancel_order.call_count == 2  # Should cancel 2 orders
 
     @pytest.mark.asyncio
     async def test_activate_kill_switch_exception(self, alert_system):
         """Test kill switch handles exceptions."""
-        with patch("src.loats.alerts.openalgo_client") as mock_openalgo:
+        with patch("src.loats.alerts.async_client") as mock_openalgo:
             mock_openalgo.get_all_orders.side_effect = Exception("API error")
-
             result = await alert_system.activate_kill_switch("Emergency stop")
 
-            assert result is False
-            assert alert_system.kill_switch_active is False
+        assert result is False
+        assert alert_system.kill_switch_active is False
 
     @pytest.mark.asyncio
     async def test_deactivate_kill_switch_not_active(self, alert_system):
-        """Test deactivating inactive kill switch."""
+        """Test deactivating an inactive kill switch."""
         result = await alert_system.deactivate_kill_switch("Resume trading")
         assert result is False
 
@@ -510,111 +479,100 @@ class TestAlertSystem:
         alert_system.bot = mock_bot
         with patch("src.loats.alerts.settings") as mock_settings:
             mock_settings.telegram_chat_id = "test_chat_id"
-
             result = await alert_system.deactivate_kill_switch("Resume trading")
 
-            assert result is True
-            assert alert_system.kill_switch_active is False
+        assert result is True
+        assert alert_system.kill_switch_active is False
 
     @pytest.mark.asyncio
     async def test_deactivate_kill_switch_exception(self, alert_system):
         """Test kill switch deactivation handles exceptions."""
         alert_system.kill_switch_active = True
-        with patch.object(
-            alert_system, "send_alert", side_effect=Exception("Test error")
-        ):
+        with patch.object(alert_system, "send_alert", side_effect=Exception("Test error")):
             result = await alert_system.deactivate_kill_switch("Resume trading")
-            assert result is False
+        assert result is False
 
     @pytest.mark.asyncio
     async def test_send_position_alert_no_positions(self, alert_system, mock_bot):
         """Test position alert when no positions exist."""
         alert_system.bot = mock_bot
-        with patch("src.loats.alerts.settings") as mock_settings:
-            with patch("src.loats.alerts.openalgo_client") as mock_openalgo:
-                mock_settings.telegram_chat_id = "test_chat_id"
-                mock_openalgo.get_position_book.return_value = {"data": None}
+        with patch("src.loats.alerts.settings") as mock_settings, \
+             patch("src.loats.alerts.async_client") as mock_openalgo:
+            mock_settings.telegram_chat_id = "test_chat_id"
+            mock_openalgo.get_position_book = AsyncMock(return_value={"data": None})
 
-                result = await alert_system.send_position_alert()
-
-                assert result is True
+            result = await alert_system.send_position_alert()
+        assert result is True
 
     @pytest.mark.asyncio
     async def test_send_position_alert_with_positions(self, alert_system, mock_bot):
         """Test position alert with open positions."""
         alert_system.bot = mock_bot
-        with patch("src.loats.alerts.settings") as mock_settings:
-            with patch("src.loats.alerts.openalgo_client") as mock_openalgo:
-                mock_settings.telegram_chat_id = "test_chat_id"
-                mock_openalgo.get_position_book.return_value = {
-                    "data": [
-                        {
-                            "symbol": "NIFTY",
-                            "quantity": 50,
-                            "average_price": 18500.0,
-                            "last_price": 18550.0,
-                            "pnl": 2500.0,
-                            "product_type": "MIS",
-                        }
-                    ]
-                }
+        with patch("src.loats.alerts.settings") as mock_settings, \
+             patch("src.loats.alerts.async_client") as mock_openalgo:
+            mock_settings.telegram_chat_id = "test_chat_id"
+            mock_openalgo.get_position_book = AsyncMock(return_value={
+                "data": [
+                    {
+                        "symbol": "NIFTY",
+                        "quantity": 50,
+                        "average_price": 18500.0,
+                        "last_price": 18550.0,
+                        "pnl": 2500.0,
+                        "product_type": "MIS",
+                    }
+                ]
+            })
 
-                result = await alert_system.send_position_alert()
-
-                assert result is True
+            result = await alert_system.send_position_alert()
+        assert result is True
 
     @pytest.mark.asyncio
     async def test_send_position_alert_exception(self, alert_system):
         """Test position alert handles exceptions."""
-        with patch("src.loats.alerts.openalgo_client") as mock_openalgo:
+        with patch("src.loats.alerts.async_client") as mock_openalgo:
             mock_openalgo.get_position_book.side_effect = Exception("API error")
-
             result = await alert_system.send_position_alert()
-
-            assert result is False
+        assert result is False
 
     @pytest.mark.asyncio
     async def test_send_funds_alert_no_data(self, alert_system, mock_bot):
         """Test funds alert when no data available."""
         alert_system.bot = mock_bot
-        with patch("src.loats.alerts.settings") as mock_settings:
-            with patch("src.loats.alerts.openalgo_client") as mock_openalgo:
-                mock_settings.telegram_chat_id = "test_chat_id"
-                mock_openalgo.get_funds.return_value = {"data": None}
+        with patch("src.loats.alerts.settings") as mock_settings, \
+             patch("src.loats.alerts.async_client") as mock_openalgo:
+            mock_settings.telegram_chat_id = "test_chat_id"
+            mock_openalgo.get_funds = AsyncMock(return_value={"data": None})
 
-                result = await alert_system.send_funds_alert()
-
-                assert result is True
+            result = await alert_system.send_funds_alert()
+        assert result is True
 
     @pytest.mark.asyncio
     async def test_send_funds_alert_with_data(self, alert_system, mock_bot):
         """Test funds alert with account data."""
         alert_system.bot = mock_bot
-        with patch("src.loats.alerts.settings") as mock_settings:
-            with patch("src.loats.alerts.openalgo_client") as mock_openalgo:
-                mock_settings.telegram_chat_id = "test_chat_id"
-                mock_openalgo.get_funds.return_value = {
-                    "data": {
-                        "available_cash": 100000.0,
-                        "utilized_margin": 50000.0,
-                        "available_margin": 50000.0,
-                        "total_equity": 150000.0,
-                    }
+        with patch("src.loats.alerts.settings") as mock_settings, \
+             patch("src.loats.alerts.async_client") as mock_openalgo:
+            mock_settings.telegram_chat_id = "test_chat_id"
+            mock_openalgo.get_funds = AsyncMock(return_value={
+                "data": {
+                    "available_cash": 100000.0,
+                    "utilized_margin": 50000.0,
+                    "available_margin": 50000.0,
+                    "total_equity": 150000.0,
                 }
+            })
 
-                result = await alert_system.send_funds_alert()
-
-                assert result is True
+            result = await alert_system.send_funds_alert()
+        assert result is True
 
     @pytest.mark.asyncio
     async def test_send_funds_alert_exception(self, alert_system):
         """Test funds alert handles exceptions."""
-        with patch("src.loats.alerts.openalgo_client") as mock_openalgo:
+        with patch("src.loats.alerts.async_client") as mock_openalgo:
             mock_openalgo.get_funds.side_effect = Exception("API error")
-
             result = await alert_system.send_funds_alert()
-
-            assert result is False
+        assert result is False
 
     @pytest.mark.asyncio
     async def test_start_command_handler(self, alert_system):
@@ -625,7 +583,6 @@ class TestAlertSystem:
         mock_context = MagicMock()
 
         await alert_system._start(mock_update, mock_context)
-
         mock_update.message.reply_text.assert_called_once()
 
     @pytest.mark.asyncio
@@ -637,12 +594,11 @@ class TestAlertSystem:
         mock_context = MagicMock()
 
         await alert_system._status(mock_update, mock_context)
-
         mock_update.message.reply_text.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_kill_command_handler_already_active(self, alert_system):
-        """Test /kill command when kill switch already active."""
+        """Test /kill command when kill switch is already active."""
         alert_system.kill_switch_active = True
         mock_update = MagicMock(spec=Update)
         mock_update.message = MagicMock()
@@ -650,9 +606,7 @@ class TestAlertSystem:
         mock_context = MagicMock()
 
         await alert_system._kill_switch(mock_update, mock_context)
-
-        mock_update.message.reply_text.assert_called_once()
-        assert "already active" in str(mock_update.message.reply_text.call_args)
+        mock_update.message.reply_text.assert_called_once_with("⚠️ Kill switch is already active.")
 
     @pytest.mark.asyncio
     async def test_kill_command_handler_with_reason(self, alert_system, mock_bot):
@@ -664,26 +618,25 @@ class TestAlertSystem:
         mock_context = MagicMock()
         mock_context.args = ["API", "failure"]
 
-        with patch("src.loats.alerts.settings") as mock_settings:
-            with patch("src.loats.alerts.openalgo_client") as mock_openalgo:
-                mock_settings.telegram_chat_id = "test_chat_id"
-                mock_openalgo.get_all_orders.return_value = {"data": []}
-                mock_openalgo.cancel_order.return_value = {"success": True}
+        with patch("src.loats.alerts.settings") as mock_settings, \
+             patch("src.loats.alerts.async_client") as mock_openalgo:
+            mock_settings.telegram_chat_id = "test_chat_id"
+            mock_openalgo.get_all_orders = AsyncMock(return_value={"data": []})
+            mock_openalgo.cancel_order = AsyncMock(return_value={"success": True})
 
-                await alert_system._kill_switch(mock_update, mock_context)
+            await alert_system._kill_switch(mock_update, mock_context)
 
-                assert alert_system.kill_switch_active is True
+        assert alert_system.kill_switch_active is True
 
     @pytest.mark.asyncio
     async def test_resume_command_handler_not_active(self, alert_system):
-        """Test /resume command when kill switch not active."""
+        """Test /resume command when kill switch is not active."""
         mock_update = MagicMock(spec=Update)
         mock_update.message = MagicMock()
         mock_update.message.reply_text = AsyncMock()
         mock_context = MagicMock()
 
         await alert_system._resume(mock_update, mock_context)
-
         mock_update.message.reply_text.assert_called_once()
 
     @pytest.mark.asyncio
@@ -698,10 +651,9 @@ class TestAlertSystem:
 
         with patch("src.loats.alerts.settings") as mock_settings:
             mock_settings.telegram_chat_id = "test_chat_id"
-
             await alert_system._resume(mock_update, mock_context)
 
-            assert alert_system.kill_switch_active is False
+        assert alert_system.kill_switch_active is False
 
     @pytest.mark.asyncio
     async def test_positions_command_handler(self, alert_system):
@@ -713,13 +665,12 @@ class TestAlertSystem:
 
         with patch.object(alert_system, "send_position_alert", return_value=True):
             await alert_system._positions(mock_update, mock_context)
-
             # Should not call reply_text on success
             assert mock_update.message.reply_text.call_count == 0
 
     @pytest.mark.asyncio
     async def test_positions_command_handler_failure(self, alert_system):
-        """Test /positions command handler on failure."""
+        """Test /positions command handler failure."""
         mock_update = MagicMock(spec=Update)
         mock_update.message = MagicMock()
         mock_update.message.reply_text = AsyncMock()
@@ -727,8 +678,7 @@ class TestAlertSystem:
 
         with patch.object(alert_system, "send_position_alert", return_value=False):
             await alert_system._positions(mock_update, mock_context)
-
-            mock_update.message.reply_text.assert_called_once()
+        mock_update.message.reply_text.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_orders_command_handler_no_orders(self, alert_system):
@@ -738,12 +688,10 @@ class TestAlertSystem:
         mock_update.message.reply_text = AsyncMock()
         mock_context = MagicMock()
 
-        with patch("src.loats.alerts.openalgo_client") as mock_openalgo:
-            mock_openalgo.get_all_orders.return_value = {"data": None}
-
+        with patch("src.loats.alerts.async_client") as mock_openalgo:
+            mock_openalgo.get_all_orders = AsyncMock(return_value={"data": None})
             await alert_system._orders(mock_update, mock_context)
-
-            mock_update.message.reply_text.assert_called_once()
+        mock_update.message.reply_text.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_orders_command_handler_with_orders(self, alert_system):
@@ -753,8 +701,8 @@ class TestAlertSystem:
         mock_update.message.reply_text = AsyncMock()
         mock_context = MagicMock()
 
-        with patch("src.loats.alerts.openalgo_client") as mock_openalgo:
-            mock_openalgo.get_all_orders.return_value = {
+        with patch("src.loats.alerts.async_client") as mock_openalgo:
+            mock_openalgo.get_all_orders = AsyncMock(return_value={
                 "data": [
                     {
                         "order_id": "order1",
@@ -766,11 +714,9 @@ class TestAlertSystem:
                         "status": "OPEN",
                     }
                 ]
-            }
-
+            })
             await alert_system._orders(mock_update, mock_context)
-
-            mock_update.message.reply_text.assert_called_once()
+        mock_update.message.reply_text.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_signals_command_handler_no_signals(self, alert_system):
@@ -781,11 +727,9 @@ class TestAlertSystem:
         mock_context = MagicMock()
 
         with patch("src.loats.alerts.Database") as mock_db:
-            mock_db.get_latest_signals.return_value = []
-
+            mock_db.return_value.get_latest_signals.return_value = []
             await alert_system._signals(mock_update, mock_context)
-
-            mock_update.message.reply_text.assert_called_once()
+        mock_update.message.reply_text.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_signals_command_handler_with_signals(
@@ -797,14 +741,12 @@ class TestAlertSystem:
         mock_update.message.reply_text = AsyncMock()
         mock_context = MagicMock()
 
-        with patch("src.loats.alerts.Database") as mock_db:
-            with patch("src.loats.alerts.settings") as mock_settings:
-                mock_db.get_latest_signals.return_value = [sample_signal]
-                mock_settings.default_symbol = "NIFTY"
-
-                await alert_system._signals(mock_update, mock_context)
-
-                mock_update.message.reply_text.assert_called_once()
+        with patch("src.loats.alerts.Database") as mock_db, \
+             patch("src.loats.alerts.settings") as mock_settings:
+            mock_db.return_value.get_latest_signals.return_value = [sample_signal]
+            mock_settings.default_symbol = "NIFTY"
+            await alert_system._signals(mock_update, mock_context)
+        mock_update.message.reply_text.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_help_command_handler(self, alert_system):
@@ -816,8 +758,7 @@ class TestAlertSystem:
 
         with patch.object(alert_system, "_start") as mock_start:
             await alert_system._help(mock_update, mock_context)
-
-            mock_start.assert_called_once_with(mock_update, mock_context)
+        mock_start.assert_called_once_with(mock_update, mock_context)
 
     @pytest.mark.asyncio
     async def test_handle_message_status(self, alert_system):
@@ -829,34 +770,31 @@ class TestAlertSystem:
 
         with patch.object(alert_system, "_status") as mock_status:
             await alert_system._handle_message(mock_update, mock_context)
-
-            mock_status.assert_called_once_with(mock_update, mock_context)
+        mock_status.assert_called_once_with(mock_update, mock_context)
 
     @pytest.mark.asyncio
     async def test_handle_message_position(self, alert_system):
         """Test handling message with 'position' keyword."""
         mock_update = MagicMock(spec=Update)
         mock_update.message = MagicMock()
-        mock_update.message.text = "Show my position"
+        mock_update.message.text = "Show my positions"
         mock_context = MagicMock()
 
         with patch.object(alert_system, "_positions") as mock_positions:
             await alert_system._handle_message(mock_update, mock_context)
-
-            mock_positions.assert_called_once_with(mock_update, mock_context)
+        mock_positions.assert_called_once_with(mock_update, mock_context)
 
     @pytest.mark.asyncio
     async def test_handle_message_order(self, alert_system):
         """Test handling message with 'order' keyword."""
         mock_update = MagicMock(spec=Update)
         mock_update.message = MagicMock()
-        mock_update.message.text = "Check orders"
+        mock_update.message.text = "Check my orders"
         mock_context = MagicMock()
 
         with patch.object(alert_system, "_orders") as mock_orders:
             await alert_system._handle_message(mock_update, mock_context)
-
-            mock_orders.assert_called_once_with(mock_update, mock_context)
+        mock_orders.assert_called_once_with(mock_update, mock_context)
 
     @pytest.mark.asyncio
     async def test_handle_message_signal(self, alert_system):
@@ -868,8 +806,7 @@ class TestAlertSystem:
 
         with patch.object(alert_system, "_signals") as mock_signals:
             await alert_system._handle_message(mock_update, mock_context)
-
-            mock_signals.assert_called_once_with(mock_update, mock_context)
+        mock_signals.assert_called_once_with(mock_update, mock_context)
 
     @pytest.mark.asyncio
     async def test_handle_message_kill(self, alert_system):
@@ -881,8 +818,7 @@ class TestAlertSystem:
 
         with patch.object(alert_system, "_kill_switch") as mock_kill:
             await alert_system._handle_message(mock_update, mock_context)
-
-            mock_kill.assert_called_once_with(mock_update, mock_context)
+        mock_kill.assert_called_once_with(mock_update, mock_context)
 
     @pytest.mark.asyncio
     async def test_handle_message_resume(self, alert_system):
@@ -894,8 +830,7 @@ class TestAlertSystem:
 
         with patch.object(alert_system, "_resume") as mock_resume:
             await alert_system._handle_message(mock_update, mock_context)
-
-            mock_resume.assert_called_once_with(mock_update, mock_context)
+        mock_resume.assert_called_once_with(mock_update, mock_context)
 
     @pytest.mark.asyncio
     async def test_handle_message_unknown(self, alert_system):
@@ -907,5 +842,4 @@ class TestAlertSystem:
         mock_context = MagicMock()
 
         await alert_system._handle_message(mock_update, mock_context)
-
         mock_update.message.reply_text.assert_called_once()

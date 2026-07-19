@@ -16,7 +16,7 @@ from .config import settings
 from .database import db
 from .logging import get_logger
 from .models import FundsData, HistoricalData, Position, QuoteData, Signal, SignalType
-from .openalgo import openalgo_client
+from .openalgo import client as openalgo_client
 from .sentiment import sentiment
 from .ta import technical_analysis
 

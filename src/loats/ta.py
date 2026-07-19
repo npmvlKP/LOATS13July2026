@@ -19,7 +19,7 @@ def calculate_rsi(df: pd.DataFrame, period: int = 14) -> pd.Series:
     close = df["close"]
     delta = close.diff()
     gain = delta.where(delta > 0, 0)
-    loss = delta.where(delta < 0, 0)
+    loss = -delta.where(delta < 0, 0)
 
     avg_gain = gain.rolling(window=period).mean()
     avg_loss = loss.rolling(window=period).mean()
@@ -156,7 +156,7 @@ def calculate_cmf(df: pd.DataFrame, period: int = 20) -> pd.Series:
     return cmf
 
 class TechnicalAnalysis:
-    """Technical Analysis engine custom indicators."""
+    """Technical Analysis engine with custom indicators."""
 
     def __init__(self, period: int = 14) -> None:
         self.period = period
@@ -200,7 +200,7 @@ class TechnicalAnalysis:
             elif (current_price < closes[-1] and closes[-1] < closes[-2] and closes[-2] < closes[-3]):
                 return 0.2
             # Check sideways movement
-            elif max(closes + [current_price]) - min(closes + [current_price]) / current_price < 0.01:
+            elif (max(closes + [current_price]) - min(closes + [current_price])) / current_price < 0.01:
                 return 0.4
 
         # Basic trend detection
@@ -217,7 +217,7 @@ class TechnicalAnalysis:
             return 0.5
 
         ranges = [(h.high - h.low) for h in historical_data]
-        # Calculate avg previous ranges
+        # Calculate avg of previous ranges
         avg_range = sum(ranges[:-1]) / (len(ranges) - 1) if len(ranges) > 1 else ranges[0]
         recent_range = ranges[-1]
 

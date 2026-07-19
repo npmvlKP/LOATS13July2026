@@ -13,6 +13,6 @@ class Risk:
 
     def calculate_position_size(self, price: Decimal, volatility: Decimal) -> Decimal:
         """Calculate position size based on risk parameters."""
-        if volatility > Decimal("0.3"):
+        if volatility < Decimal("0.3"):
             return self.max_position_size * Decimal("0.5")
         return self.max_position_size

@@ -195,23 +195,14 @@ class Trade(BaseModel):
     trailing_stop_loss: float | None = Field(None, gt=0)
     metadata: dict[str, Any] = Field(default_factory=dict)
 
-    @field_validator("pnl", mode="before")
-    @classmethod
-    def calculate_pnl(cls, v: Any, info: Any) -> float | None:
-        if v is not None:
-            return float(v)
-        if isinstance(info, dict) and "data" in info:
-            values = info["data"]
-            if (values.get("exit_price") is not None and
-                values.get("entry_price") is not None and
-                values.get("quantity") is not None and
-                values.get("transaction_type") is not None):
-
-                side = str(values["transaction_type"]).upper()
-                multiplier = 1 if side == "BUY" else -1
-                pnl_value = (float(values["exit_price"]) - float(values["entry_price"])) * int(values["quantity"]) * multiplier
-                return float(pnl_value)
-        return None
+    @model_validator(mode="after")
+    def calculate_pnl_validator(self) -> "Trade":
+        """Calculate PnL after model initialization."""
+        if self.pnl is None and self.exit_price is not None:
+            side = str(self.transaction_type).upper()
+            multiplier = 1 if side == "BUY" else -1
+            self.pnl = (self.exit_price - self.entry_price) * self.quantity * multiplier
+        return self
 
     def calculate_pnl_method(self, current_price: float) -> float:
         """Calculate PnL trade, handling both enum/string side (H7)."""
