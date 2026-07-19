@@ -12,8 +12,8 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
-from . import db
 from .config import settings
+from .database import Database
 from .logging import get_logger
 from .models import FundsData, HistoricalData, Position, QuoteData, Signal, SignalType
 from .openalgo import async_client
@@ -21,6 +21,9 @@ from .sentiment import sentiment
 from .ta import ta
 
 logger = get_logger(__name__)
+
+# Initialize database instance for use in scheduler
+db = Database()
 
 
 class TradingScheduler:
@@ -32,11 +35,11 @@ class TradingScheduler:
         Returns:
             True if market is open, False otherwise
         """
-        # Use timezone settings (should be Asia/Kolkata for IST)
+        # Use timezone from settings (should be Asia/Kolkata for IST)
         tz = ZoneInfo(settings.timezone)
         now = datetime.datetime.now(tz)
 
-        # Check weekday (Monday=0, Sunday=6)
+        # Check for weekday (Monday=0, Sunday=6)
         # Indian markets are open Monday-Friday
         if now.weekday() >= 5:  # Saturday (5) or Sunday (6)
             return False
@@ -204,7 +207,7 @@ class TradingScheduler:
 
             # Store historical data
             for hd in historical_data:
-                db.store_historical_data(hd)
+                db.store_historical_data([hd])
 
             # Calculate indicators
             indicators = ta.calculate_indicators(historical_data)
@@ -407,6 +410,7 @@ class TradingScheduler:
             sentiment_strength = (
                 sentiment_signals[0].strength if sentiment_signals else 0
             )
+
             combined_strength = (ta_strength + sentiment_strength) / 2
 
             # Determine signal type based on combined strength
@@ -512,13 +516,14 @@ class TradingScheduler:
             # Use market hours check method
             if not self.is_market_open():
                 logger.debug("Market is closed (weekend, holiday, or closed hours)")
-                # Market closed, pause frequent scans
+                # Market is closed, pause frequent scans
                 # Safely remove jobs and handle race conditions where job might not exist
                 if self.scheduler.get_job("ta_scan"):
                     try:
                         self.scheduler.remove_job("ta_scan")
                     except Exception:
                         logger.warning("Failed to remove ta_scan job", exc_info=True)
+
                 if self.scheduler.get_job("sentiment_scan"):
                     try:
                         self.scheduler.remove_job("sentiment_scan")
@@ -526,6 +531,7 @@ class TradingScheduler:
                         logger.warning(
                             "Failed to remove sentiment_scan job", exc_info=True
                         )
+
                 if self.scheduler.get_job("signal_generation"):
                     try:
                         self.scheduler.remove_job("signal_generation")
@@ -544,6 +550,7 @@ class TradingScheduler:
                     id="ta_scan",
                     name="Technical Analysis Scan",
                 )
+
             if not self.scheduler.get_job("sentiment_scan"):
                 self.scheduler.add_job(
                     self.run_sentiment_scan,
@@ -551,6 +558,7 @@ class TradingScheduler:
                     id="sentiment_scan",
                     name="Sentiment Analysis Scan",
                 )
+
             if not self.scheduler.get_job("signal_generation"):
                 self.scheduler.add_job(
                     self.run_signal_generation,
@@ -605,7 +613,7 @@ class TradingScheduler:
         """Run a specific job once immediately.
 
         Args:
-            job_id: ID of the job to run
+            job_id: The ID of the job to run
         """
         try:
             if job_id == "ta_scan":
@@ -624,7 +632,7 @@ class TradingScheduler:
             logger.exception("Failed to run job %s", job_id)
 
     def get_jobs(self) -> list[dict[str, Any]]:
-        """Get list of scheduled jobs.
+        """Get a list of all scheduled jobs.
 
         Returns:
             List of job information
@@ -640,10 +648,10 @@ class TradingScheduler:
         ]
 
     def is_running(self) -> bool:
-        """Check if scheduler is running.
+        """Check if the scheduler is running.
 
         Returns:
-            True if scheduler is running
+            True if the scheduler is running
         """
         return self.running
 
