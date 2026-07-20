@@ -21,6 +21,7 @@ from src.loats.models import (
 )
 from src.loats.openalgo import (
     AsyncOpenAlgoClient,
+    KillSwitchError,
     OpenAlgoAPIError,
     OpenAlgoClient,
     OpenAlgoError,
@@ -889,3 +890,801 @@ class TestOpenAlgoClient:
 
             # Verify request was made correctly
             mock_httpx_client.post.assert_called_once_with("/api/v1/trade_book")
+
+    def test_kill_switch_blocks_place_order(self, client: OpenAlgoClient) -> None:
+        """Test that kill switch blocks sync place_order.
+
+        Verifies the safety mechanism that prevents order placement
+        when the kill switch is active (emergency shutdown).
+        """
+        with patch("src.loats.openalgo._check_kill_switch") as mock_check:
+            mock_check.side_effect = KillSwitchError("Kill switch active")
+
+            with pytest.raises(KillSwitchError) as exc_info:
+                client.place_order(
+                    symbol="NIFTY",
+                    quantity=100,
+                    order_type=OrderType.LIMIT,
+                    price=18000.0,
+                )
+
+            assert "Kill switch active" in str(exc_info.value)
+            mock_check.assert_called_once()
+
+    def test_kill_switch_blocks_place_smart_order(self, client: OpenAlgoClient) -> None:
+        """Test that kill switch blocks sync place_smart_order.
+
+        Verifies the safety mechanism that prevents smart order placement
+        when the kill switch is active (emergency shutdown).
+        """
+        with patch("src.loats.openalgo._check_kill_switch") as mock_check:
+            mock_check.side_effect = KillSwitchError("Kill switch active")
+
+            with pytest.raises(KillSwitchError) as exc_info:
+                client.place_smart_order(
+                    symbol="NIFTY",
+                    quantity=100,
+                    order_type=OrderType.LIMIT,
+                    price=18000.0,
+                )
+
+            assert "Kill switch active" in str(exc_info.value)
+            mock_check.assert_called_once()
+
+
+class TestAsyncOpenAlgoClientFinancialPaths:
+    """Test async financial operations for AsyncOpenAlgoClient.
+
+    These tests cover the critical async order placement and modification
+    paths that are essential for trading system operation.
+    """
+
+    @pytest.fixture
+    def async_client(self) -> AsyncOpenAlgoClient:
+        """Create a test AsyncOpenAlgoClient instance."""
+        return AsyncOpenAlgoClient()
+
+    @pytest.fixture
+    def mock_async_httpx_client(self) -> AsyncMock:
+        """Create a mock httpx.AsyncClient."""
+        return AsyncMock(spec=httpx.AsyncClient)
+
+    @pytest.fixture
+    def mock_async_response(self) -> MagicMock:
+        """Create a mock httpx.Response."""
+        response = MagicMock(spec=Response)
+        response.status_code = 200
+        response.json.return_value = {
+            "success": True,
+            "message": "Success",
+            "data": {},
+        }
+        return response
+
+    async def test_async_place_order(
+        self,
+        async_client: AsyncOpenAlgoClient,
+        mock_async_httpx_client: AsyncMock,
+        mock_async_response: MagicMock,
+    ) -> None:
+        """Test async place_order method with all parameters.
+
+        Verifies:
+        - Kill switch check is called before placing order
+        - All order parameters are correctly serialized to payload
+        - Response is properly returned on success
+        """
+        mock_async_response.json.return_value = {
+            "success": True,
+            "message": "Order placed successfully",
+            "data": {
+                "order_id": "async_order_12345",
+                "status": "OPEN",
+            },
+        }
+
+        mock_async_httpx_client.post.return_value = mock_async_response
+
+        with patch.object(
+            async_client, "_ensure_client", return_value=mock_async_httpx_client
+        ):
+            with patch(
+                "src.loats.openalgo._async_check_kill_switch", new_callable=AsyncMock
+            ):
+                result = await async_client.place_order(
+                    symbol="NIFTY",
+                    quantity=100,
+                    order_type=OrderType.LIMIT,
+                    price=18000.0,
+                    transaction_type=TransactionType.BUY,
+                    product_type=ProductType.MIS,
+                    stop_loss=17950.0,
+                    take_profit=18100.0,
+                    trailing_stop_loss=50.0,
+                )
+
+                assert result["success"] is True
+                assert result["data"]["order_id"] == "async_order_12345"
+                assert result["data"]["status"] == "OPEN"
+
+                # Verify request was made correctly with all parameters
+                mock_async_httpx_client.post.assert_called_once_with(
+                    "/api/v1/place_order",
+                    json={
+                        "symbol": "NIFTY",
+                        "quantity": 100,
+                        "order_type": "LIMIT",
+                        "variety": "regular",
+                        "transaction_type": "BUY",
+                        "product_type": "MIS",
+                        "price": 18000.0,
+                        "stop_loss": 17950.0,
+                        "take_profit": 18100.0,
+                        "trailing_stop_loss": 50.0,
+                    },
+                )
+
+    async def test_async_place_order_with_string_enums(
+        self,
+        async_client: AsyncOpenAlgoClient,
+        mock_async_httpx_client: AsyncMock,
+        mock_async_response: MagicMock,
+    ) -> None:
+        """Test async place_order with string enum values.
+
+        Verifies that string enum values are handled correctly
+        without conversion.
+        """
+        mock_async_response.json.return_value = {
+            "success": True,
+            "message": "Order placed successfully",
+            "data": {
+                "order_id": "async_order_str_12345",
+                "status": "OPEN",
+            },
+        }
+
+        mock_async_httpx_client.post.return_value = mock_async_response
+
+        with patch.object(
+            async_client, "_ensure_client", return_value=mock_async_httpx_client
+        ):
+            with patch(
+                "src.loats.openalgo._async_check_kill_switch", new_callable=AsyncMock
+            ):
+                # Use string values instead of enums
+                result = await async_client.place_order(
+                    symbol="BANKNIFTY",
+                    quantity=50,
+                    order_type="MARKET",
+                    transaction_type="SELL",
+                    product_type="NRML",
+                )
+
+                assert result["success"] is True
+                assert result["data"]["order_id"] == "async_order_str_12345"
+
+                # Verify payload contains string values directly
+                call_args = mock_async_httpx_client.post.call_args
+                payload = call_args.kwargs["json"]
+                assert payload["order_type"] == "MARKET"
+                assert payload["transaction_type"] == "SELL"
+                assert payload["product_type"] == "NRML"
+
+    async def test_async_place_order_minimal_params(
+        self,
+        async_client: AsyncOpenAlgoClient,
+        mock_async_httpx_client: AsyncMock,
+        mock_async_response: MagicMock,
+    ) -> None:
+        """Test async place_order with only required parameters.
+
+        Verifies that optional parameters are not included in payload
+        when not provided.
+        """
+        mock_async_response.json.return_value = {
+            "success": True,
+            "message": "Order placed successfully",
+            "data": {
+                "order_id": "async_order_min_12345",
+                "status": "OPEN",
+            },
+        }
+
+        mock_async_httpx_client.post.return_value = mock_async_response
+
+        with patch.object(
+            async_client, "_ensure_client", return_value=mock_async_httpx_client
+        ):
+            with patch(
+                "src.loats.openalgo._async_check_kill_switch", new_callable=AsyncMock
+            ):
+                result = await async_client.place_order(
+                    symbol="NIFTY",
+                    quantity=100,
+                    order_type=OrderType.MARKET,
+                )
+
+                assert result["success"] is True
+
+                # Verify only required parameters are in payload
+                call_args = mock_async_httpx_client.post.call_args
+                payload = call_args.kwargs["json"]
+                assert "symbol" in payload
+                assert "quantity" in payload
+                assert "order_type" in payload
+                assert "price" not in payload  # Optional
+                assert "stop_loss" not in payload  # Optional
+                assert "take_profit" not in payload  # Optional
+
+    async def test_async_place_order_kill_switch_blocks(
+        self,
+        async_client: AsyncOpenAlgoClient,
+    ) -> None:
+        """Test that kill switch blocks async place_order.
+
+        Verifies the safety mechanism that prevents async order placement
+        when the kill switch is active (emergency shutdown).
+        """
+        with patch(
+            "src.loats.openalgo._async_check_kill_switch", new_callable=AsyncMock
+        ) as mock_check:
+            mock_check.side_effect = KillSwitchError("Kill switch active")
+
+            with pytest.raises(KillSwitchError) as exc_info:
+                await async_client.place_order(
+                    symbol="NIFTY",
+                    quantity=100,
+                    order_type=OrderType.LIMIT,
+                    price=18000.0,
+                )
+
+            assert "Kill switch active" in str(exc_info.value)
+            mock_check.assert_called_once()
+
+    async def test_async_place_smart_order(
+        self,
+        async_client: AsyncOpenAlgoClient,
+        mock_async_httpx_client: AsyncMock,
+        mock_async_response: MagicMock,
+    ) -> None:
+        """Test async place_smart_order method with all parameters.
+
+        Verifies:
+        - Kill switch check is called before placing smart order
+        - Strategy and metadata are correctly included in payload
+        - All order parameters are correctly serialized
+        """
+        mock_async_response.json.return_value = {
+            "success": True,
+            "message": "Smart order placed successfully",
+            "data": {
+                "order_id": "async_smart_order_12345",
+                "status": "OPEN",
+            },
+        }
+
+        mock_async_httpx_client.post.return_value = mock_async_response
+
+        with patch.object(
+            async_client, "_ensure_client", return_value=mock_async_httpx_client
+        ):
+            with patch(
+                "src.loats.openalgo._async_check_kill_switch", new_callable=AsyncMock
+            ):
+                result = await async_client.place_smart_order(
+                    symbol="NIFTY",
+                    quantity=100,
+                    order_type=OrderType.LIMIT,
+                    price=18000.0,
+                    transaction_type=TransactionType.BUY,
+                    product_type=ProductType.MIS,
+                    strategy="supertrend",
+                    stop_loss=17950.0,
+                    take_profit=18100.0,
+                    trailing_stop_loss=50.0,
+                    metadata={"strategy_name": "momentum", "signal_id": "sig_001"},
+                )
+
+                assert result["success"] is True
+                assert result["data"]["order_id"] == "async_smart_order_12345"
+
+                # Verify request was made correctly with all parameters
+                mock_async_httpx_client.post.assert_called_once_with(
+                    "/api/v1/place_smart_order",
+                    json={
+                        "symbol": "NIFTY",
+                        "quantity": 100,
+                        "order_type": "LIMIT",
+                        "strategy": "supertrend",
+                        "transaction_type": "BUY",
+                        "product_type": "MIS",
+                        "price": 18000.0,
+                        "stop_loss": 17950.0,
+                        "take_profit": 18100.0,
+                        "trailing_stop_loss": 50.0,
+                        "metadata": {
+                            "strategy_name": "momentum",
+                            "signal_id": "sig_001",
+                        },
+                    },
+                )
+
+    async def test_async_place_smart_order_default_strategy(
+        self,
+        async_client: AsyncOpenAlgoClient,
+        mock_async_httpx_client: AsyncMock,
+        mock_async_response: MagicMock,
+    ) -> None:
+        """Test async place_smart_order with default strategy.
+
+        Verifies that the default 'simple' strategy is used when
+        not explicitly specified.
+        """
+        mock_async_response.json.return_value = {
+            "success": True,
+            "message": "Smart order placed successfully",
+            "data": {
+                "order_id": "async_smart_simple_12345",
+                "status": "OPEN",
+            },
+        }
+
+        mock_async_httpx_client.post.return_value = mock_async_response
+
+        with patch.object(
+            async_client, "_ensure_client", return_value=mock_async_httpx_client
+        ):
+            with patch(
+                "src.loats.openalgo._async_check_kill_switch", new_callable=AsyncMock
+            ):
+                result = await async_client.place_smart_order(
+                    symbol="NIFTY",
+                    quantity=100,
+                    order_type=OrderType.MARKET,
+                    transaction_type=TransactionType.SELL,
+                )
+
+                assert result["success"] is True
+
+                # Verify default strategy is 'simple'
+                call_args = mock_async_httpx_client.post.call_args
+                payload = call_args.kwargs["json"]
+                assert payload["strategy"] == "simple"
+
+    async def test_async_place_smart_order_kill_switch_blocks(
+        self,
+        async_client: AsyncOpenAlgoClient,
+    ) -> None:
+        """Test that kill switch blocks async place_smart_order.
+
+        Verifies the safety mechanism that prevents async smart order placement
+        when the kill switch is active (emergency shutdown).
+        """
+        with patch(
+            "src.loats.openalgo._async_check_kill_switch", new_callable=AsyncMock
+        ) as mock_check:
+            mock_check.side_effect = KillSwitchError("Kill switch active")
+
+            with pytest.raises(KillSwitchError) as exc_info:
+                await async_client.place_smart_order(
+                    symbol="NIFTY",
+                    quantity=100,
+                    order_type=OrderType.LIMIT,
+                    price=18000.0,
+                )
+
+            assert "Kill switch active" in str(exc_info.value)
+            mock_check.assert_called_once()
+
+    async def test_async_modify_order(
+        self,
+        async_client: AsyncOpenAlgoClient,
+        mock_async_httpx_client: AsyncMock,
+        mock_async_response: MagicMock,
+    ) -> None:
+        """Test async modify_order method with all parameters.
+
+        Verifies:
+        - Order ID is correctly included in payload
+        - All modification parameters are correctly serialized
+        - No kill switch check (modify is allowed during kill switch)
+        """
+        mock_async_response.json.return_value = {
+            "success": True,
+            "message": "Order modified successfully",
+            "data": {
+                "order_id": "order_12345",
+                "status": "MODIFIED",
+            },
+        }
+
+        mock_async_httpx_client.post.return_value = mock_async_response
+
+        with patch.object(
+            async_client, "_ensure_client", return_value=mock_async_httpx_client
+        ):
+            result = await async_client.modify_order(
+                order_id="order_12345",
+                quantity=150,
+                order_type=OrderType.LIMIT,
+                price=18050.0,
+                stop_loss=18000.0,
+                take_profit=18200.0,
+                trailing_stop_loss=60.0,
+            )
+
+            assert result["success"] is True
+            assert result["data"]["order_id"] == "order_12345"
+            assert result["data"]["status"] == "MODIFIED"
+
+            # Verify request was made correctly with all parameters
+            mock_async_httpx_client.post.assert_called_once_with(
+                "/api/v1/modify_order",
+                json={
+                    "order_id": "order_12345",
+                    "quantity": 150,
+                    "order_type": "LIMIT",
+                    "price": 18050.0,
+                    "stop_loss": 18000.0,
+                    "take_profit": 18200.0,
+                    "trailing_stop_loss": 60.0,
+                },
+            )
+
+    async def test_async_modify_order_minimal_params(
+        self,
+        async_client: AsyncOpenAlgoClient,
+        mock_async_httpx_client: AsyncMock,
+        mock_async_response: MagicMock,
+    ) -> None:
+        """Test async modify_order with only order_id.
+
+        Verifies that optional parameters are not included in payload
+        when not provided.
+        """
+        mock_async_response.json.return_value = {
+            "success": True,
+            "message": "Order modified successfully",
+            "data": {
+                "order_id": "order_min_12345",
+                "status": "MODIFIED",
+            },
+        }
+
+        mock_async_httpx_client.post.return_value = mock_async_response
+
+        with patch.object(
+            async_client, "_ensure_client", return_value=mock_async_httpx_client
+        ):
+            result = await async_client.modify_order(order_id="order_min_12345")
+
+            assert result["success"] is True
+
+            # Verify only order_id is in payload
+            call_args = mock_async_httpx_client.post.call_args
+            payload = call_args.kwargs["json"]
+            assert payload["order_id"] == "order_min_12345"
+            assert "quantity" not in payload
+            assert "price" not in payload
+
+    async def test_async_modify_order_partial_update(
+        self,
+        async_client: AsyncOpenAlgoClient,
+        mock_async_httpx_client: AsyncMock,
+        mock_async_response: MagicMock,
+    ) -> None:
+        """Test async modify_order with partial parameter update.
+
+        Verifies that only provided parameters are included in payload,
+        allowing partial updates to existing orders.
+        """
+        mock_async_response.json.return_value = {
+            "success": True,
+            "message": "Order modified successfully",
+            "data": {
+                "order_id": "order_partial_12345",
+                "status": "MODIFIED",
+            },
+        }
+
+        mock_async_httpx_client.post.return_value = mock_async_response
+
+        with patch.object(
+            async_client, "_ensure_client", return_value=mock_async_httpx_client
+        ):
+            # Only update price and stop_loss
+            result = await async_client.modify_order(
+                order_id="order_partial_12345",
+                price=18100.0,
+                stop_loss=18050.0,
+            )
+
+            assert result["success"] is True
+
+            # Verify only specified parameters are in payload
+            call_args = mock_async_httpx_client.post.call_args
+            payload = call_args.kwargs["json"]
+            assert payload["order_id"] == "order_partial_12345"
+            assert payload["price"] == 18100.0
+            assert payload["stop_loss"] == 18050.0
+            assert "quantity" not in payload
+            assert "take_profit" not in payload
+
+    async def test_async_get_history(
+        self,
+        async_client: AsyncOpenAlgoClient,
+        mock_async_httpx_client: AsyncMock,
+        mock_async_response: MagicMock,
+    ) -> None:
+        """Test async get_history method."""
+        mock_async_response.json.return_value = {
+            "success": True,
+            "message": "Success",
+            "data": [
+                {
+                    "timestamp": "2023-01-01T09:15:00",
+                    "open": 17950.25,
+                    "high": 18000.50,
+                    "low": 17900.00,
+                    "close": 17980.50,
+                    "volume": 500000,
+                },
+            ],
+        }
+
+        mock_async_httpx_client.post.return_value = mock_async_response
+
+        with patch.object(
+            async_client, "_ensure_client", return_value=mock_async_httpx_client
+        ):
+            result = await async_client.get_history(
+                symbol="NIFTY",
+                interval="1min",
+                from_date="2023-01-01",
+                to_date="2023-01-02",
+            )
+
+            assert result["success"] is True
+            assert len(result["data"]) == 1
+
+            # Verify request was made correctly
+            mock_async_httpx_client.post.assert_called_once_with(
+                "/api/v1/history",
+                json={
+                    "symbol": "NIFTY",
+                    "interval": "1min",
+                    "from_date": "2023-01-01",
+                    "to_date": "2023-01-02",
+                },
+            )
+
+    async def test_async_get_option_chain(
+        self,
+        async_client: AsyncOpenAlgoClient,
+        mock_async_httpx_client: AsyncMock,
+        mock_async_response: MagicMock,
+    ) -> None:
+        """Test async get_option_chain method."""
+        mock_async_response.json.return_value = {
+            "success": True,
+            "message": "Success",
+            "data": {
+                "expiry_dates": ["2023-01-26"],
+                "options": [],
+            },
+        }
+
+        mock_async_httpx_client.post.return_value = mock_async_response
+
+        with patch.object(
+            async_client, "_ensure_client", return_value=mock_async_httpx_client
+        ):
+            result = await async_client.get_option_chain("NIFTY", "2023-01-26")
+
+            assert result["success"] is True
+            assert len(result["data"]["expiry_dates"]) == 1
+
+            # Verify request was made correctly
+            mock_async_httpx_client.post.assert_called_once_with(
+                "/api/v1/option_chain",
+                json={
+                    "symbol": "NIFTY",
+                    "expiry": "2023-01-26",
+                },
+            )
+
+    async def test_async_get_position_book(
+        self,
+        async_client: AsyncOpenAlgoClient,
+        mock_async_httpx_client: AsyncMock,
+        mock_async_response: MagicMock,
+    ) -> None:
+        """Test async get_position_book method."""
+        mock_async_response.json.return_value = {
+            "success": True,
+            "message": "Success",
+            "data": [
+                {
+                    "symbol": "NIFTY",
+                    "quantity": 100,
+                    "pnl": 5000.0,
+                },
+            ],
+        }
+
+        mock_async_httpx_client.post.return_value = mock_async_response
+
+        with patch.object(
+            async_client, "_ensure_client", return_value=mock_async_httpx_client
+        ):
+            result = await async_client.get_position_book()
+
+            assert result["success"] is True
+            assert len(result["data"]) == 1
+
+            # Verify request was made correctly
+            mock_async_httpx_client.post.assert_called_once_with(
+                "/api/v1/position_book"
+            )
+
+    async def test_async_get_funds(
+        self,
+        async_client: AsyncOpenAlgoClient,
+        mock_async_httpx_client: AsyncMock,
+        mock_async_response: MagicMock,
+    ) -> None:
+        """Test async get_funds method."""
+        mock_async_response.json.return_value = {
+            "success": True,
+            "message": "Success",
+            "data": {
+                "available_cash": 50000.0,
+                "available_margin": 40000.0,
+            },
+        }
+
+        mock_async_httpx_client.post.return_value = mock_async_response
+
+        with patch.object(
+            async_client, "_ensure_client", return_value=mock_async_httpx_client
+        ):
+            result = await async_client.get_funds()
+
+            assert result["success"] is True
+            assert result["data"]["available_cash"] == 50000.0
+
+            # Verify request was made correctly
+            mock_async_httpx_client.post.assert_called_once_with("/api/v1/funds")
+
+    async def test_async_cancel_order(
+        self,
+        async_client: AsyncOpenAlgoClient,
+        mock_async_httpx_client: AsyncMock,
+        mock_async_response: MagicMock,
+    ) -> None:
+        """Test async cancel_order method."""
+        mock_async_response.json.return_value = {
+            "success": True,
+            "message": "Order cancelled successfully",
+            "data": {
+                "order_id": "order_12345",
+                "status": "CANCELLED",
+            },
+        }
+
+        mock_async_httpx_client.post.return_value = mock_async_response
+
+        with patch.object(
+            async_client, "_ensure_client", return_value=mock_async_httpx_client
+        ):
+            result = await async_client.cancel_order("order_12345")
+
+            assert result["success"] is True
+            assert result["data"]["status"] == "CANCELLED"
+
+            # Verify request was made correctly
+            mock_async_httpx_client.post.assert_called_once_with(
+                "/api/v1/cancel_order",
+                json={"order_id": "order_12345"},
+            )
+
+    async def test_async_get_order_status(
+        self,
+        async_client: AsyncOpenAlgoClient,
+        mock_async_httpx_client: AsyncMock,
+        mock_async_response: MagicMock,
+    ) -> None:
+        """Test async get_order_status method."""
+        mock_async_response.json.return_value = {
+            "success": True,
+            "message": "Success",
+            "data": [
+                {
+                    "order_id": "order_12345",
+                    "status": "COMPLETED",
+                },
+            ],
+        }
+
+        mock_async_httpx_client.post.return_value = mock_async_response
+
+        with patch.object(
+            async_client, "_ensure_client", return_value=mock_async_httpx_client
+        ):
+            result = await async_client.get_order_status("order_12345")
+
+            assert result["success"] is True
+            assert result["data"][0]["order_id"] == "order_12345"
+
+            # Verify request was made correctly
+            mock_async_httpx_client.post.assert_called_once_with(
+                "/api/v1/order_status",
+                json={"order_id": "order_12345"},
+            )
+
+    async def test_async_get_all_orders(
+        self,
+        async_client: AsyncOpenAlgoClient,
+        mock_async_httpx_client: AsyncMock,
+        mock_async_response: MagicMock,
+    ) -> None:
+        """Test async get_all_orders method."""
+        mock_async_response.json.return_value = {
+            "success": True,
+            "message": "Success",
+            "data": [
+                {
+                    "order_id": "order_12345",
+                    "status": "OPEN",
+                },
+                {
+                    "order_id": "order_67890",
+                    "status": "COMPLETED",
+                },
+            ],
+        }
+
+        mock_async_httpx_client.post.return_value = mock_async_response
+
+        with patch.object(
+            async_client, "_ensure_client", return_value=mock_async_httpx_client
+        ):
+            result = await async_client.get_all_orders()
+
+            assert result["success"] is True
+            assert len(result["data"]) == 2
+
+            # Verify request was made correctly
+            mock_async_httpx_client.post.assert_called_once_with("/api/v1/all_orders")
+
+    async def test_async_get_trade_book(
+        self,
+        async_client: AsyncOpenAlgoClient,
+        mock_async_httpx_client: AsyncMock,
+        mock_async_response: MagicMock,
+    ) -> None:
+        """Test async get_trade_book method."""
+        mock_async_response.json.return_value = {
+            "success": True,
+            "message": "Success",
+            "data": [
+                {
+                    "trade_id": "trade_12345",
+                    "pnl": 10000.0,
+                },
+            ],
+        }
+
+        mock_async_httpx_client.post.return_value = mock_async_response
+
+        with patch.object(
+            async_client, "_ensure_client", return_value=mock_async_httpx_client
+        ):
+            result = await async_client.get_trade_book()
+
+            assert result["success"] is True
+            assert result["data"][0]["trade_id"] == "trade_12345"
+
+            # Verify request was made correctly
+            mock_async_httpx_client.post.assert_called_once_with("/api/v1/trade_book")
