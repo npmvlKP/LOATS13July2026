@@ -1,4 +1,4 @@
-﻿"""
+"""
 Alerts module LOATS13July2026.
 Implements Telegram alerts kill switch functionality.
 """
@@ -30,10 +30,11 @@ class AlertSystem:
     def __init__(self) -> None:
         """Initialize AlertSystem."""
         self.bot: Bot | None = None
-        self.application: Any = None
+        self.application: Application[Any] | None = None
         self.kill_switch_active: bool = False
         self.alert_cooldown: dict[str, datetime] = {}
         self.cooldown_period: int = 300  # 5 minutes
+        self._running: bool = False
 
     async def initialize(self) -> None:
         """Initialize Telegram bot."""
@@ -70,22 +71,37 @@ class AlertSystem:
             raise
 
     async def start(self) -> None:
-        """Start Telegram bot."""
+        """Start Telegram bot in non-blocking mode.
+
+        Uses Application.start() which starts polling in the background,
+        allowing other async tasks (like scheduler) to run concurrently.
+        """
         if not self.application:
             return
+        if self._running:
+            logger.warning("Telegram bot already running")
+            return
         try:
-            await self.application.run_polling()
+            # Initialize the application (required before start)
+            await self.application.initialize()
+            # Start polling in background - this is non-blocking
+            await self.application.start()
+            self._running = True
             logger.info("Telegram bot started")
         except Exception as e:
             logger.error(f"Failed to start Telegram bot: {e}")
             raise
 
     async def shutdown(self) -> None:
-        """Shutdown Telegram bot."""
+        """Shutdown Telegram bot gracefully."""
         if not self.application:
             return
+        if not self._running:
+            return
         try:
-            await self.application.shutdown()
+            # Stop the application gracefully
+            await self.application.stop()
+            self._running = False
             logger.info("Telegram bot shutdown complete")
         except Exception as e:
             logger.error(f"Error shutting down Telegram bot: {e}")

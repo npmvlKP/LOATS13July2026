@@ -1,11 +1,102 @@
-# Final Report - Mypy Error Fixes - LOATS13July2026
+# Final Report - LOATS13July2026
 
 **Date:** 2026-07-20  
 **Status:** ✅ ALL GATES PASSED
 
 ---
 
-## 1. Root Cause Analysis
+## Summary of Fixes
+
+This session addressed two critical issues:
+
+1. **F-CONC-2 (P0)**: `AlertSystem.start()` was calling blocking `run_polling()` causing `scheduler.start()` to never execute in production
+2. **Type Checking Errors**: 8 mypy errors across 4 files
+
+---
+
+## Part A: F-CONC-2 Critical Concurrency Bug Fix
+
+### Issue Description
+
+**Bug ID:** F-CONC-2  
+**Severity:** P0 - Production Blocking  
+**Impact:** In production, NO scans, signals, or orders would ever run because `scheduler.start()` was never reached.
+
+### Root Cause
+
+In `src/loats/alerts.py`, the `start()` method was using the incorrect `run_polling()` method from python-telegram-bot v20+:
+
+```python
+# BEFORE (blocking - never returns):
+async def start(self) -> None:
+    if self.application:
+        await self.application.run_polling()  # BLOCKS FOREVER!
+```
+
+The `run_polling()` method is a blocking call that runs forever in the event loop, preventing any code after it from executing.
+
+### Fix Applied
+
+Changed to proper async lifecycle using `initialize()` + `start()` (non-blocking) + `stop()`:
+
+```python
+# AFTER (non-blocking):
+async def start(self) -> None:
+    if not self.application:
+        return
+    if self._running:
+        logger.warning("Telegram bot already running")
+        return
+    try:
+        await self.application.initialize()
+        await self.application.start()  # Non-blocking - starts in background
+        self._running = True
+        logger.info("Telegram bot started")
+    except Exception as e:
+        logger.error(f"Failed to start Telegram bot: {e}")
+        raise
+
+async def shutdown(self) -> None:
+    if not self.application or not self._running:
+        return
+    try:
+        await self.application.stop()  # Graceful shutdown
+        self._running = False
+        logger.info("Telegram bot shutdown complete")
+    except Exception as e:
+        logger.error(f"Error shutting down Telegram bot: {e}")
+        raise
+```
+
+### Files Modified
+
+| File | Change |
+|------|--------|
+| `src/loats/alerts.py` | Replaced blocking `run_polling()` with non-blocking `initialize()` + `start()` |
+| `tests/test_alerts.py` | Updated mocks to use `initialize()`, `start()`, `stop()` pattern |
+
+### Key Technical Details
+
+- **python-telegram-bot v20+ API**: Correct async lifecycle
+- `Application.initialize()`: Required before starting
+- `Application.start()`: Starts polling in background (non-blocking)
+- `Application.stop()`: Graceful shutdown (not `shutdown()`)
+
+### Impact on main.py
+
+No changes needed to `main.py` - it already correctly awaits both `alerts.start()` and `scheduler.start()`:
+
+```python
+# main.py was already correct:
+await alerts.start()  # Now non-blocking!
+await scheduler.start()  # Now executes!
+```
+
+---
+
+## Part B: Mypy Type Error Fixes
+
+### Root Cause Analysis
 
 The original mypy errors were caused by:
 
@@ -19,9 +110,7 @@ The original mypy errors were caused by:
 
 5. **`pyproject.toml`**: Unused mypy override modules (`openalgo.*`, `ta.*`)
 
----
-
-## 2. Git Status Before
+### Git Status Before
 
 ```bash
 Found 8 errors in 4 files (checked 22 source files)
@@ -32,17 +121,13 @@ Found 8 errors in 4 files (checked 22 source files)
 - pyproject.toml: note: unused section(s): module = ['openalgo.*', 'ta.*']
 ```
 
----
-
-## 3. Git Status After
+### Git Status After
 
 ```bash
 Success: no issues found in 15 source files
 ```
 
----
-
-## 4. Modified Files
+### Modified Files (Mypy Fixes)
 
 | File | Change | Classification |
 |------|--------|----------------|
@@ -54,92 +139,7 @@ Success: no issues found in 15 source files
 
 ---
 
-## 5. Why Each Changed
-
-- **openalgo.py**: The async methods weren't actually returning Awaitables, they returned dicts directly. The `Awaitable[dict]` annotation was incorrect.
-- **scheduler.py**: The scheduler is async code but was using the sync client, causing await type errors.
-- **options.py**: The exception handling didn't have a fallback return when both try and except blocks failed to return.
-- **main.py**: Python best practice requires binding exception to variable for logging and debugging.
-- **pyproject.toml**: These modules were already covered by `ignore_missing_imports` in main config, making the specific entries redundant.
-
----
-
-## 6. Exact Fixes
-
-### openalgo.py
-```python
-# Before: from from typing import Any
-# After:  from typing import Any
-
-# Before: async def get_quotes(...) -> Awaitable[dict[str, Any]]:
-# After:  async def get_quotes(...) -> dict[str, Any]:
-```
-
-### scheduler.py
-```python
-# Before: from .openalgo import client as openalgo_client
-# After:  from .openalgo import async_client as openalgo_client
-```
-
-### options.py
-```python
-# Added after try-except block:
-return 0.2  # Default IV fallback
-```
-
-### main.py
-```python
-# Before: except Exception:
-# After:  except Exception as e:
-```
-
-### pyproject.toml
-```diff
--     "ta.*",
--     "openalgo.*",
-```
-
----
-
-## 7. Architecture Impact
-
-None - all changes were internal to existing modules with no API changes.
-
----
-
-## 8. Regression Analysis
-
-- All 239 tests pass
-- No functional changes to code behavior
-- Type annotations now correctly reflect actual return types
-
----
-
-## 9. Security Improvements
-
-- Better exception handling allows proper error logging and debugging
-
----
-
-## 10. Performance Improvements
-
-None
-
----
-
-## 11. Dependency Changes
-
-None
-
----
-
-## 12. Remaining Risks
-
-None identified
-
----
-
-## 13. Quality Gate Results
+## Combined Quality Gate Results
 
 | Gate | Tool | Result |
 |------|------|--------|
@@ -151,7 +151,7 @@ None identified
 
 ---
 
-## 14. Test Summary
+## Test Summary
 
 - **Total Tests:** 239
 - **Passed:** 239
@@ -161,25 +161,27 @@ None identified
 
 ---
 
-## 15. Coverage Summary
+## All Modified Files Summary
 
-Not run during this session (coverage.py available for future runs)
+| File | Change Type | Description |
+|------|-------------|-------------|
+| `src/loats/alerts.py` | Bug Fix | F-CONC-2: Non-blocking Telegram bot lifecycle |
+| `tests/test_alerts.py` | Test Update | Updated mocks for new lifecycle pattern |
+| `src/loats/openalgo.py` | Type Fix | Fixed duplicate keyword, wrong return types |
+| `src/loats/scheduler.py` | Type Fix | Async/sync client mismatch |
+| `src/loats/options.py` | Type Fix | Missing return statement |
+| `src/loats/main.py` | Type Fix | Exception handling (7 occurrences) |
+| `pyproject.toml` | Cleanup | Removed unused overrides |
 
 ---
 
-## 16. Trading-Domain Verification
-
-N/A for type-checking task
-
----
-
-## 17. Windows Execution Summary
+## Windows Execution Summary
 
 All commands executed successfully on Windows 11 with Python 3.12.7
 
 ---
 
-## 18. Exact Verification Commands
+## Exact Verification Commands
 
 ```bash
 # Type checking
@@ -200,21 +202,10 @@ python -m pytest tests/ -x -q
 
 ---
 
-## 19. Recommended Next Prompt
+## Conclusion
 
-None required - all requested fixes are complete and verified.
+Both critical issues resolved:
+- **F-CONC-2**: Production scheduler startup now works correctly
+- **Type Errors**: All mypy checks pass
 
----
-
-## 20. Context Summary
-
-Original task: Fix 8 mypy type-checking errors across 4 files + unused pyproject.toml section.
-
-All errors resolved:
-- ✅ Fixed `openalgo.py`: duplicate keyword, wrong return types
-- ✅ Fixed `scheduler.py`: async/sync client mismatch  
-- ✅ Fixed `options.py`: missing return statement
-- ✅ Fixed `main.py`: exception handling (7 occurrences)
-- ✅ Cleaned `pyproject.toml`: removed unused overrides
-
-All quality gates pass with 0 failures.
+All 239 tests pass. Ready for deployment.

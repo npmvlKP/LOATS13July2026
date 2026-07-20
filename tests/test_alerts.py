@@ -43,13 +43,9 @@ class TestAlertSystem:
     def mock_application(self):
         """Create a mock Telegram application."""
         app = MagicMock(spec=Application)
-        app.shutdown = AsyncMock()
-
-        # Create a proper async coroutine for run_polling
-        async def run_polling_coro():
-            return None
-
-        app.run_polling = MagicMock(return_value=run_polling_coro())
+        app.initialize = AsyncMock()
+        app.start = AsyncMock()
+        app.stop = AsyncMock()
         return app
 
     @pytest.fixture
@@ -198,8 +194,9 @@ class TestAlertSystem:
     async def test_shutdown_success(self, alert_system, mock_application):
         """Test successful bot shutdown."""
         alert_system.application = mock_application
+        alert_system._running = True
         await alert_system.shutdown()
-        mock_application.shutdown.assert_called_once()
+        mock_application.stop.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_send_alert_without_bot(self, alert_system):
