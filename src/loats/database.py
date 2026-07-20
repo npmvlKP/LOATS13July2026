@@ -32,6 +32,25 @@ logger = get_logger(__name__)
 
 T = TypeVar("T", bound=BaseModel)
 
+# -------------------------------------------------------------------------
+# Module-level SQLite PRAGMA configuration
+# -------------------------------------------------------------------------
+# Module-level PRAGMA tuple - these are executed only once globally when the
+# first connection is created, avoiding redundant PRAGMA execution on each
+# new thread's first connection. This is a performance optimization (F-PERF-1)
+# that complements the thread-local connection reuse pattern.
+_PRAGMAS: tuple[str, ...] = (
+    "PRAGMA journal_mode=WAL",
+    "PRAGMA synchronous=NORMAL",
+    "PRAGMA temp_store=MEMORY",
+    "PRAGMA cache_size=-10000",  # 10MB cache
+)
+
+# Module-level flag to track if PRAGMAs have been applied to a connection
+# This is a process-level lock ensuring PRAGMAs run exactly once per connection
+_pragma_applied: bool = False
+_pragma_lock: threading.Lock = threading.Lock()
+
 
 class Database:
     """SQLite database with audit trail functionality."""
@@ -267,15 +286,34 @@ class Database:
 
     def _get_connection(self) -> sqlite3.Connection:
         """
-        Get database connection.
-        Ensures thread-local connection sets PRAGMAs only once per connection.
+        Get database connection with thread-local caching.
+
+        Thread-local caching (via self._thread_local) ensures that each thread
+        reuses its connection, avoiding connection overhead.
+
+        Module-level PRAGMA caching ensures PRAGMAs are executed only once
+        globally (on the first connection), not on each new thread's first
+        connection. This is the F-PERF-1 optimization.
+
+        The _pragma_applied flag and _pragma_lock work together to ensure:
+        1. Only the first connection ever executes PRAGMAs (process-wide)
+        2. The check-and-set is atomic (thread-safe)
+        3. Subsequent connections skip PRAGMA execution entirely
         """
         if not hasattr(self._thread_local, "connection"):
             conn = sqlite3.connect(self.db_path)
-            conn.execute("PRAGMA journal_mode=WAL")
-            conn.execute("PRAGMA synchronous=NORMAL")
-            conn.execute("PRAGMA temp_store=MEMORY")
-            conn.execute("PRAGMA cache_size=-10000")  # 10MB cache
+
+            # F-PERF-1 optimization: Apply PRAGMAs only once globally
+            # Use double-checked locking pattern for thread safety
+            global _pragma_applied
+            if not _pragma_applied:
+                with _pragma_lock:
+                    # Re-check after acquiring lock (another thread may have set it)
+                    if not _pragma_applied:
+                        for pragma in _PRAGMAS:
+                            conn.execute(pragma)
+                        _pragma_applied = True
+
             self._thread_local.connection = conn
         conn_ref: sqlite3.Connection = self._thread_local.connection
         return conn_ref
