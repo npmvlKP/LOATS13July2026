@@ -1,6 +1,6 @@
 """
 Alerts module LOATS13July2026.
-Implements Telegram alerts kill switch functionality.
+Implements Telegram alerts kill switch functionality with circuit breaker protection.
 """
 
 import html
@@ -21,6 +21,12 @@ from src.loats.database import db
 from src.loats.logging import get_logger
 from src.loats.models import Order, Signal, SignalType, Trade
 from src.loats.openalgo import async_client
+from src.loats.utils.circuit_breaker import (
+    OPENALGO_CIRCUIT_BREAKER,
+    TELEGRAM_CIRCUIT_BREAKER,
+    CircuitBreakerOpenError,
+)
+from src.loats.utils.retry import OPENALGO_RETRY_CONFIG, retry_async
 
 logger = get_logger(__name__)
 
@@ -108,8 +114,31 @@ class AlertSystem:
             logger.error(f"Error shutting down Telegram bot: {e}")
             raise
 
+    async def _safe_send_message(self, chat_id: str, text: str, parse_mode: str = "HTML") -> bool:
+        """Send message with circuit breaker and retry protection."""
+        if not self.bot:
+            return False
+
+        try:
+            await TELEGRAM_CIRCUIT_BREAKER.call_async(
+                retry_async(OPENALGO_RETRY_CONFIG)(
+                    lambda: self.bot.send_message(
+                        chat_id=chat_id,
+                        text=text,
+                        parse_mode=parse_mode,
+                    )
+                )
+            )
+            return True
+        except CircuitBreakerOpenError as e:
+            logger.warning("Telegram circuit breaker open: %s", e)
+            return False
+        except Exception as e:
+            logger.error("Failed to send Telegram message after retries: %s", e)
+            return False
+
     async def send_alert(self, message: str, alert_type: str = "info") -> bool:
-        """Send alert via Telegram."""
+        """Send alert via Telegram with circuit breaker protection."""
         if not self.bot or not settings.telegram_chat_id:
             logger.debug(f"Alert not sent (bot not configured): {message}")
             return False
@@ -125,14 +154,15 @@ class AlertSystem:
 
         try:
             formatted_message = self._format_alert_message(message, alert_type)
-            await self.bot.send_message(
+            success = await self._safe_send_message(
                 chat_id=settings.telegram_chat_id,
                 text=formatted_message,
                 parse_mode="HTML",
             )
-            self.alert_cooldown[alert_type] = now
-            logger.info(f"Alert sent: [{alert_type}] {message}")
-            return True
+            if success:
+                self.alert_cooldown[alert_type] = now
+                logger.info(f"Alert sent: [{alert_type}] {message}")
+            return success
         except Exception as e:
             logger.error(f"Failed to send alert: {e}")
             return False
@@ -298,11 +328,41 @@ class AlertSystem:
             logger.error(f"Failed to format system alert: {e}")
             return False
 
+    async def _safe_get_position_book(self) -> dict[str, Any] | None:
+        """Get position book with circuit breaker and retry protection."""
+        try:
+            return await OPENALGO_CIRCUIT_BREAKER.call_async(
+                retry_async(OPENALGO_RETRY_CONFIG)(
+                    lambda: async_client.get_position_book()
+                )
+            )
+        except CircuitBreakerOpenError as e:
+            logger.warning("OpenAlgo circuit breaker open for get_position_book: %s", e)
+            return None
+        except Exception as e:
+            logger.error("Failed to get position book after retries: %s", e)
+            return None
+
+    async def _safe_get_funds(self) -> dict[str, Any] | None:
+        """Get funds with circuit breaker and retry protection."""
+        try:
+            return await OPENALGO_CIRCUIT_BREAKER.call_async(
+                retry_async(OPENALGO_RETRY_CONFIG)(
+                    lambda: async_client.get_funds()
+                )
+            )
+        except CircuitBreakerOpenError as e:
+            logger.warning("OpenAlgo circuit breaker open for get_funds: %s", e)
+            return None
+        except Exception as e:
+            logger.error("Failed to get funds after retries: %s", e)
+            return None
+
     async def send_position_alert(self) -> bool:
         """Send alert for current positions."""
         try:
-            position_data = await async_client.get_position_book()
-            if not position_data.get("data"):
+            position_data = await self._safe_get_position_book()
+            if not position_data or not position_data.get("data"):
                 return await self.send_system_alert("No open positions found", "info")
 
             positions = position_data["data"]
@@ -325,8 +385,8 @@ class AlertSystem:
     async def send_funds_alert(self) -> bool:
         """Send alert for current funds."""
         try:
-            funds_data = await async_client.get_funds()
-            if not funds_data.get("data"):
+            funds_data = await self._safe_get_funds()
+            if not funds_data or not funds_data.get("data"):
                 return await self.send_system_alert(
                     "No funds data available", "warning"
                 )
@@ -344,6 +404,37 @@ class AlertSystem:
             logger.error(f"Failed to get funds alert: {e}")
             return False
 
+    async def _safe_get_all_orders(self) -> dict[str, Any] | None:
+        """Get all orders with circuit breaker and retry protection."""
+        try:
+            return await OPENALGO_CIRCUIT_BREAKER.call_async(
+                retry_async(OPENALGO_RETRY_CONFIG)(
+                    lambda: async_client.get_all_orders()
+                )
+            )
+        except CircuitBreakerOpenError as e:
+            logger.warning("OpenAlgo circuit breaker open for get_all_orders: %s", e)
+            return None
+        except Exception as e:
+            logger.error("Failed to get all orders after retries: %s", e)
+            return None
+
+    async def _safe_cancel_order(self, order_id: str) -> bool:
+        """Cancel order with circuit breaker and retry protection."""
+        try:
+            await OPENALGO_CIRCUIT_BREAKER.call_async(
+                retry_async(OPENALGO_RETRY_CONFIG)(
+                    lambda: async_client.cancel_order(order_id)
+                )
+            )
+            return True
+        except CircuitBreakerOpenError as e:
+            logger.warning("OpenAlgo circuit breaker open for cancel_order: %s", e)
+            return False
+        except Exception as e:
+            logger.error("Failed to cancel order %s after retries: %s", order_id, e)
+            return False
+
     async def activate_kill_switch(self, reason: str = "Manual activation") -> bool:
         """Activate kill switch to stop all trading activities."""
         if self.kill_switch_active:
@@ -353,12 +444,19 @@ class AlertSystem:
             self.kill_switch_active = True
             logger.warning(f"Kill switch activated: {reason}")
 
-            # Cancel all open orders
-            orders_data = await async_client.get_all_orders()
-            orders = orders_data.get("data", [])
-            for order in orders:
-                if order["status"] in ["OPEN", "PENDING"]:
-                    await async_client.cancel_order(order["order_id"])
+            # Cancel all open orders with retry and circuit breaker
+            orders_data = await self._safe_get_all_orders()
+            if orders_data is None:
+                # Could not fetch orders - rollback kill switch
+                self.kill_switch_active = False
+                logger.error("Failed to fetch orders - kill switch rollback")
+                return False
+
+            if orders_data.get("data"):
+                orders = orders_data["data"]
+                for order in orders:
+                    if order["status"] in ["OPEN", "PENDING"]:
+                        await self._safe_cancel_order(order["order_id"])
 
             message = (
                 f"🚨 <b>KILL SWITCH ACTIVATED</b> 🚨\n\n"
@@ -394,6 +492,17 @@ class AlertSystem:
     def is_kill_switch_active(self) -> bool:
         """Check if kill switch is active."""
         return self.kill_switch_active
+
+    def get_circuit_breaker_status(self) -> dict[str, Any]:
+        """Get circuit breaker status for monitoring.
+
+        Returns:
+            Dictionary with OpenAlgo and Telegram circuit breaker status
+        """
+        return {
+            "openalgo": OPENALGO_CIRCUIT_BREAKER.get_status(),
+            "telegram": TELEGRAM_CIRCUIT_BREAKER.get_status(),
+        }
 
     def _is_authorized_admin(self, update: Update) -> bool:
         """Check if user is authorized admin based on telegram_admin_ids setting."""
@@ -544,8 +653,8 @@ class AlertSystem:
     async def _orders(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle /orders command."""
         try:
-            orders_data = await async_client.get_all_orders()
-            if not orders_data.get("data"):
+            orders_data = await self._safe_get_all_orders()
+            if not orders_data or not orders_data.get("data"):
                 if update.message:
                     await update.message.reply_text("ℹ️ No open orders found.")
                 return

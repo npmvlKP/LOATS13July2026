@@ -74,6 +74,13 @@ class Database:
         self.retention_days = retention_days or settings.retention_days
         self._thread_local = threading.local()
 
+        # Thread registry to track all connections across threads
+        # This enables proper cleanup of all connections on shutdown
+        # (FIX-WINDOWS-SHUTDOWN: Connections held by APScheduler worker threads
+        # must be closed to prevent file-handle leaks on Windows)
+        self._thread_registry: dict[int, sqlite3.Connection] = {}
+        self._registry_lock = threading.Lock()
+
         # Ensure directories exist
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self.audit_log_path.parent.mkdir(parents=True, exist_ok=True)
@@ -299,6 +306,10 @@ class Database:
         1. Only the first connection ever executes PRAGMAs (process-wide)
         2. The check-and-set is atomic (thread-safe)
         3. Subsequent connections skip PRAGMA execution entirely
+
+        FIX-WINDOWS-SHUTDOWN: Connections are registered in _thread_registry
+        so they can be properly closed during shutdown, preventing file-handle
+        leaks on Windows where worker threads may hold connections open.
         """
         if not hasattr(self._thread_local, "connection"):
             conn = sqlite3.connect(self.db_path)
@@ -313,6 +324,12 @@ class Database:
                         for pragma in _PRAGMAS:
                             conn.execute(pragma)
                         _pragma_applied = True
+
+            # Register connection for proper cleanup on shutdown
+            # (FIX-WINDOWS-SHUTDOWN)
+            thread_id = threading.get_ident()
+            with self._registry_lock:
+                self._thread_registry[thread_id] = conn
 
             self._thread_local.connection = conn
         conn_ref: sqlite3.Connection = self._thread_local.connection
@@ -1441,6 +1458,47 @@ class Database:
         if hasattr(self._thread_local, "connection"):
             self._thread_local.connection.close()
             del self._thread_local.connection
+
+    def close_all(self) -> None:
+        """
+        Close ALL database connections across all threads.
+
+        This method ensures proper cleanup on shutdown, preventing file-handle
+        leaks on Windows where worker threads may hold connections open.
+        (FIX-WINDOWS-SHUTDOWN)
+
+        Should be called during application shutdown.
+        """
+        closed_count = 0
+
+        # Close current thread's connection first
+        if hasattr(self._thread_local, "connection"):
+            try:
+                self._thread_local.connection.close()
+                del self._thread_local.connection
+                closed_count += 1
+            except Exception as e:
+                logger.warning(f"Error closing current thread connection: {e}")
+
+        # Close all tracked connections from other threads
+        with self._registry_lock:
+            for thread_id, conn in list(self._thread_registry.items()):
+                try:
+                    conn.close()
+                    closed_count += 1
+                except Exception as e:
+                    logger.warning(f"Error closing connection for thread {thread_id}: {e}")
+            self._thread_registry.clear()
+
+        logger.info(f"Closed {closed_count} database connections")
+
+    async def async_close_all(self) -> None:
+        """
+        Async wrapper for close_all() to avoid blocking event loop.
+
+        Should be called during async application shutdown.
+        """
+        await asyncio.to_thread(self.close_all)
 
     # -------------------------------------------------------------------------
     # Async wrapper methods for non-blocking I/O

@@ -1,6 +1,6 @@
 """Scheduler module LOATS13July2026.
 
-Implements APScheduler scan scheduling.
+Implements APScheduler scan scheduling with retry and circuit breaker patterns.
 """
 
 import asyncio
@@ -19,6 +19,8 @@ from .models import FundsData, HistoricalData, Position, QuoteData, Signal, Sign
 from .openalgo import async_client as openalgo_client
 from .sentiment import sentiment
 from .ta import technical_analysis
+from .utils.circuit_breaker import OPENALGO_CIRCUIT_BREAKER, CircuitBreakerOpenError
+from .utils.retry import OPENALGO_RETRY_CONFIG, retry_async
 
 logger = get_logger(__name__)
 
@@ -167,6 +169,38 @@ class TradingScheduler:
         finally:
             self.scan_tasks.pop(task_id, None)
 
+    async def _safe_get_history(self, symbol: str, interval: str) -> dict[str, Any] | None:
+        """Get history with retry and circuit breaker protection."""
+        try:
+            return await OPENALGO_CIRCUIT_BREAKER.call_async(
+                retry_async(OPENALGO_RETRY_CONFIG)(
+                    lambda: openalgo_client.get_history(
+                        symbol=symbol, interval=interval, from_date=None, to_date=None
+                    )
+                )
+            )
+        except CircuitBreakerOpenError as e:
+            logger.warning("OpenAlgo circuit breaker open for get_history: %s", e)
+            return None
+        except Exception as e:
+            logger.error("Failed to get history after retries: %s", e)
+            return None
+
+    async def _safe_get_quotes(self, symbols: list[str]) -> dict[str, Any] | None:
+        """Get quotes with retry and circuit breaker protection."""
+        try:
+            return await OPENALGO_CIRCUIT_BREAKER.call_async(
+                retry_async(OPENALGO_RETRY_CONFIG)(
+                    lambda: openalgo_client.get_quotes(symbols)
+                )
+            )
+        except CircuitBreakerOpenError as e:
+            logger.warning("OpenAlgo circuit breaker open for get_quotes: %s", e)
+            return None
+        except Exception as e:
+            logger.error("Failed to get quotes after retries: %s", e)
+            return None
+
     async def _ta_scan_task(self) -> None:
         """Technical analysis scan task."""
         start_time = datetime.datetime.now(datetime.UTC)
@@ -175,10 +209,12 @@ class TradingScheduler:
             symbol = settings.default_symbol
             timeframe = settings.default_timeframe
 
-            # Get historical data from OpenAlgo
-            history_data = await openalgo_client.get_history(
-                symbol=symbol, interval=timeframe, from_date=None, to_date=None
-            )
+            # Get historical data from OpenAlgo with retry and circuit breaker
+            history_data = await self._safe_get_history(symbol, timeframe)
+
+            if history_data is None:
+                logger.warning("Skipping TA scan - unable to fetch historical data")
+                return
 
             # Convert to HistoricalData objects
             historical_data = []
@@ -203,8 +239,12 @@ class TradingScheduler:
             # Calculate indicators
             indicators = technical_analysis.calculate_indicators(historical_data)
 
-            # Get current price
-            quotes = await openalgo_client.get_quotes([symbol])
+            # Get current price with retry and circuit breaker
+            quotes = await self._safe_get_quotes([symbol])
+            if quotes is None:
+                logger.warning("Skipping signal generation - unable to fetch quotes")
+                return
+
             quote_data = quotes.get("data", {}).get(symbol, {})
             current_price = quote_data.get("last_price", 0)
 
@@ -350,6 +390,36 @@ class TradingScheduler:
         finally:
             self.scan_tasks.pop(task_id, None)
 
+    async def _safe_get_position_book(self) -> dict[str, Any] | None:
+        """Get position book with retry and circuit breaker protection."""
+        try:
+            return await OPENALGO_CIRCUIT_BREAKER.call_async(
+                retry_async(OPENALGO_RETRY_CONFIG)(
+                    lambda: openalgo_client.get_position_book()
+                )
+            )
+        except CircuitBreakerOpenError as e:
+            logger.warning("OpenAlgo circuit breaker open for get_position_book: %s", e)
+            return None
+        except Exception as e:
+            logger.error("Failed to get position book after retries: %s", e)
+            return None
+
+    async def _safe_get_funds(self) -> dict[str, Any] | None:
+        """Get funds with retry and circuit breaker protection."""
+        try:
+            return await OPENALGO_CIRCUIT_BREAKER.call_async(
+                retry_async(OPENALGO_RETRY_CONFIG)(
+                    lambda: openalgo_client.get_funds()
+                )
+            )
+        except CircuitBreakerOpenError as e:
+            logger.warning("OpenAlgo circuit breaker open for get_funds: %s", e)
+            return None
+        except Exception as e:
+            logger.error("Failed to get funds after retries: %s", e)
+            return None
+
     async def _signal_generation_task(self) -> None:
         """Signal generation task."""
         start_time = datetime.datetime.now(datetime.UTC)
@@ -361,17 +431,21 @@ class TradingScheduler:
             ta_signals = await db.async_get_latest_signals(symbol, limit=1)
             sentiment_signals = await db.async_get_latest_signals(symbol, limit=1)
 
-            # Get current market data
-            quotes = await openalgo_client.get_quotes([symbol])
+            # Get current market data with retry and circuit breaker
+            quotes = await self._safe_get_quotes([symbol])
+            if quotes is None:
+                logger.warning("Skipping signal generation - unable to fetch quotes")
+                return
+
             quote_data = quotes.get("data", {}).get(symbol, {})
             current_price = quote_data.get("last_price", 0)
 
-            # Get current position and funds
-            position_data = await openalgo_client.get_position_book()
-            funds_data = await openalgo_client.get_funds()
+            # Get current position and funds with retry and circuit breaker
+            position_data = await self._safe_get_position_book()
+            funds_data = await self._safe_get_funds()
 
             # Store position and funds data
-            if position_data.get("data"):
+            if position_data and position_data.get("data"):
                 for pos in position_data["data"]:
                     pos_model = Position(
                         symbol=pos["symbol"],
@@ -385,7 +459,7 @@ class TradingScheduler:
                     )
                     await db.async_store_position(pos_model)
 
-            if funds_data.get("data"):
+            if funds_data and funds_data.get("data"):
                 funds = funds_data["data"]
                 funds_model = FundsData(
                     available_cash=funds["available_cash"],
@@ -432,12 +506,12 @@ class TradingScheduler:
                 "current_price": current_price,
                 "position_size": (
                     position_data.get("data", [{}])[0].get("quantity", 0)
-                    if position_data.get("data")
+                    if position_data and position_data.get("data")
                     else 0
                 ),
                 "available_funds": (
                     funds_data.get("data", {}).get("available_cash", 0)
-                    if funds_data.get("data")
+                    if funds_data and funds_data.get("data")
                     else 0
                 ),
             }
@@ -564,7 +638,7 @@ class TradingScheduler:
         start_time = datetime.datetime.now(datetime.UTC)
         logger.info("Starting data cleanup")
         try:
-            # Run database cleanup
+            # Run database cleanup using public API
             await db.async_cleanup()
 
             # Verify audit log integrity
@@ -620,6 +694,14 @@ class TradingScheduler:
             }
             for job in self.scheduler.get_jobs()
         ]
+
+    def get_circuit_breaker_status(self) -> dict[str, Any]:
+        """Get OpenAlgo circuit breaker status for monitoring.
+
+        Returns:
+            Dictionary with circuit breaker status
+        """
+        return OPENALGO_CIRCUIT_BREAKER.get_status()
 
     def is_running(self) -> bool:
         """Check if scheduler is running.
