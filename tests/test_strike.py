@@ -7,6 +7,7 @@ from src.strike import Strike
 def strike():
     return Strike()
 
+
 def test_strike(strike):
     result = strike.calculate({})
     assert isinstance(result, dict)

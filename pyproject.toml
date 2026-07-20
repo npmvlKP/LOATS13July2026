@@ -161,11 +161,9 @@ module = [
     "newspaper.*",
     "vaderSentiment.*",
     "apscheduler.*",
-    "ta.*",
     "vollib.*",
     "pandas.*",
     "httpx.*",
-    "openalgo.*",
 ]
 ignore_missing_imports = true
 disallow_untyped_defs = false

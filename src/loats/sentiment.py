@@ -2,6 +2,7 @@
 Sentiment analysis module LOATS13July2026.
 Implements RSS news sentiment analysis using Vader Sentiment.
 """
+
 import asyncio
 from datetime import UTC, datetime
 from typing import cast
@@ -16,6 +17,7 @@ from .logging import get_logger
 from .models import NewsItem, SentimentAnalysisResult
 
 logger = get_logger(__name__)
+
 
 class SentimentAnalyzer:
     """Sentiment analysis engine news social media."""
@@ -48,12 +50,18 @@ class SentimentAnalyzer:
             news_items: list[NewsItem] = []
             for entry in feed.entries[:max_items]:
                 try:
-                    content = await asyncio.to_thread(self._extract_article_content, entry.link)
-                    sentiment_score, sentiment_label = self.analyze_text(f"{entry.title}. {content}")
+                    content = await asyncio.to_thread(
+                        self._extract_article_content, entry.link
+                    )
+                    sentiment_score, sentiment_label = self.analyze_text(
+                        f"{entry.title}. {content}"
+                    )
                     published_date = datetime.now(UTC)
                     if hasattr(entry, "published_parsed") and entry.published_parsed:
                         pp = entry.published_parsed
-                        published_date = datetime(pp[0], pp[1], pp[2], pp[3], pp[4], pp[5], tzinfo=UTC)
+                        published_date = datetime(
+                            pp[0], pp[1], pp[2], pp[3], pp[4], pp[5], tzinfo=UTC
+                        )
 
                     news_item = NewsItem(
                         title=entry.title,
@@ -125,7 +133,9 @@ class SentimentAnalyzer:
         else:
             label = "neutral"
 
-        sorted_news = sorted(all_news, key=lambda x: abs(x.sentiment_score), reverse=True)
+        sorted_news = sorted(
+            all_news, key=lambda x: abs(x.sentiment_score), reverse=True
+        )
         return SentimentAnalysisResult(
             symbol=symbol,
             timestamp=datetime.now(UTC),
@@ -140,10 +150,13 @@ class SentimentAnalyzer:
 
     def filter_significant_news(self, news_items: list[NewsItem]) -> list[NewsItem]:
         """Filter news items significant sentiment."""
-        return [item for item in news_items if abs(item.sentiment_score) >= self.threshold]
+        return [
+            item for item in news_items if abs(item.sentiment_score) >= self.threshold
+        ]
 
     def preprocess_text(self, text: str) -> str:
         """Preprocess text sentiment analysis."""
         return " ".join(text.split())
+
 
 sentiment = SentimentAnalyzer()

@@ -12,11 +12,13 @@ def scheduler():
         instance.scheduler = mock_aps
         return instance
 
+
 @pytest.mark.asyncio
 async def test_initialization(scheduler):
     # initialize calls self.scheduler.configure
     await scheduler.initialize()
     assert scheduler.scheduler.configure.called
+
 
 @pytest.mark.asyncio
 async def test_start_shutdown(scheduler):

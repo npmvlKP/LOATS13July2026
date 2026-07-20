@@ -9,10 +9,12 @@ from src.orchestrator import Orchestrator
 def orchestrator():
     return Orchestrator()
 
+
 def test_orchestrator_registration(orchestrator):
     mock_component = MagicMock()
     orchestrator.register("test", mock_component)
     assert orchestrator._components["test"] == mock_component
+
 
 def test_orchestrator_cycle(orchestrator):
     mock_component = MagicMock()
@@ -21,6 +23,7 @@ def test_orchestrator_cycle(orchestrator):
     results = orchestrator.cycle()
     assert results["test"] == "result"
     mock_component.execute.assert_called_once()
+
 
 def test_orchestrator_cycle_error(orchestrator):
     mock_component = MagicMock()

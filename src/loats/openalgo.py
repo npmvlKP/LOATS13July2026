@@ -644,15 +644,7 @@ class AsyncOpenAlgoClient:
     # ------------------------------------------------------------------
 
     async def get_quotes(self, symbols: list[str]) -> dict[str, Any]:
-        """
-        Get quotes for multiple symbols.
-
-        Args:
-            symbols: List of symbol names
-
-        Returns:
-            Dictionary containing quote data
-        """
+        """Get quotes for multiple symbols."""
         payload = {"symbols": symbols}
         return await self._request("POST", "quotes", json=payload)
 
@@ -892,47 +884,21 @@ class AsyncOpenAlgoClient:
         return await self._request("POST", "modify_order", json=payload)
 
     async def cancel_order(self, order_id: str) -> dict[str, Any]:
-        """
-        Cancel an order.
-
-        Args:
-            order_id: Order ID to cancel
-
-        Returns:
-            Dictionary containing cancellation response
-        """
+        """Cancel an order."""
         payload = {"order_id": order_id}
         return await self._request("POST", "cancel_order", json=payload)
 
     async def get_order_status(self, order_id: str) -> dict[str, Any]:
-        """
-        Get status of an order.
-
-        Args:
-            order_id: Order ID to check
-
-        Returns:
-            Dictionary containing order status
-        """
+        """Get status of an order."""
         payload = {"order_id": order_id}
         return await self._request("POST", "order_status", json=payload)
 
     async def get_all_orders(self) -> dict[str, Any]:
-        """
-        Get all orders.
-
-        Returns:
-            Dictionary containing all orders
-        """
+        """Get all orders."""
         return await self._request("POST", "all_orders")
 
     async def get_trade_book(self) -> dict[str, Any]:
-        """
-        Get trade book.
-
-        Returns:
-            Dictionary containing trade book data
-        """
+        """Get trade book."""
         return await self._request("POST", "trade_book")
 
 

@@ -55,25 +55,20 @@ async def test_sentiment_coverage_full():
     assert analyzer.preprocess_text("hello world") == "hello world"
     assert len(analyzer.filter_significant_news([])) == 0
 
+
 @pytest.mark.asyncio
 async def test_options_coverage_full():
     engine = OptionsEngine()
     # Greeks
     with patch("src.loats.options.delta", side_effect=Exception):
-        greeks = engine.calculate_greeks(
-            100, 100, 1, 0.1, option_type=OptionType.CALL
-        )
+        greeks = engine.calculate_greeks(100, 100, 1, 0.1, option_type=OptionType.CALL)
         assert greeks.delta == 0.0
 
     # Implied Vol
-    with patch(
-        "src.loats.options.implied_volatility", side_effect=Exception
-    ):
+    with patch("src.loats.options.implied_volatility", side_effect=Exception):
         with patch("src.loats.options.brentq", side_effect=Exception):
             with patch("src.loats.options.newton", side_effect=Exception):
-                val = engine.calculate_implied_volatility(
-                    10.0, 100, 100, 1, 0.1, 0.05
-                )
+                val = engine.calculate_implied_volatility(10.0, 100, 100, 1, 0.1, 0.05)
                 assert val == 0.2
 
     analysis = OptionsAnalysis()
@@ -84,6 +79,7 @@ async def test_options_coverage_full():
         res = analysis.calculate_portfolio_greeks([], 100)
         assert res is not None
 
+
 @pytest.mark.asyncio
 async def test_scheduler_coverage():
     sched = TradingScheduler()
@@ -93,12 +89,15 @@ async def test_scheduler_coverage():
     ):
         await sched.check_market_status()
 
+
 @pytest.mark.asyncio
 async def test_main_coverage_booster():
     # Patch dependencies in src.loats.main
-    with patch("src.loats.main.scheduler") as mock_sched, patch(
-        "src.loats.main.alerts"
-    ) as mock_alert, patch("src.loats.main.db") as mock_db:
+    with (
+        patch("src.loats.main.scheduler") as mock_sched,
+        patch("src.loats.main.alerts") as mock_alert,
+        patch("src.loats.main.db") as mock_db,
+    ):
         sys_obj = TradingSystem()
 
         mock_sched.run_ta_scan = AsyncMock()
@@ -119,9 +118,7 @@ async def test_main_coverage_booster():
         await sys_obj.initialize()
 
         # Run start (mock _wait_for_shutdown to avoid hang)
-        with patch.object(
-            TradingSystem, "_wait_for_shutdown", new_callable=AsyncMock
-        ):
+        with patch.object(TradingSystem, "_wait_for_shutdown", new_callable=AsyncMock):
             await sys_obj.start()
             assert sys_obj.running
             await sys_obj.run_once()

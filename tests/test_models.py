@@ -200,7 +200,7 @@ class TestModels:
             volume=1000000,
             timestamp=datetime(2023, 1, 1, 15, 30),
             change=0.0,
-            change_percent=0.0
+            change_percent=0.0,
         )
         assert quote.change == 0.0
         assert quote.change_percent == 0.0

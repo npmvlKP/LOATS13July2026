@@ -1,4 +1,5 @@
 """Tests alerts module."""
+
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -131,7 +132,9 @@ class TestAlertSystem:
         """Test initialization fails gracefully without bot token."""
         with patch("src.loats.alerts.settings") as mock_settings:
             mock_settings.telegram_bot_token.get_secret_value.return_value = ""
-            with patch("src.loats.alerts.Bot", side_effect=InvalidToken("Invalid token")):
+            with patch(
+                "src.loats.alerts.Bot", side_effect=InvalidToken("Invalid token")
+            ):
                 with pytest.raises(InvalidToken):
                     await alert_system.initialize()
         assert alert_system.bot is None
@@ -140,7 +143,9 @@ class TestAlertSystem:
     async def test_initialize_without_chat_id(self, alert_system):
         """Test initialization fails gracefully without chat ID."""
         with patch("src.loats.alerts.settings") as mock_settings:
-            mock_settings.telegram_bot_token.get_secret_value.return_value = "test_token"
+            mock_settings.telegram_bot_token.get_secret_value.return_value = (
+                "test_token"
+            )
             mock_settings.telegram_chat_id = None
             await alert_system.initialize()
         assert alert_system.bot is None
@@ -148,16 +153,22 @@ class TestAlertSystem:
     @pytest.mark.asyncio
     async def test_initialize_success(self, alert_system, mock_bot):
         """Test successful initialization."""
-        with patch("src.loats.alerts.settings") as mock_settings, \
-             patch("src.loats.alerts.Bot") as mock_bot_class, \
-             patch("src.loats.alerts.Application") as mock_app_class:
-            mock_settings.telegram_bot_token.get_secret_value.return_value = "test_token"
+        with (
+            patch("src.loats.alerts.settings") as mock_settings,
+            patch("src.loats.alerts.Bot") as mock_bot_class,
+            patch("src.loats.alerts.Application") as mock_app_class,
+        ):
+            mock_settings.telegram_bot_token.get_secret_value.return_value = (
+                "test_token"
+            )
             mock_settings.telegram_chat_id = "test_chat_id"
             mock_bot_class.return_value = mock_bot
 
             mock_app = MagicMock()
             mock_app.add_handler = MagicMock()
-            mock_app_class.builder.return_value.bot.return_value.build.return_value = mock_app
+            mock_app_class.builder.return_value.bot.return_value.build.return_value = (
+                mock_app
+            )
 
             await alert_system.initialize()
 
@@ -290,7 +301,9 @@ class TestAlertSystem:
     @pytest.mark.asyncio
     async def test_send_signal_alert_exception(self, alert_system, sample_signal):
         """Test signal alert handles exceptions."""
-        with patch.object(alert_system, "send_alert", side_effect=Exception("Test error")):
+        with patch.object(
+            alert_system, "send_alert", side_effect=Exception("Test error")
+        ):
             result = await alert_system.send_signal_alert(sample_signal)
         assert result is False
 
@@ -320,7 +333,9 @@ class TestAlertSystem:
     @pytest.mark.asyncio
     async def test_send_order_alert_exception(self, alert_system, sample_order):
         """Test order alert handles exceptions."""
-        with patch.object(alert_system, "send_alert", side_effect=Exception("Test error")):
+        with patch.object(
+            alert_system, "send_alert", side_effect=Exception("Test error")
+        ):
             result = await alert_system.send_order_alert(sample_order, "created")
         assert result is False
 
@@ -390,7 +405,9 @@ class TestAlertSystem:
     @pytest.mark.asyncio
     async def test_send_trade_alert_exception(self, alert_system, sample_trade):
         """Test trade alert handles exceptions."""
-        with patch.object(alert_system, "send_alert", side_effect=Exception("Test error")):
+        with patch.object(
+            alert_system, "send_alert", side_effect=Exception("Test error")
+        ):
             result = await alert_system.send_trade_alert(sample_trade, "opened")
         assert result is False
 
@@ -400,7 +417,9 @@ class TestAlertSystem:
         alert_system.bot = mock_bot
         with patch("src.loats.alerts.settings") as mock_settings:
             mock_settings.telegram_chat_id = "test_chat_id"
-            result = await alert_system.send_system_alert("System restart required", "warning")
+            result = await alert_system.send_system_alert(
+                "System restart required", "warning"
+            )
 
         assert result is True
         mock_bot.send_message.assert_called_once()
@@ -408,7 +427,9 @@ class TestAlertSystem:
     @pytest.mark.asyncio
     async def test_send_system_alert_exception(self, alert_system):
         """Test system alert handles exceptions."""
-        with patch.object(alert_system, "send_alert", side_effect=Exception("Test error")):
+        with patch.object(
+            alert_system, "send_alert", side_effect=Exception("Test error")
+        ):
             result = await alert_system.send_system_alert("Test message", "info")
         assert result is False
 
@@ -423,8 +444,10 @@ class TestAlertSystem:
     async def test_activate_kill_switch_success(self, alert_system, mock_bot):
         """Test successful kill switch activation."""
         alert_system.bot = mock_bot
-        with patch("src.loats.alerts.settings") as mock_settings, \
-             patch("src.loats.alerts.async_client") as mock_openalgo:
+        with (
+            patch("src.loats.alerts.settings") as mock_settings,
+            patch("src.loats.alerts.async_client") as mock_openalgo,
+        ):
             mock_settings.telegram_chat_id = "test_chat_id"
             mock_openalgo.get_all_orders = AsyncMock(return_value={"data": []})
             mock_openalgo.cancel_order = AsyncMock(return_value={"success": True})
@@ -438,16 +461,20 @@ class TestAlertSystem:
     async def test_activate_kill_switch_with_open_orders(self, alert_system, mock_bot):
         """Test kill switch cancels open orders."""
         alert_system.bot = mock_bot
-        with patch("src.loats.alerts.settings") as mock_settings, \
-             patch("src.loats.alerts.async_client") as mock_openalgo:
+        with (
+            patch("src.loats.alerts.settings") as mock_settings,
+            patch("src.loats.alerts.async_client") as mock_openalgo,
+        ):
             mock_settings.telegram_chat_id = "test_chat_id"
-            mock_openalgo.get_all_orders = AsyncMock(return_value={
-                "data": [
-                    {"order_id": "order1", "status": "OPEN"},
-                    {"order_id": "order2", "status": "PENDING"},
-                    {"order_id": "order3", "status": "FILLED"},
-                ]
-            })
+            mock_openalgo.get_all_orders = AsyncMock(
+                return_value={
+                    "data": [
+                        {"order_id": "order1", "status": "OPEN"},
+                        {"order_id": "order2", "status": "PENDING"},
+                        {"order_id": "order3", "status": "FILLED"},
+                    ]
+                }
+            )
             mock_openalgo.cancel_order = AsyncMock(return_value={"success": True})
 
             result = await alert_system.activate_kill_switch("Emergency stop")
@@ -488,7 +515,9 @@ class TestAlertSystem:
     async def test_deactivate_kill_switch_exception(self, alert_system):
         """Test kill switch deactivation handles exceptions."""
         alert_system.kill_switch_active = True
-        with patch.object(alert_system, "send_alert", side_effect=Exception("Test error")):
+        with patch.object(
+            alert_system, "send_alert", side_effect=Exception("Test error")
+        ):
             result = await alert_system.deactivate_kill_switch("Resume trading")
         assert result is False
 
@@ -496,8 +525,10 @@ class TestAlertSystem:
     async def test_send_position_alert_no_positions(self, alert_system, mock_bot):
         """Test position alert when no positions exist."""
         alert_system.bot = mock_bot
-        with patch("src.loats.alerts.settings") as mock_settings, \
-             patch("src.loats.alerts.async_client") as mock_openalgo:
+        with (
+            patch("src.loats.alerts.settings") as mock_settings,
+            patch("src.loats.alerts.async_client") as mock_openalgo,
+        ):
             mock_settings.telegram_chat_id = "test_chat_id"
             mock_openalgo.get_position_book = AsyncMock(return_value={"data": None})
 
@@ -508,21 +539,25 @@ class TestAlertSystem:
     async def test_send_position_alert_with_positions(self, alert_system, mock_bot):
         """Test position alert with open positions."""
         alert_system.bot = mock_bot
-        with patch("src.loats.alerts.settings") as mock_settings, \
-             patch("src.loats.alerts.async_client") as mock_openalgo:
+        with (
+            patch("src.loats.alerts.settings") as mock_settings,
+            patch("src.loats.alerts.async_client") as mock_openalgo,
+        ):
             mock_settings.telegram_chat_id = "test_chat_id"
-            mock_openalgo.get_position_book = AsyncMock(return_value={
-                "data": [
-                    {
-                        "symbol": "NIFTY",
-                        "quantity": 50,
-                        "average_price": 18500.0,
-                        "last_price": 18550.0,
-                        "pnl": 2500.0,
-                        "product_type": "MIS",
-                    }
-                ]
-            })
+            mock_openalgo.get_position_book = AsyncMock(
+                return_value={
+                    "data": [
+                        {
+                            "symbol": "NIFTY",
+                            "quantity": 50,
+                            "average_price": 18500.0,
+                            "last_price": 18550.0,
+                            "pnl": 2500.0,
+                            "product_type": "MIS",
+                        }
+                    ]
+                }
+            )
 
             result = await alert_system.send_position_alert()
         assert result is True
@@ -539,8 +574,10 @@ class TestAlertSystem:
     async def test_send_funds_alert_no_data(self, alert_system, mock_bot):
         """Test funds alert when no data available."""
         alert_system.bot = mock_bot
-        with patch("src.loats.alerts.settings") as mock_settings, \
-             patch("src.loats.alerts.async_client") as mock_openalgo:
+        with (
+            patch("src.loats.alerts.settings") as mock_settings,
+            patch("src.loats.alerts.async_client") as mock_openalgo,
+        ):
             mock_settings.telegram_chat_id = "test_chat_id"
             mock_openalgo.get_funds = AsyncMock(return_value={"data": None})
 
@@ -551,17 +588,21 @@ class TestAlertSystem:
     async def test_send_funds_alert_with_data(self, alert_system, mock_bot):
         """Test funds alert with account data."""
         alert_system.bot = mock_bot
-        with patch("src.loats.alerts.settings") as mock_settings, \
-             patch("src.loats.alerts.async_client") as mock_openalgo:
+        with (
+            patch("src.loats.alerts.settings") as mock_settings,
+            patch("src.loats.alerts.async_client") as mock_openalgo,
+        ):
             mock_settings.telegram_chat_id = "test_chat_id"
-            mock_openalgo.get_funds = AsyncMock(return_value={
-                "data": {
-                    "available_cash": 100000.0,
-                    "utilized_margin": 50000.0,
-                    "available_margin": 50000.0,
-                    "total_equity": 150000.0,
+            mock_openalgo.get_funds = AsyncMock(
+                return_value={
+                    "data": {
+                        "available_cash": 100000.0,
+                        "utilized_margin": 50000.0,
+                        "available_margin": 50000.0,
+                        "total_equity": 150000.0,
+                    }
                 }
-            })
+            )
 
             result = await alert_system.send_funds_alert()
         assert result is True
@@ -606,7 +647,9 @@ class TestAlertSystem:
         mock_context = MagicMock()
 
         await alert_system._kill_switch(mock_update, mock_context)
-        mock_update.message.reply_text.assert_called_once_with("⚠️ Kill switch is already active.")
+        mock_update.message.reply_text.assert_called_once_with(
+            "⚠️ Kill switch is already active."
+        )
 
     @pytest.mark.asyncio
     async def test_kill_command_handler_with_reason(self, alert_system, mock_bot):
@@ -618,8 +661,10 @@ class TestAlertSystem:
         mock_context = MagicMock()
         mock_context.args = ["API", "failure"]
 
-        with patch("src.loats.alerts.settings") as mock_settings, \
-             patch("src.loats.alerts.async_client") as mock_openalgo:
+        with (
+            patch("src.loats.alerts.settings") as mock_settings,
+            patch("src.loats.alerts.async_client") as mock_openalgo,
+        ):
             mock_settings.telegram_chat_id = "test_chat_id"
             mock_openalgo.get_all_orders = AsyncMock(return_value={"data": []})
             mock_openalgo.cancel_order = AsyncMock(return_value={"success": True})
@@ -702,19 +747,21 @@ class TestAlertSystem:
         mock_context = MagicMock()
 
         with patch("src.loats.alerts.async_client") as mock_openalgo:
-            mock_openalgo.get_all_orders = AsyncMock(return_value={
-                "data": [
-                    {
-                        "order_id": "order1",
-                        "symbol": "NIFTY",
-                        "order_type": "LIMIT",
-                        "transaction_type": "BUY",
-                        "quantity": 50,
-                        "price": 18500.0,
-                        "status": "OPEN",
-                    }
-                ]
-            })
+            mock_openalgo.get_all_orders = AsyncMock(
+                return_value={
+                    "data": [
+                        {
+                            "order_id": "order1",
+                            "symbol": "NIFTY",
+                            "order_type": "LIMIT",
+                            "transaction_type": "BUY",
+                            "quantity": 50,
+                            "price": 18500.0,
+                            "status": "OPEN",
+                        }
+                    ]
+                }
+            )
             await alert_system._orders(mock_update, mock_context)
         mock_update.message.reply_text.assert_called_once()
 
@@ -741,8 +788,10 @@ class TestAlertSystem:
         mock_update.message.reply_text = AsyncMock()
         mock_context = MagicMock()
 
-        with patch("src.loats.alerts.Database") as mock_db, \
-             patch("src.loats.alerts.settings") as mock_settings:
+        with (
+            patch("src.loats.alerts.Database") as mock_db,
+            patch("src.loats.alerts.settings") as mock_settings,
+        ):
             mock_db.return_value.get_latest_signals.return_value = [sample_signal]
             mock_settings.default_symbol = "NIFTY"
             await alert_system._signals(mock_update, mock_context)

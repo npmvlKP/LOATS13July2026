@@ -1,0 +1,1 @@
+f=open('src/loats/openalgo.py','r')c=f.read()f.close()import asttry:ast.parse(c)print('OK')except SyntaxError as e:print('Error line',e.lineno)print('Msg:',e.msg)lines=c.split('\n')start=max(0,e.lineno-5)end=min(len(lines),e.lineno+3)for i in range(start,end):print(i+1,repr(lines[i]))

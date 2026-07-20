@@ -3,6 +3,7 @@
 import asyncio
 import signal
 import sys
+from typing import Any
 
 from .alerts import alerts
 from .config import settings
@@ -39,15 +40,14 @@ class TradingSystem:
             await scheduler.initialize()
 
             logger.info("All system components initialized successfully")
-
         except Exception as e:
-            logger.error(f"Failed to initialize trading system: {e}")
+            logger.error(f"Failed initialize trading system: {e}")
             raise
 
     async def start(self) -> None:
         """Start trading system."""
         if self.running:
-            logger.warning("Trading system already running")
+            logger.warning("Trading system running")
             return
 
         try:
@@ -61,8 +61,7 @@ class TradingSystem:
 
             # Send system startup alert
             await alerts.send_system_alert(
-                "LOATS13July2026 trading system started successfully",
-                "success"
+                "LOATS13July2026 trading system started successfully", "success"
             )
 
             self.running = True
@@ -70,23 +69,25 @@ class TradingSystem:
 
             # Wait for shutdown
             await self._wait_for_shutdown()
-
         except Exception as e:
-            logger.error(f"Failed to start trading system: {e}")
+            logger.error(f"Failed start trading system: {e}")
             raise
 
     async def _wait_for_shutdown(self) -> None:
-        """Wait for shutdown signal."""
+        """Wait shutdown signal."""
         loop = asyncio.get_running_loop()
 
-        def signal_handler(sig, frame):
+        def signal_handler(sig: int, frame: Any) -> None:
             logger.info(f"Received signal: {sig}")
             loop.call_soon_threadsafe(self.shutdown_event.set)
 
         if sys.platform != "win32":
             # Unix: add multiple signal handlers
             for sig in (signal.SIGINT, signal.SIGTERM):
-                loop.add_signal_handler(sig, lambda s=sig: asyncio.create_task(self._handle_shutdown_signal(s)))
+                loop.add_signal_handler(
+                    sig,
+                    lambda s=sig: asyncio.create_task(self._handle_shutdown_signal(s)),
+                )
         else:
             # Windows: use signal.signal
             signal.signal(signal.SIGINT, signal_handler)
@@ -111,8 +112,7 @@ class TradingSystem:
 
             # Send system shutdown alert
             await alerts.send_system_alert(
-                "LOATS13July2026 trading system shutting down",
-                "warning"
+                "LOATS13July2026 trading system shutting down", "warning"
             )
 
             # Shutdown scheduler
@@ -127,7 +127,6 @@ class TradingSystem:
             self.running = False
             self.shutdown_event.set()
             logger.info("Trading system shutdown complete")
-
         except Exception as e:
             logger.error(f"Error during shutdown: {e}")
             raise
@@ -147,25 +146,22 @@ class TradingSystem:
             await scheduler.run_signal_generation()
 
             logger.info("All scans completed")
-
         except Exception as e:
             logger.error(f"Error running scans: {e}")
             raise
 
+
 async def main() -> None:
-    """Main entry point for the trading system."""
+    """Standalone main entry point for trading system."""
     system = TradingSystem()
     try:
-        # Initialize system
         await system.initialize()
-
-        # Start system
         await system.start()
-
     except Exception as e:
         logger.error(f"Trading system failed: {e}")
         await system.shutdown()
         sys.exit(1)
+
 
 if __name__ == "__main__":
     try:

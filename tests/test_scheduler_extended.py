@@ -10,6 +10,7 @@ from src.loats.scheduler import TradingScheduler
 def scheduler():
     return TradingScheduler()
 
+
 @pytest.mark.asyncio
 async def test_is_market_open_logic(scheduler):
     # Test Saturday (Should be closed)
@@ -23,6 +24,7 @@ async def test_is_market_open_logic(scheduler):
     with patch("src.loats.scheduler.datetime.datetime") as mock_dt:
         mock_dt.now.return_value = sunday
         assert scheduler.is_market_open() is False
+
 
 @pytest.mark.asyncio
 async def test_run_once_all_jobs(scheduler):
@@ -47,9 +49,11 @@ async def test_run_once_all_jobs(scheduler):
     await scheduler.run_once("data_cleanup")
     scheduler.run_data_cleanup.assert_awaited_once()
 
+
 @pytest.mark.asyncio
 async def test_get_jobs_empty(scheduler):
     assert isinstance(scheduler.get_jobs(), list)
+
 
 @pytest.mark.asyncio
 async def test_is_running(scheduler):

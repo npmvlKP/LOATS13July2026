@@ -16,11 +16,12 @@ from .config import settings
 from .database import db
 from .logging import get_logger
 from .models import FundsData, HistoricalData, Position, QuoteData, Signal, SignalType
-from .openalgo import client as openalgo_client
+from .openalgo import async_client as openalgo_client
 from .sentiment import sentiment
 from .ta import technical_analysis
 
 logger = get_logger(__name__)
+
 
 class TradingScheduler:
     """Scheduler for trading scans and operations."""
@@ -208,7 +209,9 @@ class TradingScheduler:
             current_price = quote_data.get("last_price", 0)
 
             # Generate signal
-            signal_result = technical_analysis.generate_signal(indicators, current_price)
+            signal_result = technical_analysis.generate_signal(
+                indicators, current_price
+            )
             if signal_result:
                 signal_type, strength = signal_result
                 signal = Signal(
@@ -395,7 +398,9 @@ class TradingScheduler:
 
             # Combine signals
             ta_strength = ta_signals[0].strength if ta_signals else 0
-            sentiment_strength = sentiment_signals[0].strength if sentiment_signals else 0
+            sentiment_strength = (
+                sentiment_signals[0].strength if sentiment_signals else 0
+            )
 
             combined_strength = (ta_strength + sentiment_strength) / 2
 
@@ -425,12 +430,16 @@ class TradingScheduler:
                 "ta_strength": ta_strength,
                 "sentiment_strength": sentiment_strength,
                 "current_price": current_price,
-                "position_size": position_data.get("data", [{}])[0].get("quantity", 0)
-                if position_data.get("data")
-                else 0,
-                "available_funds": funds_data.get("data", {}).get("available_cash", 0)
-                if funds_data.get("data")
-                else 0,
+                "position_size": (
+                    position_data.get("data", [{}])[0].get("quantity", 0)
+                    if position_data.get("data")
+                    else 0
+                ),
+                "available_funds": (
+                    funds_data.get("data", {}).get("available_cash", 0)
+                    if funds_data.get("data")
+                    else 0
+                ),
             }
 
             signal = Signal(
@@ -477,7 +486,9 @@ class TradingScheduler:
 
     async def check_market_status(self) -> None:
         """Check market status and handle open/close events."""
-        task_id = f"market_status_check_{datetime.datetime.now(datetime.UTC).isoformat()}"
+        task_id = (
+            f"market_status_check_{datetime.datetime.now(datetime.UTC).isoformat()}"
+        )
         try:
             task = asyncio.create_task(self._market_status_check_task())
             self.scan_tasks[task_id] = task
@@ -617,6 +628,7 @@ class TradingScheduler:
             True if scheduler is running
         """
         return self.running
+
 
 # Export default instance
 scheduler = TradingScheduler()

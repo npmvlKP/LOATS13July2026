@@ -1,0 +1,5 @@
+f=open('src/loats/openalgo.py','rb')
+d=f.read()
+f.close()
+print(len(d))
+print(d[:100])

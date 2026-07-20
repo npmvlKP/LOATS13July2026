@@ -8,6 +8,7 @@ def test_base_adapter():
     assert adapter.send({}) is None
     assert adapter.receive() is None
 
+
 def test_openalgo_adapter():
     adapter = OpenAlgoAdapter(base_url="http://test.com", api_key="secret")
     assert adapter.send({}) is None

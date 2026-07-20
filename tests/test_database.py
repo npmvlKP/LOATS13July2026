@@ -428,7 +428,7 @@ class TestDatabase:
         old_trade = Trade(
             **sample_trade.model_dump(exclude={"trade_id", "entry_time"}),
             trade_id="old_trade_123",
-            entry_time=datetime.now() - timedelta(days=31)
+            entry_time=datetime.now() - timedelta(days=31),
         )
         db.create_trade(old_trade)
 
@@ -436,7 +436,7 @@ class TestDatabase:
         recent_trade = Trade(
             **sample_trade.model_dump(exclude={"trade_id", "entry_time"}),
             trade_id="recent_trade_123",
-            entry_time=datetime.now()
+            entry_time=datetime.now(),
         )
         db.create_trade(recent_trade)
 

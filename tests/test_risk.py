@@ -9,8 +9,10 @@ from src.risk import Risk
 def risk():
     return Risk()
 
+
 def test_risk_evaluate(risk):
     assert risk.evaluate({"test": 1}) is True
+
 
 def test_calculate_position_size(risk):
     price = Decimal("100")

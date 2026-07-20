@@ -17,6 +17,7 @@ from .models import Greeks, OptionContract, OptionType
 
 logger = get_logger(__name__)
 
+
 class OptionsEngine:
     """Options pricing analysis engine."""
 
@@ -136,6 +137,7 @@ class OptionsEngine:
             except Exception:
                 # Fallback to Newton
                 try:
+
                     def fprime(sigma: float) -> float:
                         return float(vega(flag, S, K, t, r, sigma))
 
@@ -151,6 +153,8 @@ class OptionsEngine:
                 except Exception as e:
                     logger.error(f"Failed to calculate implied volatility: {e}")
                     return 0.2  # Return default volatility on total failure
+
+        return 0.2  # Default fallback
 
     def calculate_black_scholes(
         self,
@@ -248,6 +252,7 @@ class OptionsEngine:
         parity = call_price - put_price + K * np.exp(-r * t)
         return float(parity)
 
+
 def calculate_greeks(
     S: float, K: float, t: float, r: float, sigma: float, option_type: OptionType
 ) -> Greeks:
@@ -293,6 +298,7 @@ def calculate_greeks(
             implied_volatility=sigma,
         )
 
+
 def calculate_implied_volatility(
     price: float, S: float, K: float, t: float, r: float, option_type: OptionType
 ) -> float:
@@ -308,6 +314,7 @@ def calculate_implied_volatility(
         # Fallback to a reasonable value
         return 0.2
 
+
 def calculate_var(returns: list[float], confidence_level: float = 0.95) -> float:
     """
     Calculate Value at Risk (VaR) using historical method.
@@ -318,6 +325,7 @@ def calculate_var(returns: list[float], confidence_level: float = 0.95) -> float
     sorted_returns = sorted(returns)
     index = int((1 - confidence_level) * len(sorted_returns))
     return sorted_returns[index]
+
 
 def calculate_historical_var(
     prices: list[float], confidence_level: float = 0.95
@@ -333,6 +341,7 @@ def calculate_historical_var(
         returns.append((prices[i] - prices[i - 1]) / prices[i - 1])
 
     return calculate_var(returns, confidence_level)
+
 
 class OptionsAnalysis:
     """Options analysis class for portfolio-level calculations."""
@@ -521,6 +530,7 @@ class OptionsAnalysis:
             rho=portfolio_rho,
             implied_volatility=0.0,
         )
+
 
 options = OptionsEngine()
 analysis = OptionsAnalysis()
