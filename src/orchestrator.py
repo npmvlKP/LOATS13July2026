@@ -117,7 +117,7 @@ class Orchestrator:
         Returns:
             dict with results from all components
         """
-        return self._execute_cycle(context or {})._to_dict()
+        return self._execute_cycle(context or {})._to_dict()  # type: ignore[no-any-return,attr-defined]
 
     async def cycle_async(self, context: dict[str, Any] | None = None) -> CycleResult:
         """
@@ -235,9 +235,9 @@ class Orchestrator:
 
         try:
             if hasattr(component, "execute"):
-                result = component.execute(context)
+                result: dict[str, Any] = component.execute(context)
             else:
-                result = component(context)
+                result = component(context)  # type: ignore[no-any-return]
         except Exception as e:
             self.logger.error(f"Component {name} failed: {e}")
             result = {"error": str(e)}
@@ -248,7 +248,7 @@ class Orchestrator:
         self, signals_data: dict[str, Any], context: dict[str, Any]
     ) -> list[Signal]:
         """Create Signal objects from signals data."""
-        signals = []
+        signals: list[Signal] = []
 
         if not signals_data or "signals" not in signals_data:
             return signals
@@ -353,7 +353,7 @@ def _cycle_result_to_dict(self: CycleResult) -> dict[str, Any]:
 
 
 # Monkey-patch the method onto the class
-CycleResult._to_dict = _cycle_result_to_dict
+CycleResult._to_dict = _cycle_result_to_dict  # type: ignore[attr-defined]
 
 
 __all__ = [

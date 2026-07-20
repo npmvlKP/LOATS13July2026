@@ -302,7 +302,7 @@ class TestEdgeCases:
 
     def test_signal_generation_in_cycle(self, orchestrator) -> None:
         """Test that signals are generated correctly."""
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         signals_data = {
             "signals": [
@@ -312,7 +312,7 @@ class TestEdgeCases:
                     "signal_type": "BUY",
                     "strength": 0.8,
                     "confidence": 0.9,
-                    "timestamp": datetime.now(timezone.utc),
+                    "timestamp": datetime.now(UTC),
                     "indicators": {"rsi": 70, "macd_histogram": 2.5},
                 }
             ]
