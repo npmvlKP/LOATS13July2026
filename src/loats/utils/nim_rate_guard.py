@@ -17,7 +17,7 @@ class NimRateGuard:
     """Rate limiting guard for NVIDIA NIM API calls.
 
     Implements strict rate limiting to prevent 429 "Too Many Requests" errors
-    from NVIDIA NIM API. Follows the conservative rate budget from loats.md §1.1.
+    from NVIDIA NIM API. Follows conservative rate budget from loats.md §1.1.
     """
 
     MAX_PER_MINUTE = 20  # Conservative (provider cap = 30)
@@ -93,7 +93,6 @@ async def nim_call_with_backoff(
     Raises:
         Exception: If the API call fails after all retries
     """
-    _guard = NimRateGuard()
     delays = [30, 60, 120, 300]
 
     for attempt in range(max_retries + 1):
@@ -119,3 +118,10 @@ async def nim_call_with_backoff(
 
     # This line should never be reached but satisfies mypy
     raise RuntimeError("Unexpected error in nim_call_with_backoff")
+
+
+# Module-level singleton to ensure rate limiting state persists across calls.
+# Without this singleton, each call to nim_call_with_backoff would create a
+# fresh NimRateGuard with empty _timestamps deque and _last_call=0.0, making
+# rate limiting ineffective (rate limiter cannot track state across calls).
+_guard: NimRateGuard = NimRateGuard()

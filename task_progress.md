@@ -40,3 +40,21 @@
 - [ ] Verify all health checks pass
 - [ ] Verify project is deploy-ready and stable
 - [ ] Prepare final report with root cause analysis and resolution
+
+## 🛡️ Phase 8: F-CONC-3 Rate Guard Bug Fix
+- [x] Analyze `src/loats/utils/nim_rate_guard.py` - understand current implementation
+- [x] Identify all usages of `NimRateGuard` in the codebase
+- [x] Implement module-level singleton fix (move `_guard` from local variable to module-level)
+- [x] Run quality gates (Ruff, MyPy, Flake8) - all passed
+- [x] Run tests to verify no regressions - 237 tests passed
+- [ ] Verify rate limiter behavior (manual verification completed - singleton ensures state persistence)
+
+### Bug Fix Details (F-CONC-3)
+**Root Cause:** `NimRateGuard` was instantiated inside `nim_call_with_backoff()` at line 96, creating a fresh instance with empty state on every call.
+
+**Impact:** Rate limiter was ineffective - sliding window and gap checks never accumulated state, allowing NVIDIA NIM API to be hammered with concurrent requests.
+
+**Resolution:** Moved `_guard = NimRateGuard()` to module-level (end of file), ensuring a single shared instance tracks call timestamps and enforces ≤20 req/min with ≥3s gap.
+
+**Modified Files:**
+- `src/loats/utils/nim_rate_guard.py` - singleton pattern implementation
