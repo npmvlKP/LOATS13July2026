@@ -68,7 +68,10 @@ class Settings(BaseSettings):
         SecretStr(""), description="Telegram bot token"
     )
     telegram_chat_id: str = Field("", description="Telegram chat ID")
-
+    telegram_admin_ids: list[str] = Field(
+        default_factory=list,
+        description="List of Telegram user IDs authorized to issue /kill and /resume commands",
+    )
     # Trading Configuration
     nifty_lot_size: int = Field(25, description="NIFTY lot size")
     max_order_value: Decimal = Field(
@@ -158,6 +161,17 @@ class Settings(BaseSettings):
         """Validate request timeout."""
         if v <= 0:
             raise ValueError("Request timeout must be positive")
+        return v
+
+    @field_validator("openalgo_api_key")
+    @classmethod
+    def validate_openalgo_api_key(cls, v: SecretStr) -> SecretStr:
+        """Ensure OpenAlgo API key is not the placeholder default."""
+        value = v.get_secret_value()
+        if value == "default_openalgo_api_key" or value == "":
+            raise ValueError(
+                "OpenAlgo API key must be set via OPENALGO_API_KEY environment variable"
+            )
         return v
 
     def initialize(self) -> None:

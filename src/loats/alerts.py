@@ -395,6 +395,22 @@ class AlertSystem:
         """Check if kill switch is active."""
         return self.kill_switch_active
 
+    def _is_authorized_admin(self, update: Update) -> bool:
+        """Check if user is authorized admin based on telegram_admin_ids setting."""
+        if not settings.telegram_admin_ids:
+            # No admin list configured - reject all commands for safety
+            logger.warning(
+                "Telegram admin ID allow-list is empty. "
+                "Configure TELEGRAM_ADMIN_IDS for security."
+            )
+            return False
+
+        if not update.effective_user:
+            return False
+
+        user_id = str(update.effective_user.id)
+        return user_id in settings.telegram_admin_ids
+
     # Telegram command handlers
     async def _start(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle /start command."""
@@ -437,6 +453,19 @@ class AlertSystem:
     ) -> None:
         """Handle /kill command."""
         try:
+            # Check admin authorization
+            if not self._is_authorized_admin(update):
+                logger.warning(
+                    f"Unauthorized kill switch attempt from user: "
+                    f"{update.effective_user.id if update.effective_user else 'unknown'}"
+                )
+                if update.message:
+                    await update.message.reply_text(
+                        "⛔ Unauthorized: You are not authorized to issue this command. "
+                        "Configure TELEGRAM_ADMIN_IDS with your user ID."
+                    )
+                return
+
             if self.kill_switch_active:
                 if update.message:
                     await update.message.reply_text("⚠️ Kill switch is already active.")
@@ -463,6 +492,19 @@ class AlertSystem:
     async def _resume(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle /resume command."""
         try:
+            # Check admin authorization
+            if not self._is_authorized_admin(update):
+                logger.warning(
+                    f"Unauthorized resume attempt from user: "
+                    f"{update.effective_user.id if update.effective_user else 'unknown'}"
+                )
+                if update.message:
+                    await update.message.reply_text(
+                        "⛔ Unauthorized: You are not authorized to issue this command. "
+                        "Configure TELEGRAM_ADMIN_IDS with your user ID."
+                    )
+                return
+
             if not self.kill_switch_active:
                 if update.message:
                     await update.message.reply_text("ℹ️ Kill switch is not active.")

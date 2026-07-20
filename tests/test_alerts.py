@@ -641,9 +641,13 @@ class TestAlertSystem:
         mock_update = MagicMock(spec=Update)
         mock_update.message = MagicMock()
         mock_update.message.reply_text = AsyncMock()
+        mock_update.effective_user.id = "123456789"
         mock_context = MagicMock()
 
-        await alert_system._kill_switch(mock_update, mock_context)
+        with patch("src.loats.alerts.settings") as mock_settings:
+            mock_settings.telegram_admin_ids = ["123456789"]
+            await alert_system._kill_switch(mock_update, mock_context)
+
         mock_update.message.reply_text.assert_called_once_with(
             "⚠️ Kill switch is already active."
         )
@@ -655,6 +659,7 @@ class TestAlertSystem:
         mock_update = MagicMock(spec=Update)
         mock_update.message = MagicMock()
         mock_update.message.reply_text = AsyncMock()
+        mock_update.effective_user.id = "123456789"
         mock_context = MagicMock()
         mock_context.args = ["API", "failure"]
 
@@ -663,6 +668,7 @@ class TestAlertSystem:
             patch("src.loats.alerts.async_client") as mock_openalgo,
         ):
             mock_settings.telegram_chat_id = "test_chat_id"
+            mock_settings.telegram_admin_ids = ["123456789"]
             mock_openalgo.get_all_orders = AsyncMock(return_value={"data": []})
             mock_openalgo.cancel_order = AsyncMock(return_value={"success": True})
 
@@ -689,10 +695,12 @@ class TestAlertSystem:
         mock_update = MagicMock(spec=Update)
         mock_update.message = MagicMock()
         mock_update.message.reply_text = AsyncMock()
+        mock_update.effective_user.id = "123456789"
         mock_context = MagicMock()
 
         with patch("src.loats.alerts.settings") as mock_settings:
             mock_settings.telegram_chat_id = "test_chat_id"
+            mock_settings.telegram_admin_ids = ["123456789"]
             await alert_system._resume(mock_update, mock_context)
 
         assert alert_system.kill_switch_active is False
