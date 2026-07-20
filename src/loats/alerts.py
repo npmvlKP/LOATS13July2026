@@ -30,7 +30,7 @@ class AlertSystem:
     def __init__(self) -> None:
         """Initialize AlertSystem."""
         self.bot: Bot | None = None
-        self.application: Application[Any] | None = None
+        self.application: Any = None  # type: ignore[type-arg]
         self.kill_switch_active: bool = False
         self.alert_cooldown: dict[str, datetime] = {}
         self.cooldown_period: int = 300  # 5 minutes

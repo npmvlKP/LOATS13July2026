@@ -1402,7 +1402,9 @@ class Database:
         """Async wrapper for store_funds() to avoid blocking event loop."""
         return await asyncio.to_thread(self.store_funds, funds)
 
-    async def async_get_latest_signals(self, symbol: str, limit: int = 10) -> list[Signal]:
+    async def async_get_latest_signals(
+        self, symbol: str, limit: int = 10
+    ) -> list[Signal]:
         """Async wrapper for get_latest_signals() to avoid blocking event loop."""
         return await asyncio.to_thread(self.get_latest_signals, symbol, limit)
 
