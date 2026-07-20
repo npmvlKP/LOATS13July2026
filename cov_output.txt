@@ -1,0 +1,72 @@
+============================= test session starts =============================
+platform win32 -- Python 3.12.7, pytest-9.1.0, pluggy-1.6.0
+benchmark: 5.2.3 (defaults: timer=time.perf_counter disable_gc=False min_rounds=5 min_time=0.000005 max_time=1.0 calibration_precision=10 warmup=False warmup_iterations=100000)
+Using --randomly-seed=3715149637
+rootdir: g:\.OA\LOATS-13July2026\LOATS13July2026
+configfile: pyproject.toml
+plugins: faker-2.0.0, anyio-4.14.0, Faker-37.12.0, hydra-core-1.3.2, hypothesis-6.155.3, langsmith-0.8.18, locust-2.44.1, asyncio-1.4.0, benchmark-5.2.3, cov-7.1.0, html-4.2.0, metadata-3.1.1, mock-3.15.1, randomly-4.1.0, timeout-2.4.0, xdist-3.8.0, typeguard-4.5.2
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 239 items
+
+tests\test_scheduler_extended.py ....                                    [  1%]
+tests\test_alerts.py ................................................... [ 23%]
+..........                                                               [ 27%]
+tests\test_strength.py .                                                 [ 27%]
+tests\test_database.py ......................                            [ 36%]
+tests\test_openalgo.py ....................                              [ 45%]
+tests\test_models.py .........................                           [ 55%]
+tests\test_sentiment.py ...                                              [ 56%]
+tests\test_scheduler.py ..                                               [ 57%]
+tests\test_config.py .......                                             [ 60%]
+tests\test_audit_hash_mutation.py .                                      [ 61%]
+tests\test_risk.py ..                                                    [ 61%]
+tests\test_final_logging_verification.py .                               [ 62%]
+tests\test_modules.py .                                                  [ 62%]
+tests\test_rules.py .                                                    [ 63%]
+tests\test_options.py .............                                      [ 68%]
+tests\test_orchestrator.py ...                                           [ 69%]
+tests\test_minimal_logging.py .                                          [ 70%]
+tests\test_simple_logging.py ..                                          [ 71%]
+tests\test_portfolio_greeks.py ....                                      [ 72%]
+tests\test_sentiment_coverage.py ......                                  [ 75%]
+tests\test_main_extended.py ........                                     [ 78%]
+tests\test_adapters.py ..                                                [ 79%]
+tests\test_logging.py .....                                              [ 81%]
+tests\test_vacuum_cleanup.py ...                                         [ 82%]
+tests\test_main.py ...                                                   [ 84%]
+tests\test_alerts_coverage.py .......                                    [ 87%]
+tests\test_coverage_booster.py ....                                      [ 88%]
+tests\test_ta.py ...................                                     [ 96%]
+tests\test_logging_implementation.py .                                   [ 97%]
+tests\test_scheduler_full.py ......                                      [ 99%]
+tests\test_strike.py .                                                   [100%]
+
+============================== warnings summary ===============================
+tests/test_alerts.py::TestAlertSystem::test_initialize_success
+  C:\Program Files\Python312\Lib\unittest\mock.py:478: RuntimeWarning: coroutine 'TestAlertSystem.mock_application.<locals>.run_polling_coro' was never awaited
+    _safe_super(NonCallableMock, self).__init__(
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=============================== tests coverage ================================
+_______________ coverage: platform win32, python 3.12.7-final-0 _______________
+
+Name                           Stmts   Miss Branch BrPart  Cover   Missing
+--------------------------------------------------------------------------
+src\loats\alerts.py              347     53    140     26    81%   79-81, 90-92, 103->109, 119-121, 144-145, 180-181, 183-184, 204->206, 206->208, 208->211, 227-228, 233-234, 257->259, 259->261, 397->exit, 399-400, 413->exit, 415-416, 424->426, 434->exit, 440-444, 450->452, 460->exit, 466-470, 480-483, 490->492, 497->496, 508->exit, 510-513, 522->524, 540->exit, 542-545, 551-554, 561->exit, 576->exit, 580-583
+src\loats\config\settings.py      79      1     10      1    98%   124
+src\loats\database.py            359     16     58     14    92%   286, 617-620, 626, 727, 821, 910, 944->947, 1073, 1079, 1230, 1287, 1313, 1324, 1326-1327, 1364->exit
+src\loats\initialization.py        6      1      2      1    75%   20
+src\loats\logging.py              20      0      4      0   100%
+src\loats\main.py                 98     21     12      2    75%   34, 78-97, 130-132, 167-173
+src\loats\models.py              231      8     24      5    93%   81, 90->98, 92->98, 100->103, 147, 245-255
+src\loats\openalgo.py            288     91    124     32    57%   76->exit, 82-88, 109, 131-132, 151-153, 186, 218, 343->345, 346, 347->349, 349->352, 362->364, 365, 366->368, 368->370, 370->373, 411->413, 413->415, 415->418, 427->429, 430, 431->433, 433->435, 435->437, 437->440, 469->472, 474->476, 476->478, 478->480, 481, 482->484, 484->486, 486->489, 569->exit, 575-581, 608, 626-627, 670-676, 693-694, 698, 702, 738-768, 806-835, 864-884, 888-889, 893-894, 898, 902
+src\loats\options.py             219     47     50     10    75%   35, 60, 84, 114-115, 118-119, 129-130, 142, 157, 191-223, 231-237, 251-253, 271, 282-292, 313-315, 337, 357, 407->401, 495
+src\loats\scheduler.py           276     70     64     21    71%   44-47, 67-69, 120->exit, 130-132, 136->exit, 140-147, 152-154, 163-166, 200->204, 215->238, 239-254, 268-271, 305-308, 311, 331-332, 346-349, 375-386, 388->400, 410-413, 417->419, 419->428, 465-480, 496-499, 512->511, 515-516, 521->529, 529->537, 537->exit, 545-546, 555-558, 574, 578-579, 604-606
+src\loats\sentiment.py            90     16     24      3    80%   52-78, 120-123, 132
+src\loats\ta.py                  194     19     82     18    85%   34, 95, 115, 117, 126-128, 151, 195, 202, 221->227, 229-231, 237, 247, 255, 259, 297->307, 311, 320, 330->351
+--------------------------------------------------------------------------
+TOTAL                           2207    343    594    133    79%
+Required test coverage of 60.0% reached. Total coverage: 79.22%
+======================= 239 passed, 1 warning in 13.40s =======================

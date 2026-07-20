@@ -1,0 +1,52 @@
+============================= test session starts =============================
+platform win32 -- Python 3.12.7, pytest-9.1.0, pluggy-1.6.0
+benchmark: 5.2.3 (defaults: timer=time.perf_counter disable_gc=False min_rounds=5 min_time=0.000005 max_time=1.0 calibration_precision=10 warmup=False warmup_iterations=100000)
+Using --randomly-seed=3956893615
+rootdir: g:\.OA\LOATS-13July2026\LOATS13July2026
+configfile: pyproject.toml
+plugins: faker-2.0.0, anyio-4.14.0, Faker-37.12.0, hydra-core-1.3.2, hypothesis-6.155.3, langsmith-0.8.18, locust-2.44.1, asyncio-1.4.0, benchmark-5.2.3, cov-7.1.0, html-4.2.0, metadata-3.1.1, mock-3.15.1, randomly-4.1.0, timeout-2.4.0, xdist-3.8.0, typeguard-4.5.2
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 239 items
+
+tests\test_options.py .............                                      [  5%]
+tests\test_strike.py .                                                   [  5%]
+tests\test_logging.py .....                                              [  7%]
+tests\test_alerts_coverage.py .......                                    [ 10%]
+tests\test_adapters.py ..                                                [ 11%]
+tests\test_logging_implementation.py .                                   [ 12%]
+tests\test_scheduler_full.py ......                                      [ 14%]
+tests\test_simple_logging.py ..                                          [ 15%]
+tests\test_sentiment_coverage.py ......                                  [ 17%]
+tests\test_vacuum_cleanup.py ...                                         [ 19%]
+tests\test_minimal_logging.py .                                          [ 19%]
+tests\test_risk.py ..                                                    [ 20%]
+tests\test_sentiment.py ...                                              [ 21%]
+tests\test_scheduler.py ..                                               [ 22%]
+tests\test_main_extended.py ........                                     [ 25%]
+tests\test_portfolio_greeks.py ....                                      [ 27%]
+tests\test_orchestrator.py ...                                           [ 28%]
+tests\test_strength.py .                                                 [ 29%]
+tests\test_ta.py ...................                                     [ 37%]
+tests\test_main.py ...                                                   [ 38%]
+tests\test_openalgo.py ....................                              [ 46%]
+tests\test_database.py ......................                            [ 56%]
+tests\test_audit_hash_mutation.py .                                      [ 56%]
+tests\test_config.py .......                                             [ 59%]
+tests\test_final_logging_verification.py .                               [ 59%]
+tests\test_coverage_booster.py ....                                      [ 61%]
+tests\test_scheduler_extended.py ....                                    [ 63%]
+tests\test_alerts.py ................................................... [ 84%]
+..........                                                               [ 88%]
+tests\test_modules.py .                                                  [ 89%]
+tests\test_rules.py .                                                    [ 89%]
+tests\test_models.py .........................                           [100%]
+
+============================== warnings summary ===============================
+tests/test_alerts.py::TestAlertSystem::test_send_system_alert
+  C:\Program Files\Python312\Lib\unittest\mock.py:2208: RuntimeWarning: coroutine 'TestAlertSystem.mock_application.<locals>.run_polling_coro' was never awaited
+    def __init__(self, name, parent):
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================= 239 passed, 1 warning in 8.40s ========================
