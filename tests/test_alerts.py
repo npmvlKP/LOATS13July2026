@@ -770,8 +770,8 @@ class TestAlertSystem:
         mock_update.message.reply_text = AsyncMock()
         mock_context = MagicMock()
 
-        with patch("src.loats.alerts.Database") as mock_db:
-            mock_db.return_value.get_latest_signals.return_value = []
+        with patch("src.loats.alerts.db") as mock_db:
+            mock_db.get_latest_signals.return_value = []
             await alert_system._signals(mock_update, mock_context)
         mock_update.message.reply_text.assert_called_once()
 
@@ -786,10 +786,10 @@ class TestAlertSystem:
         mock_context = MagicMock()
 
         with (
-            patch("src.loats.alerts.Database") as mock_db,
+            patch("src.loats.alerts.db") as mock_db,
             patch("src.loats.alerts.settings") as mock_settings,
         ):
-            mock_db.return_value.get_latest_signals.return_value = [sample_signal]
+            mock_db.get_latest_signals.return_value = [sample_signal]
             mock_settings.default_symbol = "NIFTY"
             await alert_system._signals(mock_update, mock_context)
         mock_update.message.reply_text.assert_called_once()

@@ -17,7 +17,7 @@ from telegram.ext import (
 )
 
 from src.loats.config import settings
-from src.loats.database import Database
+from src.loats.database import db
 from src.loats.logging import get_logger
 from src.loats.models import Order, Signal, SignalType, Trade
 from src.loats.openalgo import async_client
@@ -534,7 +534,7 @@ class AlertSystem:
     ) -> None:
         """Handle /signals command."""
         try:
-            signals = Database().get_latest_signals(settings.default_symbol, limit=5)
+            signals = db.get_latest_signals(settings.default_symbol, limit=5)
             if not signals:
                 if update.message:
                     await update.message.reply_text("ℹ️ No recent signals found.")
