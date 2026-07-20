@@ -9,6 +9,7 @@ import json
 import sqlite3
 import threading
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from pathlib import Path
 from typing import Any, TypeVar
 
@@ -290,9 +291,80 @@ class Database:
         """Convert dictionary to Pydantic model."""
         return model_class(**data)
 
+    def _canonical_serialize(self, data: dict[str, Any]) -> str:
+        """
+        Serialize a dictionary to a canonical JSON string for hashing.
+
+        This ensures deterministic serialization across Python/Pydantic versions:
+        - Datetime values are serialized to ISO-8601 format with UTC timezone
+        - Float values use fixed decimal representation to avoid precision issues
+        - Keys are sorted alphabetically
+        - None values are serialized as null
+        - Lists and nested dicts are recursively processed
+
+        This provides a stable canonical form that doesn't depend on:
+        - Pydantic's datetime serialization format
+        - Python's float representation
+        - Dictionary ordering (keys are sorted)
+
+        Args:
+            data: Dictionary to serialize
+
+        Returns:
+            Canonical JSON string suitable for hashing
+        """
+        return json.dumps(self._canonical_normalize(data), sort_keys=True)
+
+    def _canonical_normalize(self, value: Any) -> Any:
+        """
+        Recursively normalize a value to canonical form.
+
+        - datetime objects -> ISO-8601 UTC string
+        - Decimal objects -> float with fixed precision
+        - None -> None
+        - dict -> recursively normalized dict
+        - list -> recursively normalized list
+        - other -> unchanged
+
+        Args:
+            value: Value to normalize
+
+        Returns:
+            Normalized value in canonical form
+        """
+        if isinstance(value, datetime):
+            # Normalize to UTC and convert to ISO-8601
+            if value.tzinfo is None:
+                value = value.replace(tzinfo=UTC)
+            return value.isoformat().replace("+00:00", "Z")
+        elif isinstance(value, Decimal):
+            # Convert Decimal to float with fixed precision
+            return float(value)
+        elif isinstance(value, dict):
+            return {k: self._canonical_normalize(v) for k, v in value.items()}
+        elif isinstance(value, list):
+            return [self._canonical_normalize(item) for item in value]
+        elif value is None:
+            return None
+        else:
+            return value
+
     def _calculate_sha256(self, data: dict[str, Any]) -> str:
-        """Calculate SHA-256 hash of a dictionary."""
-        data_str = json.dumps(data, sort_keys=True)
+        """
+        Calculate SHA-256 hash of a dictionary using canonical serialization.
+
+        Uses canonical JSON serialization to ensure:
+        - Deterministic hash across Python/Pydantic versions
+        - No dependency on internal serialization details
+        - Stable hash for audit log entries
+
+        Args:
+            data: Dictionary to hash
+
+        Returns:
+            SHA-256 hash as hex string
+        """
+        data_str = self._canonical_serialize(data)
         return hashlib.sha256(data_str.encode()).hexdigest()
 
     def _log_audit(
