@@ -3,6 +3,7 @@ Database module for LOATS13July2026.
 Implements SQLite database with audit trail and JSONL dual-write.
 """
 
+import asyncio
 import hashlib
 import json
 import sqlite3
@@ -1364,6 +1365,50 @@ class Database:
         if hasattr(self._thread_local, "connection"):
             self._thread_local.connection.close()
             del self._thread_local.connection
+
+    # -------------------------------------------------------------------------
+    # Async wrapper methods for non-blocking I/O
+    # -------------------------------------------------------------------------
+
+    async def async_initialize(self) -> None:
+        """Async wrapper for initialize() to avoid blocking event loop."""
+        await asyncio.to_thread(self.initialize)
+
+    async def async_cleanup(self) -> None:
+        """Async wrapper for cleanup() to avoid blocking event loop."""
+        await asyncio.to_thread(self.cleanup)
+
+    async def async_vacuum(self) -> None:
+        """Async wrapper for vacuum() to avoid blocking event loop."""
+        await asyncio.to_thread(self.vacuum)
+
+    async def async_create_signal(self, signal: Signal) -> bool:
+        """Async wrapper for create_signal() to avoid blocking event loop."""
+        return await asyncio.to_thread(self.create_signal, signal)
+
+    async def async_store_historical_data(self, data: list[HistoricalData]) -> bool:
+        """Async wrapper for store_historical_data() to avoid blocking event loop."""
+        return await asyncio.to_thread(self.store_historical_data, data)
+
+    async def async_store_quote(self, quote: QuoteData) -> bool:
+        """Async wrapper for store_quote() to avoid blocking event loop."""
+        return await asyncio.to_thread(self.store_quote, quote)
+
+    async def async_store_position(self, position: Position) -> bool:
+        """Async wrapper for store_position() to avoid blocking event loop."""
+        return await asyncio.to_thread(self.store_position, position)
+
+    async def async_store_funds(self, funds: FundsData) -> bool:
+        """Async wrapper for store_funds() to avoid blocking event loop."""
+        return await asyncio.to_thread(self.store_funds, funds)
+
+    async def async_get_latest_signals(self, symbol: str, limit: int = 10) -> list[Signal]:
+        """Async wrapper for get_latest_signals() to avoid blocking event loop."""
+        return await asyncio.to_thread(self.get_latest_signals, symbol, limit)
+
+    async def async_verify_audit_log_integrity(self) -> bool:
+        """Async wrapper for verify_audit_log_integrity() to avoid blocking event loop."""
+        return await asyncio.to_thread(self.verify_audit_log_integrity)
 
 
 # Create a module-level singleton instance

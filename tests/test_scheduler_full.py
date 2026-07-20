@@ -53,12 +53,15 @@ async def test_run_ta_scan_success(scheduler):
         mock_ta.calculate_indicators.return_value = {}
         mock_ta.generate_signal.return_value = ("BUY", 0.8)
 
+        # Mock async methods
+        mock_db.async_store_historical_data = AsyncMock(return_value=True)
+        mock_db.async_create_signal = AsyncMock(return_value=True)
+        mock_db.async_store_quote = AsyncMock(return_value=True)
+
         await scheduler.run_ta_scan()
 
-        assert mock_db.create_signal.called
-        # Check if store_quote was called - implementation might skip if data identical or error
-        # Based on failure, let's verify scheduler.py logic for store_quote call
-        # assert mock_db.store_quote.called
+        assert mock_db.async_create_signal.called
+        assert mock_db.async_store_historical_data.called
 
 
 @pytest.mark.asyncio
@@ -83,8 +86,11 @@ async def test_run_sentiment_scan_success(scheduler):
         )
         mock_sentiment.analyze_symbol_sentiment.return_value = mock_result
 
+        # Mock async methods
+        mock_db.async_create_signal = AsyncMock(return_value=True)
+
         await scheduler.run_sentiment_scan()
-        assert mock_db.create_signal.called
+        assert mock_db.async_create_signal.called
 
 
 @pytest.mark.asyncio
@@ -96,9 +102,15 @@ async def test_run_signal_generation_success(scheduler):
         patch("src.loats.scheduler.db") as mock_db,
     ):
 
-        mock_db.get_latest_signals.return_value = [
-            MagicMock(strength=0.8, indicators={})
-        ]
+        # Mock async methods
+        mock_db.async_get_latest_signals = AsyncMock(
+            return_value=[MagicMock(strength=0.8, indicators={})]
+        )
+        mock_db.async_store_position = AsyncMock(return_value=True)
+        mock_db.async_store_funds = AsyncMock(return_value=True)
+        mock_db.async_create_signal = AsyncMock(return_value=True)
+        mock_db.async_store_quote = AsyncMock(return_value=True)
+
         mock_client.get_quotes.return_value = {
             "data": {"NSE:NIFTY50": {"last_price": 105}}
         }
@@ -113,7 +125,7 @@ async def test_run_signal_generation_success(scheduler):
         }
 
         await scheduler.run_signal_generation()
-        assert mock_db.create_signal.called
+        assert mock_db.async_create_signal.called
 
 
 @pytest.mark.asyncio
@@ -137,8 +149,12 @@ async def test_check_market_status_closed(scheduler):
 @pytest.mark.asyncio
 async def test_run_data_cleanup_success(scheduler):
     with patch("src.loats.scheduler.db") as mock_db:
-        mock_db.verify_audit_log_integrity.return_value = True
+        # Mock async methods
+        mock_db.async_cleanup = AsyncMock(return_value=True)
+        mock_db.async_verify_audit_log_integrity = AsyncMock(return_value=True)
+        mock_db.async_vacuum = AsyncMock(return_value=True)
+
         await scheduler.run_data_cleanup()
-        assert mock_db._cleanup_old_data.called
-        assert mock_db.verify_audit_log_integrity.called
-        assert mock_db.vacuum.called
+        assert mock_db.async_cleanup.called
+        assert mock_db.async_verify_audit_log_integrity.called
+        assert mock_db.async_vacuum.called

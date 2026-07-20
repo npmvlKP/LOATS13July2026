@@ -198,7 +198,7 @@ class TradingScheduler:
 
             # Store historical data
             if historical_data:
-                db.store_historical_data(historical_data)
+                await db.async_store_historical_data(historical_data)
 
             # Calculate indicators
             indicators = technical_analysis.calculate_indicators(historical_data)
@@ -229,26 +229,26 @@ class TradingScheduler:
                 )
 
                 # Store signal
-                db.create_signal(signal)
+                await db.async_create_signal(signal)
                 logger.info(
                     "TA signal generated: %s, strength %.2f", signal_type, strength
                 )
 
-            # Store quote
-            if quote_data:
-                quote = QuoteData(
-                    symbol=symbol,
-                    last_price=quote_data["last_price"],
-                    open=quote_data["open"],
-                    high=quote_data["high"],
-                    low=quote_data["low"],
-                    close=quote_data["close"],
-                    volume=quote_data["volume"],
-                    timestamp=datetime.datetime.now(datetime.UTC),
-                    change=quote_data.get("change", 0),
-                    change_percent=quote_data.get("change_percent", 0),
-                )
-                db.store_quote(quote)
+                # Store quote
+                if quote_data:
+                    quote = QuoteData(
+                        symbol=symbol,
+                        last_price=quote_data["last_price"],
+                        open=quote_data["open"],
+                        high=quote_data["high"],
+                        low=quote_data["low"],
+                        close=quote_data["close"],
+                        volume=quote_data["volume"],
+                        timestamp=datetime.datetime.now(datetime.UTC),
+                        change=quote_data.get("change", 0),
+                        change_percent=quote_data.get("change_percent", 0),
+                    )
+                    await db.async_store_quote(quote)
 
         except Exception:
             logger.exception("Technical analysis scan failed")
@@ -321,7 +321,7 @@ class TradingScheduler:
             )
 
             # Store signal
-            db.create_signal(signal)
+            await db.async_create_signal(signal)
             logger.info(
                 "Sentiment signal generated: %s, score %.2f",
                 signal_type,
@@ -358,8 +358,8 @@ class TradingScheduler:
             symbol = settings.default_symbol
 
             # Get latest technical and sentiment signals
-            ta_signals = db.get_latest_signals(symbol, limit=1)
-            sentiment_signals = db.get_latest_signals(symbol, limit=1)
+            ta_signals = await db.async_get_latest_signals(symbol, limit=1)
+            sentiment_signals = await db.async_get_latest_signals(symbol, limit=1)
 
             # Get current market data
             quotes = await openalgo_client.get_quotes([symbol])
@@ -383,7 +383,7 @@ class TradingScheduler:
                         buy_quantity=pos["buy_quantity"],
                         sell_quantity=pos["sell_quantity"],
                     )
-                    db.store_position(pos_model)
+                    await db.async_store_position(pos_model)
 
             if funds_data.get("data"):
                 funds = funds_data["data"]
@@ -394,7 +394,7 @@ class TradingScheduler:
                     total_equity=funds["total_equity"],
                     timestamp=datetime.datetime.now(datetime.UTC),
                 )
-                db.store_funds(funds_model)
+                await db.async_store_funds(funds_model)
 
             # Combine signals
             ta_strength = ta_signals[0].strength if ta_signals else 0
@@ -453,7 +453,7 @@ class TradingScheduler:
             )
 
             # Store signal
-            db.create_signal(signal)
+            await db.async_create_signal(signal)
             logger.info(
                 "Combined signal generated: %s, strength %.2f",
                 signal_type,
@@ -474,7 +474,7 @@ class TradingScheduler:
                     change=quote_data.get("change", 0),
                     change_percent=quote_data.get("change_percent", 0),
                 )
-                db.store_quote(quote)
+                await db.async_store_quote(quote)
 
         except Exception:
             logger.exception("Signal generation scan failed")
@@ -565,16 +565,16 @@ class TradingScheduler:
         logger.info("Starting data cleanup")
         try:
             # Run database cleanup
-            db._cleanup_old_data()
+            await db.async_cleanup()
 
             # Verify audit log integrity
-            if db.verify_audit_log_integrity():
+            if await db.async_verify_audit_log_integrity():
                 logger.info("Audit log integrity verified")
             else:
                 logger.warning("Audit log integrity check failed")
 
             # Optimize database
-            db.vacuum()
+            await db.async_vacuum()
         except Exception:
             logger.exception("Data cleanup failed")
         finally:
