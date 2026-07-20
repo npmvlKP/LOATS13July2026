@@ -3,6 +3,7 @@ Alerts module LOATS13July2026.
 Implements Telegram alerts kill switch functionality.
 """
 
+import html
 from datetime import UTC, datetime
 from typing import Any
 
@@ -442,7 +443,7 @@ class AlertSystem:
                 return
 
             reason = (
-                " ".join(context.args)
+                html.escape(" ".join(context.args))
                 if context.args
                 else "Manual activation via Telegram"
             )
@@ -468,7 +469,7 @@ class AlertSystem:
                 return
 
             reason = (
-                " ".join(context.args)
+                html.escape(" ".join(context.args))
                 if context.args
                 else "Manual deactivation via Telegram"
             )
