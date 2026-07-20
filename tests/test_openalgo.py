@@ -674,7 +674,7 @@ class TestOpenAlgoClient:
         mock_httpx_client: MagicMock,
     ) -> None:
         """Test error handling in OpenAlgoClient.
-        
+
         Now raises exceptions instead of returning error dictionaries,
         matching AsyncOpenAlgoClient behavior (F-CONC-5 fix).
         """

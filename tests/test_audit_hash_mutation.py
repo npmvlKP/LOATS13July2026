@@ -102,8 +102,12 @@ def test_audit_log_hash_integrity(db: Database):
     check_data = {k: v for k, v in re_serialized_data.items() if k != "sha256_hash"}
     recalculated_hash = db._calculate_sha256(check_data)
 
-    assert recalculated_hash == calculated_hash, "Hash should be reproducible after re-serialization"
-    assert recalculated_hash == re_serialized_data["sha256_hash"], "Hash should match stored hash"
+    assert (
+        recalculated_hash == calculated_hash
+    ), "Hash should be reproducible after re-serialization"
+    assert (
+        recalculated_hash == re_serialized_data["sha256_hash"]
+    ), "Hash should match stored hash"
 
     print(f"\nCanonical Hash: {calculated_hash}")
     assert True

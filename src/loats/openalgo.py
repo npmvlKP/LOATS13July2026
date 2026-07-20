@@ -2,8 +2,10 @@
 OpenAlgo client implementation for LOATS13July2026.
 """
 
+from __future__ import annotations
+
 from datetime import UTC, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import httpx
 
@@ -21,6 +23,9 @@ from .models import (
     TransactionType,
 )
 
+if TYPE_CHECKING:
+    from .alerts import AlertSystem
+
 logger = get_logger(__name__)
 
 
@@ -36,7 +41,9 @@ class KillSwitchError(OpenAlgoError):
     can be placed when emergency shutdown is triggered.
     """
 
-    def __init__(self, message: str = "Kill switch is active - order placement blocked") -> None:
+    def __init__(
+        self, message: str = "Kill switch is active - order placement blocked"
+    ) -> None:
         self.message = message
         super().__init__(self.message)
 
@@ -56,9 +63,10 @@ class OpenAlgoAPIError(OpenAlgoError):
         super().__init__(f"API Error {status_code}: {message}")
 
 
-def _get_alerts():
+def _get_alerts() -> AlertSystem:
     """Lazy import of alerts to avoid circular import."""
     from .alerts import alerts
+
     return alerts
 
 
@@ -105,7 +113,7 @@ class OpenAlgoClient:
         self.timeout = settings.request_timeout
         self.client: httpx.Client | None = None
 
-    def __enter__(self) -> "OpenAlgoClient":
+    def __enter__(self) -> OpenAlgoClient:
         """Context manager entry."""
         self.client = httpx.Client(
             base_url=self.base_url,
@@ -603,7 +611,7 @@ class AsyncOpenAlgoClient:
         self.timeout = settings.request_timeout
         self.client: httpx.AsyncClient | None = None
 
-    async def __aenter__(self) -> "AsyncOpenAlgoClient":
+    async def __aenter__(self) -> AsyncOpenAlgoClient:
         """Async context manager entry."""
         self.client = httpx.AsyncClient(
             base_url=self.base_url,
