@@ -12,7 +12,6 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, TypeVar
 
-import pandas as pd
 from pydantic import BaseModel
 
 from .config import settings
@@ -1326,39 +1325,6 @@ class Database:
             return True
         except (json.JSONDecodeError, KeyError, FileNotFoundError):
             return False
-
-    # -------------------------------------------------------------------------
-    # Utility methods
-    # -------------------------------------------------------------------------
-
-    def get_dataframe(self, query: str, params: tuple[Any, ...] = ()) -> pd.DataFrame:
-        """
-        Execute query and return results as pandas DataFrame.
-
-        Args:
-            query: SQL query string
-            params: Query parameters
-        Returns:
-            pandas DataFrame with query results
-        """
-        conn = self._get_connection()
-        return pd.read_sql_query(query, conn, params=params)
-
-    def execute_query(self, query: str, params: tuple[Any, ...] = ()) -> bool:
-        """
-        Execute write query (INSERT/UPDATE/DELETE/CREATE).
-
-        Args:
-            query: SQL query string
-            params: Query parameters
-        Returns:
-            True if successful
-        """
-        conn = self._get_connection()
-        cursor = conn.cursor()
-        cursor.execute(query, params)
-        conn.commit()
-        return True
 
     def close(self) -> None:
         """Close database connection for current thread."""

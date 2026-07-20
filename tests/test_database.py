@@ -451,52 +451,6 @@ class TestDatabase:
         recent_trade_retrieved = db.get_trade("recent_trade_123")
         assert recent_trade_retrieved is not None
 
-    def test_get_dataframe(
-        self,
-        db: Database,
-        sample_historical_data: list[HistoricalData],
-    ) -> None:
-        """Test get_dataframe method."""
-        # Store historical data
-        db.store_historical_data(sample_historical_data)
-
-        # Get as dataframe
-        df = db.get_dataframe(
-            "SELECT * FROM historical_data WHERE symbol = ?",
-            ("TEST",),
-        )
-
-        assert len(df) == 3
-        assert "symbol" in df.columns
-        assert "timestamp" in df.columns
-        assert "open" in df.columns
-        assert df.iloc[0]["symbol"] == "TEST"
-
-    def test_execute_query(self, db: Database) -> None:
-        """Test execute_query method."""
-        # Create a test table
-        result = db.execute_query("""
-            CREATE TABLE IF NOT EXISTS test_table (
-                id INTEGER PRIMARY KEY,
-                name TEXT NOT NULL,
-                value REAL
-            )
-        """)
-        assert result is True
-
-        # Insert data
-        result = db.execute_query(
-            "INSERT INTO test_table (name, value) VALUES (?, ?)",
-            ("test", 42.0),
-        )
-        assert result is True
-
-        # Verify data was inserted
-        df = db.get_dataframe("SELECT * FROM test_table")
-        assert len(df) == 1
-        assert df.iloc[0]["name"] == "test"
-        assert df.iloc[0]["value"] == 42.0
-
     def test_vacuum(self, db: Database) -> None:
         """Test vacuum method."""
         # This is a no-op test since vacuum doesn't return anything
