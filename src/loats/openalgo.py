@@ -140,7 +140,11 @@ class OpenAlgoClient:
             **kwargs: Additional arguments to pass to httpx
 
         Returns:
-            Dictionary containing the API response with success, message, data keys
+            Dictionary containing the API response
+
+        Raises:
+            OpenAlgoAPIError: For API response errors (HTTP 4xx/5xx)
+            OpenAlgoError: For other request errors (timeout, connection, etc.)
         """
         client = self._ensure_client()
         url = f"/api/v1/{endpoint.lstrip('/')}"
@@ -153,51 +157,40 @@ class OpenAlgoClient:
 
             # Check for HTTP error status codes
             if hasattr(response, "status_code") and response.status_code >= 400:
-                return {
-                    "success": False,
-                    "message": f"HTTP error: {response.status_code}",
-                    "data": {},
-                }
+                raise OpenAlgoAPIError(
+                    status_code=response.status_code,
+                    message=f"HTTP error: {response.status_code}",
+                    details={"response": response.text},
+                )
 
             try:
                 data = response.json()
                 return data  # type: ignore[no-any-return]
             except ValueError as e:
                 logger.error(f"JSON decode error: {e}")
-                return {
-                    "success": False,
-                    "message": f"JSON decode error: {e}",
-                    "data": {},
-                }
+                raise OpenAlgoError(f"JSON decode error: {e}") from e
 
         except httpx.HTTPStatusError as e:
+            # This is raised when response.raise_for_status() is called and status >= 400
+            # httpx doesn't raise this automatically unless raise_for_status() is called
             logger.error(f"HTTP error: {e}")
-            return {
-                "success": False,
-                "message": f"HTTP error: {e.response.status_code}",
-                "data": {},
-            }
-        except httpx.TimeoutException:
-            logger.error("Request timed out")
-            return {
-                "success": False,
-                "message": "Timeout error",
-                "data": {},
-            }
+            raise OpenAlgoAPIError(
+                status_code=e.response.status_code,
+                message=f"HTTP error: {e.response.status_code}",
+                details={"response": e.response.text},
+            ) from e
+        except httpx.TimeoutException as e:
+            logger.error(f"Request timed out: {e}")
+            raise OpenAlgoError(f"Timeout error: {e}") from e
         except httpx.ConnectError as e:
             logger.error(f"Connection error: {e}")
-            return {
-                "success": False,
-                "message": f"Connection error: {e}",
-                "data": {},
-            }
+            raise OpenAlgoError(f"Connection error: {e}") from e
+        except OpenAlgoError:
+            # Re-raise our own exceptions
+            raise
         except Exception as e:
             logger.error(f"Request failed: {e}")
-            return {
-                "success": False,
-                "message": f"Request failed: {e}",
-                "data": {},
-            }
+            raise OpenAlgoError(f"Request failed: {e}") from e
 
     # ------------------------------------------------------------------
     # Conversion helpers

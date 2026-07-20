@@ -21,6 +21,7 @@ from src.loats.models import (
 )
 from src.loats.openalgo import (
     AsyncOpenAlgoClient,
+    OpenAlgoAPIError,
     OpenAlgoClient,
     OpenAlgoError,
 )
@@ -672,20 +673,25 @@ class TestOpenAlgoClient:
         client: OpenAlgoClient,
         mock_httpx_client: MagicMock,
     ) -> None:
-        """Test error handling in OpenAlgoClient."""
-        # Test HTTP error - should return {success: False} envelope
+        """Test error handling in OpenAlgoClient.
+        
+        Now raises exceptions instead of returning error dictionaries,
+        matching AsyncOpenAlgoClient behavior (F-CONC-5 fix).
+        """
+        # Test HTTP error - should raise OpenAlgoAPIError
         error_response = MagicMock(spec=Response)
         error_response.status_code = 500
         error_response.text = "Internal Server Error"
         mock_httpx_client.post.return_value = error_response
 
         with patch.object(client, "_ensure_client", return_value=mock_httpx_client):
-            result = client.get_quotes(["NIFTY"])
+            with pytest.raises(OpenAlgoAPIError) as exc_info:
+                client.get_quotes(["NIFTY"])
 
-            assert result["success"] is False
-            assert "HTTP error" in result["message"]
+            assert exc_info.value.status_code == 500
+            assert "HTTP error" in exc_info.value.message
 
-        # Test JSON decode error - should return {success: False} envelope
+        # Test JSON decode error - should raise OpenAlgoError
         mock_response = MagicMock(spec=Response)
         mock_response.status_code = 200
         mock_response.json.side_effect = ValueError("Invalid JSON")
@@ -693,28 +699,28 @@ class TestOpenAlgoClient:
         mock_httpx_client.post.return_value = mock_response
 
         with patch.object(client, "_ensure_client", return_value=mock_httpx_client):
-            result = client.get_quotes(["NIFTY"])
+            with pytest.raises(OpenAlgoError) as exc_info:
+                client.get_quotes(["NIFTY"])
 
-            assert result["success"] is False
-            assert "JSON decode error" in result["message"]
+            assert "JSON decode error" in str(exc_info.value)
 
-        # Test timeout error - should return {success: False} envelope
+        # Test timeout error - should raise OpenAlgoError
         mock_httpx_client.post.side_effect = httpx.TimeoutException("Timeout")
 
         with patch.object(client, "_ensure_client", return_value=mock_httpx_client):
-            result = client.get_quotes(["NIFTY"])
+            with pytest.raises(OpenAlgoError) as exc_info:
+                client.get_quotes(["NIFTY"])
 
-            assert result["success"] is False
-            assert "Timeout error" in result["message"]
+            assert "Timeout error" in str(exc_info.value)
 
-        # Test connection error - should return {success: False} envelope
+        # Test connection error - should raise OpenAlgoError
         mock_httpx_client.post.side_effect = httpx.ConnectError("Connection failed")
 
         with patch.object(client, "_ensure_client", return_value=mock_httpx_client):
-            result = client.get_quotes(["NIFTY"])
+            with pytest.raises(OpenAlgoError) as exc_info:
+                client.get_quotes(["NIFTY"])
 
-            assert result["success"] is False
-            assert "Connection error" in result["message"]
+            assert "Connection error" in str(exc_info.value)
 
     def test_model_conversion(self, client: OpenAlgoClient) -> None:
         """Test conversion between OpenAlgo responses and models."""
