@@ -28,6 +28,19 @@ class OpenAlgoError(Exception):
     """Base exception for OpenAlgo client errors."""
 
 
+class KillSwitchError(OpenAlgoError):
+    """Exception raised when order placement is attempted while kill switch is active.
+
+    This is a safety-critical exception that prevents order placement when the
+    trading system kill switch has been activated. This ensures no new orders
+    can be placed when emergency shutdown is triggered.
+    """
+
+    def __init__(self, message: str = "Kill switch is active - order placement blocked") -> None:
+        self.message = message
+        super().__init__(self.message)
+
+
 class OpenAlgoAPIError(OpenAlgoError):
     """Exception for API response errors."""
 
@@ -41,6 +54,36 @@ class OpenAlgoAPIError(OpenAlgoError):
         self.message = message
         self.details = details or {}
         super().__init__(f"API Error {status_code}: {message}")
+
+
+def _get_alerts():
+    """Lazy import of alerts to avoid circular import."""
+    from .alerts import alerts
+    return alerts
+
+
+def _check_kill_switch() -> None:
+    """Check if kill switch is active and raise KillSwitchError if so.
+
+    Raises:
+        KillSwitchError: If kill switch is active.
+    """
+    alerts = _get_alerts()
+    if alerts.is_kill_switch_active():
+        logger.error("Kill switch active - order placement blocked")
+        raise KillSwitchError()
+
+
+async def _async_check_kill_switch() -> None:
+    """Async version: Check if kill switch is active and raise KillSwitchError if so.
+
+    Raises:
+        KillSwitchError: If kill switch is active.
+    """
+    alerts = _get_alerts()
+    if alerts.is_kill_switch_active():
+        logger.error("Kill switch active - order placement blocked")
+        raise KillSwitchError()
 
 
 class OpenAlgoClient:
@@ -338,7 +381,13 @@ class OpenAlgoClient:
 
         Returns:
             Dictionary containing order response
+
+        Raises:
+            KillSwitchError: If kill switch is active.
         """
+        # Check kill switch before placing order
+        _check_kill_switch()
+
         # Normalize enum values to strings
         if isinstance(order_type, OrderType):
             order_type = order_type.value
@@ -406,7 +455,13 @@ class OpenAlgoClient:
 
         Returns:
             Dictionary containing smart order response
+
+        Raises:
+            KillSwitchError: If kill switch is active.
         """
+        # Check kill switch before placing order
+        _check_kill_switch()
+
         # Normalize enum values to strings
         if isinstance(order_type, OrderType):
             order_type = order_type.value
@@ -733,7 +788,13 @@ class AsyncOpenAlgoClient:
 
         Returns:
             Dictionary containing order response
+
+        Raises:
+            KillSwitchError: If kill switch is active.
         """
+        # Check kill switch before placing order
+        await _async_check_kill_switch()
+
         # Normalize enum values to strings
         if isinstance(order_type, OrderType):
             order_type = order_type.value
@@ -801,7 +862,13 @@ class AsyncOpenAlgoClient:
 
         Returns:
             Dictionary containing smart order response
+
+        Raises:
+            KillSwitchError: If kill switch is active.
         """
+        # Check kill switch before placing order
+        await _async_check_kill_switch()
+
         # Normalize enum values to strings
         if isinstance(order_type, OrderType):
             order_type = order_type.value
