@@ -90,42 +90,72 @@ def calculate_atr(df: pd.DataFrame, period: int = 14) -> pd.Series:
 def calculate_supertrend(
     df: pd.DataFrame, period: int = 10, multiplier: float = 3.0
 ) -> tuple[pd.Series, pd.Series]:
-    """Calculate Supertrend indicator."""
-    if len(df) < period:
+    """Calculate Supertrend indicator using vectorized NumPy operations.
+
+    Optimized version: Uses NumPy arrays instead of pandas iloc for the
+    state-dependent loop, reducing indexing overhead significantly.
+
+    The Supertrend algorithm is inherently sequential (direction depends on
+    previous direction), so we cannot fully vectorize. However, by using NumPy
+    arrays and avoiding pandas iloc overhead, we achieve significant speedup
+    for large datasets.
+    """
+    n = len(df)
+
+    if n < period:
         return (
-            pd.Series([np.nan] * len(df), index=df.index),
-            pd.Series([np.nan] * len(df), index=df.index),
+            pd.Series([np.nan] * n, index=df.index),
+            pd.Series([np.nan] * n, index=df.index),
         )
 
-    high = df["high"]
-    low = df["low"]
-    close = df["close"]
+    # Extract data as NumPy arrays for faster access (cast to ensure numpy arrays)
+    close_arr: np.ndarray = np.asarray(df["close"].values, dtype=np.float64)
+    high_arr: np.ndarray = np.asarray(df["high"].values, dtype=np.float64)
+    low_arr: np.ndarray = np.asarray(df["low"].values, dtype=np.float64)
 
+    # Vectorized ATR calculation
     atr = calculate_atr(df, period)
-    hl2 = (high + low) / 2
-    upper_band = hl2 + (multiplier * atr)
-    lower_band = hl2 - (multiplier * atr)
+    atr_arr: np.ndarray = np.asarray(atr.values, dtype=np.float64)
 
-    supertrend = pd.Series(np.nan, index=close.index)
-    direction = pd.Series(np.nan, index=close.index)
+    # Vectorized band calculations
+    hl2_arr = (high_arr + low_arr) / 2.0
+    upper_band_arr = hl2_arr + (multiplier * atr_arr)
+    lower_band_arr = hl2_arr - (multiplier * atr_arr)
+
+    # Pre-allocate NumPy arrays for output
+    supertrend_arr = np.full(n, np.nan, dtype=np.float64)
+    direction_arr = np.full(n, np.nan, dtype=np.float64)
+
+    # Initialize direction as 1 (bullish) - standard Supertrend convention
     curr_dir = 1
 
-    for i in range(period, len(close)):
-        if close.iloc[i] > upper_band.iloc[i - 1]:
+    # State-dependent loop using NumPy array indexing (much faster than pandas iloc)
+    for i in range(period, n):
+        # Determine direction based on price and previous band
+        if close_arr[i] > upper_band_arr[i - 1]:
             curr_dir = 1
-        elif close.iloc[i] < lower_band.iloc[i - 1]:
+        elif close_arr[i] < lower_band_arr[i - 1]:
             curr_dir = -1
 
-        direction.iloc[i] = curr_dir
+        direction_arr[i] = curr_dir
 
+        # Calculate supertrend value with trailing max/min
         if curr_dir == 1:
-            supertrend.iloc[i] = lower_band.iloc[i]
-            if not pd.isna(supertrend.iloc[i - 1]) and direction.iloc[i - 1] == 1:
-                supertrend.iloc[i] = max(supertrend.iloc[i], supertrend.iloc[i - 1])
+            st_val = lower_band_arr[i]
+            # Only apply trailing if previous was also bullish
+            if direction_arr[i - 1] == 1 and not np.isnan(supertrend_arr[i - 1]):
+                st_val = max(st_val, supertrend_arr[i - 1])
+            supertrend_arr[i] = st_val
         else:
-            supertrend.iloc[i] = upper_band.iloc[i]
-            if not pd.isna(supertrend.iloc[i - 1]) and direction.iloc[i - 1] == -1:
-                supertrend.iloc[i] = min(supertrend.iloc[i], supertrend.iloc[i - 1])
+            st_val = upper_band_arr[i]
+            # Only apply trailing if previous was also bearish
+            if direction_arr[i - 1] == -1 and not np.isnan(supertrend_arr[i - 1]):
+                st_val = min(st_val, supertrend_arr[i - 1])
+            supertrend_arr[i] = st_val
+
+    # Convert back to pandas Series with proper index
+    supertrend = pd.Series(supertrend_arr, index=df.index, dtype=np.float64)
+    direction = pd.Series(direction_arr, index=df.index, dtype=np.float64)
 
     return supertrend, direction
 
