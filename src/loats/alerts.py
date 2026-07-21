@@ -16,17 +16,17 @@ from telegram.ext import (
     filters,
 )
 
-from src.loats.config import settings
-from src.loats.database import db
-from src.loats.logging import get_logger
-from src.loats.models import Order, Signal, SignalType, Trade
-from src.loats.openalgo import async_client
-from src.loats.utils.circuit_breaker import (
+from .config import settings
+from .database import db
+from .logging import get_logger
+from .models import Order, Signal, SignalType, Trade
+from .openalgo import async_client
+from .utils.circuit_breaker import (
     OPENALGO_CIRCUIT_BREAKER,
     TELEGRAM_CIRCUIT_BREAKER,
     CircuitBreakerOpenError,
 )
-from src.loats.utils.retry import OPENALGO_RETRY_CONFIG, retry_async
+from .utils.retry import OPENALGO_RETRY_CONFIG, retry_async
 
 logger = get_logger(__name__)
 
