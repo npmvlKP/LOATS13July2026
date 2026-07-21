@@ -5,7 +5,7 @@ Implements Telegram alerts kill switch functionality with circuit breaker protec
 
 import html
 from datetime import UTC, datetime
-from typing import Any, cast
+from typing import Any
 
 from telegram import Bot, Update
 from telegram.ext import (
@@ -37,7 +37,7 @@ class AlertSystem:
     def __init__(self) -> None:
         """Initialize AlertSystem."""
         self.bot: Bot | None = None
-        self.application: Application[None, None, None, None, None, None] | None = None
+        self.application: Application[Any, Any, Any, Any, Any, Any] | None = None  # type: ignore[type-arg]
         self.kill_switch_active: bool = False
         self.alert_cooldown: dict[str, datetime] = {}
         self.cooldown_period: int = 300  # 5 minutes
