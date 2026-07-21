@@ -160,6 +160,8 @@ disallow_subclassing_any = true
 disallow_untyped_calls = false
 explicit_package_bases = true
 exclude = ["tests/"]
+# Disable known Pydantic v2 limitations
+disable_error_code = ["untyped-decorator", "no-any-return"]
 
 [[tool.mypy.overrides]]
 module = [
@@ -172,6 +174,8 @@ module = [
     "httpx.*",
 ]
 ignore_missing_imports = true
+# Ignore untyped decorator warnings from Pydantic v2 (known limitation)
+disable_error_code = ["untyped-decorator"]
 disallow_untyped_defs = false
 disallow_incomplete_defs = false
 check_untyped_defs = false

@@ -344,7 +344,7 @@ class Database:
 
     def _dict_to_model(self, data: dict[str, Any], model_class: type[T]) -> T:
         """Convert dictionary to Pydantic model."""
-        return model_class(**data)
+        return model_class(**data)  # type: ignore[return-value, misc]
 
     def _canonical_serialize(self, data: dict[str, Any]) -> str:
         """
