@@ -43,6 +43,7 @@ def configure_test_logging() -> None:
 def test_settings() -> Settings:
     """Create test settings with temporary paths."""
     from pydantic import SecretStr
+
     from src.loats.config._settings import Settings
 
     # Create temporary directory for test data
@@ -63,6 +64,7 @@ def test_settings() -> Settings:
 def db() -> Generator[Database, None, None]:
     """Create a test database instance."""
     from pydantic import SecretStr
+
     from src.loats.config._settings import Settings
 
     # Create temporary directory for test data
