@@ -213,7 +213,9 @@ class Trade(BaseModel):
     """Trade model for database storage."""
 
     trade_id: str = Field(
-        default_factory=lambda: f"trade_{datetime.now(UTC).strftime('%Y%m%d%H%M%S%f')}_{uuid4().hex[:8]}"
+        default_factory=lambda: (
+            f"trade_{datetime.now(UTC).strftime('%Y%m%d%H%M%S%f')}_{uuid4().hex[:8]}"
+        )
     )
     symbol: str
     quantity: int = Field(gt=0)
@@ -268,7 +270,9 @@ class Signal(BaseModel):
     """Trading signal model."""
 
     signal_id: str = Field(
-        default_factory=lambda: f"signal_{datetime.now(UTC).strftime('%Y%m%d%H%M%S%f')}_{uuid4().hex[:8]}"
+        default_factory=lambda: (
+            f"signal_{datetime.now(UTC).strftime('%Y%m%d%H%M%S%f')}_{uuid4().hex[:8]}"
+        )
     )
     symbol: str
     signal_type: SignalType
@@ -295,7 +299,9 @@ class AuditLogEntry(BaseModel):
     """Audit log entry model."""
 
     entry_id: str = Field(
-        default_factory=lambda: f"audit_{datetime.now(UTC).strftime('%Y%m%d%H%M%S%f')}_{uuid4().hex[:8]}"
+        default_factory=lambda: (
+            f"audit_{datetime.now(UTC).strftime('%Y%m%d%H%M%S%f')}_{uuid4().hex[:8]}"
+        )
     )
     timestamp: datetime
     action: str

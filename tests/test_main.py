@@ -25,7 +25,6 @@ async def test_trading_system_initialization(trading_system):
             "src.loats.main.scheduler.initialize", new_callable=AsyncMock
         ) as mock_scheduler_init,
     ):
-
         await trading_system.initialize()
         mock_db_init.assert_called_once()
         mock_db_verify.assert_called_once()
@@ -50,7 +49,6 @@ async def test_trading_system_start_shutdown(trading_system):
             "src.loats.main.TradingSystem._wait_for_shutdown", new_callable=AsyncMock
         ),
     ):
-
         await trading_system.start()
         assert trading_system.running is True
         mock_alerts_start.assert_called_once()
@@ -66,7 +64,6 @@ async def test_trading_system_start_shutdown(trading_system):
             ) as mock_alerts_shutdown,
             patch("src.loats.main.db.close") as mock_db_close,
         ):
-
             await trading_system.shutdown()
             assert trading_system.running is False
             mock_scheduler_shutdown.assert_called_once()
@@ -87,7 +84,6 @@ async def test_trading_system_run_once(trading_system):
             "src.loats.main.scheduler.run_signal_generation", new_callable=AsyncMock
         ) as mock_signal,
     ):
-
         await trading_system.run_once()
         mock_ta.assert_called_once()
         mock_sentiment.assert_called_once()

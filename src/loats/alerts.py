@@ -15,6 +15,7 @@ from telegram.ext import (
     MessageHandler,
     filters,
 )
+from typing import cast
 
 from src.loats.config import settings
 from src.loats.database import db
@@ -37,7 +38,7 @@ class AlertSystem:
     def __init__(self) -> None:
         """Initialize AlertSystem."""
         self.bot: Bot | None = None
-        self.application: Any = None  # type: ignore[type-arg]
+        self.application: Application = cast(Application, None)
         self.kill_switch_active: bool = False
         self.alert_cooldown: dict[str, datetime] = {}
         self.cooldown_period: int = 300  # 5 minutes
@@ -114,7 +115,9 @@ class AlertSystem:
             logger.error(f"Error shutting down Telegram bot: {e}")
             raise
 
-    async def _safe_send_message(self, chat_id: str, text: str, parse_mode: str = "HTML") -> bool:
+    async def _safe_send_message(
+        self, chat_id: str, text: str, parse_mode: str = "HTML"
+    ) -> bool:
         """Send message with circuit breaker and retry protection."""
         if not self.bot:
             return False
@@ -285,7 +288,7 @@ class AlertSystem:
                 f"<b>Trade ID:</b> {trade.trade_id}\n"
                 f"<b>Symbol:</b> {trade.symbol}\n"
                 f"<b>Strategy:</b> {trade.strategy}\n"
-                f"<b>Type:</b> {(trade.transaction_type.value if trade.transaction_type else "N/A")}\n"
+                f"<b>Type:</b> {(trade.transaction_type.value if trade.transaction_type else 'N/A')}\n"
                 f"<b>Quantity:</b> {trade.quantity}\n"
                 f"<b>Entry Price:</b> {trade.entry_price:.2f}\n"
                 f"<b>Status:</b> {trade.status}\n"
@@ -347,9 +350,7 @@ class AlertSystem:
         """Get funds with circuit breaker and retry protection."""
         try:
             return await OPENALGO_CIRCUIT_BREAKER.call_async(
-                retry_async(OPENALGO_RETRY_CONFIG)(
-                    lambda: async_client.get_funds()
-                )
+                retry_async(OPENALGO_RETRY_CONFIG)(lambda: async_client.get_funds())
             )
         except CircuitBreakerOpenError as e:
             logger.warning("OpenAlgo circuit breaker open for get_funds: %s", e)

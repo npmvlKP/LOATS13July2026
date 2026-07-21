@@ -237,7 +237,7 @@ class Orchestrator:
             if hasattr(component, "execute"):
                 result: dict[str, Any] = component.execute(context)
             else:
-                result = component(context)  # type: ignore[no-any-return]
+                result = component(context)
         except Exception as e:
             self.logger.error(f"Component {name} failed: {e}")
             result = {"error": str(e)}

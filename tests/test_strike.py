@@ -209,9 +209,9 @@ class TestStrikeSelector:
             latencies.append(result.latency_ms)
 
         avg_latency = sum(latencies) / len(latencies)
-        assert (
-            avg_latency < 5.0
-        ), f"Average latency {avg_latency:.2f}ms exceeds 5ms target"
+        assert avg_latency < 5.0, (
+            f"Average latency {avg_latency:.2f}ms exceeds 5ms target"
+        )
 
 
 class TestStrikeClass:

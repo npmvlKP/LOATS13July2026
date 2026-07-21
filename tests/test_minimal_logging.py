@@ -83,12 +83,12 @@ def test_logging_configuration():
             if isinstance(handler, logging.StreamHandler)
         ]
 
-        assert (
-            len(file_handlers) == 0
-        ), "No file handlers should be configured in test mode"
-        assert (
-            len(console_handlers) > 0
-        ), "Console handler should be configured in test mode"
+        assert len(file_handlers) == 0, (
+            "No file handlers should be configured in test mode"
+        )
+        assert len(console_handlers) > 0, (
+            "Console handler should be configured in test mode"
+        )
 
     # Test production mode
     with patch("pathlib.Path.mkdir") as mock_mkdir:
@@ -110,12 +110,12 @@ def test_logging_configuration():
             if isinstance(handler, logging.StreamHandler)
         ]
 
-        assert (
-            len(file_handlers) > 0
-        ), "File handler should be configured in production mode"
-        assert (
-            len(console_handlers) > 0
-        ), "Console handler should be configured in production mode"
+        assert len(file_handlers) > 0, (
+            "File handler should be configured in production mode"
+        )
+        assert len(console_handlers) > 0, (
+            "Console handler should be configured in production mode"
+        )
 
     print("OK: All logging configuration tests passed")
 

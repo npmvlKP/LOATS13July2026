@@ -25,7 +25,6 @@ async def test_run_ta_scan_success(scheduler):
         patch("src.loats.scheduler.db") as mock_db,
         patch("src.loats.scheduler.technical_analysis") as mock_ta,
     ):
-
         mock_client.get_history.return_value = {
             "data": [
                 {
@@ -72,7 +71,6 @@ async def test_run_sentiment_scan_success(scheduler):
         ) as mock_sentiment,
         patch("src.loats.scheduler.db") as mock_db,
     ):
-
         mock_result = SentimentAnalysisResult(
             symbol="NSE:NIFTY50",
             timestamp=datetime.datetime.now(datetime.UTC),
@@ -101,7 +99,6 @@ async def test_run_signal_generation_success(scheduler):
         ) as mock_client,
         patch("src.loats.scheduler.db") as mock_db,
     ):
-
         # Mock async methods
         mock_db.async_get_latest_signals = AsyncMock(
             return_value=[MagicMock(strength=0.8, indicators={})]

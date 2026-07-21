@@ -67,7 +67,7 @@ def _calculate_delay(config: RetryConfig, attempt: int) -> float:
     # Add jitter to prevent thundering herd
     if config.jitter:
         jitter_range = delay * config.jitter_factor
-        delay = delay + random.uniform(-jitter_range, jitter_range)
+        delay = delay + random.uniform(-jitter_range, jitter_range)  # nosec: B311
         delay = max(0.1, delay)  # Ensure minimum delay
 
     return delay
@@ -106,16 +106,12 @@ def retry_sync(
 
                     # Check if exception is excluded from retry
                     if isinstance(e, cfg.excluded_exceptions):
-                        logger.debug(
-                            f"Retry excluded for {type(e).__name__}: {e}"
-                        )
+                        logger.debug(f"Retry excluded for {type(e).__name__}: {e}")
                         raise
 
                     # Check if exception is retryable
                     if not isinstance(e, cfg.retryable_exceptions):
-                        logger.debug(
-                            f"Non-retryable exception {type(e).__name__}: {e}"
-                        )
+                        logger.debug(f"Non-retryable exception {type(e).__name__}: {e}")
                         raise
 
                     # Check if we have more attempts
@@ -180,16 +176,12 @@ def retry_async(
 
                     # Check if exception is excluded from retry
                     if isinstance(e, cfg.excluded_exceptions):
-                        logger.debug(
-                            f"Retry excluded for {type(e).__name__}: {e}"
-                        )
+                        logger.debug(f"Retry excluded for {type(e).__name__}: {e}")
                         raise
 
                     # Check if exception is retryable
                     if not isinstance(e, cfg.retryable_exceptions):
-                        logger.debug(
-                            f"Non-retryable exception {type(e).__name__}: {e}"
-                        )
+                        logger.debug(f"Non-retryable exception {type(e).__name__}: {e}")
                         raise
 
                     # Check if we have more attempts

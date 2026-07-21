@@ -85,9 +85,9 @@ class TestOrchestrator:
             latencies.append(result["metrics"]["total_latency_ms"])
 
         avg_latency = sum(latencies) / len(latencies)
-        assert (
-            avg_latency < 100.0
-        ), f"Average latency {avg_latency:.2f}ms exceeds 100ms target"
+        assert avg_latency < 100.0, (
+            f"Average latency {avg_latency:.2f}ms exceeds 100ms target"
+        )
 
     def test_orchestrator_component_execution_order(
         self, orchestrator, mock_components

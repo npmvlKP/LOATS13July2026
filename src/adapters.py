@@ -22,6 +22,7 @@ class BaseAdapter:
         """Receive data."""
         return None
 
+
 class OpenAlgoAdapter(BaseAdapter):
     def __init__(self, base_url: str, api_key: str) -> None:
         super().__init__()

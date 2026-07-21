@@ -169,7 +169,9 @@ class TradingScheduler:
         finally:
             self.scan_tasks.pop(task_id, None)
 
-    async def _safe_get_history(self, symbol: str, interval: str) -> dict[str, Any] | None:
+    async def _safe_get_history(
+        self, symbol: str, interval: str
+    ) -> dict[str, Any] | None:
         """Get history with retry and circuit breaker protection."""
         try:
             return await OPENALGO_CIRCUIT_BREAKER.call_async(
@@ -409,9 +411,7 @@ class TradingScheduler:
         """Get funds with retry and circuit breaker protection."""
         try:
             return await OPENALGO_CIRCUIT_BREAKER.call_async(
-                retry_async(OPENALGO_RETRY_CONFIG)(
-                    lambda: openalgo_client.get_funds()
-                )
+                retry_async(OPENALGO_RETRY_CONFIG)(lambda: openalgo_client.get_funds())
             )
         except CircuitBreakerOpenError as e:
             logger.warning("OpenAlgo circuit breaker open for get_funds: %s", e)

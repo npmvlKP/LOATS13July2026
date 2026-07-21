@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 import logging
 from decimal import Decimal
+from typing import Any
 
 
 class Risk:
@@ -7,7 +10,7 @@ class Risk:
         self.logger = logging.getLogger(__name__)
         self.max_position_size = max_position_size or Decimal("100000")
 
-    def evaluate(self, data: dict) -> bool:
+    def evaluate(self, data: dict[str, Any]) -> bool:
         """Evaluate risk parameters. Returns True if within risk limits."""
         return True
 

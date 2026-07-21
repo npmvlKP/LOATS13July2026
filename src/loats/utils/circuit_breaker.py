@@ -113,9 +113,7 @@ class CircuitBreaker:
             if self._state == CircuitState.OPEN and self._should_attempt_reset():
                 self._state = CircuitState.HALF_OPEN
                 self._half_open_at = time.monotonic()
-                logger.info(
-                    f"Circuit breaker '{self.name}' transitioning to HALF_OPEN"
-                )
+                logger.info(f"Circuit breaker '{self.name}' transitioning to HALF_OPEN")
             return self._state
 
     @property

@@ -1487,7 +1487,9 @@ class Database:
                     conn.close()
                     closed_count += 1
                 except Exception as e:
-                    logger.warning(f"Error closing connection for thread {thread_id}: {e}")
+                    logger.warning(
+                        f"Error closing connection for thread {thread_id}: {e}"
+                    )
             self._thread_registry.clear()
 
         logger.info(f"Closed {closed_count} database connections")
