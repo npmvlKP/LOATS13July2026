@@ -1,2 +1,0 @@
-importopen('src/loats/alerts.py', 'r', encoding='utf-8')content =f.read()old 'f"<b>Type:</b> {trade.transaction_type.value}\\n"'
-new 'f"<b>Type:</b> {(trade.transaction_type.value trade.transaction_type else \'N/A\')}\\n"' contentcontent.replace(old, new)open('src/loats/alerts.py', 'w', encoding='utf-8')f:f.write(content)print('Fixed alerts.py')
