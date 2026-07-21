@@ -174,7 +174,7 @@ class TradingScheduler:
     ) -> dict[str, Any] | None:
         """Get history with retry and circuit breaker protection."""
         try:
-            return await OPENALGO_CIRCUIT_BREAKER.call_async(
+            return await OPENALGO_CIRCUIT_BREAKER.call_async(  # type: ignore[no-any-return]
                 retry_async(OPENALGO_RETRY_CONFIG)(
                     lambda: openalgo_client.get_history(
                         symbol=symbol, interval=interval, from_date=None, to_date=None
@@ -191,7 +191,7 @@ class TradingScheduler:
     async def _safe_get_quotes(self, symbols: list[str]) -> dict[str, Any] | None:
         """Get quotes with retry and circuit breaker protection."""
         try:
-            return await OPENALGO_CIRCUIT_BREAKER.call_async(
+            return await OPENALGO_CIRCUIT_BREAKER.call_async(  # type: ignore[no-any-return]
                 retry_async(OPENALGO_RETRY_CONFIG)(
                     lambda: openalgo_client.get_quotes(symbols)
                 )
@@ -395,7 +395,7 @@ class TradingScheduler:
     async def _safe_get_position_book(self) -> dict[str, Any] | None:
         """Get position book with retry and circuit breaker protection."""
         try:
-            return await OPENALGO_CIRCUIT_BREAKER.call_async(
+            return await OPENALGO_CIRCUIT_BREAKER.call_async(  # type: ignore[no-any-return]
                 retry_async(OPENALGO_RETRY_CONFIG)(
                     lambda: openalgo_client.get_position_book()
                 )
@@ -410,7 +410,7 @@ class TradingScheduler:
     async def _safe_get_funds(self) -> dict[str, Any] | None:
         """Get funds with retry and circuit breaker protection."""
         try:
-            return await OPENALGO_CIRCUIT_BREAKER.call_async(
+            return await OPENALGO_CIRCUIT_BREAKER.call_async(  # type: ignore[no-any-return]
                 retry_async(OPENALGO_RETRY_CONFIG)(lambda: openalgo_client.get_funds())
             )
         except CircuitBreakerOpenError as e:

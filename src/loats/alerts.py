@@ -122,10 +122,12 @@ class AlertSystem:
         if not self.bot:
             return False
 
+        # Capture bot reference to ensure type narrowing in lambda
+        bot: Bot = self.bot
         try:
             await TELEGRAM_CIRCUIT_BREAKER.call_async(
                 retry_async(OPENALGO_RETRY_CONFIG)(
-                    lambda: self.bot.send_message(
+                    lambda: bot.send_message(
                         chat_id=chat_id,
                         text=text,
                         parse_mode=parse_mode,
@@ -334,7 +336,7 @@ class AlertSystem:
     async def _safe_get_position_book(self) -> dict[str, Any] | None:
         """Get position book with circuit breaker and retry protection."""
         try:
-            return await OPENALGO_CIRCUIT_BREAKER.call_async(
+            return await OPENALGO_CIRCUIT_BREAKER.call_async(  # type: ignore[no-any-return]
                 retry_async(OPENALGO_RETRY_CONFIG)(
                     lambda: async_client.get_position_book()
                 )
@@ -349,7 +351,7 @@ class AlertSystem:
     async def _safe_get_funds(self) -> dict[str, Any] | None:
         """Get funds with circuit breaker and retry protection."""
         try:
-            return await OPENALGO_CIRCUIT_BREAKER.call_async(
+            return await OPENALGO_CIRCUIT_BREAKER.call_async(  # type: ignore[no-any-return]
                 retry_async(OPENALGO_RETRY_CONFIG)(lambda: async_client.get_funds())
             )
         except CircuitBreakerOpenError as e:
@@ -408,7 +410,7 @@ class AlertSystem:
     async def _safe_get_all_orders(self) -> dict[str, Any] | None:
         """Get all orders with circuit breaker and retry protection."""
         try:
-            return await OPENALGO_CIRCUIT_BREAKER.call_async(
+            return await OPENALGO_CIRCUIT_BREAKER.call_async(  # type: ignore[no-any-return]
                 retry_async(OPENALGO_RETRY_CONFIG)(
                     lambda: async_client.get_all_orders()
                 )
