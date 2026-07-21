@@ -6,7 +6,12 @@ lightweight, production-grade trading system using OpenAlgo APIs.
 from __future__ import annotations
 
 __version__ = "0.1.0"
-__all__ = ["configure_logging", "get_logger", "logger", "get_settings", "settings"]
+__all__ = [
+    "configure_logging",
+    "get_logger",
+    "get_settings",
+    "initialize_system",
+]
 
 from .config._settings import get_settings
 from .initialization import initialize_system

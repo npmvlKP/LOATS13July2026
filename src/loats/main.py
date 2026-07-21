@@ -28,8 +28,8 @@ class TradingSystem:
             # Initialize settings
             settings.initialize()
 
-            # Initialize database
-            db._initialize_database()
+            # Initialize database (using public alias)
+            db.initialize()
             if not db.verify_audit_log_integrity():
                 logger.warning("Audit log integrity check failed during initialization")
 

@@ -160,8 +160,9 @@ disallow_subclassing_any = true
 disallow_untyped_calls = false
 explicit_package_bases = true
 exclude = ["tests/"]
-# Disable known Pydantic v2 limitations
-disable_error_code = ["untyped-decorator", "no-any-return"]
+# Set MYPYPATH for proper module resolution with src layout
+# This ensures mypy can find loats module when analyzing src/loats/ files
+namespace_packages = true
 
 [[tool.mypy.overrides]]
 module = [

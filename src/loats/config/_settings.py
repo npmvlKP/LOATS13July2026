@@ -54,9 +54,7 @@ class Settings(BaseSettings):  # type: ignore[misc, valid-type]
 
     # OpenAlgo Configuration
     openalgo_api_key: SecretStr = Field(
-        SecretStr("default_openalgo_api_key"),
-        min_length=1,
-        description="OpenAlgo API key",
+        description="OpenAlgo API key (REQUIRED - no default)",
     )
     openalgo_base_url: str = Field(
         "http://127.0.0.1:5000", description="Base URL for OpenAlgo REST API"
@@ -168,9 +166,9 @@ class Settings(BaseSettings):  # type: ignore[misc, valid-type]
     @field_validator("openalgo_api_key")
     @classmethod
     def validate_openalgo_api_key(cls, v: SecretStr) -> SecretStr:
-        """Ensure OpenAlgo API key is not the placeholder default."""
+        """Ensure OpenAlgo API key is provided (no default allowed for secrets)."""
         value = v.get_secret_value()
-        if value == "default_openalgo_api_key" or value == "":
+        if not value:
             raise ValueError(
                 "OpenAlgo API key must be set via OPENALGO_API_KEY environment variable"
             )
