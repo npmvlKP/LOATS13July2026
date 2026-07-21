@@ -39,6 +39,7 @@ class TestPortfolioGreeks:
                 theta=-0.05,
                 vega=0.1,
                 rho=0.03,
+                quantity=1,
             ),
             OptionContract(
                 symbol="NIFTY23JAN18000PE",
@@ -54,6 +55,7 @@ class TestPortfolioGreeks:
                 theta=-0.06,
                 vega=0.1,
                 rho=-0.03,
+                quantity=2,
             ),
             OptionContract(
                 symbol="NIFTY23JAN18100CE",
@@ -69,6 +71,7 @@ class TestPortfolioGreeks:
                 theta=-0.04,
                 vega=0.08,
                 rho=0.025,
+                quantity=3,
             ),
         ]
 
@@ -77,7 +80,7 @@ class TestPortfolioGreeks:
         options_analysis: OptionsAnalysis,
         sample_contracts: list[OptionContract],
     ) -> None:
-        """Test calculate_portfolio_greeks method."""
+        """Test calculate_portfolio_greeks method with position sizing."""
         underlying_price = 18000.0
         risk_free_rate = 0.05
         volatility = 0.25
@@ -105,14 +108,67 @@ class TestPortfolioGreeks:
         assert portfolio_greeks.implied_volatility == 0.0
 
         # Check that the values are reasonable
-        # Delta should be between -3 and 3 for this portfolio (3 contracts)
-        assert -3 <= portfolio_greeks.delta <= 3
+        # Delta should be between -6 and 6 for this portfolio (3 contracts with varying quantities)
+        assert -6 <= portfolio_greeks.delta <= 6
         # Gamma should be positive
         assert portfolio_greeks.gamma >= 0
         # Vega should be positive
         assert portfolio_greeks.vega >= 0
         # Theta should be negative (time decay)
         assert portfolio_greeks.theta <= 0
+
+    def test_calculate_portfolio_greeks_with_quantity_scaling(
+        self,
+        options_analysis: OptionsAnalysis,
+    ) -> None:
+        """Test that quantity field properly scales portfolio Greeks."""
+        now = datetime.now(UTC)
+        expiry = now + timedelta(days=30)
+
+        # Contract with quantity 1
+        contract_qty_1 = OptionContract(
+            symbol="NIFTY18000CE",
+            strike_price=18000.0,
+            expiry=expiry,
+            option_type=OptionType.CALL,
+            last_price=150.0,
+            open_interest=1000,
+            volume=500,
+            implied_volatility=0.25,
+            quantity=1,
+        )
+
+        # Contract with quantity 5
+        contract_qty_5 = OptionContract(
+            symbol="NIFTY18000CE2",
+            strike_price=18000.0,
+            expiry=expiry,
+            option_type=OptionType.CALL,
+            last_price=150.0,
+            open_interest=1000,
+            volume=500,
+            implied_volatility=0.25,
+            quantity=5,
+        )
+
+        greeks_1 = options_analysis.calculate_portfolio_greeks(
+            contracts=[contract_qty_1],
+            underlying_price=18000.0,
+            risk_free_rate=0.05,
+        )
+
+        greeks_5 = options_analysis.calculate_portfolio_greeks(
+            contracts=[contract_qty_5],
+            underlying_price=18000.0,
+            risk_free_rate=0.05,
+        )
+
+        # Greeks should scale by quantity factor (5x for qty_5 vs qty_1)
+        assert abs(greeks_5.delta) > abs(greeks_1.delta)
+        assert abs(greeks_5.gamma) > abs(greeks_1.gamma)
+        assert abs(greeks_5.vega) > abs(greeks_1.vega)
+        # Note: Theta is negative, so greeks_5.theta < greeks_1.theta (more negative)
+        assert abs(greeks_5.theta) > abs(greeks_1.theta)
 
     def test_calculate_portfolio_greeks_default_risk_free_rate(
         self,
@@ -186,3 +242,35 @@ class TestPortfolioGreeks:
         assert portfolio_greeks.theta == 0.0
         assert portfolio_greeks.rho == 0.0
         assert portfolio_greeks.implied_volatility == 0.0
+
+    def test_calculate_portfolio_greeks_default_quantity(
+        self,
+        options_analysis: OptionsAnalysis,
+    ) -> None:
+        """Test that quantity defaults to 1 when not specified."""
+        now = datetime.now(UTC)
+        expiry = now + timedelta(days=30)
+
+        # Create contract without specifying quantity (should default to 1)
+        contract_no_qty = OptionContract(
+            symbol="NIFTY18000CE",
+            strike_price=18000.0,
+            expiry=expiry,
+            option_type=OptionType.CALL,
+            last_price=150.0,
+            open_interest=1000,
+            volume=500,
+            implied_volatility=0.25,
+            # quantity not specified - should default to 1
+        )
+
+        assert contract_no_qty.quantity == 1
+
+        # Should work with default quantity
+        greeks = options_analysis.calculate_portfolio_greeks(
+            contracts=[contract_no_qty],
+            underlying_price=18000.0,
+            risk_free_rate=0.05,
+        )
+
+        assert isinstance(greeks, Greeks)

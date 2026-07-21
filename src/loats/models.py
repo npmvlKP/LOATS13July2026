@@ -139,6 +139,7 @@ class OptionContract(BaseModel):
     theta: float | None = None
     vega: float | None = None
     rho: float | None = None
+    quantity: int = Field(default=1, ge=1, description="Position quantity/lots")
 
     @field_validator("last_price", mode="before")
     @classmethod

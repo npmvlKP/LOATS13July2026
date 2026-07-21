@@ -28,7 +28,7 @@ from src.loats.models import (
 )
 
 if TYPE_CHECKING:
-    from src.loats.config.settings import Settings
+    from src.loats.config._settings import Settings
 
 
 @pytest.fixture(autouse=True)
@@ -43,8 +43,7 @@ def configure_test_logging() -> None:
 def test_settings() -> Settings:
     """Create test settings with temporary paths."""
     from pydantic import SecretStr
-
-    from src.loats.config.settings import Settings
+    from src.loats.config._settings import Settings
 
     # Create temporary directory for test data
     with tempfile.TemporaryDirectory() as temp_dir:
@@ -64,8 +63,7 @@ def test_settings() -> Settings:
 def db() -> Generator[Database, None, None]:
     """Create a test database instance."""
     from pydantic import SecretStr
-
-    from src.loats.config.settings import Settings
+    from src.loats.config._settings import Settings
 
     # Create temporary directory for test data
     temp_dir = tempfile.mkdtemp()

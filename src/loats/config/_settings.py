@@ -190,5 +190,6 @@ def get_settings() -> Settings:
     return Settings()  # type: ignore[call-arg]
 
 
-# Alias for backward compatibility
-settings: Settings = get_settings()
+# Backward compatibility: get_settings() returns cached instance.
+# Use get_settings() function for lazy initialization.
+# The lru_cache defers Settings() instantiation until first call.

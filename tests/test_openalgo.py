@@ -7,8 +7,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import httpx
 import pytest
 from httpx import Response
+from src.loats.config import settings
 
-from src.loats.config.settings import settings
 from src.loats.models import (
     HistoricalData,
     Order,

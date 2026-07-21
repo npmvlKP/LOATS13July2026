@@ -515,12 +515,13 @@ class OptionsAnalysis:
                 option_type=contract.option_type,
             )
 
-            quantity = 1  # Assuming quantity 1 for now
-            portfolio_delta += greeks.delta * quantity
-            portfolio_gamma += greeks.gamma * quantity
-            portfolio_vega += greeks.vega * quantity
-            portfolio_theta += greeks.theta * quantity
-            portfolio_rho += greeks.rho * quantity
+            # Use contract quantity for position sizing (defaults to 1)
+            contract_quantity = contract.quantity
+            portfolio_delta += greeks.delta * contract_quantity
+            portfolio_gamma += greeks.gamma * contract_quantity
+            portfolio_vega += greeks.vega * contract_quantity
+            portfolio_theta += greeks.theta * contract_quantity
+            portfolio_rho += greeks.rho * contract_quantity
 
         return Greeks(
             delta=portfolio_delta,
