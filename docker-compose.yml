@@ -1,0 +1,109 @@
+# LOATS13July2026 - LITE Docker Compose Configuration
+# LITE Philosophy: No Docker services, no heavy ML, pure Python
+# This compose file is for CI/CD testing and optional local development
+#
+# NOTE: This is NOT a production deployment. For production:
+# - Use your cloud provider's managed services (AWS, GCP, Azure)
+# - Deploy as a Python application with proper process management
+# - Use environment-specific configuration
+
+version: "3.9"
+
+services:
+  # LOATS Application - Lightweight options analysis
+  loats:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: loats13july2026
+    restart: unless-stopped
+    environment:
+      # OpenAlgo Configuration (set these in .env)
+      - OPENALGO_API_KEY=${OPENALGO_API_KEY}
+      - OPENALGO_BASE_URL=${OPENALGO_BASE_URL:-http://host.docker.internal:5000}
+      - OPENALGO_MODE=ANALYZE
+      # Python environment
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
+      - TZ=Asia/Kolkata
+    env_file:
+      - .env
+    volumes:
+      # Mount for development hot-reload (comment out for production)
+      - ./src:/app/src:ro
+      # Mount logs directory
+      - loats_logs:/app/logs
+      # Mount audit database
+      - loats_data:/app/data
+    ports:
+      - "8000:8000"  # If web server is added
+    healthcheck:
+      test: ["CMD", "python", "quick_health_check.py"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - loats_network
+    # Resource limits (LITE = minimal footprint)
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 128M
+    # Security: read-only root filesystem
+    read_only: true
+    # Security: no new privileges
+    security_opt:
+      - no-new-privileges:true
+    # Stop signal for graceful shutdown
+    stop_grace_period: 10s
+
+  # Optional: OpenAlgo API server for local testing
+  # Uncomment if you need to run OpenAlgo locally
+  # openalgo:
+  #   image: openalgo/openalgo:latest
+  #   container_name: openalgo_api
+  #   restart: unless-stopped
+  #   environment:
+  #     - API_KEY=${OPENALGO_API_KEY}
+  #     - DATA_MODE=SIMULATED
+  #   ports:
+  #     - "5000:5000"
+  #   networks:
+  #     - loats_network
+
+networks:
+  loats_network:
+    driver: bridge
+    # Internal network only - no external access
+    internal: false
+
+volumes:
+  loats_logs:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./logs
+  loats_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./data
+
+# Development profile - includes development tools
+profiles:
+  dev:
+    description: "Development environment with hot-reload"
+    # Runs with source mounts for development
+  test:
+    description: "Testing environment"
+    # Optimized for CI/CD testing
+  prod:
+    description: "Production environment (use cloud deployment instead)"
+    # Note: This is just a placeholder - use cloud services for production

@@ -1,7 +1,14 @@
 # Gitleaks configuration for secret detection
-# This ensures no secrets are committed to the repository
+# LITE: This config is for CI/CD environments where gitleaks binary is installed.
+# Local Windows environments may not have gitleaks - use GitHub Actions Security Scan.
+#
+# Usage in CI:
+#   gitleaks detect --source . --config .gitleaks.toml
+#
+# Usage locally (if gitleaks installed):
+#   gitleaks detect --source . --config .gitleaks.toml --no-banner
 
-title = "gitleaks config"
+title = "gitleaks config for LOATS13July2026"
 
 [extend]
 # Use the default gitleaks rules
@@ -11,5 +18,9 @@ useDefault = true
 description = "Allowlisted files and patterns"
 paths = [
     '''gitleaks\.toml''',
+    '''\.gitleaks\.toml''',
     '''(.*?)(tests?|spec|test_.*?)\.py$''',
 ]
+
+# Note: For GitHub Actions, use the security.yml workflow which runs
+# gitleaks via gitleaks/gitleaks-action@v2
