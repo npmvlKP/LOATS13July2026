@@ -18,6 +18,34 @@ from .models import Greeks, OptionContract, OptionType
 logger = get_logger(__name__)
 
 
+class ExpiredContractError(ValueError):
+    """Raised when attempting to calculate Greeks for an expired option contract.
+
+    M6: Replaces silent clamping of negative time-to-expiry values.
+    Expired contracts must be handled explicitly rather than producing misleading Greeks.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        symbol: str | None = None,
+        expiry: datetime | None = None,
+        time_to_expiry: float | None = None,
+    ) -> None:
+        """Initialize ExpiredContractError.
+
+        Args:
+            message: Human-readable error message.
+            symbol: Option contract symbol (optional).
+            expiry: Contract expiry datetime (optional).
+            time_to_expiry: Calculated time to expiry in years (optional).
+        """
+        self.symbol = symbol
+        self.expiry = expiry
+        self.time_to_expiry = time_to_expiry
+        super().__init__(message)
+
+
 class OptionsEngine:
     """Options pricing analysis engine."""
 
@@ -42,15 +70,52 @@ class OptionsEngine:
         r: float | None = None,
         sigma: float = 0.2,
         option_type: OptionType = OptionType.CALL,
+        allow_expired: bool = False,
     ) -> Greeks:
         """
         Calculate Greeks for an option using Black-Scholes model.
+
+        Args:
+            S: Spot price.
+            K: Strike price.
+            t: Time to expiration in years.
+            r: Risk-free rate (optional, defaults to self.risk_free_rate).
+            sigma: Volatility.
+            option_type: OptionType.CALL or OptionType.PUT.
+            allow_expired: If False (default), raises ExpiredContractError when t <= 0.
+
+        Raises:
+            ExpiredContractError: If t <= 0 and allow_expired is False.
         """
         r = r if r is not None else self.risk_free_rate
         flag = "c" if option_type == OptionType.CALL else "p"
 
-        # Handle edge cases
-        t = max(t, 0.0001)  # Small time to avoid division by zero
+        # M6: Validate time to expiry - raise error for expired contracts
+        if t <= 0:
+            if allow_expired:
+                # Return Greeks at expiry (intrinsic value only)
+                if option_type == OptionType.CALL:
+                    return Greeks(
+                        delta=1.0 if S > K else 0.0,
+                        gamma=0.0,
+                        theta=0.0,
+                        vega=0.0,
+                        rho=0.0,
+                        implied_volatility=sigma,
+                    )
+                else:
+                    return Greeks(
+                        delta=-1.0 if S < K else 0.0,
+                        gamma=0.0,
+                        theta=0.0,
+                        vega=0.0,
+                        rho=0.0,
+                        implied_volatility=sigma,
+                    )
+            raise ExpiredContractError(
+                f"Cannot calculate Greeks for expired contract (t={t:.6f} years)",
+                time_to_expiry=t,
+            )
 
         try:
             delta_val = delta(flag, S, K, t, r, sigma)
@@ -103,9 +168,21 @@ class OptionsEngine:
     ) -> float:
         """
         Calculate implied volatility using robust methods.
+
+        Raises:
+            ExpiredContractError: If t <= 0.
         """
         r = r if r is not None else self.risk_free_rate
         flag = "c" if option_type == OptionType.CALL else "p"
+
+        # M6: Validate time to expiry - raise error for expired contracts
+        if t <= 0:
+            raise ExpiredContractError(
+                f"Cannot calculate implied volatility for expired contract (t={t:.6f} years)",
+                time_to_expiry=t,
+            )
+
+        # M6: Only clamp very small positive values to avoid numerical issues
         t = max(t, 0.0001)
 
         # Check price within arbitrage bounds to avoid solver failure (H9)
@@ -167,9 +244,21 @@ class OptionsEngine:
     ) -> float:
         """
         Calculate Black-Scholes option price.
+
+        Raises:
+            ExpiredContractError: If t <= 0.
         """
         r = r if r is not None else self.risk_free_rate
         flag = "c" if option_type == OptionType.CALL else "p"
+
+        # M6: Validate time to expiry - raise error for expired contracts
+        if t <= 0:
+            raise ExpiredContractError(
+                f"Cannot calculate Black-Scholes for expired contract (t={t:.6f} years)",
+                time_to_expiry=t,
+            )
+
+        # M6: Only clamp very small positive values to avoid numerical issues
         t = max(t, 0.0001)
 
         return float(black_scholes(flag, S, K, t, r, sigma))
@@ -258,8 +347,20 @@ def calculate_greeks(
 ) -> Greeks:
     """
     Standalone function to calculate Greeks for an option.
+
+    Raises:
+        ExpiredContractError: If t <= 0.
     """
     flag = "c" if option_type == OptionType.CALL else "p"
+
+    # M6: Validate time to expiry - raise error for expired contracts
+    if t <= 0:
+        raise ExpiredContractError(
+            f"Cannot calculate Greeks for expired contract (t={t:.6f} years)",
+            time_to_expiry=t,
+        )
+
+    # Only clamp very small positive values to avoid numerical issues
     t = max(t, 0.0001)
 
     try:
@@ -304,8 +405,20 @@ def calculate_implied_volatility(
 ) -> float:
     """
     Standalone function to calculate implied volatility using robust methods.
+
+    Raises:
+        ExpiredContractError: If t <= 0.
     """
     flag = "c" if option_type == OptionType.CALL else "p"
+
+    # M6: Validate time to expiry - raise error for expired contracts
+    if t <= 0:
+        raise ExpiredContractError(
+            f"Cannot calculate implied volatility for expired contract (t={t:.6f} years)",
+            time_to_expiry=t,
+        )
+
+    # Only clamp very small positive values to avoid numerical issues
     t = max(t, 0.0001)
 
     try:
@@ -537,6 +650,7 @@ options = OptionsEngine()
 analysis = OptionsAnalysis()
 
 __all__ = [
+    "ExpiredContractError",
     "OptionsAnalysis",
     "OptionsEngine",
     "analysis",

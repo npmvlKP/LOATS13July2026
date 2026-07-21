@@ -10,6 +10,7 @@ from vollib.black_scholes.implied_volatility import implied_volatility
 
 from src.loats.models import Greeks, OptionContract, OptionType
 from src.loats.options import (
+    ExpiredContractError,
     OptionsAnalysis,
     calculate_greeks,
     calculate_historical_var,
@@ -448,7 +449,19 @@ class TestOptionsAnalysis:
 
     def test_edge_cases(self, options: OptionsAnalysis) -> None:
         """Test edge cases for options calculations."""
-        # Test with zero time to expiry
+        # Test ExpiredContractError is raised for t=0.0 (expired contract)
+        with pytest.raises(ExpiredContractError) as exc_info:
+            options.engine.calculate_greeks(
+                S=18000.0,
+                K=18000.0,
+                t=0.0,
+                r=0.05,
+                sigma=0.25,
+                option_type=OptionType.CALL,
+            )
+        assert exc_info.value.time_to_expiry == 0.0
+
+        # Test allow_expired=True returns Greeks for expired contracts
         greeks = options.engine.calculate_greeks(
             S=18000.0,
             K=18000.0,
@@ -456,10 +469,42 @@ class TestOptionsAnalysis:
             r=0.05,
             sigma=0.25,
             option_type=OptionType.CALL,
+            allow_expired=True,
         )
+        assert isinstance(greeks, Greeks)
 
-        # For zero time to expiry, ATM option should have delta ~0.5
-        assert abs(greeks.delta - 0.5) < 0.1
+        # Test standalone calculate_greeks raises ExpiredContractError
+        with pytest.raises(ExpiredContractError):
+            calculate_greeks(
+                S=18000.0,
+                K=18000.0,
+                t=0.0,
+                r=0.05,
+                sigma=0.25,
+                option_type=OptionType.CALL,
+            )
+
+        # Test implied volatility raises ExpiredContractError for expired contract
+        with pytest.raises(ExpiredContractError):
+            options.engine.calculate_implied_volatility(
+                price=100.0,
+                S=18000.0,
+                K=18000.0,
+                t=0.0,
+                r=0.05,
+                option_type=OptionType.CALL,
+            )
+
+        # Test with very small time to expiry (should clamp to 0.0001)
+        greeks = options.engine.calculate_greeks(
+            S=18000.0,
+            K=18000.0,
+            t=0.00001,
+            r=0.05,
+            sigma=0.25,
+            option_type=OptionType.CALL,
+        )
+        assert isinstance(greeks, Greeks)
 
         # Test with very small volatility
         greeks = options.engine.calculate_greeks(
@@ -506,6 +551,25 @@ class TestOptionsAnalysis:
         # Test VaR with single price
         var = calculate_var([0.01], confidence_level=0.95)
         assert var == 0.01  # Only one return value
+
+    def test_expired_contract_error_attributes(self, options: OptionsAnalysis) -> None:
+        """Test ExpiredContractError has correct attributes."""
+        try:
+            options.engine.calculate_greeks(
+                S=18000.0,
+                K=18000.0,
+                t=-0.5,  # Negative time (expired)
+                r=0.05,
+                sigma=0.25,
+                option_type=OptionType.CALL,
+            )
+            pytest.fail("Expected ExpiredContractError to be raised")
+        except ExpiredContractError as e:
+            assert e.symbol is None  # Not provided in this call
+            assert e.expiry is None  # Not provided in this call
+            assert e.time_to_expiry == -0.5
+            assert isinstance(e.symbol, (type(None), str))
+            assert isinstance(e.expiry, (type(None), datetime))
 
     def test_option_contract_model(self) -> None:
         """Test OptionContract model."""
