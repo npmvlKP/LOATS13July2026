@@ -46,6 +46,10 @@ class TestAlertSystem:
         app.initialize = AsyncMock()
         app.start = AsyncMock()
         app.stop = AsyncMock()
+        # Mock the updater for v20+ lifecycle (start_polling/stop)
+        app.updater = MagicMock()
+        app.updater.start_polling = AsyncMock()
+        app.updater.stop = AsyncMock()
         return app
 
     @pytest.fixture

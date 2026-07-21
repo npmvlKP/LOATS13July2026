@@ -80,8 +80,9 @@ class AlertSystem:
     async def start(self) -> None:
         """Start Telegram bot in non-blocking mode.
 
-        Uses Application.start() which starts polling in the background,
-        allowing other async tasks (like scheduler) to run concurrently.
+        Uses the v20+ lifecycle: initialize() → start() → updater.start_polling().
+        This starts polling in the background, allowing other async tasks
+        (like scheduler) to run concurrently.
         """
         if not self.application:
             return
@@ -91,8 +92,13 @@ class AlertSystem:
         try:
             # Initialize the application (required before start)
             await self.application.initialize()
-            # Start polling in background - this is non-blocking
+            # Start the application - this starts the async processing
             await self.application.start()
+            # Start polling via updater (v20+ lifecycle)
+            if self.application.updater is not None:
+                await self.application.updater.start_polling()
+            else:
+                logger.warning("Telegram updater not available - bot commands disabled")
             self._running = True
             logger.info("Telegram bot started")
         except Exception as e:
@@ -100,12 +106,18 @@ class AlertSystem:
             raise
 
     async def shutdown(self) -> None:
-        """Shutdown Telegram bot gracefully."""
+        """Shutdown Telegram bot gracefully.
+
+        Uses the v20+ shutdown lifecycle: updater.stop() → application.stop().
+        """
         if not self.application:
             return
         if not self._running:
             return
         try:
+            # Stop the updater first (v20+ lifecycle)
+            if self.application.updater is not None:
+                await self.application.updater.stop()
             # Stop the application gracefully
             await self.application.stop()
             self._running = False
