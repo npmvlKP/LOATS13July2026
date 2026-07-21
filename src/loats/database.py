@@ -370,6 +370,81 @@ class Database:
         """
         return json.dumps(self._canonical_normalize(data), sort_keys=True)
 
+    def _get_canonical_format_documentation(self) -> str:
+        """
+        Returns documentation for the canonical serialization format used in audit hashes.
+
+        This format ensures deterministic audit hash computation across different
+        Python versions, platforms, and Pydantic model versions.
+
+        CANONICAL JSON FORMAT SPECIFICATION:
+        ====================================
+
+        1. Key Ordering:
+           - Keys are sorted alphabetically (sort_keys=True)
+           - Example: {"a": 1, "b": 2} not {"b": 2, "a": 1}
+
+        2. Datetime Serialization:
+           - All datetime objects are converted to ISO-8601 UTC format
+           - Naive datetimes (no timezone) are assumed to be UTC
+           - Timezone-aware datetimes are converted to UTC
+           - Format: "2024-01-15T10:30:00Z" (ISO-8601 with Z suffix for UTC)
+
+        3. Numeric Types:
+           - Decimal values are converted to float
+           - No trailing zeros preserved (1.0 becomes 1.0, not 1)
+           - Scientific notation avoided where possible
+
+        4. Null Handling:
+           - None values are serialized as JSON null
+           - Absent keys are not included (only explicit None)
+
+        5. String Escaping:
+           - Special characters escaped per JSON specification
+           - Unicode characters preserved
+           - Control characters escaped as \\uXXXX
+
+        6. Nested Structures:
+           - Dictionaries within dicts are recursively processed
+           - Lists are recursively processed
+           - Nested keys are sorted within each dict
+
+        EXAMPLE TRANSFORMATION:
+        -----------------------
+        Input (Python dict):
+            {
+                "order_id": "123",
+                "timestamp": datetime(2024, 1, 15, 10, 30, 0, tzinfo=UTC),
+                "amount": Decimal("100.50"),
+                "nested": {"z_key": 1, "a_key": 2},
+                "items": [1, 2, 3]
+            }
+
+        Canonical JSON output:
+            {
+                "amount": 100.5,
+                "items": [1, 2, 3],
+                "nested": {"a_key": 2, "z_key": 1},
+                "order_id": "123",
+                "timestamp": "2024-01-15T10:30:00Z"
+            }
+
+        HASH COMPUTATION:
+        -----------------
+        The SHA-256 hash is computed over the UTF-8 encoded canonical JSON string.
+        This produces a 64-character hexadecimal hash that:
+        - Is deterministic across Python versions
+        - Survives serialization/deserialization cycles
+        - Can be independently verified by external systems
+
+        Returns:
+            Human-readable documentation string
+        """
+        return (
+            "Canonical JSON format: sorted keys, ISO-8601 UTC datetimes, "
+            "Decimal→float, no trailing zeros, recursive nested structures"
+        )
+
     def _canonical_normalize(self, value: Any) -> Any:
         """
         Recursively normalize a value to canonical form.

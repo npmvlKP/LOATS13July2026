@@ -178,15 +178,6 @@ class OpenAlgoClient:
                 logger.error(f"JSON decode error: {e}")
                 raise OpenAlgoError(f"JSON decode error: {e}") from e
 
-        except httpx.HTTPStatusError as e:
-            # This is raised when response.raise_for_status() is called and status >= 400
-            # httpx doesn't raise this automatically unless raise_for_status() is called
-            logger.error(f"HTTP error: {e}")
-            raise OpenAlgoAPIError(
-                status_code=e.response.status_code,
-                message=f"HTTP error: {e.response.status_code}",
-                details={"response": e.response.text},
-            ) from e
         except httpx.TimeoutException as e:
             logger.error(f"Request timed out: {e}")
             raise OpenAlgoError(f"Timeout error: {e}") from e
@@ -678,13 +669,6 @@ class AsyncOpenAlgoClient:
                 logger.error(f"JSON decode error: {e}")
                 raise OpenAlgoError(f"JSON decode error: {e}") from e
 
-        except httpx.HTTPStatusError as e:
-            logger.error(f"HTTP error: {e}")
-            raise OpenAlgoAPIError(
-                status_code=e.response.status_code,
-                message=f"HTTP error: {e.response.status_code}",
-                details={"response": e.response.text},
-            ) from e
         except httpx.TimeoutException as e:
             logger.error(f"Request timed out: {e}")
             raise OpenAlgoError(f"Timeout error: {e}") from e
