@@ -52,6 +52,11 @@ packages = ["src/loats"]
 [tool.ruff]
 line-length = 88
 target-version = "py312"
+# Exclude non-Python files from linting
+exclude = [
+    "*.env",         # Any .env files (shell config, not Python)
+    ".ruff_cache",   # Ruff cache directory
+]
 
 [tool.ruff.lint.mccabe]
 # §4.1 specifies LOC ≤ 100 per function; cyclomatic complexity max

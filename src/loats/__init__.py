@@ -15,3 +15,4 @@ initialize_system()
 
 # Get default logger
 logger = get_logger("loats")
+

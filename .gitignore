@@ -6,7 +6,12 @@
 .env.*
 !.env.example
 !.env.test
+.env.example
 secrets.env
+
+# Ruff-specific exclusions (env files are not Python)
+.ruffignore
+
 
 # Virtual environment
 .venv/
