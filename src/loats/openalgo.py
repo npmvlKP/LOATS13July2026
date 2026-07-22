@@ -654,13 +654,11 @@ class AsyncOpenAlgoClient:
             else:
                 response = await client.request(method, url, **kwargs)
 
-            # Check for HTTP error status codes
-            if hasattr(response, "status_code") and response.status_code >= 400:
-                raise OpenAlgoAPIError(
-                    status_code=response.status_code,
-                    message=f"HTTP error: {response.status_code}",
-                    details={"response": response.text},
-                )
+            # Trigger an httpx.HTTPStatusError carrying the full response
+            # context (status, headers, body). This exception is then
+            # chained below to preserve the diagnostic stack for operators
+            # investigating production failures (NEW-H1).
+            response.raise_for_status()
 
             try:
                 data = response.json()
@@ -669,12 +667,26 @@ class AsyncOpenAlgoClient:
                 logger.error(f"JSON decode error: {e}")
                 raise OpenAlgoError(f"JSON decode error: {e}") from e
 
+        except httpx.HTTPStatusError as e:
+            # Preserve the original httpx exception (response, headers,
+            # request) via explicit __cause__ chaining so logs and tracebacks
+            # retain the full HTTP failure context (NEW-H1).
+            logger.error(f"API HTTP error {e.response.status_code}: {e.response.text}")
+            raise OpenAlgoAPIError(
+                status_code=e.response.status_code,
+                message=f"HTTP error: {e.response.status_code}",
+                details={"response": e.response.text},
+            ) from e
         except httpx.TimeoutException as e:
             logger.error(f"Request timed out: {e}")
             raise OpenAlgoError(f"Timeout error: {e}") from e
         except httpx.ConnectError as e:
             logger.error(f"Connection error: {e}")
             raise OpenAlgoError(f"Connection error: {e}") from e
+        except OpenAlgoError:
+            # Re-raise our own exceptions without losing the original
+            # exception chain attached via ``raise ... from ...``.
+            raise
         except Exception as e:
             logger.error(f"Request failed: {e}")
             raise OpenAlgoError(f"Request failed: {e}") from e

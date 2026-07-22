@@ -124,22 +124,34 @@ class TestAsyncOpenAlgoClient:
         mock_async_httpx_client: AsyncMock,
     ) -> None:
         """Test error handling in AsyncOpenAlgoClient."""
-        # Test HTTP error - should raise OpenAlgoAPIError
+        # Test HTTP error - should raise OpenAlgoAPIError chained from
+        # an httpx.HTTPStatusError so the original response context is
+        # preserved (NEW-H1).
         error_response = AsyncMock(spec=Response)
         error_response.status_code = 500
         error_response.text = "Internal Server Error"
+        # Mirror httpx behaviour: raise_for_status() must raise on >= 400
+        error_response.raise_for_status.side_effect = httpx.HTTPStatusError(
+            "Server Error",
+            request=httpx.Request("POST", "http://test/api/v1/quotes"),
+            response=error_response,
+        )
         mock_async_httpx_client.post.return_value = error_response
 
         with patch.object(
             async_client, "_ensure_client", return_value=mock_async_httpx_client
         ):
-            with pytest.raises(Exception) as exc_info:  # Should raise OpenAlgoAPIError
+            with pytest.raises(OpenAlgoAPIError) as exc_info:
                 await async_client._request(
                     "POST", "quotes", json={"symbols": ["NIFTY"]}
                 )
             assert "API Error 500" in str(exc_info.value)
+            # Verify the original httpx exception is preserved in __cause__
+            # for diagnostics (NEW-H1).
+            assert isinstance(exc_info.value.__cause__, httpx.HTTPStatusError)
 
-        # Test JSON decode error - should raise OpenAlgoError
+        # Test JSON decode error - should raise OpenAlgoError chained from
+        # the original ValueError.
         mock_response = AsyncMock(spec=Response)
         mock_response.status_code = 200
         mock_response.json.side_effect = ValueError("Invalid JSON")
@@ -149,13 +161,15 @@ class TestAsyncOpenAlgoClient:
         with patch.object(
             async_client, "_ensure_client", return_value=mock_async_httpx_client
         ):
-            with pytest.raises(Exception) as exc_info:  # Should raise OpenAlgoError
+            with pytest.raises(OpenAlgoError) as exc_info:
                 await async_client._request(
                     "POST", "quotes", json={"symbols": ["NIFTY"]}
                 )
             assert "JSON decode error" in str(exc_info.value)
+            assert isinstance(exc_info.value.__cause__, ValueError)
 
-        # Test timeout error - should raise OpenAlgoError
+        # Test timeout error - should raise OpenAlgoError chained from
+        # httpx.TimeoutException.
         mock_async_httpx_client.post.side_effect = httpx.TimeoutException("Timeout")
 
         with patch.object(
@@ -166,8 +180,10 @@ class TestAsyncOpenAlgoClient:
                     "POST", "quotes", json={"symbols": ["NIFTY"]}
                 )
             assert "Timeout error" in str(exc_info.value)
+            assert isinstance(exc_info.value.__cause__, httpx.TimeoutException)
 
-        # Test connection error - should raise OpenAlgoError
+        # Test connection error - should raise OpenAlgoError chained from
+        # httpx.ConnectError.
         mock_async_httpx_client.post.side_effect = httpx.ConnectError(
             "Connection failed"
         )
@@ -180,6 +196,7 @@ class TestAsyncOpenAlgoClient:
                     "POST", "quotes", json={"symbols": ["NIFTY"]}
                 )
             assert "Connection error" in str(exc_info.value)
+            assert isinstance(exc_info.value.__cause__, httpx.ConnectError)
 
 
 class TestOpenAlgoClient:

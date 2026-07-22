@@ -62,13 +62,15 @@ async def test_trading_system_start_shutdown(trading_system):
             patch(
                 "src.loats.main.alerts.shutdown", new_callable=AsyncMock
             ) as mock_alerts_shutdown,
-            patch("src.loats.main.db.close") as mock_db_close,
+            patch(
+                "src.loats.main.db.async_close_all", new_callable=AsyncMock
+            ) as mock_db_close_all,
         ):
             await trading_system.shutdown()
             assert trading_system.running is False
             mock_scheduler_shutdown.assert_called_once()
             mock_alerts_shutdown.assert_called_once()
-            mock_db_close.assert_called_once()
+            mock_db_close_all.assert_called_once()
 
 
 @pytest.mark.asyncio

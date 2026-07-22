@@ -113,6 +113,7 @@ async def test_main_coverage_booster():
         mock_alert.send_system_alert = AsyncMock()
 
         mock_db.verify_audit_log_integrity.return_value = True
+        mock_db.async_close_all = AsyncMock()
 
         # Run initialization
         await sys_obj.initialize()

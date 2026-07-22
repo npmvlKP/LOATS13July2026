@@ -121,8 +121,8 @@ class TradingSystem:
             # Shutdown alert system
             await alerts.shutdown()
 
-            # Close database connections
-            db.close()
+            # Close all database connections (cross-thread)
+            await db.async_close_all()
 
             self.running = False
             self.shutdown_event.set()
