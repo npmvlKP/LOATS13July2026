@@ -208,11 +208,11 @@ class AlertSystem:
                 emoji = "⚪"
 
             indicators = "\n".join(
-                [f"{name}: {value:.4f}" for name, value in signal.indicators.items()]
+                [f"{html.escape(name)}: {value:.4f}" for name, value in signal.indicators.items()]
             )
             metadata = "\n".join(
                 [
-                    f"{key}: {value}"
+                    f"{html.escape(key)}: {html.escape(str(value))}"
                     for key, value in signal.metadata.items()
                     if key != "indicators_count"
                 ]
@@ -220,7 +220,7 @@ class AlertSystem:
 
             message = (
                 f"{emoji} <b>TRADING SIGNAL</b> {emoji}\n\n"
-                f"<b>Symbol:</b> {signal.symbol}\n"
+                f"<b>Symbol:</b> {html.escape(signal.symbol)}\n"
                 f"<b>Type:</b> {signal.signal_type.value}\n"
                 f"<b>Strength:</b> {signal.strength:.2f}\n"
                 f"<b>Confidence:</b> {signal.confidence:.2f}\n"
@@ -383,13 +383,16 @@ f"<b>Quantity:</b> {trade.quantity}\n"
             message = "📊 <b>CURRENT POSITIONS</b>\n\n"
             for pos in positions:
                 pnl_color = "green" if pos.get("pnl", 0) >= 0 else "red"
+                # Escape all external data to prevent HTML injection
+                symbol = html.escape(str(pos.get("symbol", "N/A")))
+                product_type = html.escape(str(pos.get("product_type", "N/A")))
                 message += (
-                    f"<b>Symbol:</b> {pos['symbol']}\n"
+                    f"<b>Symbol:</b> {symbol}\n"
                     f"<b>Quantity:</b> {pos['quantity']}\n"
                     f"<b>Avg Price:</b> {pos['average_price']:.2f}\n"
                     f"<b>Last Price:</b> {pos['last_price']:.2f}\n"
                     f"<b>PnL:</b> <span color='{pnl_color}'>{pos.get('pnl', 0):.2f}</span>\n"
-                    f"<b>Product:</b> {pos['product_type']}\n\n"
+                    f"<b>Product:</b> {product_type}\n\n"
                 )
             return await self.send_alert(message, "info")
         except Exception as e:
@@ -472,9 +475,11 @@ f"<b>Quantity:</b> {trade.quantity}\n"
                     if order["status"] in ["OPEN", "PENDING"]:
                         await self._safe_cancel_order(order["order_id"])
 
+            # Escape user-supplied reason to prevent HTML injection
+            escaped_reason = html.escape(reason)
             message = (
                 f"🚨 <b>KILL SWITCH ACTIVATED</b> 🚨\n\n"
-                f"<b>Reason:</b> {reason}\n"
+                f"<b>Reason:</b> {escaped_reason}\n"
                 f"<b>Timestamp:</b> {datetime.now(UTC).strftime('%Y-%m-%d %H:%M:%S')}\n\n"
                 "All open orders cancelled. No new orders will be placed."
             )
@@ -492,9 +497,11 @@ f"<b>Quantity:</b> {trade.quantity}\n"
         try:
             self.kill_switch_active = False
             logger.info(f"Kill switch deactivated: {reason}")
+            # Escape user-supplied reason to prevent HTML injection
+            escaped_reason = html.escape(reason)
             message = (
                 f"<b>KILL SWITCH DEACTIVATED</b> ✅\n\n"
-                f"<b>Reason:</b> {reason}\n"
+                f"<b>Reason:</b> {escaped_reason}\n"
                 f"<b>Timestamp:</b> {datetime.now(UTC).strftime('%Y-%m-%d %H:%M:%S')}\n\n"
                 "Trading activities can now resume."
             )
@@ -677,14 +684,21 @@ f"<b>Quantity:</b> {trade.quantity}\n"
             message = "📋 <b>OPEN ORDERS</b>\n\n"
             for order in orders:
                 if order["status"] in ["OPEN", "PENDING"]:
+                    # Escape all external data to prevent HTML injection
+                    order_id = html.escape(str(order["order_id"]))
+                    symbol = html.escape(str(order["symbol"]))
+                    order_type = html.escape(str(order["order_type"]))
+                    transaction = html.escape(str(order["transaction_type"]))
+                    price = html.escape(str(order.get("price", "MARKET")))
+                    status = html.escape(str(order["status"]))
                     message += (
-                        f"<b>Order ID:</b> {order['order_id']}\n"
-                        f"<b>Symbol:</b> {order['symbol']}\n"
-                        f"<b>Type:</b> {order['order_type']}\n"
-                        f"<b>Transaction:</b> {order['transaction_type']}\n"
+                        f"<b>Order ID:</b> {order_id}\n"
+                        f"<b>Symbol:</b> {symbol}\n"
+                        f"<b>Type:</b> {order_type}\n"
+                        f"<b>Transaction:</b> {transaction}\n"
                         f"<b>Quantity:</b> {order['quantity']}\n"
-                        f"<b>Price:</b> {order.get('price', 'MARKET')}\n"
-                        f"<b>Status:</b> {order['status']}\n\n"
+                        f"<b>Price:</b> {price}\n"
+                        f"<b>Status:</b> {status}\n\n"
                     )
 
             if update.message:

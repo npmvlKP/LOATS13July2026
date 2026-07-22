@@ -901,3 +901,161 @@ class TestAlertSystem:
 
         await alert_system._handle_message(mock_update, mock_context)
         mock_update.message.reply_text.assert_called_once()
+
+    # ========================================================================
+    # HTML Injection Prevention Tests
+    # ========================================================================
+
+    @pytest.mark.asyncio
+    async def test_activate_kill_switch_html_injection_prevention(
+        self, alert_system, mock_bot
+    ):
+        """Test that HTML tags in kill switch reason are properly escaped."""
+        alert_system.bot = mock_bot
+        # Attempt HTML injection via reason parameter
+        malicious_reason = "<script>alert('XSS')</script>"
+        with (
+            patch("src.loats.alerts.settings") as mock_settings,
+            patch("src.loats.alerts.async_client") as mock_openalgo,
+        ):
+            mock_settings.telegram_chat_id = "test_chat_id"
+            mock_openalgo.get_all_orders = AsyncMock(return_value={"data": []})
+            mock_openalgo.cancel_order = AsyncMock(return_value={"success": True})
+
+            await alert_system.activate_kill_switch(malicious_reason)
+
+        # Verify the message was sent
+        mock_bot.send_message.assert_called_once()
+        call_args = mock_bot.send_message.call_args
+        sent_message = call_args.kwargs.get("text") or call_args[1].get("text")
+        # Verify HTML is escaped: the malicious input is converted to safe entities
+        assert "&lt;script&gt;" in sent_message  # Malicious script tag is escaped
+        assert "alert" in sent_message  # Non-HTML content preserved
+
+    @pytest.mark.asyncio
+    async def test_deactivate_kill_switch_html_injection_prevention(
+        self, alert_system, mock_bot
+    ):
+        """Test that HTML tags in deactivate reason are properly escaped."""
+        alert_system.kill_switch_active = True
+        alert_system.bot = mock_bot
+        # Attempt HTML injection via reason parameter
+        malicious_reason = "<b>bold attempt</b>"
+        with patch("src.loats.alerts.settings") as mock_settings:
+            mock_settings.telegram_chat_id = "test_chat_id"
+            await alert_system.deactivate_kill_switch(malicious_reason)
+
+        # Verify the message was sent
+        mock_bot.send_message.assert_called_once()
+        call_args = mock_bot.send_message.call_args
+        sent_message = call_args.kwargs.get("text") or call_args[1].get("text")
+        # Verify HTML is escaped: check that malicious bold tag appears as escaped entity
+        assert "&lt;b&gt;bold attempt&lt;/b&gt;" in sent_message
+
+    @pytest.mark.asyncio
+    async def test_send_position_alert_html_injection_prevention(
+        self, alert_system, mock_bot
+    ):
+        """Test that HTML in position data from API is properly escaped."""
+        alert_system.bot = mock_bot
+        with (
+            patch("src.loats.alerts.settings") as mock_settings,
+            patch("src.loats.alerts.async_client") as mock_openalgo,
+        ):
+            mock_settings.telegram_chat_id = "test_chat_id"
+            # Simulate malicious symbol name from external API
+            mock_openalgo.get_position_book = AsyncMock(
+                return_value={
+                    "data": [
+                        {
+                            "symbol": "<XSS>",
+                            "quantity": 50,
+                            "average_price": 18500.0,
+                            "last_price": 18550.0,
+                            "pnl": 2500.0,
+                            "product_type": "MIS",
+                        }
+                    ]
+                }
+            )
+
+            await alert_system.send_position_alert()
+
+        mock_bot.send_message.assert_called_once()
+        call_args = mock_bot.send_message.call_args
+        sent_message = call_args.kwargs.get("text") or call_args[1].get("text")
+        # Verify HTML is escaped: malicious symbol should appear as escaped entity
+        assert "&lt;XSS&gt;" in sent_message
+
+    @pytest.mark.asyncio
+    async def test_orders_command_html_injection_prevention(self, alert_system):
+        """Test that HTML in order data from API is properly escaped."""
+        mock_update = MagicMock(spec=Update)
+        mock_update.message = MagicMock()
+        mock_update.message.reply_text = AsyncMock()
+        mock_context = MagicMock()
+
+        with patch("src.loats.alerts.async_client") as mock_openalgo:
+            # Simulate malicious order data from external API
+            mock_openalgo.get_all_orders = AsyncMock(
+                return_value={
+                    "data": [
+                        {
+                            "order_id": "<b>order123</b>",
+                            "symbol": "<script>alert(1)</script>",
+                            "order_type": "<img onerror=alert(1)>",
+                            "transaction_type": "BUY",
+                            "quantity": 50,
+                            "price": 18500.0,
+                            "status": "OPEN",
+                        }
+                    ]
+                }
+            )
+            await alert_system._orders(mock_update, mock_context)
+
+        mock_update.message.reply_text.assert_called_once()
+        call_args = mock_update.message.reply_text.call_args
+        # Handle both positional and keyword argument access
+        if call_args[0]:
+            sent_message = call_args[0][0] if call_args[0] else ""
+        else:
+            sent_message = call_args[1].get("text", "")
+        # Verify HTML is escaped: malicious tags should appear as escaped entities
+        assert "&lt;b&gt;order123&lt;/b&gt;" in sent_message
+        assert "&lt;script&gt;alert(1)&lt;/script&gt;" in sent_message
+        assert "&lt;img onerror=alert(1)&gt;" in sent_message
+
+    @pytest.mark.asyncio
+    async def test_send_signal_alert_html_injection_prevention(
+        self, alert_system, mock_bot
+    ):
+        """Test that HTML in signal metadata is properly escaped."""
+        alert_system.bot = mock_bot
+        # Create signal with malicious metadata
+        signal = Signal(
+            signal_id="test_signal_xss",
+            symbol="NIFTY",
+            signal_type=SignalType.BUY,
+            strength=0.85,
+            confidence=0.92,
+            timestamp=datetime.now(UTC),
+            indicators={
+                "rsi": 65.4,
+                "<b>indicator</b>": 12.3,  # Malicious indicator name
+            },
+            metadata={
+                "strategy": "<script>alert('XSS')</script>",
+                "timeframe": "15m",
+            },
+        )
+        with patch("src.loats.alerts.settings") as mock_settings:
+            mock_settings.telegram_chat_id = "test_chat_id"
+            await alert_system.send_signal_alert(signal)
+
+        mock_bot.send_message.assert_called_once()
+        call_args = mock_bot.send_message.call_args
+        sent_message = call_args.kwargs.get("text") or call_args[1].get("text")
+        # Verify HTML is escaped: malicious tags should appear as escaped entities
+        assert "&lt;script&gt;" in sent_message
+        assert "&lt;b&gt;indicator&lt;/b&gt;" in sent_message
