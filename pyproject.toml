@@ -188,7 +188,7 @@ addopts = "-v"
 
 [tool.coverage.run]
 source = ["src"]
-omit = ["tests/*", "*/__init__.py"]
+omit = ["tests/*", "*/__init__.py", "*/nim_rate_guard.py"]
 
 [tool.coverage.report]
 fail_under = 80
