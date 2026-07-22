@@ -77,7 +77,7 @@ jobs:
 
       - name: Run pip-audit
         run: |
-          pip-audit --format=json --output-file pip-audit-report.json || true
+          pip-audit --format=json --output-file pip-audit-report.json
 
       - name: Upload security reports
         if: always()
@@ -200,7 +200,6 @@ jobs:
           output: 'trivy-report.json'
           exit-code: '1'
           severity: 'CRITICAL,HIGH'
-        continue-on-error: true
 
       - name: Upload Trivy report
         if: always()
