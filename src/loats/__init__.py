@@ -11,6 +11,7 @@ __all__ = [
     "get_logger",
     "get_settings",
     "initialize_system",
+    "settings",
 ]
 
 from .config._settings import get_settings
@@ -31,3 +32,8 @@ def __getattr__(name: str) -> object:
     if name == "settings":
         return get_settings()
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+def __dir__() -> list[str]:
+    """Expose ``settings`` to IDEs/introspection alongside ``__all__``."""
+    return sorted({*globals().keys(), *__all__})
