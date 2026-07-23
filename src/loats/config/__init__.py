@@ -2,9 +2,19 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, Any
+
 from ._settings import Settings, get_settings
 
 __all__ = ["Settings", "get_settings", "settings"]
+
+
+if TYPE_CHECKING:
+    # Static-typing only: declare ``settings`` as a module-level attribute
+    # typed as the *Settings instance type*. This lets mypy resolve
+    # ``settings.sqlite_db_path`` etc. to the concrete fields of Settings.
+    # At runtime, ``settings`` is provided lazily by PEP 562 ``__getattr__``.
+    settings: Settings
 
 
 # Lazy-loaded ``settings`` accessor for the ``loats.config`` package.
@@ -28,10 +38,13 @@ __all__ = ["Settings", "get_settings", "settings"]
 # available on the package — only the resolved instance is lazy. This mirrors
 # the lazy-accessor pattern already in use at the top-level ``loats``
 # package (``src/loats/__init__.py``).
-_LAZY_SENTINEL = object()
-
-
-def __getattr__(name: str) -> object:
+#
+# NOTE: ``__getattr__`` return type is intentionally ``Any`` (NOT ``object``).
+# A bare ``object`` would erase the Settings type and produce the
+# ``"object" has no attribute "X"`` mypy errors at every consumer
+# (e.g. ``settings.sqlite_db_path``). ``Any`` keeps the static type generic
+# and lets mypy re-resolve attribute access at the call site.
+def __getattr__(name: str) -> Any:
     """Resolve ``settings`` lazily on first access."""
     if name == "settings":
         # Delegate to ``get_settings`` so the ``lru_cache`` ensures a single,

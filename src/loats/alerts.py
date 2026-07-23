@@ -243,7 +243,10 @@ class AlertSystem:
                 emoji = "⚪"
 
             indicators = "\n".join(
-                [f"{html.escape(name)}: {value:.4f}" for name, value in signal.indicators.items()]
+                [
+                    f"{html.escape(name)}: {value:.4f}"
+                    for name, value in signal.indicators.items()
+                ]
             )
             metadata = "\n".join(
                 [
@@ -335,9 +338,9 @@ class AlertSystem:
                 f"{emoji} <b>TRADE {action.upper()}</b> {emoji}\n\n"
                 f"<b>Trade ID:</b> {trade.trade_id}\n"
                 f"<b>Symbol:</b> {trade.symbol}\n"
-f"<b>Strategy:</b> {trade.strategy}\n"
-f"<b>Type:</b> {trade.transaction_type.value if trade.transaction_type else 'N/A'}\n"
-f"<b>Quantity:</b> {trade.quantity}\n"
+                f"<b>Strategy:</b> {trade.strategy}\n"
+                f"<b>Type:</b> {trade.transaction_type.value if trade.transaction_type else 'N/A'}\n"
+                f"<b>Quantity:</b> {trade.quantity}\n"
                 f"<b>Entry Price:</b> {trade.entry_price:.2f}\n"
                 f"<b>Status:</b> {trade.status}\n"
                 f"<b>Entry Time:</b> {trade.entry_time.strftime('%Y-%m-%d %H:%M:%S')}"

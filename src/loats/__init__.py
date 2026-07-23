@@ -5,6 +5,8 @@ lightweight, production-grade trading system using OpenAlgo APIs.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, Any
+
 __version__ = "0.1.0"
 __all__ = [
     "configure_logging",
@@ -25,10 +27,25 @@ initialize_system()
 logger = get_logger("loats")
 
 
+if TYPE_CHECKING:
+    # Static-typing only: declare ``settings`` as a module-level attribute
+    # typed as the *Settings instance type*. This lets mypy resolve
+    # ``settings.sqlite_db_path`` etc. to the concrete fields of Settings.
+    # At runtime, ``settings`` is provided lazily by PEP 562 ``__getattr__``.
+    from .config._settings import Settings
+
+    settings: Settings
+
+
 # Lazy-loaded settings accessor for backward compatibility
 # Uses __getattr__ to defer Settings() instantiation until first access
 # This preserves lru_cache lazy-init purpose - validation runs on first use, not import
-def __getattr__(name: str) -> object:
+#
+# NOTE: signature return type must NOT be ``object`` (would erase the Settings
+# type and surface ``"object" has no attribute ...`` errors at every consumer).
+# ``Any`` keeps the static type generic, so mypy re-resolves attribute access
+# at the call site against the runtime proxy.
+def __getattr__(name: str) -> Any:
     if name == "settings":
         return get_settings()
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

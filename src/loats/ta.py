@@ -123,8 +123,12 @@ def calculate_supertrend(
     lower_band_arr = hl2_arr - (multiplier * atr_arr)
 
     # Pre-allocate NumPy arrays for output
-    supertrend_arr: np.ndarray[tuple[int], np.dtype[np.float64]] = np.full(n, np.nan, dtype=np.float64)
-    direction_arr: np.ndarray[tuple[int], np.dtype[np.float64]] = np.full(n, np.nan, dtype=np.float64)
+    supertrend_arr: np.ndarray[tuple[int], np.dtype[np.float64]] = np.full(
+        n, np.nan, dtype=np.float64
+    )
+    direction_arr: np.ndarray[tuple[int], np.dtype[np.float64]] = np.full(
+        n, np.nan, dtype=np.float64
+    )
 
     # Initialize direction as 1 (bullish) - standard Supertrend convention
     curr_dir = 1

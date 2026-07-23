@@ -34,9 +34,9 @@ def test_configure_logging_test_mode():
             if isinstance(handler, logging.FileHandler)
         ]
 
-        assert len(file_handlers) == 0, (
-            "No file handlers should be configured in test mode"
-        )
+        assert (
+            len(file_handlers) == 0
+        ), "No file handlers should be configured in test mode"
 
         # Check that console handler is configured
         console_handlers = [
@@ -81,12 +81,12 @@ def test_configure_logging_production_mode():
             if isinstance(handler, logging.StreamHandler)
         ]
 
-        assert len(file_handlers) > 0, (
-            "File handler should be configured in production mode"
-        )
-        assert len(console_handlers) > 0, (
-            "Console handler should be configured in production mode"
-        )
+        assert (
+            len(file_handlers) > 0
+        ), "File handler should be configured in production mode"
+        assert (
+            len(console_handlers) > 0
+        ), "Console handler should be configured in production mode"
 
 
 def test_logs_directory_not_created_in_test_mode():

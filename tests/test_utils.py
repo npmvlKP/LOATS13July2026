@@ -394,6 +394,7 @@ class TestRetrySync:
         call_count = 0
 
         config = RetryConfig(max_attempts=3)
+
         @retry_sync(config=config)
         def flaky_func() -> int:
             nonlocal call_count
@@ -411,6 +412,7 @@ class TestRetrySync:
         call_count = 0
 
         config = RetryConfig(max_attempts=2)
+
         @retry_sync(config=config)
         def always_fail() -> int:
             nonlocal call_count
@@ -426,6 +428,7 @@ class TestRetrySync:
         call_count = 0
 
         config = RetryConfig(retryable_exceptions=(ConnectionError,))
+
         @retry_sync(config=config)
         def non_retryable_fail() -> int:
             nonlocal call_count
@@ -441,6 +444,7 @@ class TestRetrySync:
         call_count = 0
 
         config = RetryConfig(excluded_exceptions=(ValueError,))
+
         @retry_sync(config=config)
         def excluded_fail() -> int:
             nonlocal call_count
@@ -495,6 +499,7 @@ class TestRetryAsync:
         call_count = 0
 
         config = RetryConfig(max_attempts=3)
+
         @retry_async(config=config)
         async def async_flaky() -> int:
             nonlocal call_count
@@ -513,6 +518,7 @@ class TestRetryAsync:
         call_count = 0
 
         config = RetryConfig(max_attempts=2)
+
         @retry_async(config=config)
         async def async_always_fail() -> int:
             nonlocal call_count
@@ -529,6 +535,7 @@ class TestRetryAsync:
         call_count = 0
 
         config = RetryConfig(excluded_exceptions=(ValueError,))
+
         @retry_async(config=config)
         async def async_excluded_fail() -> int:
             nonlocal call_count
