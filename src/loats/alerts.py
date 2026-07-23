@@ -17,7 +17,7 @@ from telegram.ext import (
 )
 
 from .config import settings
-from .database import db
+from .database import Database, db
 from .logging import get_logger
 from .models import Order, Signal, SignalType, Trade
 from .openalgo import async_client
@@ -32,16 +32,51 @@ logger = get_logger(__name__)
 
 
 class AlertSystem:
-    """Alert system using Telegram bot notifications and kill switch."""
+    """Alert system using Telegram bot notifications and kill switch.
 
-    def __init__(self) -> None:
-        """Initialize AlertSystem."""
+    The ``AlertSystem`` accepts an optional ``Database`` instance via its
+    constructor. When omitted, the shared module-level ``db`` singleton
+    is used (so the original ``AlertSystem()`` call-site continues to
+    work unchanged). The active database reference is exposed via the
+    :attr:`db` property and is **looked up dynamically** so test-time
+    patches of ``src.loats.alerts.db`` continue to be honored when an
+    explicit instance is not injected. This eliminates the per-command
+    ``Database()`` instantiation that previously caused connection /
+    file-handle churn on Windows (NEW-M5).
+    """
+
+    def __init__(self, database: Database | None = None) -> None:
+        """Initialize AlertSystem.
+
+        Args:
+            database: Optional ``Database`` instance. When ``None`` (the
+                default), the module-level ``db`` singleton is used at
+                attribute-access time so callers may also pass an explicit
+                fixture (preferred for proper dependency injection).
+        """
+        self._explicit_db: Database | None = database
         self.bot: Bot | None = None
         self.application: Application[Any, Any, Any, Any, Any, Any] | None = None  # type: ignore[type-arg]
         self.kill_switch_active: bool = False
         self.alert_cooldown: dict[str, datetime] = {}
         self.cooldown_period: int = 300  # 5 minutes
         self._running: bool = False
+
+    @property
+    def db(self) -> Database:
+        """Return the active :class:`Database` instance.
+
+        Order of resolution:
+
+        1. An explicitly injected ``Database`` passed to ``__init__``.
+        2. The module-level ``db`` singleton imported at the top of this
+           module, resolved **at access time** so patches like
+           ``patch("src.loats.alerts.db")`` remain effective.
+        """
+        if self._explicit_db is not None:
+            return self._explicit_db
+        # Late binding so unit-test patches of ``db`` keep working.
+        return db
 
     async def initialize(self) -> None:
         """Initialize Telegram bot."""
@@ -713,7 +748,8 @@ f"<b>Quantity:</b> {trade.quantity}\n"
     ) -> None:
         """Handle /signals command."""
         try:
-            signals = db.get_latest_signals(settings.default_symbol, limit=5)
+            # NEW-M5: use injected database to avoid per-command connection churn
+            signals = self.db.get_latest_signals(settings.default_symbol, limit=5)
             if not signals:
                 if update.message:
                     await update.message.reply_text("ℹ️ No recent signals found.")
