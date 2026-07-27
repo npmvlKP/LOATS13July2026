@@ -33,23 +33,30 @@ logger = get_logger(__name__)
 T = TypeVar("T", bound=BaseModel)
 
 # -------------------------------------------------------------------------
-# Module-level SQLite PRAGMA configuration
+# SQLite PRAGMA configuration (F-PERF-1 fix)
 # -------------------------------------------------------------------------
-# Module-level PRAGMA tuple - these are executed only once globally when the
-# first connection is created, avoiding redundant PRAGMA execution on each
-# new thread's first connection. This is a performance optimization (F-PERF-1)
-# that complements the thread-local connection reuse pattern.
+# FIX-F-PERF-1:
+#   PRAGMAs in SQLite are **per-connection** settings; opening a new
+#   connection resets them to defaults. The previous implementation used a
+#   **module-level** flag to skip PRAGMA execution on subsequent connections,
+#   which was both a correctness bug (multi-Database-instance scenarios
+#   would skip required PRAGMAs) and unsafe under threading (race-window
+#   where two threads both create connections before the flag is set).
+#
+#   Correct optimization:
+#   - Track, per Database instance, which connection objects have already
+#     had PRAGMAs applied (via id(conn), which is unique while the connection
+#     is alive).
+#   - First time a given connection is used, apply PRAGMAs once.
+#   - Thread-local reuse means a *thread* only pays the PRAGMA cost once.
+#   - A fine-grained lock (per-instance) guards the check-and-set to keep
+#     it race-free across worker threads.
 _PRAGMAS: tuple[str, ...] = (
     "PRAGMA journal_mode=WAL",
     "PRAGMA synchronous=NORMAL",
     "PRAGMA temp_store=MEMORY",
     "PRAGMA cache_size=-10000",  # 10MB cache
 )
-
-# Module-level flag to track if PRAGMAs have been applied to a connection
-# This is a process-level lock ensuring PRAGMAs run exactly once per connection
-_pragma_applied: bool = False
-_pragma_lock: threading.Lock = threading.Lock()
 
 
 class Database:
@@ -80,6 +87,13 @@ class Database:
         # must be closed to prevent file-handle leaks on Windows)
         self._thread_registry: dict[int, sqlite3.Connection] = {}
         self._registry_lock = threading.Lock()
+
+        # Per-instance PRAGMA tracking (F-PERF-1)
+        # Each distinct connection object is keyed by id(conn) so that PRAGMAs
+        # are applied exactly once per connection lifecycle, while still being
+        # correctly applied when new connections are opened.
+        self._pragmas_applied: set[int] = set()
+        self._pragmas_lock = threading.Lock()
 
         # Ensure directories exist
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
@@ -295,45 +309,57 @@ class Database:
         """
         Get database connection with thread-local caching.
 
-        Thread-local caching (via self._thread_local) ensures that each thread
-        reuses its connection, avoiding connection overhead.
+        Optimization strategy (F-PERF-1):
+            * Thread-local caching (``self._thread_local``) ensures each
+              thread reuses its connection, avoiding connection-open overhead.
+            * Per-instance PRAGMA tracking (``self._pragmas_applied`` keyed
+              by ``id(conn)``) ensures each *new* connection runs PRAGMAs
+              exactly once. Reusing a thread-local connection is a fast path
+              with zero PRAGMA cost.
 
-        Module-level PRAGMA caching ensures PRAGMAs are executed only once
-        globally (on the first connection), not on each new thread's first
-        connection. This is the F-PERF-1 optimization.
+        Why per-instance (not module-level) tracking:
+            SQLite PRAGMAs (e.g., ``journal_mode=WAL``, ``cache_size``) are
+            **per-connection** settings; opening a new connection object
+            resets them to defaults. A module-level flag would incorrectly
+            skip PRAGMAs on later connections in long-running processes and
+            was unsafe across Database instances.
 
-        The _pragma_applied flag and _pragma_lock work together to ensure:
-        1. Only the first connection ever executes PRAGMAs (process-wide)
-        2. The check-and-set is atomic (thread-safe)
-        3. Subsequent connections skip PRAGMA execution entirely
+        Thread safety:
+            ``self._pragmas_lock`` guards the check-and-set so concurrent
+            threads racing to create their first connection pay the PRAGMA
+            cost once per *new* connection object only.
 
-        FIX-WINDOWS-SHUTDOWN: Connections are registered in _thread_registry
-        so they can be properly closed during shutdown, preventing file-handle
-        leaks on Windows where worker threads may hold connections open.
+        FIX-WINDOWS-SHUTDOWN: Connections are also registered in
+        ``self._thread_registry`` so they can be properly closed during
+        shutdown, preventing file-handle leaks on Windows where worker
+        threads may hold connections open.
         """
-        if not hasattr(self._thread_local, "connection"):
-            conn = sqlite3.connect(self.db_path)
+        # Fast path: thread-local connection (most common case)
+        thread_local_conn: sqlite3.Connection | None = getattr(
+            self._thread_local, "connection", None
+        )
+        if thread_local_conn is not None:
+            return thread_local_conn
 
-            # F-PERF-1 optimization: Apply PRAGMAs only once globally
-            # Use double-checked locking pattern for thread safety
-            global _pragma_applied
-            if not _pragma_applied:
-                with _pragma_lock:
-                    # Re-check after acquiring lock (another thread may have set it)
-                    if not _pragma_applied:
-                        for pragma in _PRAGMAS:
-                            conn.execute(pragma)
-                        _pragma_applied = True
+        # Slow path: open a new connection for this thread
+        conn = sqlite3.connect(self.db_path)
 
-            # Register connection for proper cleanup on shutdown
-            # (FIX-WINDOWS-SHUTDOWN)
-            thread_id = threading.get_ident()
-            with self._registry_lock:
-                self._thread_registry[thread_id] = conn
+        # Apply PRAGMAs exactly once per connection object (F-PERF-1)
+        conn_id = id(conn)
+        with self._pragmas_lock:
+            if conn_id not in self._pragmas_applied:
+                for pragma in _PRAGMAS:
+                    conn.execute(pragma)
+                self._pragmas_applied.add(conn_id)
 
-            self._thread_local.connection = conn
-        conn_ref: sqlite3.Connection = self._thread_local.connection
-        return conn_ref
+        # Register connection for proper cleanup on shutdown
+        # (FIX-WINDOWS-SHUTDOWN)
+        thread_id = threading.get_ident()
+        with self._registry_lock:
+            self._thread_registry[thread_id] = conn
+
+        self._thread_local.connection = conn
+        return conn
 
     def _model_to_dict(self, model: BaseModel) -> dict[str, Any]:
         """Convert Pydantic model to dictionary."""
@@ -344,7 +370,7 @@ class Database:
 
     def _dict_to_model(self, data: dict[str, Any], model_class: type[T]) -> T:
         """Convert dictionary to Pydantic model."""
-        return model_class(**data)  # type: ignore[return-value, misc]
+        return model_class(**data)
 
     def _canonical_serialize(self, data: dict[str, Any]) -> str:
         """

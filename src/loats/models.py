@@ -51,7 +51,7 @@ class OrderStatus(StrEnum):
     PENDING = "PENDING"
 
 
-class QuoteData(BaseModel):  # type: ignore[misc, valid-type]
+class QuoteData(BaseModel):
     """Quote data model."""
 
     symbol: str
@@ -103,7 +103,7 @@ class QuoteData(BaseModel):  # type: ignore[misc, valid-type]
         return data
 
 
-class HistoricalData(BaseModel):  # type: ignore[misc, valid-type]
+class HistoricalData(BaseModel):
     """Historical data model."""
 
     symbol: str
@@ -123,7 +123,7 @@ class OptionType(StrEnum):
     PUT = "PE"
 
 
-class OptionContract(BaseModel):  # type: ignore[misc, valid-type]
+class OptionContract(BaseModel):
     """Option contract model."""
 
     symbol: str
@@ -155,7 +155,7 @@ class OptionContract(BaseModel):  # type: ignore[misc, valid-type]
             raise ValueError(f"Invalid price value: {v}") from e
 
 
-class OptionChain(BaseModel):  # type: ignore[misc, valid-type]
+class OptionChain(BaseModel):
     """Option chain model."""
 
     symbol: str
@@ -166,7 +166,7 @@ class OptionChain(BaseModel):  # type: ignore[misc, valid-type]
     puts: list[OptionContract]
 
 
-class Position(BaseModel):  # type: ignore[misc, valid-type]
+class Position(BaseModel):
     """Position model."""
 
     symbol: str
@@ -179,7 +179,7 @@ class Position(BaseModel):  # type: ignore[misc, valid-type]
     sell_quantity: int
 
 
-class FundsData(BaseModel):  # type: ignore[misc, valid-type]
+class FundsData(BaseModel):
     """Funds data model."""
 
     available_cash: float
@@ -189,7 +189,7 @@ class FundsData(BaseModel):  # type: ignore[misc, valid-type]
     timestamp: datetime
 
 
-class Order(BaseModel):  # type: ignore[misc, valid-type]
+class Order(BaseModel):
     """Order model."""
 
     order_id: str
@@ -210,7 +210,7 @@ class Order(BaseModel):  # type: ignore[misc, valid-type]
     trailing_stop_loss: float | None = Field(None, gt=0)
 
 
-class Trade(BaseModel):  # type: ignore[misc, valid-type]
+class Trade(BaseModel):
     """Trade model for database storage."""
 
     trade_id: str = Field(
@@ -267,7 +267,7 @@ class SignalType(StrEnum):
     NEUTRAL = "NEUTRAL"
 
 
-class Signal(BaseModel):  # type: ignore[misc, valid-type]
+class Signal(BaseModel):
     """Trading signal model."""
 
     signal_id: str = Field(
@@ -284,7 +284,7 @@ class Signal(BaseModel):  # type: ignore[misc, valid-type]
     confidence: float | None = Field(None, ge=0, le=1)
 
 
-class NewsItem(BaseModel):  # type: ignore[misc, valid-type]
+class NewsItem(BaseModel):
     """News item model."""
 
     title: str
@@ -296,7 +296,7 @@ class NewsItem(BaseModel):  # type: ignore[misc, valid-type]
     sentiment_label: str
 
 
-class AuditLogEntry(BaseModel):  # type: ignore[misc, valid-type]
+class AuditLogEntry(BaseModel):
     """Audit log entry model."""
 
     entry_id: str = Field(
@@ -315,7 +315,7 @@ class AuditLogEntry(BaseModel):  # type: ignore[misc, valid-type]
     sha256_hash: str | None = None
 
 
-class TAIndicator(BaseModel):  # type: ignore[misc, valid-type]
+class TAIndicator(BaseModel):
     """Technical analysis indicator model."""
 
     name: str
@@ -324,7 +324,7 @@ class TAIndicator(BaseModel):  # type: ignore[misc, valid-type]
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
-class Greeks(BaseModel):  # type: ignore[misc, valid-type]
+class Greeks(BaseModel):
     """Greeks model for options."""
 
     delta: float
@@ -335,7 +335,7 @@ class Greeks(BaseModel):  # type: ignore[misc, valid-type]
     implied_volatility: float
 
 
-class VaRResult(BaseModel):  # type: ignore[misc, valid-type]
+class VaRResult(BaseModel):
     """Value at Risk result model."""
 
     confidence_level: float
@@ -347,7 +347,7 @@ class VaRResult(BaseModel):  # type: ignore[misc, valid-type]
     timestamp: datetime
 
 
-class SentimentAnalysisResult(BaseModel):  # type: ignore[misc, valid-type]
+class SentimentAnalysisResult(BaseModel):
     """Sentiment analysis result model."""
 
     symbol: str
