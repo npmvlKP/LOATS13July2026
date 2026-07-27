@@ -16,7 +16,9 @@ from .config import settings
 from .database import db
 from .logging import get_logger
 from .models import FundsData, HistoricalData, Position, QuoteData, Signal, SignalType
+from .alerts import alerts
 from .openalgo import async_client as openalgo_client
+from .openalgo import KillSwitchError
 from .sentiment import sentiment
 from .ta import technical_analysis
 from .utils.circuit_breaker import OPENALGO_CIRCUIT_BREAKER, CircuitBreakerOpenError
@@ -208,6 +210,8 @@ class TradingScheduler:
         start_time = datetime.datetime.now(datetime.UTC)
         logger.info("Starting technical analysis scan")
         try:
+            # Check kill switch before executing trading operations
+            self._check_kill_switch()
             symbol = settings.default_symbol
             timeframe = settings.default_timeframe
 
@@ -292,6 +296,9 @@ class TradingScheduler:
                     )
                     await db.async_store_quote(quote)
 
+        except KillSwitchError:
+            # Re-raise KillSwitchError to ensure kill switch enforcement
+            raise
         except Exception:
             logger.exception("Technical analysis scan failed")
         finally:
@@ -319,6 +326,8 @@ class TradingScheduler:
         start_time = datetime.datetime.now(datetime.UTC)
         logger.info("Starting sentiment analysis scan")
         try:
+            # Check kill switch before executing trading operations
+            self._check_kill_switch()
             symbol = settings.default_symbol
 
             # Example RSS feeds
@@ -370,6 +379,9 @@ class TradingScheduler:
                 result.sentiment_score,
             )
 
+        except KillSwitchError:
+            # Re-raise KillSwitchError to ensure kill switch enforcement
+            raise
         except Exception:
             logger.exception("Sentiment analysis scan failed")
         finally:
@@ -425,6 +437,8 @@ class TradingScheduler:
         start_time = datetime.datetime.now(datetime.UTC)
         logger.info("Starting signal generation scan")
         try:
+            # Check kill switch before executing trading operations
+            self._check_kill_switch()
             symbol = settings.default_symbol
 
             # Get latest technical and sentiment signals
@@ -550,6 +564,9 @@ class TradingScheduler:
                 )
                 await db.async_store_quote(quote)
 
+        except KillSwitchError:
+            # Re-raise KillSwitchError to ensure kill switch enforcement
+            raise
         except Exception:
             logger.exception("Signal generation scan failed")
         finally:
@@ -702,6 +719,16 @@ class TradingScheduler:
             Dictionary with circuit breaker status
         """
         return OPENALGO_CIRCUIT_BREAKER.get_status()
+
+    def _check_kill_switch(self) -> None:
+        """Check if kill switch is active and raise KillSwitchError if so.
+
+        Raises:
+            KillSwitchError: If kill switch is active.
+        """
+        if alerts.is_kill_switch_active():
+            logger.error("Kill switch active - trading operations blocked")
+            raise KillSwitchError()
 
     def is_running(self) -> bool:
         """Check if scheduler is running.
