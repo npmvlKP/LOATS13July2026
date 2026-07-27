@@ -4,6 +4,7 @@ Implements RSS news sentiment analysis using Vader Sentiment.
 """
 
 import asyncio
+import json
 from datetime import UTC, datetime
 from typing import cast
 from urllib.parse import urlparse
@@ -15,6 +16,7 @@ from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 from .config import settings
 from .logging import get_logger
 from .models import NewsItem, SentimentAnalysisResult
+from .utils.cache import cache_manager
 
 logger = get_logger(__name__)
 
@@ -99,6 +101,19 @@ class SentimentAnalyzer:
         max_items: int = 20,
     ) -> SentimentAnalysisResult:
         """Analyze sentiment specific symbol across multiple RSS feeds asynchronously."""
+        # Create cache key based on symbol and RSS URLs
+        cache_key = f"sentiment:{symbol}:{hash(frozenset(rss_urls))}:{max_items}"
+
+        # Try to get cached result first
+        cached_result = await cache_manager.get(cache_key)
+        if cached_result:
+            try:
+                logger.debug(f"Sentiment cache hit for {symbol}")
+                return SentimentAnalysisResult(**json.loads(cached_result))
+            except Exception as e:
+                logger.warning(f"Failed to parse cached sentiment result: {e}")
+
+        # Cache miss - perform full analysis
         all_news: list[NewsItem] = []
         positive_count = 0
         negative_count = 0
@@ -136,7 +151,7 @@ class SentimentAnalyzer:
         sorted_news = sorted(
             all_news, key=lambda x: abs(x.sentiment_score), reverse=True
         )
-        return SentimentAnalysisResult(
+        sentiment_result = SentimentAnalysisResult(
             symbol=symbol,
             timestamp=datetime.now(UTC),
             sentiment_score=avg_score,
@@ -147,6 +162,17 @@ class SentimentAnalyzer:
             neutral_count=neutral_count,
             top_news=sorted_news[:5],
         )
+
+        # Cache the result for 5 minutes (300 seconds)
+        try:
+            await cache_manager.set(
+                cache_key, sentiment_result.model_dump_json(), ttl=300
+            )
+            logger.debug(f"Cached sentiment result for {symbol}")
+        except Exception as e:
+            logger.warning(f"Failed to cache sentiment result: {e}")
+
+        return sentiment_result
 
     def filter_significant_news(self, news_items: list[NewsItem]) -> list[NewsItem]:
         """Filter news items significant sentiment."""

@@ -12,13 +12,13 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
+from .alerts import alerts
 from .config import settings
 from .database import db
 from .logging import get_logger
 from .models import FundsData, HistoricalData, Position, QuoteData, Signal, SignalType
-from .alerts import alerts
-from .openalgo import async_client as openalgo_client
 from .openalgo import KillSwitchError
+from .openalgo import async_client as openalgo_client
 from .sentiment import sentiment
 from .ta import technical_analysis
 from .utils.circuit_breaker import OPENALGO_CIRCUIT_BREAKER, CircuitBreakerOpenError

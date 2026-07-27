@@ -4,6 +4,7 @@ OpenAlgo client implementation for LOATS13July2026.
 
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
@@ -22,6 +23,7 @@ from .models import (
     QuoteData,
     TransactionType,
 )
+from .utils.cache import cache_manager
 
 if TYPE_CHECKING:
     from .alerts import AlertSystem
@@ -697,8 +699,31 @@ class AsyncOpenAlgoClient:
 
     async def get_quotes(self, symbols: list[str]) -> dict[str, Any]:
         """Get quotes for multiple symbols."""
+        # Create cache key based on symbols
+        symbols_sorted = sorted(symbols)
+        cache_key = f"quotes:{hash(frozenset(symbols_sorted))}"
+
+        # Try to get cached result first (60 seconds TTL)
+        cached_result = await cache_manager.get(cache_key)
+        if cached_result:
+            try:
+                logger.debug(f"Quotes cache hit for {symbols}")
+                return json.loads(cached_result)  # type: ignore[no-any-return]
+            except Exception as e:
+                logger.warning(f"Failed to parse cached quotes: {e}")
+
+        # Cache miss - make API request
         payload = {"symbols": symbols}
-        return await self._request("POST", "quotes", json=payload)
+        result = await self._request("POST", "quotes", json=payload)
+
+        # Cache the result for 60 seconds
+        try:
+            await cache_manager.set(cache_key, json.dumps(result), ttl=60)
+            logger.debug(f"Cached quotes for {symbols}")
+        except Exception as e:
+            logger.warning(f"Failed to cache quotes: {e}")
+
+        return result
 
     async def get_history(
         self,

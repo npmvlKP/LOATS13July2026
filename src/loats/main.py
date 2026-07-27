@@ -10,6 +10,7 @@ from .config import settings
 from .database import db
 from .logging import logger
 from .scheduler import scheduler
+from .utils.cache import close_cache, initialize_cache
 
 
 class TradingSystem:
@@ -27,6 +28,9 @@ class TradingSystem:
 
             # Initialize settings
             settings.initialize()
+
+            # Initialize cache system
+            await initialize_cache()
 
             # Initialize database (using public alias)
             db.initialize()
@@ -120,6 +124,9 @@ class TradingSystem:
 
             # Shutdown alert system
             await alerts.shutdown()
+
+            # Close cache system
+            await close_cache()
 
             # Close all database connections (cross-thread)
             await db.async_close_all()
