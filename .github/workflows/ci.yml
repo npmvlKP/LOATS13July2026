@@ -23,13 +23,13 @@ jobs:
   # ============================================================
   # Quality Gates - Linting & Type Checking
   # ============================================================
-  quality-gates:
-    name: Quality Gates (${{ matrix.python-version }})
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ['3.12']
+   quality-gates:
+     name: Quality Gates (${{ matrix.python-version }})
+     runs-on: ubuntu-latest
+     strategy:
+       fail-fast: true
+       matrix:
+         python-version: ['3.12']
 
     steps:
       - name: Checkout repository
@@ -92,13 +92,13 @@ jobs:
   # ============================================================
   # Tests - Unit & Integration
   # ============================================================
-  tests:
-    name: Tests (${{ matrix.python-version }})
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ['3.12']
+   tests:
+     name: Tests (${{ matrix.python-version }})
+     runs-on: ubuntu-latest
+     strategy:
+       fail-fast: true
+       matrix:
+         python-version: ['3.12']
         # Optionally test on Windows for cross-platform compatibility
         include:
           - os: windows-latest
