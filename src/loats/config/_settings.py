@@ -89,16 +89,6 @@ class Settings(BaseSettings):
         Decimal("1000000.00"), description="Maximum total exposure"
     )
 
-    # NVIDIA NIM Rate Limiting
-    nim_max_requests_per_minute: int = Field(
-        20, description="Maximum NVIDIA NIM requests per minute"
-    )
-    nim_min_gap_seconds: Decimal = Field(
-        Decimal("3.0"), description="Minimum gap between NVIDIA NIM requests (seconds)"
-    )
-    nim_max_context_tokens: int = Field(
-        4096, description="Maximum context tokens for NVIDIA NIM prompts"
-    )
 
     # Timezone Configuration
     timezone: str = Field(
@@ -110,12 +100,6 @@ class Settings(BaseSettings):
     def validate_decimals(cls, v: Decimal) -> Decimal:
         """Ensure decimal values have proper precision for financial calculations."""
         return v.quantize(Decimal("0.01"))
-
-    @field_validator("nim_min_gap_seconds")
-    @classmethod
-    def validate_nim_gap(cls, v: Decimal) -> Decimal:
-        """Ensure NIM gap has proper precision."""
-        return v.quantize(Decimal("0.1"))
 
     @field_validator("environment")
     @classmethod
