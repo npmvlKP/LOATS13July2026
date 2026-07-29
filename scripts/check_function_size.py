@@ -1,39 +1,64 @@
 #!/usr/bin/env python3
-"""Check function size Python files ensure function exceeds 100 lines."""
+"""Check function size across Python files ensure functions not exceed maximum line count."""
 
 import ast
 import sys
 from pathlib import Path
 
 
-def check_function_size() -> int:
-    """Check function size all Python files src/ directory.
-    Phase-00: max_lines set 200 (temporary).
-    4.1 target ≤100 LOC; large functions (_initialize_database,
-    calculate_indicators) refactored Phase 01-02.
+def check_file_function_size(file_path: Path, max_lines: int) -> list[str]:
+    """Check all function sizes in a single file.
+
+    Args:
+        file_path: Path to the Python file to check
+        max_lines: Maximum allowed function size in lines
+
+    Returns:
+        List of violation messages for functions exceeding max_lines
     """
-    max_lines = 200
-    exit_code = 0
-    src = Path(__file__).parent.parent / "src"
-    path = src.rglob("*.py")
+    violations: list[str] = []
     try:
-        for file in path:
-            content = file.read_text(encoding="utf-8")
-            tree = ast.parse(content)
-            for node in ast.walk(tree):
-                if isinstance(node, ast.FunctionDef):
-                    start = node.lineno
-                    end = node.end_lineno
-                    if end - start > max_lines:
-                        print(
-                            f"{file}:{start} Function {node.name} large ({end - start} lines)"
-                        )
-                        exit_code = 1
+        content = file_path.read_text(encoding="utf-8")
+        tree = ast.parse(content)
+        for node in ast.walk(tree):
+            if isinstance(node, ast.FunctionDef):
+                start = node.lineno
+                end = getattr(node, "end_lineno", None)
+                if start is None or end is None:
+                    continue
+                func_size = end - start + 1
+                if func_size > max_lines:
+                    violations.append(
+                        f"{file_path}:{start} Function {node.name} too large ({func_size} lines)"
+                    )
     except Exception as e:
-        print(f"Error processing {file}: {e}")
-        exit_code = 1
+        print(f"Error processing {file_path}: {e}")
+    return violations
+
+
+def check_function_size(max_lines: int = 200) -> int:
+    """Check function sizes across all Python files in the project.
+
+    Phase-00: max_lines set to 200 (temporary).
+    Target ≤100 LOC after Phase 01-02 refactoring.
+
+    Returns:
+        Exit code (0 for pass, 1 for fail)
+    """
+    exit_code = 0
+    src_path = Path(__file__).parent.parent / "src"
+    for file_path in src_path.rglob("*.py"):
+        violations = check_file_function_size(file_path, max_lines)
+        for violation in violations:
+            print(violation)
+            exit_code = 1
     return exit_code
 
 
-if __name__ == "__main__":
+def main() -> None:
+    """CLI entry point."""
     sys.exit(check_function_size())
+
+
+if __name__ == "__main__":
+    main()
