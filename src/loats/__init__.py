@@ -18,7 +18,7 @@ __all__ = [
 
 from .config._settings import get_settings
 from .initialization import initialize_system
-from .logging import configure_logging, get_logger
+from .loats_logging import configure_logging, get_logger
 
 # Initialize system when package is imported
 initialize_system()

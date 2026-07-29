@@ -12,7 +12,7 @@ from vollib.black_scholes import black_scholes
 from vollib.black_scholes.greeks.analytical import delta, gamma, rho, theta, vega
 from vollib.ref_python.black_scholes.implied_volatility import implied_volatility
 
-from .logging import get_logger
+from .loats_logging import get_logger
 from .models import Greeks, OptionContract, OptionType
 
 logger = get_logger(__name__)

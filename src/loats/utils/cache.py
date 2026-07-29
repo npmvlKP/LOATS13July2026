@@ -10,7 +10,7 @@ from typing import Any, TypeVar
 import redis.asyncio as redis
 from pydantic import BaseModel
 
-from ..logging import get_logger
+from ..loats_logging import get_logger
 
 logger = get_logger(__name__)
 

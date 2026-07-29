@@ -4,7 +4,7 @@ System initialization for LOATS13July2026.
 
 import os
 
-from .logging import configure_logging
+from .loats_logging import configure_logging
 
 
 def initialize_system() -> None:

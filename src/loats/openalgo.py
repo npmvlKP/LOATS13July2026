@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any
 import httpx
 
 from .config import settings
-from .logging import get_logger
+from .loats_logging import get_logger
 from .models import (
     HistoricalData,
     Order,

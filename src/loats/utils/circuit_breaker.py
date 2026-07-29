@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, TypeVar
 
-from ..logging import get_logger
+from ..loats_logging import get_logger
 
 logger = get_logger(__name__)
 

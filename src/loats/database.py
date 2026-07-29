@@ -16,7 +16,7 @@ from typing import Any, TypeVar
 from pydantic import BaseModel
 
 from .config import settings
-from .logging import get_logger
+from .loats_logging import get_logger
 from .models import (
     AuditLogEntry,
     FundsData,

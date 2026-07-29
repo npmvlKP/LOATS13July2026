@@ -7,7 +7,7 @@ Provides standalone indicator calculation functions.
 import numpy as np
 import pandas as pd
 
-from .logging import get_logger
+from .loats_logging import get_logger
 from .models import HistoricalData, TAIndicator
 
 logger = get_logger(__name__)

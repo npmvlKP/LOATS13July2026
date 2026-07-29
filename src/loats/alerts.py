@@ -18,7 +18,7 @@ from telegram.ext import (
 
 from .config import settings
 from .database import Database, db
-from .logging import get_logger
+from .loats_logging import get_logger
 from .models import Order, Signal, SignalType, Trade
 from .openalgo import async_client
 from .utils.circuit_breaker import (
