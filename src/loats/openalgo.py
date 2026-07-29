@@ -166,12 +166,15 @@ class OpenAlgoClient:
                 response = client.request(method, url, **kwargs)
 
             # Check for HTTP error status codes
-            if hasattr(response, "status_code") and response.status_code >= 400:
+            try:
+                response.raise_for_status()
+            except httpx.HTTPStatusError as e:
+                logger.error(f"API HTTP error {e.response.status_code}: {e.response.text}")
                 raise OpenAlgoAPIError(
-                    status_code=response.status_code,
-                    message=f"HTTP error: {response.status_code}",
-                    details={"response": response.text},
-                )
+                    status_code=e.response.status_code,
+                    message=f"HTTP error: {e.response.status_code}",
+                    details={"response": e.response.text},
+                ) from e
 
             try:
                 data = response.json()
