@@ -1595,6 +1595,11 @@ class Database:
 
         logger.info(f"Closed {closed_count} database connections")
 
+        # Additional cleanup: ensure thread-local storage is reset
+        # This prevents potential issues with thread reuse
+        if hasattr(self._thread_local, "__dict__"):
+            self._thread_local.__dict__.clear()
+
     async def async_close_all(self) -> None:
         """
         Async wrapper for close_all() to avoid blocking event loop.
