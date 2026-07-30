@@ -2,19 +2,19 @@
 
 import asyncio
 import datetime
-from typing import Any
+from typing import Any, cast
 from zoneinfo import ZoneInfo
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
-from loats.alerts import alerts
-from loats.config import settings
-from loats.database import Database
-from loats.loats_logging import get_logger
-from loats.metrics import record_signal, track_job
-from loats.models import (
+from .alerts import alerts
+from .config import settings
+from .database import Database
+from .loats_logging import get_logger
+from .metrics import record_signal, track_job
+from .models import (
     FundsData,
     HistoricalData,
     Position,
@@ -22,14 +22,14 @@ from loats.models import (
     Signal,
     SignalType,
 )
-from loats.openalgo import KillSwitchError, async_client
-from loats.sentiment import sentiment
-from loats.ta import technical_analysis
-from loats.utils.circuit_breaker import (
+from .openalgo import KillSwitchError, async_client
+from .sentiment import sentiment
+from .ta import technical_analysis
+from .utils.circuit_breaker import (
     OPENALGO_CIRCUIT_BREAKER,
     CircuitBreakerOpenError,
 )
-from loats.utils.retry import OPENALGO_RETRY_CONFIG, retry_async
+from .utils.retry import OPENALGO_RETRY_CONFIG, retry_async
 
 logger = get_logger(__name__)
 
@@ -56,6 +56,7 @@ class TradingScheduler:
         self.scheduler = AsyncIOScheduler()
         self.running = False
         self.scan_tasks: dict[str, asyncio.Task[Any]] = {}
+        self.db = Database()
 
     async def initialize(self) -> None:
         """Initialize scheduler set jobs."""
@@ -171,13 +172,14 @@ class TradingScheduler:
     ) -> dict[str, Any] | None:
         """Get history retry circuit breaker protection."""
         try:
-            return await OPENALGO_CIRCUIT_BREAKER.call_async(
+            result = await OPENALGO_CIRCUIT_BREAKER.call_async(
                 retry_async(OPENALGO_RETRY_CONFIG)(
                     lambda: async_client.get_history(
                         symbol=symbol, interval=interval, from_date=None, to_date=None
                     )
                 )
             )
+            return cast("dict[str, Any] | None", result)
         except CircuitBreakerOpenError:
             logger.warning("OpenAlgo circuit breaker open get_history")
             return None
@@ -188,11 +190,12 @@ class TradingScheduler:
     async def _safe_get_quotes(self, symbols: list[str]) -> dict[str, Any] | None:
         """Get quotes retry circuit breaker protection."""
         try:
-            return await OPENALGO_CIRCUIT_BREAKER.call_async(
+            result = await OPENALGO_CIRCUIT_BREAKER.call_async(
                 retry_async(OPENALGO_RETRY_CONFIG)(
                     lambda: async_client.get_quotes(symbols)
                 )
             )
+            return cast("dict[str, Any] | None", result)
         except CircuitBreakerOpenError:
             logger.warning("OpenAlgo circuit breaker open get_quotes")
             return None
@@ -229,7 +232,7 @@ class TradingScheduler:
                     )
                 )
 
-            await Database.async_store_historical_data(historical_data_objs)
+            await self.db.async_store_historical_data(historical_data_objs)
             indicators = technical_analysis.calculate_indicators(historical_data_objs)
             quotes = await self._safe_get_quotes([symbol])
             if quotes is None:
@@ -258,7 +261,7 @@ class TradingScheduler:
                         "indicators_count": len(indicators),
                     },
                 )
-                await Database.async_create_signal(signal)
+                await self.db.async_create_signal(signal)
                 logger.info(
                     "TA signal generated: %s, strength %.2f", signal_type, strength
                 )
@@ -275,7 +278,7 @@ class TradingScheduler:
                 change=quote_data.get("change", 0),
                 change_percent=quote_data.get("change_percent", 0),
             )
-            await Database.async_store_quote(quote)
+            await self.db.async_store_quote(quote)
         except KillSwitchError:
             raise
         except Exception:
@@ -342,7 +345,7 @@ class TradingScheduler:
                 confidence=abs(result.sentiment_score),
                 metadata=metadata,
             )
-            await Database.async_create_signal(signal)
+            await self.db.async_create_signal(signal)
             logger.info(
                 "Sentiment signal generated: %s, score %.2f",
                 signal_type,
@@ -375,11 +378,12 @@ class TradingScheduler:
     async def _safe_get_position_book(self) -> dict[str, Any] | None:
         """Get position book retry circuit breaker protection."""
         try:
-            return await OPENALGO_CIRCUIT_BREAKER.call_async(
+            result = await OPENALGO_CIRCUIT_BREAKER.call_async(
                 retry_async(OPENALGO_RETRY_CONFIG)(
                     lambda: async_client.get_position_book()
                 )
             )
+            return cast("dict[str, Any] | None", result)
         except CircuitBreakerOpenError:
             logger.warning("OpenAlgo circuit breaker open get_position_book")
             return None
@@ -390,9 +394,10 @@ class TradingScheduler:
     async def _safe_get_funds(self) -> dict[str, Any] | None:
         """Get funds retry circuit breaker protection."""
         try:
-            return await OPENALGO_CIRCUIT_BREAKER.call_async(
+            result = await OPENALGO_CIRCUIT_BREAKER.call_async(
                 retry_async(OPENALGO_RETRY_CONFIG)(lambda: async_client.get_funds())
             )
+            return cast("dict[str, Any] | None", result)
         except CircuitBreakerOpenError:
             logger.warning("OpenAlgo circuit breaker open get_funds")
             return None
@@ -408,8 +413,8 @@ class TradingScheduler:
         try:
             self._check_kill_switch()
             symbol = settings.default_symbol
-            ta_signals = await Database.async_get_latest_signals(symbol, limit=1)
-            sentiment_signals = await Database.async_get_latest_signals(symbol, limit=1)
+            ta_signals = await self.db.async_get_latest_signals(symbol, limit=1)
+            sentiment_signals = await self.db.async_get_latest_signals(symbol, limit=1)
 
             quotes = await self._safe_get_quotes([symbol])
             if quotes is None:
@@ -434,7 +439,7 @@ class TradingScheduler:
                         buy_quantity=pos["buy_quantity"],
                         sell_quantity=pos["sell_quantity"],
                     )
-                    await Database.async_store_position(pos_model)
+                    await self.db.async_store_position(pos_model)
 
             if funds_data and funds_data.get("data"):
                 funds = funds_data["data"]
@@ -445,7 +450,7 @@ class TradingScheduler:
                     total_equity=funds["total_equity"],
                     timestamp=datetime.datetime.now(datetime.UTC),
                 )
-                await Database.async_store_funds(funds_model)
+                await self.db.async_store_funds(funds_model)
 
             ta_strength = ta_signals[0].strength if ta_signals else 0
             sentiment_strength = (
@@ -461,14 +466,14 @@ class TradingScheduler:
             else:
                 signal_type = SignalType.NEUTRAL
 
-            indicators = {}
+            indicators: dict[str, float] = {}
             if ta_signals:
                 indicators.update(ta_signals[0].indicators)
             if sentiment_signals:
                 indicators.update(
                     {
                         "sentiment_score": sentiment_signals[0].indicators.get(
-                            "sentiment_score", 0
+                            "sentiment_score", 0.0
                         )
                     }
                 )
@@ -499,7 +504,7 @@ class TradingScheduler:
                 confidence=combined_strength,
                 metadata=metadata,
             )
-            await Database.async_create_signal(signal)
+            await self.db.async_create_signal(signal)
             logger.info(
                 "Combined signal generated: %s, strength %.2f",
                 signal_type,
@@ -518,7 +523,7 @@ class TradingScheduler:
                 change=quote_data.get("change", 0),
                 change_percent=quote_data.get("change_percent", 0),
             )
-            await Database.async_store_quote(quote)
+            await self.db.async_store_quote(quote)
         except KillSwitchError:
             raise
         except Exception:
@@ -603,10 +608,10 @@ class TradingScheduler:
         start_time = datetime.datetime.now(datetime.UTC)
         logger.info("Starting data cleanup")
         try:
-            await Database.async_cleanup()
-            await Database.async_verify_audit_log_integrity()
+            await self.db.async_cleanup()
+            await self.db.async_verify_audit_log_integrity()
             logger.info("Audit log integrity verified")
-            await Database.async_vacuum()
+            await self.db.async_vacuum()
         except Exception:
             logger.exception("Data cleanup failed")
         finally:

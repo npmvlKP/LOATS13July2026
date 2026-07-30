@@ -5,13 +5,13 @@ import signal
 import sys
 from typing import Any
 
-from loats.alerts import alerts
-from loats.config import settings
-from loats.database import db
-from loats.loats_logging import logger
-from loats.metrics import start_metrics_server
-from loats.scheduler import scheduler
-from loats.utils.cache import close_cache, initialize_cache
+from .alerts import alerts
+from .config import settings
+from .database import db
+from .loats_logging import logger
+from .metrics import start_metrics_server
+from .scheduler import scheduler
+from .utils.cache import close_cache, initialize_cache
 
 
 class TradingSystem:
