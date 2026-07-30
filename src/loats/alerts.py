@@ -3,6 +3,7 @@ Alerts module LOATS13July2026.
 Implements Telegram alerts kill switch functionality with circuit breaker protection.
 """
 
+import asyncio
 import html
 from datetime import UTC, datetime
 from typing import Any
@@ -118,6 +119,9 @@ class AlertSystem:
         Uses the v20+ lifecycle: initialize() → start() → updater.start_polling().
         This starts polling in the background, allowing other async tasks
         (like scheduler) to run concurrently.
+
+        FIX-F-CONC-2: The original implementation used start_polling() which is blocking.
+        We now use start_polling() in a separate task to avoid blocking the event loop.
         """
         if not self.application:
             return
@@ -129,9 +133,12 @@ class AlertSystem:
             await self.application.initialize()
             # Start the application - this starts the async processing
             await self.application.start()
-            # Start polling via updater (v20+ lifecycle)
+            # Start polling via updater (v20+ lifecycle) in a separate task
             if self.application.updater is not None:
-                await self.application.updater.start_polling()
+                # Run polling in background task to avoid blocking event loop
+                polling_task = asyncio.create_task(self.application.updater.start_polling())
+                # Store reference to task for cleanup
+                self._polling_task = polling_task
             else:
                 logger.warning("Telegram updater not available - bot commands disabled")
             self._running = True
@@ -139,11 +146,12 @@ class AlertSystem:
         except Exception as e:
             logger.error(f"Failed to start Telegram bot: {e}")
             raise
-
     async def shutdown(self) -> None:
         """Shutdown Telegram bot gracefully.
 
         Uses the v20+ shutdown lifecycle: updater.stop() → application.stop().
+
+        FIX-F-CONC-2: Properly cancel the polling task to avoid resource leaks.
         """
         if not self.application:
             return
@@ -155,6 +163,13 @@ class AlertSystem:
                 await self.application.updater.stop()
             # Stop the application gracefully
             await self.application.stop()
+            # Cancel polling task if it exists
+            if hasattr(self, '_polling_task') and self._polling_task:
+                self._polling_task.cancel()
+                try:
+                    await self._polling_task
+                except asyncio.CancelledError:
+                    pass
             self._running = False
             logger.info("Telegram bot shutdown complete")
         except Exception as e:
