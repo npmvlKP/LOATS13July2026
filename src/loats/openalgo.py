@@ -169,7 +169,9 @@ class OpenAlgoClient:
             try:
                 response.raise_for_status()
             except httpx.HTTPStatusError as e:
-                logger.error(f"API HTTP error {e.response.status_code}: {e.response.text}")
+                logger.error(
+                    f"API HTTP error {e.response.status_code}: {e.response.text}"
+                )
                 raise OpenAlgoAPIError(
                     status_code=e.response.status_code,
                     message=f"HTTP error: {e.response.status_code}",

@@ -1,5 +1,5 @@
-"""Scheduler module LOATS13July2026. Implements APScheduler scan scheduling retry circuit breaker patterns.
-"""
+"""Scheduler module LOATS13July2026. Implements APScheduler scan scheduling retry circuit breaker patterns."""
+
 import asyncio
 import datetime
 from typing import Any
@@ -33,6 +33,7 @@ from loats.utils.retry import OPENALGO_RETRY_CONFIG, retry_async
 
 logger = get_logger(__name__)
 
+
 class TradingScheduler:
     """Scheduler trading scans operations."""
 
@@ -59,11 +60,13 @@ class TradingScheduler:
     async def initialize(self) -> None:
         """Initialize scheduler set jobs."""
         try:
-            self.scheduler.configure(job_defaults={
-                "coalesce": True,
-                "max_instances": 1,
-                "misfire_grace_time": 30,
-            })
+            self.scheduler.configure(
+                job_defaults={
+                    "coalesce": True,
+                    "max_instances": 1,
+                    "misfire_grace_time": 30,
+                }
+            )
             await self._add_jobs()
             logger.info("Trading scheduler initialized")
         except Exception:
@@ -73,15 +76,45 @@ class TradingScheduler:
     async def _add_jobs(self) -> None:
         """Add scheduled jobs scheduler."""
         # Technical Analysis scan (every 1 minute)
-        self.scheduler.add_job(self.run_ta_scan, IntervalTrigger(seconds=settings.ta_scan_interval), id="ta_scan", name="Technical Analysis Scan", replace_existing=True)
+        self.scheduler.add_job(
+            self.run_ta_scan,
+            IntervalTrigger(seconds=settings.ta_scan_interval),
+            id="ta_scan",
+            name="Technical Analysis Scan",
+            replace_existing=True,
+        )
         # Sentiment scan (every 5 minutes)
-        self.scheduler.add_job(self.run_sentiment_scan, IntervalTrigger(seconds=settings.sentiment_scan_interval), id="sentiment_scan", name="Sentiment Analysis Scan", replace_existing=True)
+        self.scheduler.add_job(
+            self.run_sentiment_scan,
+            IntervalTrigger(seconds=settings.sentiment_scan_interval),
+            id="sentiment_scan",
+            name="Sentiment Analysis Scan",
+            replace_existing=True,
+        )
         # Signal generation (every 30 seconds)
-        self.scheduler.add_job(self.run_signal_generation, IntervalTrigger(seconds=settings.signal_scan_interval), id="signal_generation", name="Signal Generation", replace_existing=True)
+        self.scheduler.add_job(
+            self.run_signal_generation,
+            IntervalTrigger(seconds=settings.signal_scan_interval),
+            id="signal_generation",
+            name="Signal Generation",
+            replace_existing=True,
+        )
         # Market status checks (every 1 minute)
-        self.scheduler.add_job(self.check_market_status, IntervalTrigger(minutes=1), id="market_status_check", name="Market Status Check", replace_existing=True)
+        self.scheduler.add_job(
+            self.check_market_status,
+            IntervalTrigger(minutes=1),
+            id="market_status_check",
+            name="Market Status Check",
+            replace_existing=True,
+        )
         # Data cleanup (daily at 3 AM)
-        self.scheduler.add_job(self.run_data_cleanup, CronTrigger(hour=3, minute=0), id="data_cleanup", name="Data Cleanup", replace_existing=True)
+        self.scheduler.add_job(
+            self.run_data_cleanup,
+            CronTrigger(hour=3, minute=0),
+            id="data_cleanup",
+            name="Data Cleanup",
+            replace_existing=True,
+        )
 
     async def start(self) -> None:
         """Start scheduler."""
@@ -109,7 +142,9 @@ class TradingScheduler:
                         task.cancel()
                 # Wait for tasks to cancel
                 if self.scan_tasks:
-                    await asyncio.gather(*self.scan_tasks.values(), return_exceptions=True)
+                    await asyncio.gather(
+                        *self.scan_tasks.values(), return_exceptions=True
+                    )
                 self.scheduler.shutdown(wait=False)
                 self.running = False
                 logger.info("Trading scheduler shutdown complete")
@@ -131,11 +166,17 @@ class TradingScheduler:
         finally:
             self.scan_tasks.pop(task_id, None)
 
-    async def _safe_get_history(self, symbol: str, interval: str) -> dict[str, Any] | None:
+    async def _safe_get_history(
+        self, symbol: str, interval: str
+    ) -> dict[str, Any] | None:
         """Get history retry circuit breaker protection."""
         try:
             return await OPENALGO_CIRCUIT_BREAKER.call_async(
-                retry_async(OPENALGO_RETRY_CONFIG)(lambda: async_client.get_history(symbol=symbol, interval=interval, from_date=None, to_date=None))
+                retry_async(OPENALGO_RETRY_CONFIG)(
+                    lambda: async_client.get_history(
+                        symbol=symbol, interval=interval, from_date=None, to_date=None
+                    )
+                )
             )
         except CircuitBreakerOpenError:
             logger.warning("OpenAlgo circuit breaker open get_history")
@@ -148,7 +189,9 @@ class TradingScheduler:
         """Get quotes retry circuit breaker protection."""
         try:
             return await OPENALGO_CIRCUIT_BREAKER.call_async(
-                retry_async(OPENALGO_RETRY_CONFIG)(lambda: async_client.get_quotes(symbols))
+                retry_async(OPENALGO_RETRY_CONFIG)(
+                    lambda: async_client.get_quotes(symbols)
+                )
             )
         except CircuitBreakerOpenError:
             logger.warning("OpenAlgo circuit breaker open get_quotes")
@@ -173,16 +216,18 @@ class TradingScheduler:
 
             historical_data_objs = []
             for item in history_data.get("data", []):
-                historical_data_objs.append(HistoricalData(
-                    symbol=symbol,
-                    timestamp=datetime.datetime.fromisoformat(item["timestamp"]),
-                    open=item["open"],
-                    high=item["high"],
-                    low=item["low"],
-                    close=item["close"],
-                    volume=item["volume"],
-                    interval=timeframe,
-                ))
+                historical_data_objs.append(
+                    HistoricalData(
+                        symbol=symbol,
+                        timestamp=datetime.datetime.fromisoformat(item["timestamp"]),
+                        open=item["open"],
+                        high=item["high"],
+                        low=item["low"],
+                        close=item["close"],
+                        volume=item["volume"],
+                        interval=timeframe,
+                    )
+                )
 
             await Database.async_store_historical_data(historical_data_objs)
             indicators = technical_analysis.calculate_indicators(historical_data_objs)
@@ -194,7 +239,9 @@ class TradingScheduler:
             quote_data = quotes.get("data", {}).get(symbol, {})
             current_price = quote_data.get("last_price", 0)
 
-            signal_result = technical_analysis.generate_signal(indicators, current_price)
+            signal_result = technical_analysis.generate_signal(
+                indicators, current_price
+            )
             if signal_result:
                 signal_type, strength = signal_result
                 record_signal(signal_type, "ta")
@@ -208,11 +255,13 @@ class TradingScheduler:
                     metadata={
                         "scan_type": "ta",
                         "timeframe": timeframe,
-                        "indicators_count": len(indicators)
-                    }
+                        "indicators_count": len(indicators),
+                    },
                 )
                 await Database.async_create_signal(signal)
-                logger.info("TA signal generated: %s, strength %.2f", signal_type, strength)
+                logger.info(
+                    "TA signal generated: %s, strength %.2f", signal_type, strength
+                )
 
             quote = QuoteData(
                 symbol=symbol,
@@ -224,7 +273,7 @@ class TradingScheduler:
                 volume=quote_data["volume"],
                 timestamp=datetime.datetime.now(datetime.UTC),
                 change=quote_data.get("change", 0),
-                change_percent=quote_data.get("change_percent", 0)
+                change_percent=quote_data.get("change_percent", 0),
             )
             await Database.async_store_quote(quote)
         except KillSwitchError:
@@ -232,7 +281,9 @@ class TradingScheduler:
         except Exception:
             logger.exception("Technical analysis scan failed")
         finally:
-            duration = (datetime.datetime.now(datetime.UTC) - start_time).total_seconds()
+            duration = (
+                datetime.datetime.now(datetime.UTC) - start_time
+            ).total_seconds()
             logger.info("Technical analysis scan completed %.2fms", duration * 1000)
 
     async def run_sentiment_scan(self) -> None:
@@ -260,7 +311,7 @@ class TradingScheduler:
             rss_feeds = [
                 "https://economictimes.indiatimes.com/markets/rssfeeds/1977021501.cms",
                 "https://www.moneycontrol.com/rss/latestnews.xml",
-                "https://www.bloombergquint.com/markets-feed"
+                "https://www.bloombergquint.com/markets-feed",
             ]
             result = await sentiment.analyze_symbol_sentiment(symbol, rss_feeds)
             metadata = {
@@ -289,16 +340,22 @@ class TradingScheduler:
                 timestamp=datetime.datetime.now(datetime.UTC),
                 indicators={"sentiment_score": result.sentiment_score},
                 confidence=abs(result.sentiment_score),
-                metadata=metadata
+                metadata=metadata,
             )
             await Database.async_create_signal(signal)
-            logger.info("Sentiment signal generated: %s, score %.2f", signal_type, result.sentiment_score)
+            logger.info(
+                "Sentiment signal generated: %s, score %.2f",
+                signal_type,
+                result.sentiment_score,
+            )
         except KillSwitchError:
             raise
         except Exception:
             logger.exception("Sentiment analysis scan failed")
         finally:
-            duration = (datetime.datetime.now(datetime.UTC) - start_time).total_seconds()
+            duration = (
+                datetime.datetime.now(datetime.UTC) - start_time
+            ).total_seconds()
             logger.info("Sentiment analysis scan completed %.2fms", duration * 1000)
 
     async def run_signal_generation(self) -> None:
@@ -319,7 +376,9 @@ class TradingScheduler:
         """Get position book retry circuit breaker protection."""
         try:
             return await OPENALGO_CIRCUIT_BREAKER.call_async(
-                retry_async(OPENALGO_RETRY_CONFIG)(lambda: async_client.get_position_book())
+                retry_async(OPENALGO_RETRY_CONFIG)(
+                    lambda: async_client.get_position_book()
+                )
             )
         except CircuitBreakerOpenError:
             logger.warning("OpenAlgo circuit breaker open get_position_book")
@@ -373,7 +432,7 @@ class TradingScheduler:
                         pnl=pos["pnl"],
                         product_type=pos["product_type"],
                         buy_quantity=pos["buy_quantity"],
-                        sell_quantity=pos["sell_quantity"]
+                        sell_quantity=pos["sell_quantity"],
                     )
                     await Database.async_store_position(pos_model)
 
@@ -384,12 +443,14 @@ class TradingScheduler:
                     utilized_margin=funds["utilized_margin"],
                     available_margin=funds["available_margin"],
                     total_equity=funds["total_equity"],
-                    timestamp=datetime.datetime.now(datetime.UTC)
+                    timestamp=datetime.datetime.now(datetime.UTC),
                 )
                 await Database.async_store_funds(funds_model)
 
             ta_strength = ta_signals[0].strength if ta_signals else 0
-            sentiment_strength = sentiment_signals[0].strength if sentiment_signals else 0
+            sentiment_strength = (
+                sentiment_signals[0].strength if sentiment_signals else 0
+            )
 
             combined_strength = (ta_strength + sentiment_strength) / 2
 
@@ -404,15 +465,29 @@ class TradingScheduler:
             if ta_signals:
                 indicators.update(ta_signals[0].indicators)
             if sentiment_signals:
-                indicators.update({"sentiment_score": sentiment_signals[0].indicators.get("sentiment_score", 0)})
+                indicators.update(
+                    {
+                        "sentiment_score": sentiment_signals[0].indicators.get(
+                            "sentiment_score", 0
+                        )
+                    }
+                )
 
             metadata = {
                 "scan_type": "combined",
                 "ta_strength": ta_strength,
                 "sentiment_strength": sentiment_strength,
                 "current_price": current_price,
-                "position_size": position_data.get("data", [{}])[0].get("quantity", 0) if (position_data and position_data.get("data")) else 0,
-                "available_funds": funds_data.get("data", {}).get("available_cash", 0) if (funds_data and funds_data.get("data")) else 0
+                "position_size": (
+                    position_data.get("data", [{}])[0].get("quantity", 0)
+                    if (position_data and position_data.get("data"))
+                    else 0
+                ),
+                "available_funds": (
+                    funds_data.get("data", {}).get("available_cash", 0)
+                    if (funds_data and funds_data.get("data"))
+                    else 0
+                ),
             }
 
             signal = Signal(
@@ -422,10 +497,14 @@ class TradingScheduler:
                 timestamp=datetime.datetime.now(datetime.UTC),
                 indicators=indicators,
                 confidence=combined_strength,
-                metadata=metadata
+                metadata=metadata,
             )
             await Database.async_create_signal(signal)
-            logger.info("Combined signal generated: %s, strength %.2f", signal_type, combined_strength)
+            logger.info(
+                "Combined signal generated: %s, strength %.2f",
+                signal_type,
+                combined_strength,
+            )
 
             quote = QuoteData(
                 symbol=symbol,
@@ -437,7 +516,7 @@ class TradingScheduler:
                 volume=quote_data["volume"],
                 timestamp=datetime.datetime.now(datetime.UTC),
                 change=quote_data.get("change", 0),
-                change_percent=quote_data.get("change_percent", 0)
+                change_percent=quote_data.get("change_percent", 0),
             )
             await Database.async_store_quote(quote)
         except KillSwitchError:
@@ -445,12 +524,16 @@ class TradingScheduler:
         except Exception:
             logger.exception("Signal generation scan failed")
         finally:
-            duration = (datetime.datetime.now(datetime.UTC) - start_time).total_seconds()
+            duration = (
+                datetime.datetime.now(datetime.UTC) - start_time
+            ).total_seconds()
             logger.info("Signal generation scan completed %.2fms", duration * 1000)
 
     async def check_market_status(self) -> None:
         """Check market status handle open/close events."""
-        task_id = f"market_status_check_{datetime.datetime.now(datetime.UTC).isoformat()}"
+        task_id = (
+            f"market_status_check_{datetime.datetime.now(datetime.UTC).isoformat()}"
+        )
         try:
             task = asyncio.create_task(self._market_status_check_task())
             self.scan_tasks[task_id] = task
@@ -478,11 +561,26 @@ class TradingScheduler:
 
             logger.debug("Market open")
             if not self.scheduler.get_job("ta_scan"):
-                self.scheduler.add_job(self.run_ta_scan, IntervalTrigger(seconds=settings.ta_scan_interval), id="ta_scan", name="Technical Analysis Scan")
+                self.scheduler.add_job(
+                    self.run_ta_scan,
+                    IntervalTrigger(seconds=settings.ta_scan_interval),
+                    id="ta_scan",
+                    name="Technical Analysis Scan",
+                )
             if not self.scheduler.get_job("sentiment_scan"):
-                self.scheduler.add_job(self.run_sentiment_scan, IntervalTrigger(seconds=settings.sentiment_scan_interval), id="sentiment_scan", name="Sentiment Analysis Scan")
+                self.scheduler.add_job(
+                    self.run_sentiment_scan,
+                    IntervalTrigger(seconds=settings.sentiment_scan_interval),
+                    id="sentiment_scan",
+                    name="Sentiment Analysis Scan",
+                )
             if not self.scheduler.get_job("signal_generation"):
-                self.scheduler.add_job(self.run_signal_generation, IntervalTrigger(seconds=settings.signal_scan_interval), id="signal_generation", name="Signal Generation")
+                self.scheduler.add_job(
+                    self.run_signal_generation,
+                    IntervalTrigger(seconds=settings.signal_scan_interval),
+                    id="signal_generation",
+                    name="Signal Generation",
+                )
         except Exception:
             logger.exception("Market status check failed")
 
@@ -512,7 +610,9 @@ class TradingScheduler:
         except Exception:
             logger.exception("Data cleanup failed")
         finally:
-            duration = (datetime.datetime.now(datetime.UTC) - start_time).total_seconds()
+            duration = (
+                datetime.datetime.now(datetime.UTC) - start_time
+            ).total_seconds()
             logger.info("Data cleanup completed %.2fms", duration * 1000)
 
     async def run_once(self, job_id: str) -> None:
@@ -535,7 +635,15 @@ class TradingScheduler:
 
     def get_jobs(self) -> list[dict[str, Any]]:
         """Get list all scheduled jobs."""
-        return [{"id": job.id, "name": job.name, "trigger": str(job.trigger), "next_run_time": job.next_run_time} for job in self.scheduler.get_jobs()]
+        return [
+            {
+                "id": job.id,
+                "name": job.name,
+                "trigger": str(job.trigger),
+                "next_run_time": job.next_run_time,
+            }
+            for job in self.scheduler.get_jobs()
+        ]
 
     def get_circuit_breaker_status(self) -> dict[str, Any]:
         """Get OpenAlgo circuit breaker status monitoring."""
@@ -550,6 +658,7 @@ class TradingScheduler:
     def is_running(self) -> bool:
         """Check scheduler running."""
         return self.running
+
 
 # Export default instance
 scheduler = TradingScheduler()

@@ -1,4 +1,5 @@
 """Main entry point LOATS13July2026 trading system."""
+
 import asyncio
 import signal
 import sys
@@ -15,6 +16,7 @@ from loats.utils.cache import close_cache, initialize_cache
 
 class TradingSystem:
     """Main trading system class."""
+
     def __init__(self) -> None:
         """Initialize TradingSystem."""
         self.shutdown_event = asyncio.Event()
@@ -46,7 +48,9 @@ class TradingSystem:
             logger.info("Starting LOATS13July2026 trading system")
             await alerts.start()
             await scheduler.start()
-            await alerts.send_system_alert("LOATS13July2026 trading system started successfully", "success")
+            await alerts.send_system_alert(
+                "LOATS13July2026 trading system started successfully", "success"
+            )
             self.running = True
             logger.info("Trading system started successfully")
             await self._wait_for_shutdown()
@@ -57,6 +61,7 @@ class TradingSystem:
     async def _wait_for_shutdown(self) -> None:
         """Wait for shutdown signal."""
         loop = asyncio.get_running_loop()
+
         def signal_handler(sig: int, frame: Any) -> None:
             logger.info(f"Received signal: {sig}")
             loop.call_soon_threadsafe(self.shutdown_event.set)
@@ -66,7 +71,10 @@ class TradingSystem:
             signal.signal(signal.SIGTERM, signal_handler)
         else:
             for sig in (signal.SIGINT, signal.SIGTERM):
-                loop.add_signal_handler(sig, lambda s=sig: asyncio.create_task(self._handle_shutdown_signal(s)))
+                loop.add_signal_handler(
+                    sig,
+                    lambda s=sig: asyncio.create_task(self._handle_shutdown_signal(s)),
+                )
 
         await self.shutdown_event.wait()
 
@@ -82,7 +90,9 @@ class TradingSystem:
             return
         try:
             logger.info("Shutting down LOATS13July2026 trading system")
-            await alerts.send_system_alert("LOATS13July2026 trading system shutting down", "warning")
+            await alerts.send_system_alert(
+                "LOATS13July2026 trading system shutting down", "warning"
+            )
             await scheduler.shutdown()
             await alerts.shutdown()
             await close_cache()
@@ -106,6 +116,7 @@ class TradingSystem:
             logger.error(f"Error running scans: {e}")
             raise
 
+
 async def main() -> None:
     """Standalone main entry point for trading system."""
     system = TradingSystem()
@@ -116,6 +127,7 @@ async def main() -> None:
         logger.error(f"Trading system failed: {e}")
         await system.shutdown()
         sys.exit(1)
+
 
 if __name__ == "__main__":
     try:

@@ -89,7 +89,6 @@ class Settings(BaseSettings):
         Decimal("1000000.00"), description="Maximum total exposure"
     )
 
-
     # Timezone Configuration
     timezone: str = Field(
         "Asia/Kolkata", description="Timezone for all datetime operations"
