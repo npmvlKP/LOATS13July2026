@@ -12,6 +12,7 @@ import httpx
 
 from .config import settings
 from .loats_logging import get_logger
+from .utils.rate_limiter import ORDER_RATE_LIMITER, SMART_ORDER_RATE_LIMITER, RateLimitExceededError
 from .models import (
     HistoricalData,
     Order,
@@ -694,6 +695,9 @@ class AsyncOpenAlgoClient:
             # Re-raise our own exceptions without losing the original
             # exception chain attached via ``raise ... from ...``.
             raise
+        except RateLimitExceededError:
+            # Re-raise rate limit exceptions without losing context
+            raise
         except Exception as e:
             logger.error(f"Request failed: {e}")
             raise OpenAlgoError(f"Request failed: {e}") from e
@@ -818,9 +822,17 @@ class AsyncOpenAlgoClient:
 
         Raises:
             KillSwitchError: If kill switch is active.
+            RateLimitExceededError: If rate limit is exceeded.
         """
         # Check kill switch before placing order
         await _async_check_kill_switch()
+
+        # Apply rate limiting
+        if not await ORDER_RATE_LIMITER.acquire():
+            logger.warning("Rate limit exceeded for order placement")
+            raise RateLimitExceededError(
+                f"Order rate limit exceeded: {settings.max_ops} orders per second"
+            )
 
         # Normalize enum values to strings
         if isinstance(order_type, OrderType):
@@ -892,9 +904,17 @@ class AsyncOpenAlgoClient:
 
         Raises:
             KillSwitchError: If kill switch is active.
+            RateLimitExceededError: If rate limit is exceeded.
         """
         # Check kill switch before placing order
         await _async_check_kill_switch()
+
+        # Apply rate limiting
+        if not await SMART_ORDER_RATE_LIMITER.acquire():
+            logger.warning("Rate limit exceeded for smart order placement")
+            raise RateLimitExceededError(
+                f"Smart order rate limit exceeded: {settings.max_ops} orders per second"
+            )
 
         # Normalize enum values to strings
         if isinstance(order_type, OrderType):

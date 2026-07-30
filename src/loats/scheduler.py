@@ -280,6 +280,7 @@ class TradingScheduler:
             )
             await self.db.async_store_quote(quote)
         except KillSwitchError:
+            logger.warning("Kill switch active - TA scan aborted")
             raise
         except Exception:
             logger.exception("Technical analysis scan failed")
@@ -352,6 +353,7 @@ class TradingScheduler:
                 result.sentiment_score,
             )
         except KillSwitchError:
+            logger.warning("Kill switch active - sentiment scan aborted")
             raise
         except Exception:
             logger.exception("Sentiment analysis scan failed")
@@ -525,6 +527,7 @@ class TradingScheduler:
             )
             await self.db.async_store_quote(quote)
         except KillSwitchError:
+            logger.warning("Kill switch active - signal generation aborted")
             raise
         except Exception:
             logger.exception("Signal generation scan failed")
