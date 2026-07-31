@@ -628,6 +628,10 @@ class Database:
         cursor.execute(
             "DELETE FROM quotes WHERE created_at_ms < ?", (cutoff_timestamp_ms,)
         )
+        # Delete old orders
+        cursor.execute(
+            "DELETE FROM orders WHERE updated_at_ms < ?", (cutoff_timestamp_ms,)
+        )
 
         conn.commit()
         logger.info(f"Cleaned data older than {cutoff_timestamp_ms} ms epoch.")

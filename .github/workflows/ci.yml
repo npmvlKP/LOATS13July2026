@@ -1,4 +1,4 @@
-name: CI Pipeline
+name: Pipeline
 
 on:
   push:
@@ -19,7 +19,7 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        python-version: ["3.12"]
+        python-version: [3.12]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -60,7 +60,7 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        python-version: ["3.12"]
+        python-version: [3.12]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -95,10 +95,10 @@ jobs:
     if: github.event_name == 'pull_request'
     steps:
       - uses: actions/checkout@v4
-      - name: Build and Test
+      - name: Build Test
         run: |
           docker build -t loats13july2026:test .
-          docker run --rm --name loats-health-test loats13july2026:test python -c "import sys; print('Health Check Passed')" || exit 1
+          docker run --rm --name loats-health-test loats13july2026:test python -c "import sys;print('Health Check Passed')" || exit 1
           docker stop loats-health-test || true
 
   status:
