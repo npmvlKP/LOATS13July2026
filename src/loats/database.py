@@ -15,7 +15,7 @@ from typing import Any, TypeVar
 
 from pydantic import BaseModel
 
-from .config import settings
+from .config import get_settings
 from .loats_logging import get_logger
 from .models import (
     AuditLogEntry,
@@ -76,6 +76,7 @@ class Database:
             audit_log_path: Path to audit log JSONL file
             retention_days: Number of days to retain data (defaults to settings)
         """
+        settings = get_settings()
         self.db_path = db_path or Path(settings.sqlite_db_path)
         self.audit_log_path = audit_log_path or Path(settings.audit_log_path)
         self.retention_days = retention_days or settings.retention_days

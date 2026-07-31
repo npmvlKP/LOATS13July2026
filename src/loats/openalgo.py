@@ -1,18 +1,21 @@
 """
-OpenAlgo client implementation for LOATS13July2026.
+OpenAlgo client implementation LOATS13July2026.
 """
-
 from __future__ import annotations
 
 import json
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any
+from typing import Any, Optional, TYPE_CHECKING
 
 import httpx
 
-from .config import settings
+from .config import get_settings
 from .loats_logging import get_logger
-from .utils.rate_limiter import ORDER_RATE_LIMITER, SMART_ORDER_RATE_LIMITER, RateLimitExceededError
+from .utils.rate_limiter import (
+    ORDER_RATE_LIMITER,
+    SMART_ORDER_RATE_LIMITER,
+    RateLimitExceededError,
+)
 from .models import (
     HistoricalData,
     Order,
@@ -31,93 +34,60 @@ if TYPE_CHECKING:
 
 logger = get_logger(__name__)
 
-
 class OpenAlgoError(Exception):
-    """Base exception for OpenAlgo client errors."""
-
+    """Base exception OpenAlgo client errors."""
 
 class KillSwitchError(OpenAlgoError):
-    """Exception raised when order placement is attempted while kill switch is active.
+    """Exception raised when order placement attempted while kill switch active."""
 
-    This is a safety-critical exception that prevents order placement when the
-    trading system kill switch has been activated. This ensures no new orders
-    can be placed when emergency shutdown is triggered.
-    """
-
-    def __init__(
-        self, message: str = "Kill switch is active - order placement blocked"
-    ) -> None:
+    def __init__(self, message: str = "Kill switch active, order placement blocked") -> None:
         self.message = message
         super().__init__(self.message)
 
-
 class OpenAlgoAPIError(OpenAlgoError):
-    """Exception for API response errors."""
+    """Exception API response errors."""
 
     def __init__(
         self,
         status_code: int,
         message: str,
-        details: dict[str, Any] | None = None,
-    ):
+        details: Optional[dict[str, Any]] = None,
+    ) -> None:
         self.status_code = status_code
         self.message = message
         self.details = details or {}
         super().__init__(f"API Error {status_code}: {message}")
 
-
 def _get_alerts() -> AlertSystem:
-    """Lazy import of alerts to avoid circular import."""
+    """Lazy import alerts avoid circular import."""
     from .alerts import alerts
-
     return alerts
 
-
 def _check_kill_switch() -> None:
-    """Check if kill switch is active and raise KillSwitchError if so.
-
-    Raises:
-        KillSwitchError: If kill switch is active.
-    """
+    """Check kill switch active."""
     alerts = _get_alerts()
     if alerts.is_kill_switch_active():
-        logger.error("Kill switch active - order placement blocked")
+        logger.error("Kill switch active, order placement blocked")
         raise KillSwitchError()
-
 
 async def _async_check_kill_switch() -> None:
-    """Async version: Check if kill switch is active and raise KillSwitchError if so.
-
-    Raises:
-        KillSwitchError: If kill switch is active.
-    """
+    """Async version: Check kill switch active."""
     alerts = _get_alerts()
     if alerts.is_kill_switch_active():
-        logger.error("Kill switch active - order placement blocked")
+        logger.error("Kill switch active, order placement blocked")
         raise KillSwitchError()
 
-
 class OpenAlgoClient:
-    """Client for interacting with OpenAlgo API."""
+    """Client interacting OpenAlgo API."""
 
-    def __init__(self, api_key: str | None = None, base_url: str | None = None) -> None:
-        """
-        Initialize OpenAlgo client.
-
-        Args:
-            api_key: OpenAlgo API key. If not provided, uses settings.openalgo_api_key
-            base_url: OpenAlgo base URL. If not provided,
-            uses settings.openalgo_base_url
-
-        """
+    def __init__(self, api_key: Optional[str] = None, base_url: Optional[str] = None) -> None:
+        settings = get_settings()
         self.api_key: str = api_key or settings.openalgo_api_key.get_secret_value()
-
-        self.base_url = str(base_url or settings.openalgo_base_url)
-        self.timeout = settings.request_timeout
-        self.client: httpx.Client | None = None
+        self.base_url: str = base_url or settings.openalgo_base_url
+        self.timeout: float = settings.request_timeout
+        self.client: Optional[httpx.Client] = None
 
     def __enter__(self) -> OpenAlgoClient:
-        """Context manager entry."""
         self.client = httpx.Client(
             base_url=self.base_url,
             timeout=self.timeout,
@@ -126,13 +96,11 @@ class OpenAlgoClient:
         return self
 
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
-        """Context manager exit."""
         if self.client:
             self.client.close()
             self.client = None
 
     def _ensure_client(self) -> httpx.Client:
-        """Ensure the HTTP client is available."""
         if self.client is None:
             self.client = httpx.Client(
                 base_url=self.base_url,
@@ -142,69 +110,38 @@ class OpenAlgoClient:
         return self.client
 
     def _request(self, method: str, endpoint: str, **kwargs: Any) -> dict[str, Any]:
-        """
-        Make an API request to OpenAlgo.
-
-        Args:
-            method: HTTP method (GET, POST, etc.)
-            endpoint: API endpoint
-            **kwargs: Additional arguments to pass to httpx
-
-        Returns:
-            Dictionary containing the API response
-
-        Raises:
-            OpenAlgoAPIError: For API response errors (HTTP 4xx/5xx)
-            OpenAlgoError: For other request errors (timeout, connection, etc.)
-        """
         client = self._ensure_client()
         url = f"/api/v1/{endpoint.lstrip('/')}"
-
         try:
             if method.upper() == "POST":
                 response = client.post(url, **kwargs)
             else:
                 response = client.request(method, url, **kwargs)
-
-            # Check for HTTP error status codes
-            try:
-                response.raise_for_status()
-            except httpx.HTTPStatusError as e:
-                logger.error(
-                    f"API HTTP error {e.response.status_code}: {e.response.text}"
-                )
-                raise OpenAlgoAPIError(
-                    status_code=e.response.status_code,
-                    message=f"HTTP error: {e.response.status_code}",
-                    details={"response": e.response.text},
-                ) from e
-
-            try:
-                data = response.json()
-                return data  # type: ignore[no-any-return]
-            except ValueError as e:
-                logger.error(f"JSON decode error: {e}")
-                raise OpenAlgoError(f"JSON decode error: {e}") from e
-
+            response.raise_for_status()
+            return response.json()  # type: ignore[no-any-return]
+        except httpx.HTTPStatusError as e:
+            logger.error(f"API HTTP error {e.response.status_code}: {e.response.text}")
+            raise OpenAlgoAPIError(
+                status_code=e.response.status_code,
+                message=f"HTTP error: {e.response.status_code}",
+                details={"response": e.response.text},
+            )
+        except ValueError as e:
+            logger.error(f"JSON decode error: {e}")
+            raise OpenAlgoError(f"JSON decode error: {e}")
         except httpx.TimeoutException as e:
             logger.error(f"Request timed out: {e}")
-            raise OpenAlgoError(f"Timeout error: {e}") from e
+            raise OpenAlgoError(f"Timeout error: {e}")
         except httpx.ConnectError as e:
             logger.error(f"Connection error: {e}")
-            raise OpenAlgoError(f"Connection error: {e}") from e
+            raise OpenAlgoError(f"Connection error: {e}")
         except OpenAlgoError:
-            # Re-raise our own exceptions
             raise
         except Exception as e:
             logger.error(f"Request failed: {e}")
-            raise OpenAlgoError(f"Request failed: {e}") from e
-
-    # ------------------------------------------------------------------
-    # Conversion helpers
-    # ------------------------------------------------------------------
+            raise OpenAlgoError(f"Request failed: {e}")
 
     def _convert_to_quote(self, symbol: str, data: dict[str, Any]) -> QuoteData:
-        """Convert API response data to QuoteData model."""
         return QuoteData(
             symbol=symbol,
             last_price=data.get("last_price", 0.0),
@@ -218,16 +155,9 @@ class OpenAlgoClient:
             change_percent=data.get("change_percent", 0.0),
         )
 
-    def _convert_to_historical_data(
-        self, symbol: str, interval: str, data: dict[str, Any]
-    ) -> HistoricalData:
-        """Convert API response data to HistoricalData model."""
+    def _convert_to_historical_data(self, symbol: str, interval: str, data: dict[str, Any]) -> HistoricalData:
         timestamp_str = data.get("timestamp", datetime.now(UTC).isoformat())
-        if isinstance(timestamp_str, str):
-            timestamp = datetime.fromisoformat(timestamp_str)
-        else:
-            timestamp = timestamp_str
-
+        timestamp = datetime.fromisoformat(timestamp_str) if isinstance(timestamp_str, str) else timestamp_str
         return HistoricalData(
             symbol=symbol,
             timestamp=timestamp,
@@ -240,7 +170,6 @@ class OpenAlgoClient:
         )
 
     def _convert_to_position(self, data: dict[str, Any]) -> Position:
-        """Convert API response data to Position model."""
         return Position(
             symbol=data.get("symbol", ""),
             quantity=data.get("quantity", 0),
@@ -253,13 +182,8 @@ class OpenAlgoClient:
         )
 
     def _convert_to_order(self, data: dict[str, Any]) -> Order:
-        """Convert API response data to Order model."""
         timestamp_str = data.get("timestamp", datetime.now(UTC).isoformat())
-        if isinstance(timestamp_str, str):
-            timestamp = datetime.fromisoformat(timestamp_str)
-        else:
-            timestamp = timestamp_str
-
+        timestamp = datetime.fromisoformat(timestamp_str) if isinstance(timestamp_str, str) else timestamp_str
         return Order(
             order_id=data.get("order_id", ""),
             symbol=data.get("symbol", ""),
@@ -279,74 +203,22 @@ class OpenAlgoClient:
             trailing_stop_loss=data.get("trailing_stop_loss"),
         )
 
-    # ------------------------------------------------------------------
-    # API Endpoints
-    # ------------------------------------------------------------------
-
     def get_quotes(self, symbols: list[str]) -> dict[str, Any]:
-        """
-        Get quotes for multiple symbols.
-
-        Args:
-            symbols: List of symbol names
-
-        Returns:
-            Dictionary containing quote data
-        """
         payload = {"symbols": symbols}
         return self._request("POST", "quotes", json=payload)
 
-    def get_history(
-        self,
-        symbol: str,
-        interval: str,
-        from_date: str | None = None,
-        to_date: str | None = None,
-    ) -> dict[str, Any]:
-        """
-        Get historical data for a symbol.
-
-        Args:
-            symbol: Symbol name
-            interval: Time interval (e.g., "1min", "5min", "1day")
-            from_date: Start date in YYYY-MM-DD format
-            to_date: End date in YYYY-MM-DD format
-
-        Returns:
-            Dictionary containing historical data
-        """
-        payload = {
-            "symbol": symbol,
-            "interval": interval,
-            "from_date": from_date,
-            "to_date": to_date,
-        }
+    def get_history(self, symbol: str, interval: str, from_date: Optional[str] = None, to_date: Optional[str] = None) -> dict[str, Any]:
+        payload = {"symbol": symbol, "interval": interval, "from_date": from_date, "to_date": to_date}
         return self._request("POST", "history", json=payload)
 
-    def get_option_chain(
-        self,
-        symbol: str,
-        expiry: str | None = None,
-    ) -> dict[str, Any]:
-        """
-        Get option chain for a symbol.
-
-        Args:
-            symbol: Symbol name
-            expiry: Expiry date in YYYY-MM-DD format
-
-        Returns:
-            Dictionary containing option chain data
-        """
+    def get_option_chain(self, symbol: str, expiry: Optional[str] = None) -> dict[str, Any]:
         payload = {"symbol": symbol, "expiry": expiry}
         return self._request("POST", "option_chain", json=payload)
 
     def get_position_book(self) -> dict[str, Any]:
-        """Get current position book."""
         return self._request("POST", "position_book")
 
     def get_funds(self) -> dict[str, Any]:
-        """Get available funds."""
         return self._request("POST", "funds")
 
     def place_order(
@@ -354,50 +226,20 @@ class OpenAlgoClient:
         symbol: str,
         quantity: int,
         order_type: str | OrderType,
-        price: float | None = None,
+        price: Optional[float] = None,
         variety: str | OrderVariety = "regular",
         transaction_type: str | TransactionType = "BUY",
         product_type: str | ProductType = "MIS",
-        trigger_price: float | None = None,
-        stop_loss: float | None = None,
-        take_profit: float | None = None,
-        trailing_stop_loss: float | None = None,
+        trigger_price: Optional[float] = None,
+        stop_loss: Optional[float] = None,
+        take_profit: Optional[float] = None,
+        trailing_stop_loss: Optional[float] = None,
     ) -> dict[str, Any]:
-        """
-        Place an order.
-
-        Args:
-            symbol: Symbol name
-            quantity: Order quantity
-            order_type: Order type (MARKET, LIMIT, SL, SL-M)
-            price: Order price (required for LIMIT, SL, SL-M)
-            variety: Order variety (regular, amo)
-            transaction_type: BUY or SELL
-            product_type: MIS, NRML, CNC
-            trigger_price: Trigger price for SL orders
-            stop_loss: Stop loss price
-            take_profit: Take profit price
-            trailing_stop_loss: Trailing stop loss amount
-
-        Returns:
-            Dictionary containing order response
-
-        Raises:
-            KillSwitchError: If kill switch is active.
-        """
-        # Check kill switch before placing order
         _check_kill_switch()
-
-        # Normalize enum values to strings
-        if isinstance(order_type, OrderType):
-            order_type = order_type.value
-        if isinstance(variety, OrderVariety):
-            variety = variety.value
-        if isinstance(transaction_type, TransactionType):
-            transaction_type = transaction_type.value
-        if isinstance(product_type, ProductType):
-            product_type = product_type.value
-
+        if isinstance(order_type, OrderType): order_type = order_type.value
+        if isinstance(variety, OrderVariety): variety = variety.value
+        if isinstance(transaction_type, TransactionType): transaction_type = transaction_type.value
+        if isinstance(product_type, ProductType): product_type = product_type.value
         payload: dict[str, Any] = {
             "symbol": symbol,
             "quantity": quantity,
@@ -406,19 +248,11 @@ class OpenAlgoClient:
             "transaction_type": transaction_type,
             "product_type": product_type,
         }
-
-        # Add optional fields
-        if price is not None:
-            payload["price"] = price
-        if trigger_price is not None:
-            payload["trigger_price"] = trigger_price
-        if stop_loss is not None:
-            payload["stop_loss"] = stop_loss
-        if take_profit is not None:
-            payload["take_profit"] = take_profit
-        if trailing_stop_loss is not None:
-            payload["trailing_stop_loss"] = trailing_stop_loss
-
+        if price is not None: payload["price"] = price
+        if trigger_price is not None: payload["trigger_price"] = trigger_price
+        if stop_loss is not None: payload["stop_loss"] = stop_loss
+        if take_profit is not None: payload["take_profit"] = take_profit
+        if trailing_stop_loss is not None: payload["trailing_stop_loss"] = trailing_stop_loss
         return self._request("POST", "place_order", json=payload)
 
     def place_smart_order(
@@ -426,50 +260,20 @@ class OpenAlgoClient:
         symbol: str,
         quantity: int,
         order_type: str | OrderType,
-        price: float | None = None,
-        trigger_price: float | None = None,
-        stop_loss: float | None = None,
-        take_profit: float | None = None,
-        trailing_stop_loss: float | None = None,
+        price: Optional[float] = None,
+        trigger_price: Optional[float] = None,
+        stop_loss: Optional[float] = None,
+        take_profit: Optional[float] = None,
+        trailing_stop_loss: Optional[float] = None,
         strategy: str = "simple",
         transaction_type: str | TransactionType = "BUY",
         product_type: str | ProductType = "MIS",
-        metadata: dict[str, Any] | None = None,
+        metadata: Optional[dict[str, Any]] = None,
     ) -> dict[str, Any]:
-        """
-        Place a smart order with advanced features.
-
-        Args:
-            symbol: Symbol name
-            quantity: Order quantity
-            order_type: Order type (MARKET, LIMIT, SL, SL-M)
-            price: Order price
-            trigger_price: Trigger price for SL orders
-            stop_loss: Stop loss price
-            take_profit: Take profit price
-            trailing_stop_loss: Trailing stop loss amount
-            strategy: Strategy type (simple, bracket, cover)
-            transaction_type: BUY or SELL
-            product_type: MIS, NRML, CNC
-            metadata: Additional metadata
-
-        Returns:
-            Dictionary containing smart order response
-
-        Raises:
-            KillSwitchError: If kill switch is active.
-        """
-        # Check kill switch before placing order
         _check_kill_switch()
-
-        # Normalize enum values to strings
-        if isinstance(order_type, OrderType):
-            order_type = order_type.value
-        if isinstance(transaction_type, TransactionType):
-            transaction_type = transaction_type.value
-        if isinstance(product_type, ProductType):
-            product_type = product_type.value
-
+        if isinstance(order_type, OrderType): order_type = order_type.value
+        if isinstance(transaction_type, TransactionType): transaction_type = transaction_type.value
+        if isinstance(product_type, ProductType): product_type = product_type.value
         payload: dict[str, Any] = {
             "symbol": symbol,
             "quantity": quantity,
@@ -478,140 +282,63 @@ class OpenAlgoClient:
             "transaction_type": transaction_type,
             "product_type": product_type,
         }
-
-        if price is not None:
-            payload["price"] = price
-        if trigger_price is not None:
-            payload["trigger_price"] = trigger_price
-        if stop_loss is not None:
-            payload["stop_loss"] = stop_loss
-        if take_profit is not None:
-            payload["take_profit"] = take_profit
-        if trailing_stop_loss is not None:
-            payload["trailing_stop_loss"] = trailing_stop_loss
-        if metadata is not None:
-            payload["metadata"] = metadata
-
+        if price is not None: payload["price"] = price
+        if trigger_price is not None: payload["trigger_price"] = trigger_price
+        if stop_loss is not None: payload["stop_loss"] = stop_loss
+        if take_profit is not None: payload["take_profit"] = take_profit
+        if trailing_stop_loss is not None: payload["trailing_stop_loss"] = trailing_stop_loss
+        if metadata is not None: payload["metadata"] = metadata
         return self._request("POST", "place_smart_order", json=payload)
 
     def modify_order(
         self,
         order_id: str,
-        quantity: int | None = None,
-        order_type: str | OrderType | None = None,
-        price: float | None = None,
-        trigger_price: float | None = None,
-        stop_loss: float | None = None,
-        take_profit: float | None = None,
-        trailing_stop_loss: float | None = None,
+        quantity: Optional[int] = None,
+        order_type: Optional[str | OrderType] = None,
+        price: Optional[float] = None,
+        trigger_price: Optional[float] = None,
+        stop_loss: Optional[float] = None,
+        take_profit: Optional[float] = None,
+        trailing_stop_loss: Optional[float] = None,
     ) -> dict[str, Any]:
-        """
-        Modify an existing order.
-
-        Args:
-            order_id: Order ID to modify
-            quantity: New quantity
-            order_type: New order type
-            price: New price
-            trigger_price: New trigger price
-            stop_loss: New stop loss price
-            take_profit: New take profit price
-            trailing_stop_loss: New trailing stop loss amount
-
-        Returns:
-            Dictionary containing modification response
-        """
-        if isinstance(order_type, OrderType):
-            order_type = order_type.value
-
+        if isinstance(order_type, OrderType): order_type = order_type.value
         payload: dict[str, Any] = {"order_id": order_id}
-
-        if quantity is not None:
-            payload["quantity"] = quantity
-        if order_type is not None:
-            payload["order_type"] = order_type
-        if price is not None:
-            payload["price"] = price
-        if trigger_price is not None:
-            payload["trigger_price"] = trigger_price
-        if stop_loss is not None:
-            payload["stop_loss"] = stop_loss
-        if take_profit is not None:
-            payload["take_profit"] = take_profit
-        if trailing_stop_loss is not None:
-            payload["trailing_stop_loss"] = trailing_stop_loss
-
+        if quantity is not None: payload["quantity"] = quantity
+        if order_type is not None: payload["order_type"] = order_type
+        if price is not None: payload["price"] = price
+        if trigger_price is not None: payload["trigger_price"] = trigger_price
+        if stop_loss is not None: payload["stop_loss"] = stop_loss
+        if take_profit is not None: payload["take_profit"] = take_profit
+        if trailing_stop_loss is not None: payload["trailing_stop_loss"] = trailing_stop_loss
         return self._request("POST", "modify_order", json=payload)
 
     def cancel_order(self, order_id: str) -> dict[str, Any]:
-        """
-        Cancel an order.
-
-        Args:
-            order_id: Order ID to cancel
-
-        Returns:
-            Dictionary containing cancellation response
-        """
         payload = {"order_id": order_id}
         return self._request("POST", "cancel_order", json=payload)
 
     def get_order_status(self, order_id: str) -> dict[str, Any]:
-        """
-        Get status of an order.
-
-        Args:
-            order_id: Order ID to check
-
-        Returns:
-            Dictionary containing order status
-        """
         payload = {"order_id": order_id}
         return self._request("POST", "order_status", json=payload)
 
     def get_all_orders(self) -> dict[str, Any]:
-        """
-        Get all orders.
-
-        Returns:
-            Dictionary containing all orders
-        """
         return self._request("POST", "all_orders")
 
     def get_trade_book(self) -> dict[str, Any]:
-        """
-        Get trade book.
-
-        Returns:
-            Dictionary containing trade book data
-        """
         return self._request("POST", "trade_book")
 
-
-# Export a default client instance
 client = OpenAlgoClient()
 
-
 class AsyncOpenAlgoClient:
-    """Async client for interacting with OpenAlgo API."""
+    """Async client interacting OpenAlgo API."""
 
-    def __init__(self, api_key: str | None = None, base_url: str | None = None) -> None:
-        """
-        Initialize AsyncOpenAlgoClient.
-
-        Args:
-            api_key: OpenAlgo API key. If not provided, uses settings.openalgo_api_key
-            base_url: OpenAlgo base URL. If not provided,
-            uses settings.openalgo_base_url
-
-        """
+    def __init__(self, api_key: Optional[str] = None, base_url: Optional[str] = None) -> None:
+        settings = get_settings()
         self.api_key: str = api_key or settings.openalgo_api_key.get_secret_value()
-        self.base_url = str(base_url or settings.openalgo_base_url)
-        self.timeout = settings.request_timeout
-        self.client: httpx.AsyncClient | None = None
+        self.base_url: str = base_url or settings.openalgo_base_url
+        self.timeout: float = settings.request_timeout
+        self.client: Optional[httpx.AsyncClient] = None
 
     async def __aenter__(self) -> AsyncOpenAlgoClient:
-        """Async context manager entry."""
         self.client = httpx.AsyncClient(
             base_url=self.base_url,
             timeout=self.timeout,
@@ -620,13 +347,11 @@ class AsyncOpenAlgoClient:
         return self
 
     async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
-        """Async context manager exit."""
         if self.client:
             await self.client.aclose()
             self.client = None
 
     async def _ensure_client(self) -> httpx.AsyncClient:
-        """Ensure the HTTP async client is available."""
         if self.client is None:
             self.client = httpx.AsyncClient(
                 base_url=self.base_url,
@@ -635,156 +360,58 @@ class AsyncOpenAlgoClient:
             )
         return self.client
 
-    async def _request(
-        self, method: str, endpoint: str, **kwargs: Any
-    ) -> dict[str, Any]:
-        """
-        Make an async API request to OpenAlgo.
-
-        Args:
-            method: HTTP method (GET, POST, etc.)
-            endpoint: API endpoint
-            **kwargs: Additional arguments to pass to httpx
-
-        Returns:
-            Dictionary containing the API response
-
-        Raises:
-            OpenAlgoAPIError: For API response errors
-            OpenAlgoError: For other request errors
-        """
+    async def _request(self, method: str, endpoint: str, **kwargs: Any) -> dict[str, Any]:
         client = await self._ensure_client()
         url = f"/api/v1/{endpoint.lstrip('/')}"
-
         try:
             if method.upper() == "POST":
                 response = await client.post(url, **kwargs)
             else:
                 response = await client.request(method, url, **kwargs)
-
-            # Trigger an httpx.HTTPStatusError carrying the full response
-            # context (status, headers, body). This exception is then
-            # chained below to preserve the diagnostic stack for operators
-            # investigating production failures (NEW-H1).
             response.raise_for_status()
-
-            try:
-                data = response.json()
-                return data  # type: ignore[no-any-return]
-            except ValueError as e:
-                logger.error(f"JSON decode error: {e}")
-                raise OpenAlgoError(f"JSON decode error: {e}") from e
-
+            return response.json()  # type: ignore[no-any-return]
         except httpx.HTTPStatusError as e:
-            # Preserve the original httpx exception (response, headers,
-            # request) via explicit __cause__ chaining so logs and tracebacks
-            # retain the full HTTP failure context (NEW-H1).
             logger.error(f"API HTTP error {e.response.status_code}: {e.response.text}")
             raise OpenAlgoAPIError(
                 status_code=e.response.status_code,
                 message=f"HTTP error: {e.response.status_code}",
                 details={"response": e.response.text},
-            ) from e
-        except httpx.TimeoutException as e:
-            logger.error(f"Request timed out: {e}")
-            raise OpenAlgoError(f"Timeout error: {e}") from e
-        except httpx.ConnectError as e:
-            logger.error(f"Connection error: {e}")
-            raise OpenAlgoError(f"Connection error: {e}") from e
-        except OpenAlgoError:
-            # Re-raise our own exceptions without losing the original
-            # exception chain attached via ``raise ... from ...``.
-            raise
-        except RateLimitExceededError:
-            # Re-raise rate limit exceptions without losing context
-            raise
+            )
         except Exception as e:
             logger.error(f"Request failed: {e}")
-            raise OpenAlgoError(f"Request failed: {e}") from e
-
-    # ------------------------------------------------------------------
-    # API Endpoints
-    # ------------------------------------------------------------------
+            raise OpenAlgoError(f"Request failed: {e}")
 
     async def get_quotes(self, symbols: list[str]) -> dict[str, Any]:
-        """Get quotes for multiple symbols."""
-        # Create cache key based on symbols
         symbols_sorted = sorted(symbols)
         cache_key = f"quotes:{hash(frozenset(symbols_sorted))}"
-
-        # Try to get cached result first (60 seconds TTL)
         cached_result = await cache_manager.get(cache_key)
         if cached_result:
             try:
-                logger.debug(f"Quotes cache hit for {symbols}")
+                logger.debug(f"Quotes cache hit {symbols}")
                 return json.loads(cached_result)  # type: ignore[no-any-return]
             except Exception as e:
-                logger.warning(f"Failed to parse cached quotes: {e}")
-
-        # Cache miss - make API request
+                logger.warning(f"Failed parse cached quotes: {e}")
         payload = {"symbols": symbols}
         result = await self._request("POST", "quotes", json=payload)
-
-        # Cache the result for 60 seconds
         try:
             await cache_manager.set(cache_key, json.dumps(result), ttl=60)
-            logger.debug(f"Cached quotes for {symbols}")
+            logger.debug(f"Cached quotes {symbols}")
         except Exception as e:
-            logger.warning(f"Failed to cache quotes: {e}")
-
+            logger.warning(f"Failed cache quotes: {e}")
         return result
 
-    async def get_history(
-        self,
-        symbol: str,
-        interval: str,
-        from_date: str | None = None,
-        to_date: str | None = None,
-    ) -> dict[str, Any]:
-        """
-        Get historical data for a symbol.
-
-        Args:
-            symbol: Symbol name
-            interval: Time interval (e.g., "1min", "5min", "1day")
-            from_date: Start date in YYYY-MM-DD format
-            to_date: End date in YYYY-MM-DD format
-
-        Returns:
-            Dictionary containing historical data
-        """
-        payload = {
-            "symbol": symbol,
-            "interval": interval,
-            "from_date": from_date,
-            "to_date": to_date,
-        }
+    async def get_history(self, symbol: str, interval: str, from_date: Optional[str] = None, to_date: Optional[str] = None) -> dict[str, Any]:
+        payload = {"symbol": symbol, "interval": interval, "from_date": from_date, "to_date": to_date}
         return await self._request("POST", "history", json=payload)
 
-    async def get_option_chain(
-        self,
-        symbol: str,
-        expiry: str | None = None,
-    ) -> dict[str, Any]:
-        """
-        Get option chain for a symbol.
-
-        Args:
-            symbol: Symbol name
-            expiry: Expiry date in YYYY-MM-DD format
-
-        Returns:
-            Dictionary containing option chain data
-        """
+    async def get_option_chain(self, symbol: str, expiry: Optional[str] = None) -> dict[str, Any]:
         payload = {"symbol": symbol, "expiry": expiry}
         return await self._request("POST", "option_chain", json=payload)
 
     async def get_position_book(self) -> dict[str, Any]:
-        """Get current position book."""
         return await self._request("POST", "position_book")
 
     async def get_funds(self) -> dict[str, Any]:
-        """Get available funds."""
         return await self._request("POST", "funds")
 
     async def place_order(
@@ -792,58 +419,23 @@ class AsyncOpenAlgoClient:
         symbol: str,
         quantity: int,
         order_type: str | OrderType,
-        price: float | None = None,
+        price: Optional[float] = None,
         variety: str | OrderVariety = "regular",
         transaction_type: str | TransactionType = "BUY",
         product_type: str | ProductType = "MIS",
-        trigger_price: float | None = None,
-        stop_loss: float | None = None,
-        take_profit: float | None = None,
-        trailing_stop_loss: float | None = None,
+        trigger_price: Optional[float] = None,
+        stop_loss: Optional[float] = None,
+        take_profit: Optional[float] = None,
+        trailing_stop_loss: Optional[float] = None,
     ) -> dict[str, Any]:
-        """
-        Place an order.
-
-        Args:
-            symbol: Symbol name
-            quantity: Order quantity
-            order_type: Order type (MARKET, LIMIT, SL, SL-M)
-            price: Order price (required for LIMIT, SL, SL-M)
-            variety: Order variety (regular, amo)
-            transaction_type: BUY or SELL
-            product_type: MIS, NRML, CNC
-            trigger_price: Trigger price for SL orders
-            stop_loss: Stop loss price
-            take_profit: Take profit price
-            trailing_stop_loss: Trailing stop loss amount
-
-        Returns:
-            Dictionary containing order response
-
-        Raises:
-            KillSwitchError: If kill switch is active.
-            RateLimitExceededError: If rate limit is exceeded.
-        """
-        # Check kill switch before placing order
         await _async_check_kill_switch()
-
-        # Apply rate limiting
         if not await ORDER_RATE_LIMITER.acquire():
-            logger.warning("Rate limit exceeded for order placement")
-            raise RateLimitExceededError(
-                f"Order rate limit exceeded: {settings.max_ops} orders per second"
-            )
-
-        # Normalize enum values to strings
-        if isinstance(order_type, OrderType):
-            order_type = order_type.value
-        if isinstance(variety, OrderVariety):
-            variety = variety.value
-        if isinstance(transaction_type, TransactionType):
-            transaction_type = transaction_type.value
-        if isinstance(product_type, ProductType):
-            product_type = product_type.value
-
+            logger.warning("Rate limit exceeded order placement")
+            raise RateLimitExceededError("Rate limit exceeded")
+        if isinstance(order_type, OrderType): order_type = order_type.value
+        if isinstance(variety, OrderVariety): variety = variety.value
+        if isinstance(transaction_type, TransactionType): transaction_type = transaction_type.value
+        if isinstance(product_type, ProductType): product_type = product_type.value
         payload: dict[str, Any] = {
             "symbol": symbol,
             "quantity": quantity,
@@ -852,19 +444,11 @@ class AsyncOpenAlgoClient:
             "transaction_type": transaction_type,
             "product_type": product_type,
         }
-
-        # Add optional fields
-        if price is not None:
-            payload["price"] = price
-        if trigger_price is not None:
-            payload["trigger_price"] = trigger_price
-        if stop_loss is not None:
-            payload["stop_loss"] = stop_loss
-        if take_profit is not None:
-            payload["take_profit"] = take_profit
-        if trailing_stop_loss is not None:
-            payload["trailing_stop_loss"] = trailing_stop_loss
-
+        if price is not None: payload["price"] = price
+        if trigger_price is not None: payload["trigger_price"] = trigger_price
+        if stop_loss is not None: payload["stop_loss"] = stop_loss
+        if take_profit is not None: payload["take_profit"] = take_profit
+        if trailing_stop_loss is not None: payload["trailing_stop_loss"] = trailing_stop_loss
         return await self._request("POST", "place_order", json=payload)
 
     async def place_smart_order(
@@ -872,58 +456,23 @@ class AsyncOpenAlgoClient:
         symbol: str,
         quantity: int,
         order_type: str | OrderType,
-        price: float | None = None,
-        trigger_price: float | None = None,
-        stop_loss: float | None = None,
-        take_profit: float | None = None,
-        trailing_stop_loss: float | None = None,
+        price: Optional[float] = None,
+        trigger_price: Optional[float] = None,
+        stop_loss: Optional[float] = None,
+        take_profit: Optional[float] = None,
+        trailing_stop_loss: Optional[float] = None,
         strategy: str = "simple",
         transaction_type: str | TransactionType = "BUY",
         product_type: str | ProductType = "MIS",
-        metadata: dict[str, Any] | None = None,
+        metadata: Optional[dict[str, Any]] = None,
     ) -> dict[str, Any]:
-        """
-        Place a smart order with advanced features.
-
-        Args:
-            symbol: Symbol name
-            quantity: Order quantity
-            order_type: Order type (MARKET, LIMIT, SL, SL-M)
-            price: Order price
-            trigger_price: Trigger price for SL orders
-            stop_loss: Stop loss price
-            take_profit: Take profit price
-            trailing_stop_loss: Trailing stop loss amount
-            strategy: Strategy type (simple, bracket, cover)
-            transaction_type: BUY or SELL
-            product_type: MIS, NRML, CNC
-            metadata: Additional metadata
-
-        Returns:
-            Dictionary containing smart order response
-
-        Raises:
-            KillSwitchError: If kill switch is active.
-            RateLimitExceededError: If rate limit is exceeded.
-        """
-        # Check kill switch before placing order
         await _async_check_kill_switch()
-
-        # Apply rate limiting
         if not await SMART_ORDER_RATE_LIMITER.acquire():
-            logger.warning("Rate limit exceeded for smart order placement")
-            raise RateLimitExceededError(
-                f"Smart order rate limit exceeded: {settings.max_ops} orders per second"
-            )
-
-        # Normalize enum values to strings
-        if isinstance(order_type, OrderType):
-            order_type = order_type.value
-        if isinstance(transaction_type, TransactionType):
-            transaction_type = transaction_type.value
-        if isinstance(product_type, ProductType):
-            product_type = product_type.value
-
+            logger.warning("Rate limit exceeded smart order placement")
+            raise RateLimitExceededError("Rate limit exceeded")
+        if isinstance(order_type, OrderType): order_type = order_type.value
+        if isinstance(transaction_type, TransactionType): transaction_type = transaction_type.value
+        if isinstance(product_type, ProductType): product_type = product_type.value
         payload: dict[str, Any] = {
             "symbol": symbol,
             "quantity": quantity,
@@ -932,89 +481,48 @@ class AsyncOpenAlgoClient:
             "transaction_type": transaction_type,
             "product_type": product_type,
         }
-
-        if price is not None:
-            payload["price"] = price
-        if trigger_price is not None:
-            payload["trigger_price"] = trigger_price
-        if stop_loss is not None:
-            payload["stop_loss"] = stop_loss
-        if take_profit is not None:
-            payload["take_profit"] = take_profit
-        if trailing_stop_loss is not None:
-            payload["trailing_stop_loss"] = trailing_stop_loss
-        if metadata is not None:
-            payload["metadata"] = metadata
-
+        if price is not None: payload["price"] = price
+        if trigger_price is not None: payload["trigger_price"] = trigger_price
+        if stop_loss is not None: payload["stop_loss"] = stop_loss
+        if take_profit is not None: payload["take_profit"] = take_profit
+        if trailing_stop_loss is not None: payload["trailing_stop_loss"] = trailing_stop_loss
+        if metadata is not None: payload["metadata"] = metadata
         return await self._request("POST", "place_smart_order", json=payload)
 
     async def modify_order(
         self,
         order_id: str,
-        quantity: int | None = None,
-        order_type: str | OrderType | None = None,
-        price: float | None = None,
-        trigger_price: float | None = None,
-        stop_loss: float | None = None,
-        take_profit: float | None = None,
-        trailing_stop_loss: float | None = None,
+        quantity: Optional[int] = None,
+        order_type: Optional[str | OrderType] = None,
+        price: Optional[float] = None,
+        trigger_price: Optional[float] = None,
+        stop_loss: Optional[float] = None,
+        take_profit: Optional[float] = None,
+        trailing_stop_loss: Optional[float] = None,
     ) -> dict[str, Any]:
-        """
-        Modify an existing order.
-
-        Args:
-            order_id: Order ID to modify
-            quantity: New quantity
-            order_type: New order type
-            price: New price
-            trigger_price: New trigger price
-            stop_loss: New stop loss price
-            take_profit: New take profit price
-            trailing_stop_loss: New trailing stop loss amount
-
-        Returns:
-            Dictionary containing modification response
-        """
-        if isinstance(order_type, OrderType):
-            order_type = order_type.value
-
+        if isinstance(order_type, OrderType): order_type = order_type.value
         payload: dict[str, Any] = {"order_id": order_id}
-
-        if quantity is not None:
-            payload["quantity"] = quantity
-        if order_type is not None:
-            payload["order_type"] = order_type
-        if price is not None:
-            payload["price"] = price
-        if trigger_price is not None:
-            payload["trigger_price"] = trigger_price
-        if stop_loss is not None:
-            payload["stop_loss"] = stop_loss
-        if take_profit is not None:
-            payload["take_profit"] = take_profit
-        if trailing_stop_loss is not None:
-            payload["trailing_stop_loss"] = trailing_stop_loss
-
+        if quantity is not None: payload["quantity"] = quantity
+        if order_type is not None: payload["order_type"] = order_type
+        if price is not None: payload["price"] = price
+        if trigger_price is not None: payload["trigger_price"] = trigger_price
+        if stop_loss is not None: payload["stop_loss"] = stop_loss
+        if take_profit is not None: payload["take_profit"] = take_profit
+        if trailing_stop_loss is not None: payload["trailing_stop_loss"] = trailing_stop_loss
         return await self._request("POST", "modify_order", json=payload)
 
     async def cancel_order(self, order_id: str) -> dict[str, Any]:
-        """Cancel an order."""
         payload = {"order_id": order_id}
         return await self._request("POST", "cancel_order", json=payload)
 
     async def get_order_status(self, order_id: str) -> dict[str, Any]:
-        """Get status of an order."""
         payload = {"order_id": order_id}
         return await self._request("POST", "order_status", json=payload)
 
     async def get_all_orders(self) -> dict[str, Any]:
-        """Get all orders."""
         return await self._request("POST", "all_orders")
 
     async def get_trade_book(self) -> dict[str, Any]:
-        """Get trade book."""
         return await self._request("POST", "trade_book")
 
-
-# Export async client instance for scheduler
 async_client = AsyncOpenAlgoClient()

@@ -4,7 +4,7 @@ import time
 from collections import deque
 from typing import Any, Callable, Coroutine, Optional
 
-from ..config import settings
+from ..config import get_settings
 from ..loats_logging import get_logger
 
 logger = get_logger(__name__)
@@ -20,9 +20,10 @@ class RateLimiter:
         """Initialize rate limiter.
 
         Args:
-            max_ops: Maximum operations perinterval (default: from settings)
-            interval: Time interval seconds (default:1.0
+            max_ops: Maximum operations per interval (default: from settings)
+            interval: Time interval in seconds (default: 1.0)
         """
+        settings = get_settings()
         self.max_ops: int = max_ops if max_ops is not None else settings.max_ops
         self.interval: float = interval
         self.tokens: float = float(self.max_ops)
@@ -77,9 +78,10 @@ class AsyncRateLimiter:
         """Initialize async rate limiter.
 
         Args:
-            max_ops: Maximum operations perwindow (default: from settings)
-            window_size: Time window seconds (default:1.0
+            max_ops: Maximum operations per window (default: from settings)
+            window_size: Time window in seconds (default: 1.0)
         """
+        settings = get_settings()
         self.max_ops: int = max_ops if max_ops is not None else settings.max_ops
         self.window_size: float = window_size
         self.timestamps: deque[float] = deque()
