@@ -55,7 +55,7 @@ class OpenAlgoAPIError(OpenAlgoError):
     ) -> None:
         self.status_code = status_code
         self.message = message
-        self.details = details or {}
+        self.details = details
         super().__init__(f"API Error {status_code}: {message}")
 
 def _get_alerts() -> AlertSystem:
@@ -155,9 +155,15 @@ class OpenAlgoClient:
             change_percent=data.get("change_percent", 0.0),
         )
 
-    def _convert_to_historical_data(self, symbol: str, interval: str, data: dict[str, Any]) -> HistoricalData:
+    def _convert_to_historical_data(
+        self, symbol: str, interval: str, data: dict[str, Any]
+    ) -> HistoricalData:
         timestamp_str = data.get("timestamp", datetime.now(UTC).isoformat())
-        timestamp = datetime.fromisoformat(timestamp_str) if isinstance(timestamp_str, str) else timestamp_str
+        timestamp = (
+            datetime.fromisoformat(timestamp_str)
+            if isinstance(timestamp_str, str)
+            else timestamp_str
+        )
         return HistoricalData(
             symbol=symbol,
             timestamp=timestamp,
@@ -183,7 +189,11 @@ class OpenAlgoClient:
 
     def _convert_to_order(self, data: dict[str, Any]) -> Order:
         timestamp_str = data.get("timestamp", datetime.now(UTC).isoformat())
-        timestamp = datetime.fromisoformat(timestamp_str) if isinstance(timestamp_str, str) else timestamp_str
+        timestamp = (
+            datetime.fromisoformat(timestamp_str)
+            if isinstance(timestamp_str, str)
+            else timestamp_str
+        )
         return Order(
             order_id=data.get("order_id", ""),
             symbol=data.get("symbol", ""),
@@ -207,8 +217,19 @@ class OpenAlgoClient:
         payload = {"symbols": symbols}
         return self._request("POST", "quotes", json=payload)
 
-    def get_history(self, symbol: str, interval: str, from_date: Optional[str] = None, to_date: Optional[str] = None) -> dict[str, Any]:
-        payload = {"symbol": symbol, "interval": interval, "from_date": from_date, "to_date": to_date}
+    def get_history(
+        self,
+        symbol: str,
+        interval: str,
+        from_date: Optional[str] = None,
+        to_date: Optional[str] = None,
+    ) -> dict[str, Any]:
+        payload = {
+            "symbol": symbol,
+            "interval": interval,
+            "from_date": from_date,
+            "to_date": to_date,
+        }
         return self._request("POST", "history", json=payload)
 
     def get_option_chain(self, symbol: str, expiry: Optional[str] = None) -> dict[str, Any]:
@@ -236,10 +257,15 @@ class OpenAlgoClient:
         trailing_stop_loss: Optional[float] = None,
     ) -> dict[str, Any]:
         _check_kill_switch()
-        if isinstance(order_type, OrderType): order_type = order_type.value
-        if isinstance(variety, OrderVariety): variety = variety.value
-        if isinstance(transaction_type, TransactionType): transaction_type = transaction_type.value
-        if isinstance(product_type, ProductType): product_type = product_type.value
+        if isinstance(order_type, OrderType):
+            order_type = order_type.value
+        if isinstance(variety, OrderVariety):
+            variety = variety.value
+        if isinstance(transaction_type, TransactionType):
+            transaction_type = transaction_type.value
+        if isinstance(product_type, ProductType):
+            product_type = product_type.value
+
         payload: dict[str, Any] = {
             "symbol": symbol,
             "quantity": quantity,
@@ -248,11 +274,17 @@ class OpenAlgoClient:
             "transaction_type": transaction_type,
             "product_type": product_type,
         }
-        if price is not None: payload["price"] = price
-        if trigger_price is not None: payload["trigger_price"] = trigger_price
-        if stop_loss is not None: payload["stop_loss"] = stop_loss
-        if take_profit is not None: payload["take_profit"] = take_profit
-        if trailing_stop_loss is not None: payload["trailing_stop_loss"] = trailing_stop_loss
+        if price is not None:
+            payload["price"] = price
+        if trigger_price is not None:
+            payload["trigger_price"] = trigger_price
+        if stop_loss is not None:
+            payload["stop_loss"] = stop_loss
+        if take_profit is not None:
+            payload["take_profit"] = take_profit
+        if trailing_stop_loss is not None:
+            payload["trailing_stop_loss"] = trailing_stop_loss
+
         return self._request("POST", "place_order", json=payload)
 
     def place_smart_order(
@@ -271,9 +303,13 @@ class OpenAlgoClient:
         metadata: Optional[dict[str, Any]] = None,
     ) -> dict[str, Any]:
         _check_kill_switch()
-        if isinstance(order_type, OrderType): order_type = order_type.value
-        if isinstance(transaction_type, TransactionType): transaction_type = transaction_type.value
-        if isinstance(product_type, ProductType): product_type = product_type.value
+        if isinstance(order_type, OrderType):
+            order_type = order_type.value
+        if isinstance(transaction_type, TransactionType):
+            transaction_type = transaction_type.value
+        if isinstance(product_type, ProductType):
+            product_type = product_type.value
+
         payload: dict[str, Any] = {
             "symbol": symbol,
             "quantity": quantity,
@@ -282,12 +318,19 @@ class OpenAlgoClient:
             "transaction_type": transaction_type,
             "product_type": product_type,
         }
-        if price is not None: payload["price"] = price
-        if trigger_price is not None: payload["trigger_price"] = trigger_price
-        if stop_loss is not None: payload["stop_loss"] = stop_loss
-        if take_profit is not None: payload["take_profit"] = take_profit
-        if trailing_stop_loss is not None: payload["trailing_stop_loss"] = trailing_stop_loss
-        if metadata is not None: payload["metadata"] = metadata
+        if price is not None:
+            payload["price"] = price
+        if trigger_price is not None:
+            payload["trigger_price"] = trigger_price
+        if stop_loss is not None:
+            payload["stop_loss"] = stop_loss
+        if take_profit is not None:
+            payload["take_profit"] = take_profit
+        if trailing_stop_loss is not None:
+            payload["trailing_stop_loss"] = trailing_stop_loss
+        if metadata is not None:
+            payload["metadata"] = metadata
+
         return self._request("POST", "place_smart_order", json=payload)
 
     def modify_order(
@@ -301,18 +344,30 @@ class OpenAlgoClient:
         take_profit: Optional[float] = None,
         trailing_stop_loss: Optional[float] = None,
     ) -> dict[str, Any]:
-        if isinstance(order_type, OrderType): order_type = order_type.value
+        _check_kill_switch()
+        if isinstance(order_type, OrderType):
+            order_type = order_type.value
+
         payload: dict[str, Any] = {"order_id": order_id}
-        if quantity is not None: payload["quantity"] = quantity
-        if order_type is not None: payload["order_type"] = order_type
-        if price is not None: payload["price"] = price
-        if trigger_price is not None: payload["trigger_price"] = trigger_price
-        if stop_loss is not None: payload["stop_loss"] = stop_loss
-        if take_profit is not None: payload["take_profit"] = take_profit
-        if trailing_stop_loss is not None: payload["trailing_stop_loss"] = trailing_stop_loss
+        if quantity is not None:
+            payload["quantity"] = quantity
+        if order_type is not None:
+            payload["order_type"] = order_type
+        if price is not None:
+            payload["price"] = price
+        if trigger_price is not None:
+            payload["trigger_price"] = trigger_price
+        if stop_loss is not None:
+            payload["stop_loss"] = stop_loss
+        if take_profit is not None:
+            payload["take_profit"] = take_profit
+        if trailing_stop_loss is not None:
+            payload["trailing_stop_loss"] = trailing_stop_loss
+
         return self._request("POST", "modify_order", json=payload)
 
     def cancel_order(self, order_id: str) -> dict[str, Any]:
+        _check_kill_switch()
         payload = {"order_id": order_id}
         return self._request("POST", "cancel_order", json=payload)
 
@@ -325,8 +380,6 @@ class OpenAlgoClient:
 
     def get_trade_book(self) -> dict[str, Any]:
         return self._request("POST", "trade_book")
-
-client = OpenAlgoClient()
 
 class AsyncOpenAlgoClient:
     """Async client interacting OpenAlgo API."""
@@ -400,8 +453,19 @@ class AsyncOpenAlgoClient:
             logger.warning(f"Failed cache quotes: {e}")
         return result
 
-    async def get_history(self, symbol: str, interval: str, from_date: Optional[str] = None, to_date: Optional[str] = None) -> dict[str, Any]:
-        payload = {"symbol": symbol, "interval": interval, "from_date": from_date, "to_date": to_date}
+    async def get_history(
+        self,
+        symbol: str,
+        interval: str,
+        from_date: Optional[str] = None,
+        to_date: Optional[str] = None,
+    ) -> dict[str, Any]:
+        payload = {
+            "symbol": symbol,
+            "interval": interval,
+            "from_date": from_date,
+            "to_date": to_date,
+        }
         return await self._request("POST", "history", json=payload)
 
     async def get_option_chain(self, symbol: str, expiry: Optional[str] = None) -> dict[str, Any]:
@@ -432,10 +496,15 @@ class AsyncOpenAlgoClient:
         if not await get_order_rate_limiter().acquire():
             logger.warning("Rate limit exceeded order placement")
             raise RateLimitExceededError("Rate limit exceeded")
-        if isinstance(order_type, OrderType): order_type = order_type.value
-        if isinstance(variety, OrderVariety): variety = variety.value
-        if isinstance(transaction_type, TransactionType): transaction_type = transaction_type.value
-        if isinstance(product_type, ProductType): product_type = product_type.value
+        if isinstance(order_type, OrderType):
+            order_type = order_type.value
+        if isinstance(variety, OrderVariety):
+            variety = variety.value
+        if isinstance(transaction_type, TransactionType):
+            transaction_type = transaction_type.value
+        if isinstance(product_type, ProductType):
+            product_type = product_type.value
+
         payload: dict[str, Any] = {
             "symbol": symbol,
             "quantity": quantity,
@@ -444,11 +513,17 @@ class AsyncOpenAlgoClient:
             "transaction_type": transaction_type,
             "product_type": product_type,
         }
-        if price is not None: payload["price"] = price
-        if trigger_price is not None: payload["trigger_price"] = trigger_price
-        if stop_loss is not None: payload["stop_loss"] = stop_loss
-        if take_profit is not None: payload["take_profit"] = take_profit
-        if trailing_stop_loss is not None: payload["trailing_stop_loss"] = trailing_stop_loss
+        if price is not None:
+            payload["price"] = price
+        if trigger_price is not None:
+            payload["trigger_price"] = trigger_price
+        if stop_loss is not None:
+            payload["stop_loss"] = stop_loss
+        if take_profit is not None:
+            payload["take_profit"] = take_profit
+        if trailing_stop_loss is not None:
+            payload["trailing_stop_loss"] = trailing_stop_loss
+
         return await self._request("POST", "place_order", json=payload)
 
     async def place_smart_order(
@@ -470,9 +545,13 @@ class AsyncOpenAlgoClient:
         if not await get_smart_order_rate_limiter().acquire():
             logger.warning("Rate limit exceeded smart order placement")
             raise RateLimitExceededError("Rate limit exceeded")
-        if isinstance(order_type, OrderType): order_type = order_type.value
-        if isinstance(transaction_type, TransactionType): transaction_type = transaction_type.value
-        if isinstance(product_type, ProductType): product_type = product_type.value
+        if isinstance(order_type, OrderType):
+            order_type = order_type.value
+        if isinstance(transaction_type, TransactionType):
+            transaction_type = transaction_type.value
+        if isinstance(product_type, ProductType):
+            product_type = product_type.value
+
         payload: dict[str, Any] = {
             "symbol": symbol,
             "quantity": quantity,
@@ -481,12 +560,19 @@ class AsyncOpenAlgoClient:
             "transaction_type": transaction_type,
             "product_type": product_type,
         }
-        if price is not None: payload["price"] = price
-        if trigger_price is not None: payload["trigger_price"] = trigger_price
-        if stop_loss is not None: payload["stop_loss"] = stop_loss
-        if take_profit is not None: payload["take_profit"] = take_profit
-        if trailing_stop_loss is not None: payload["trailing_stop_loss"] = trailing_stop_loss
-        if metadata is not None: payload["metadata"] = metadata
+        if price is not None:
+            payload["price"] = price
+        if trigger_price is not None:
+            payload["trigger_price"] = trigger_price
+        if stop_loss is not None:
+            payload["stop_loss"] = stop_loss
+        if take_profit is not None:
+            payload["take_profit"] = take_profit
+        if trailing_stop_loss is not None:
+            payload["trailing_stop_loss"] = trailing_stop_loss
+        if metadata is not None:
+            payload["metadata"] = metadata
+
         return await self._request("POST", "place_smart_order", json=payload)
 
     async def modify_order(
@@ -500,18 +586,30 @@ class AsyncOpenAlgoClient:
         take_profit: Optional[float] = None,
         trailing_stop_loss: Optional[float] = None,
     ) -> dict[str, Any]:
-        if isinstance(order_type, OrderType): order_type = order_type.value
+        await _async_check_kill_switch()
+        if isinstance(order_type, OrderType):
+            order_type = order_type.value
+
         payload: dict[str, Any] = {"order_id": order_id}
-        if quantity is not None: payload["quantity"] = quantity
-        if order_type is not None: payload["order_type"] = order_type
-        if price is not None: payload["price"] = price
-        if trigger_price is not None: payload["trigger_price"] = trigger_price
-        if stop_loss is not None: payload["stop_loss"] = stop_loss
-        if take_profit is not None: payload["take_profit"] = take_profit
-        if trailing_stop_loss is not None: payload["trailing_stop_loss"] = trailing_stop_loss
+        if quantity is not None:
+            payload["quantity"] = quantity
+        if order_type is not None:
+            payload["order_type"] = order_type
+        if price is not None:
+            payload["price"] = price
+        if trigger_price is not None:
+            payload["trigger_price"] = trigger_price
+        if stop_loss is not None:
+            payload["stop_loss"] = stop_loss
+        if take_profit is not None:
+            payload["take_profit"] = take_profit
+        if trailing_stop_loss is not None:
+            payload["trailing_stop_loss"] = trailing_stop_loss
+
         return await self._request("POST", "modify_order", json=payload)
 
     async def cancel_order(self, order_id: str) -> dict[str, Any]:
+        await _async_check_kill_switch()
         payload = {"order_id": order_id}
         return await self._request("POST", "cancel_order", json=payload)
 

@@ -1,5 +1,4 @@
 """Main entry point LOATS13July2026 trading system."""
-
 import asyncio
 import signal
 import sys
@@ -7,13 +6,11 @@ from typing import Any
 
 from .alerts import alerts
 from .config import get_settings
-settings = get_settings()
-from .database import db
+from .database import Database
 from .loats_logging import logger
 from .metrics import start_metrics_server
 from .scheduler import scheduler
 from .utils.cache import close_cache, initialize_cache
-
 
 class TradingSystem:
     """Main trading system class."""
@@ -22,19 +19,25 @@ class TradingSystem:
         """Initialize TradingSystem."""
         self.shutdown_event = asyncio.Event()
         self.running = False
+        settings = get_settings()
+        self.db = Database(
+            db_path=settings.sqlite_db_path,
+            audit_log_path=settings.audit_log_path,
+            retention_days=settings.retention_days
+        )
 
     async def initialize(self) -> None:
         """Initialize all system components."""
         try:
             logger.info("Initializing LOATS13July2026 trading system")
             start_metrics_server()
-            settings.initialize()
+            # Settings get_settings() implicitly initialized via config module
             await initialize_cache()
-            db.initialize()
-            if not db.verify_audit_log_integrity():
+            await self.db.async_initialize()
+            if not await self.db.async_verify_audit_log_integrity():
                 logger.warning("Audit log integrity check failed during initialization")
             await alerts.initialize()
-            await scheduler.initialize()
+            await scheduler.initialize(self.db)
             logger.info("All system components initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize trading system: {e}")
@@ -49,9 +52,7 @@ class TradingSystem:
             logger.info("Starting LOATS13July2026 trading system")
             await alerts.start()
             await scheduler.start()
-            await alerts.send_system_alert(
-                "LOATS13July2026 trading system started successfully", "success"
-            )
+            await alerts.send_system_alert("LOATS13July2026 trading system started successfully", "success")
             self.running = True
             logger.info("Trading system started successfully")
             await self._wait_for_shutdown()
@@ -72,10 +73,7 @@ class TradingSystem:
             signal.signal(signal.SIGTERM, signal_handler)
         else:
             for sig in (signal.SIGINT, signal.SIGTERM):
-                loop.add_signal_handler(
-                    sig,
-                    lambda s=sig: asyncio.create_task(self._handle_shutdown_signal(s)),
-                )
+                loop.add_signal_handler(sig, lambda s=sig: asyncio.create_task(self._handle_shutdown_signal(s)))
 
         await self.shutdown_event.wait()
 
@@ -91,13 +89,11 @@ class TradingSystem:
             return
         try:
             logger.info("Shutting down LOATS13July2026 trading system")
-            await alerts.send_system_alert(
-                "LOATS13July2026 trading system shutting down", "warning"
-            )
+            await alerts.send_system_alert("LOATS13July2026 trading system shutting down", "warning")
             await scheduler.shutdown()
             await alerts.shutdown()
             await close_cache()
-            await db.async_close_all()
+            await self.db.async_close_all()
             self.running = False
             self.shutdown_event.set()
             logger.info("Trading system shutdown complete")
@@ -117,7 +113,6 @@ class TradingSystem:
             logger.error(f"Error running scans: {e}")
             raise
 
-
 async def main() -> None:
     """Standalone main entry point for trading system."""
     system = TradingSystem()
@@ -128,7 +123,6 @@ async def main() -> None:
         logger.error(f"Trading system failed: {e}")
         await system.shutdown()
         sys.exit(1)
-
 
 if __name__ == "__main__":
     try:

@@ -768,7 +768,7 @@ class AlertSystem:
         """Handle /signals command."""
         try:
             # NEW-M5: use injected database to avoid per-command connection churn
-            signals = self.db.get_latest_signals(settings.default_symbol, limit=5)
+            signals = await self.db.async_get_latest_signals(settings.default_symbol, limit=5)
             if not signals:
                 if update.message:
                     await update.message.reply_text("ℹ️ No recent signals found.")
