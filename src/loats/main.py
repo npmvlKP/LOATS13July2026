@@ -6,7 +6,8 @@ import sys
 from typing import Any
 
 from .alerts import alerts
-from .config import settings
+from .config import get_settings
+settings = get_settings()
 from .database import db
 from .loats_logging import logger
 from .metrics import start_metrics_server

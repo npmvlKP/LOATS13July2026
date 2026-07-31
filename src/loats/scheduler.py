@@ -10,7 +10,8 @@ from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
 from .alerts import alerts
-from .config import settings
+from .config import get_settings
+settings = get_settings()
 from .database import Database
 from .loats_logging import get_logger
 from .metrics import record_signal, track_job

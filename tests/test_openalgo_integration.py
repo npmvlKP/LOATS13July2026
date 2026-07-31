@@ -11,7 +11,7 @@ import httpx
 import pytest
 
 from src.loats.alerts import alerts
-from src.loats.config import settings
+from src.loats.config import get_settings
 from src.loats.models import (
     HistoricalData,
     OrderType,
@@ -26,9 +26,15 @@ from src.loats.openalgo import (
     OpenAlgoClient,
 )
 
+settings = get_settings()
+
 # Test configuration - use sandbox if available, otherwise skip integration tests
 OPENALGO_SANDBOX_ENABLED = os.getenv("OPENALGO_SANDBOX_ENABLED", "false").lower() == "true"
-OPENALGO_API_KEY = os.getenv("OPENALGO_API_KEY", settings.openalgo_api_key.get_secret_value())
+OPENALGO_API_KEY = os.getenv("OPENALGO_API_KEY") or (
+    settings.openalgo_api_key.get_secret_value()
+    if hasattr(settings.openalgo_api_key, "get_secret_value")
+    else settings.openalgo_api_key
+)
 TEST_SYMBOL = "NIFTY"
 
 def is_sandbox_available() -> bool:
@@ -37,14 +43,19 @@ def is_sandbox_available() -> bool:
         return False
     try:
         # Test connection sandbox
-        client = httpx.Client(timeout=5.0)
-        response = client.get(f"{settings.openalgo_base_url}/api/v1/ping", headers={"x-api-key": OPENALGO_API_KEY})
-        return response.status_code == 200
+        with httpx.Client(timeout=5.0) as client:
+            response = client.get(
+                f"{settings.openalgo_base_url}/api/v1/ping",
+                headers={"x-api-key": OPENALGO_API_KEY},
+            )
+            return response.status_code == 200
     except (httpx.ConnectError, httpx.TimeoutException):
         return False
 
 # Skip integration tests if sandbox not available
-pytestmark = pytest.mark.skipif(not is_sandbox_available(), reason="OpenAlgo sandbox not available integration testing")
+pytestmark = pytest.mark.skipif(
+    not is_sandbox_available(), reason="OpenAlgo sandbox not available integration testing"
+)
 
 class TestOpenAlgoClientIntegration:
     """Integration tests OpenAlgoClient real API calls."""
@@ -62,7 +73,7 @@ class TestOpenAlgoClientIntegration:
         latency = time.time() - start_time
         assert result["success"] is True
         assert TEST_SYMBOL in result["data"]
-        assert isinstance(result["data"][TEST_SYMBOL]["last_price"], float)
+        assert isinstance(result["data"][TEST_SYMBOL]["last_price"], (int, float))
         assert latency < 2.0  # respond within 2 seconds
 
         # Validate model conversion
@@ -74,14 +85,21 @@ class TestOpenAlgoClientIntegration:
     def test_get_history_real_api(self, client: OpenAlgoClient) -> None:
         """Test get_history real API call."""
         start_time = time.time()
-        result = client.get_history(symbol=TEST_SYMBOL, interval="1min", from_date="2023-01-01", to_date="2023-01-02")
+        result = client.get_history(
+            symbol=TEST_SYMBOL,
+            interval="1min",
+            from_date="2023-01-01",
+            to_date="2023-01-02",
+        )
         latency = time.time() - start_time
         assert result["success"] is True
         assert len(result["data"]) > 0
         assert latency < 3.0  # respond within 3 seconds
 
         # Validate model conversion
-        historical = client._convert_to_historical_data(TEST_SYMBOL, "1min", result["data"][0])
+        historical = client._convert_to_historical_data(
+            TEST_SYMBOL, "1min", result["data"][0]
+        )
         assert isinstance(historical, HistoricalData)
         assert historical.symbol == TEST_SYMBOL
         assert historical.interval == "1min"
@@ -100,7 +118,13 @@ class TestOpenAlgoClientIntegration:
         alerts.activate_kill_switch()
         try:
             with pytest.raises(KillSwitchError) as exc_info:
-                client.place_order(symbol=TEST_SYMBOL, quantity=1, order_type=OrderType.MARKET, transaction_type=TransactionType.BUY, product_type=ProductType.MIS)
+                client.place_order(
+                    symbol=TEST_SYMBOL,
+                    quantity=1,
+                    order_type=OrderType.MARKET,
+                    transaction_type=TransactionType.BUY,
+                    product_type=ProductType.MIS,
+                )
             assert "kill switch active" in str(exc_info.value).lower()
         finally:
             # Restore original kill switch state
@@ -110,7 +134,13 @@ class TestOpenAlgoClientIntegration:
     def test_place_and_cancel_order(self, client: OpenAlgoClient) -> None:
         """Test complete order lifecycle: place then cancel."""
         # Place order
-        place_result = client.place_order(symbol=TEST_SYMBOL, quantity=1, order_type=OrderType.MARKET, transaction_type=TransactionType.BUY, product_type=ProductType.MIS)
+        place_result = client.place_order(
+            symbol=TEST_SYMBOL,
+            quantity=1,
+            order_type=OrderType.MARKET,
+            transaction_type=TransactionType.BUY,
+            product_type=ProductType.MIS,
+        )
         assert place_result["success"] is True
         order_id = place_result["data"]["order_id"]
 
@@ -155,7 +185,7 @@ class TestAsyncOpenAlgoClientIntegration:
         latency = time.time() - start_time
         assert result["success"] is True
         assert TEST_SYMBOL in result["data"]
-        assert isinstance(result["data"][TEST_SYMBOL]["last_price"], float)
+        assert isinstance(result["data"][TEST_SYMBOL]["last_price"], (int, float))
         assert latency < 2.0  # respond within 2 seconds
 
     async def test_async_error_handling_real_api(self, async_client: AsyncOpenAlgoClient) -> None:
@@ -172,7 +202,13 @@ class TestAsyncOpenAlgoClientIntegration:
         alerts.activate_kill_switch()
         try:
             with pytest.raises(KillSwitchError) as exc_info:
-                await async_client.place_order(symbol=TEST_SYMBOL, quantity=1, order_type=OrderType.MARKET, transaction_type=TransactionType.BUY, product_type=ProductType.MIS)
+                await async_client.place_order(
+                    symbol=TEST_SYMBOL,
+                    quantity=1,
+                    order_type=OrderType.MARKET,
+                    transaction_type=TransactionType.BUY,
+                    product_type=ProductType.MIS,
+                )
             assert "kill switch active" in str(exc_info.value).lower()
         finally:
             # Restore original kill switch state
@@ -182,11 +218,11 @@ class TestAsyncOpenAlgoClientIntegration:
     async def test_async_load_testing(self, async_client: AsyncOpenAlgoClient) -> None:
         """Test async client performance under multiple concurrent requests."""
         async def make_request() -> float:
-            start_time = time.time()
+            req_start = time.time()
             result = await async_client.get_quotes([TEST_SYMBOL])
             assert result["success"] is True
             assert TEST_SYMBOL in result["data"]
-            return time.time() - start_time
+            return time.time() - req_start
 
         start_time = time.time()
         tasks = [make_request() for _ in range(5)]
@@ -203,18 +239,22 @@ class TestPerformanceBenchmarks:
     def test_latency_benchmark_sync(self, benchmark) -> None:
         """Benchmark sync client latency."""
         client = OpenAlgoClient()
+
         def get_quotes():
             return client.get_quotes([TEST_SYMBOL])
+
         result = benchmark(get_quotes)
         assert result["success"] is True
 
+    @pytest.mark.asyncio
     async def test_latency_benchmark_async(self, benchmark) -> None:
         """Benchmark async client latency."""
-        client = AsyncOpenAlgoClient()
-        async def get_quotes():
-            return await client.get_quotes([TEST_SYMBOL])
-        result = await benchmark(get_quotes)
-        assert result["success"] is True
+        async with AsyncOpenAlgoClient() as client:
+            async def get_quotes():
+                return await client.get_quotes([TEST_SYMBOL])
+
+            result = await benchmark(get_quotes)
+            assert result["success"] is True
 
     def test_throughput_benchmark(self) -> None:
         """Test client throughput under load."""

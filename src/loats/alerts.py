@@ -17,7 +17,8 @@ from telegram.ext import (
     filters,
 )
 
-from .config import settings
+from src.loats.config import get_settings
+settings = get_settings()
 from .database import Database, db
 from .loats_logging import get_logger
 from .models import Order, Signal, SignalType, Trade

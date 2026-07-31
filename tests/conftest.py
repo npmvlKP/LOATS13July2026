@@ -26,7 +26,7 @@ from src.loats.models import (
 )
 
 if TYPE_CHECKING:
-    from src.loats.config._settings import Settings
+    from src.loats.config.settings import Settings
 
 from src.loats.loats_logging import configure_logging
 
@@ -41,7 +41,7 @@ def test_settings() -> Settings:
     """Create test settings for temporary paths."""
     from pydantic import SecretStr
 
-    from src.loats.config._settings import Settings
+    from src.loats.config.settings import Settings
 
     with tempfile.TemporaryDirectory() as temp_dir:
         temp_path = Path(temp_dir)

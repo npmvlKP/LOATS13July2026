@@ -7,8 +7,8 @@ from .circuit_breaker import (
     CircuitBreakerOpenError,
 )
 from .rate_limiter import (
-    ORDER_RATE_LIMITER,
-    SMART_ORDER_RATE_LIMITER,
+    get_order_rate_limiter,
+    get_smart_order_rate_limiter,
     RateLimitExceededError,
     AsyncRateLimiter,
     RateLimiter,
@@ -18,15 +18,15 @@ from .rate_limiter import (
 from .retry import OPENALGO_RETRY_CONFIG, retry_async, retry_sync
 
 __all__ = [
-    # Cache
+    "Cache",
     "cache_manager",
-    # Circuit breaker
+    "Circuit breaker",
     "OPENALGO_CIRCUIT_BREAKER",
     "TELEGRAM_CIRCUIT_BREAKER",
     "CircuitBreakerOpenError",
-    # Rate limiter
-    "ORDER_RATE_LIMITER",
-    "SMART_ORDER_RATE_LIMITER",
+    "Rate limiter",
+    "get_order_rate_limiter",
+    "get_smart_order_rate_limiter",
     "RateLimitExceededError",
     "AsyncRateLimiter",
     "RateLimiter",

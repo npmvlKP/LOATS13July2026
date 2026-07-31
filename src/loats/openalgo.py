@@ -12,8 +12,8 @@ import httpx
 from .config import get_settings
 from .loats_logging import get_logger
 from .utils.rate_limiter import (
-    ORDER_RATE_LIMITER,
-    SMART_ORDER_RATE_LIMITER,
+    get_order_rate_limiter,
+    get_smart_order_rate_limiter,
     RateLimitExceededError,
 )
 from .models import (
@@ -429,7 +429,7 @@ class AsyncOpenAlgoClient:
         trailing_stop_loss: Optional[float] = None,
     ) -> dict[str, Any]:
         await _async_check_kill_switch()
-        if not await ORDER_RATE_LIMITER.acquire():
+        if not await get_order_rate_limiter().acquire():
             logger.warning("Rate limit exceeded order placement")
             raise RateLimitExceededError("Rate limit exceeded")
         if isinstance(order_type, OrderType): order_type = order_type.value
@@ -467,7 +467,7 @@ class AsyncOpenAlgoClient:
         metadata: Optional[dict[str, Any]] = None,
     ) -> dict[str, Any]:
         await _async_check_kill_switch()
-        if not await SMART_ORDER_RATE_LIMITER.acquire():
+        if not await get_smart_order_rate_limiter().acquire():
             logger.warning("Rate limit exceeded smart order placement")
             raise RateLimitExceededError("Rate limit exceeded")
         if isinstance(order_type, OrderType): order_type = order_type.value
