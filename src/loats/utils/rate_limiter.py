@@ -1,9 +1,8 @@
-"""Rate limiter implementation for LOATS13July2026."""
-
+"""Rate limiter implementation LOATS13July2026."""
 import asyncio
 import time
 from collections import deque
-from typing import Any, Callable, Coroutine
+from typing import Any, Callable, Coroutine, Optional
 
 from ..config import settings
 from ..loats_logging import get_logger
@@ -13,40 +12,40 @@ logger = get_logger(__name__)
 class RateLimiter:
     """Rate limiter implementation using token bucket algorithm.
 
-    This rate limiter enforces the maximum orders per second limit
-    specified in the settings (max_ops).
+    rate limiter enforces maximum orders per second limit
+    specifiedsettings (max_ops).
     """
 
-    def __init__(self, max_ops: int = None, interval: float = 1.0) -> None:
+    def __init__(self, max_ops: Optional[int] = None, interval: float = 1.0) -> None:
         """Initialize rate limiter.
 
         Args:
-            max_ops: Maximum operations per interval (default: from settings)
-            interval: Time interval in seconds (default: 1.0)
+            max_ops: Maximum operations perinterval (default: from settings)
+            interval: Time interval seconds (default:1.0
         """
-        self.max_ops = max_ops if max_ops is not None else settings.max_ops
-        self.interval = interval
-        self.tokens = self.max_ops
-        self.last_refill_time = time.monotonic()
-        self.lock = asyncio.Lock()
+        self.max_ops: int = max_ops if max_ops is not None else settings.max_ops
+        self.interval: float = interval
+        self.tokens: float = float(self.max_ops)
+        self.last_refill_time: float = time.monotonic()
+        self.lock: asyncio.Lock = asyncio.Lock()
 
     async def acquire(self) -> bool:
-        """Acquire a token for an operation.
+        """Acquire token operation.
 
         Returns:
-            True if token acquired successfully, False if rate limit exceeded
+            True token acquired successfully, False rate limit exceeded
         """
         async with self.lock:
-            current_time = time.monotonic()
-            time_since_refill = current_time - self.last_refill_time
+            current_time: float = time.monotonic()
+            time_since_refill: float = current_time - self.last_refill_time
 
-            # Refill tokens based on elapsed time
+            # Refill tokens based elapsed time
             if time_since_refill >= self.interval:
                 self.tokens = self.max_ops
                 self.last_refill_time = current_time
             else:
-                # Partial refill based on elapsed time
-                tokens_to_add = (time_since_refill / self.interval) * self.max_ops
+                # Partial refill based elapsed time
+                tokens_to_add: float = (time_since_refill / self.interval) * self.max_ops
                 self.tokens = min(self.max_ops, self.tokens + tokens_to_add)
                 self.last_refill_time = current_time
 
@@ -57,45 +56,45 @@ class RateLimiter:
                 return False
 
     async def wait_for_token(self) -> None:
-        """Wait until a token is available.
+        """Wait until token available.
 
         Raises:
-            RateLimitExceededError: If waiting would take too long
+            RateLimitExceededError: waiting take long
         """
         while True:
             if await self.acquire():
                 return
-            await asyncio.sleep(0.1)  # Small sleep to prevent busy waiting
+            await asyncio.sleep(0.1)  # Small sleep prevent busy waiting
 
 class AsyncRateLimiter:
     """Async rate limiter using sliding window algorithm.
 
-    This implementation is more precise for async operations and
+    implementation more precise async operations
     provides better control over rate limiting.
     """
 
-    def __init__(self, max_ops: int = None, window_size: float = 1.0) -> None:
+    def __init__(self, max_ops: Optional[int] = None, window_size: float = 1.0) -> None:
         """Initialize async rate limiter.
 
         Args:
-            max_ops: Maximum operations per window (default: from settings)
-            window_size: Time window in seconds (default: 1.0)
+            max_ops: Maximum operations perwindow (default: from settings)
+            window_size: Time window seconds (default:1.0
         """
-        self.max_ops = max_ops if max_ops is not None else settings.max_ops
-        self.window_size = window_size
-        self.timestamps = deque()
-        self.lock = asyncio.Lock()
+        self.max_ops: int = max_ops if max_ops is not None else settings.max_ops
+        self.window_size: float = window_size
+        self.timestamps: deque[float] = deque()
+        self.lock: asyncio.Lock = asyncio.Lock()
 
     async def acquire(self) -> bool:
-        """Acquire permission for an operation.
+        """Acquire permission operation.
 
         Returns:
-            True if operation allowed, False if rate limit exceeded
+            True operation allowed, False rate limit exceeded
         """
         async with self.lock:
-            current_time = time.monotonic()
+            current_time: float = time.monotonic()
 
-            # Remove timestamps outside the current window
+            # Remove timestamps outside current window
             while self.timestamps and current_time - self.timestamps[0] > self.window_size:
                 self.timestamps.popleft()
 
@@ -106,38 +105,40 @@ class AsyncRateLimiter:
                 return False
 
     async def wait_for_token(self) -> None:
-        """Wait until operation is allowed.
+        """Wait until operation allowed.
 
         Raises:
-            RateLimitExceededError: If waiting would take too long
+            RateLimitExceededError: waiting take long
         """
         while True:
             if await self.acquire():
                 return
+            await asyncio.sleep(0.1)
 
-            # Calculate when the next token will be available
-            async with self.lock:
-                if self.timestamps:
-                    oldest_timestamp = self.timestamps[0]
-                    wait_time = (oldest_timestamp + self.window_size) - time.monotonic()
-                    if wait_time > 0:
-                        await asyncio.sleep(min(wait_time, 0.1))
-                else:
-                    await asyncio.sleep(0.1)
+    # Calculate when next token available
+    async def get_wait_time(self) -> float:
+        """Calculate wait time until next token available."""
+        async with self.lock:
+            if not self.timestamps:
+                return 0.0
+
+            oldest_timestamp: float = self.timestamps[0]
+            wait_time: float = (oldest_timestamp + self.window_size) - time.monotonic()
+            return max(wait_time, 0.0)
 
 class RateLimitExceededError(Exception):
-    """Exception raised when rate limit is exceeded."""
+    """Exception raised when rate limit exceeded."""
 
     def __init__(self, message: str = "Rate limit exceeded") -> None:
-        self.message = message
+        self.message: str = message
         super().__init__(self.message)
 
-def rate_limited(max_ops: int = None, window_size: float = 1.0) -> Callable:
-    """Decorator for rate limiting sync functions.
+def rate_limited(max_ops: Optional[int] = None, window_size: float = 1.0) -> Callable:
+    """Decorator rate limiting sync functions.
 
     Args:
         max_ops: Maximum operations per window
-        window_size: Time window in seconds
+        window_size: Time window seconds
 
     Returns:
         Decorator function
@@ -154,12 +155,12 @@ def rate_limited(max_ops: int = None, window_size: float = 1.0) -> Callable:
         return wrapper
     return decorator
 
-def async_rate_limited(max_ops: int = None, window_size: float = 1.0) -> Callable:
-    """Decorator for rate limiting async functions.
+def async_rate_limited(max_ops: Optional[int] = None, window_size: float = 1.0) -> Callable:
+    """Decorator rate limiting async functions.
 
     Args:
         max_ops: Maximum operations per window
-        window_size: Time window in seconds
+        window_size: Time window seconds
 
     Returns:
         Decorator function

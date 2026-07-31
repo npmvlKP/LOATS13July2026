@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from ._settings import Settings, get_settings
+from .settings import Settings, get_settings
 
 __all__ = ["Settings", "get_settings", "settings"]
 

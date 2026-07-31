@@ -16,7 +16,7 @@ __all__ = [
     "settings",
 ]
 
-from .config._settings import get_settings
+from .config.settings import get_settings
 from .initialization import initialize_system
 from .loats_logging import configure_logging, get_logger
 
@@ -32,7 +32,7 @@ if TYPE_CHECKING:
     # typed as the *Settings instance type*. This lets mypy resolve
     # ``settings.sqlite_db_path`` etc. to the concrete fields of Settings.
     # At runtime, ``settings`` is provided lazily by PEP 562 ``__getattr__``.
-    from .config._settings import Settings
+    from .config.settings import Settings
 
     settings: Settings
 
