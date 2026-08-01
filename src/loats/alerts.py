@@ -33,7 +33,6 @@ logger = get_logger(__name__)
 # Settings must be accessed after all imports to avoid circular imports
 settings = get_settings()
 
-
 class AlertSystem:
     """Alert system using Telegram bot notifications kill switch.
     `AlertSystem` accepts an optional ``Database` instance constructor.
@@ -184,10 +183,10 @@ class AlertSystem:
             )
             return True
         except CircuitBreakerOpenError:
-            logger.warning("Telegram circuit breaker open: %s", )
+            logger.warning("Telegram circuit breaker open")
             return False
         except Exception:
-            logger.error("Failed send Telegram message after retries: %s", )
+            logger.error("Failed send Telegram message after retries")
             return False
 
     async def send_alert(self, message: str, alert_type: str = "info") -> bool:
@@ -487,7 +486,7 @@ class AlertSystem:
             )
             return True
         except CircuitBreakerOpenError:
-            logger.warning("OpenAlgo circuit breaker open cancel_order: %s", )
+            logger.warning("OpenAlgo circuit breaker open cancel_order")
             return False
         except Exception as e:
             logger.error("Failed cancel order after retries: %s", order_id, exc_info=e)
