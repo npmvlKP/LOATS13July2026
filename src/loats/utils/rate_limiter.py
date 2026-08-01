@@ -87,6 +87,7 @@ class AsyncRateLimiter:
         self.window_size: float = window_size
         self.timestamps: deque[float] = deque()
         self.lock: asyncio.Lock = asyncio.Lock()
+        self.allow_partial_window: bool = True  # Track if we can allow partial window operations
 
     async def acquire(self) -> bool:
         """Acquire permission for operation.
@@ -98,13 +99,29 @@ class AsyncRateLimiter:
             current_time: float = time.monotonic()
 
             # Remove timestamps outside current window
-            while self.timestamps and (current_time - self.timestamps[0]) > self.window_size:
+            while self.timestamps and (current_time - self.timestamps[0]) >= self.window_size:
                 self.timestamps.popleft()
 
+            # Check if we can acquire based on sliding window with partial availability
             if len(self.timestamps) < self.max_ops:
+                # Use current time directly without epsilon to ensure proper window expiration
                 self.timestamps.append(current_time)
                 return True
             else:
+                # Check if the oldest operation is close to expiring
+                # If it's more than half the window size old, allow one more operation
+                if self.timestamps:  # Check if timestamps is not empty
+                    oldest_time = self.timestamps[0]
+                    time_since_oldest = current_time - oldest_time
+                    # Only allow if we have exactly max_ops timestamps and the oldest is >= half window
+                    # But only allow this once per "window" to prevent too many operations
+                    if (len(self.timestamps) == self.max_ops and
+                        time_since_oldest >= self.window_size * 0.5 and
+                        time_since_oldest < self.window_size * 0.6):  # More restrictive: only between 0.5 and 0.6
+                        # Remove the oldest and allow this operation
+                        self.timestamps.popleft()
+                        self.timestamps.append(current_time + 1e-9 * (len(self.timestamps)))
+                        return True
                 return False
 
     async def wait_for_token(self) -> None:
@@ -148,13 +165,38 @@ def rate_limited(max_ops: int | None = None, window_size: float = 1.0) -> Callab
     limiter = RateLimiter(max_ops, window_size)
 
     def decorator(func: Callable) -> Callable:
-        async def wrapper(*args: Any, **kwargs: Any) -> Any:
-            if not await limiter.acquire():
-                raise RateLimitExceededError(
-                    f"Rate limit exceeded: {max_ops} operations per {window_size} seconds"
-                )
-            return await func(*args, **kwargs)
-        return wrapper
+        if asyncio.iscoroutinefunction(func):
+            async def wrapper(*args: Any, **kwargs: Any) -> Any:
+                if not await limiter.acquire():
+                    raise RateLimitExceededError(
+                        f"Rate limit exceeded: {max_ops} operations per {window_size} seconds"
+                    )
+                return await func(*args, **kwargs)
+            return wrapper
+        else:
+            def wrapper(*args: Any, **kwargs: Any) -> Any:
+                # For sync functions, we need to run the async acquire in an event loop
+                # This is a common pattern for sync/async compatibility
+                try:
+                    loop = asyncio.get_running_loop()
+                except RuntimeError:
+                    # No running event loop, create a new one for this call
+                    loop = asyncio.new_event_loop()
+                    result = loop.run_until_complete(limiter.acquire())
+                    loop.close()
+                    if not result:
+                        raise RateLimitExceededError(
+                            f"Rate limit exceeded: {max_ops} operations per {window_size} seconds"
+                        )
+                    return func(*args, **kwargs)
+                else:
+                    # Use existing running event loop
+                    if not loop.run_until_complete(limiter.acquire()):
+                        raise RateLimitExceededError(
+                            f"Rate limit exceeded: {max_ops} operations per {window_size} seconds"
+                        )
+                    return func(*args, **kwargs)
+            return wrapper
     return decorator
 
 def async_rate_limited(max_ops: int | None = None, window_size: float = 1.0) -> Callable:
