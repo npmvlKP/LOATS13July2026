@@ -1,6 +1,7 @@
 """
 Test actual logging implementation loats package.
 """
+
 import logging
 import os
 import sys
@@ -36,11 +37,17 @@ def test_logging_implementation():
 
     # Check only console handler configured
     root_logger = logging.getLogger()
-    file_handlers = [h for h in root_logger.handlers if isinstance(h, logging.FileHandler)]
-    console_handlers = [h for h in root_logger.handlers if isinstance(h, logging.StreamHandler)]
+    file_handlers = [
+        h for h in root_logger.handlers if isinstance(h, logging.FileHandler)
+    ]
+    console_handlers = [
+        h for h in root_logger.handlers if isinstance(h, logging.StreamHandler)
+    ]
 
     assert len(file_handlers) == 0, "No file handlers configured in test mode"
-    assert len(console_handlers) > 0, "Console handler should be configured in test mode"
+    assert len(console_handlers) > 0, (
+        "Console handler should be configured in test mode"
+    )
 
     print("OK: Test mode configuration works correctly")
 
@@ -64,15 +71,24 @@ def test_logging_implementation():
 
     # Check both console and file handlers configured
     root_logger = logging.getLogger()
-    file_handlers = [h for h in root_logger.handlers if isinstance(h, logging.FileHandler)]
-    console_handlers = [h for h in root_logger.handlers if isinstance(h, logging.StreamHandler)]
+    file_handlers = [
+        h for h in root_logger.handlers if isinstance(h, logging.FileHandler)
+    ]
+    console_handlers = [
+        h for h in root_logger.handlers if isinstance(h, logging.StreamHandler)
+    ]
 
-    assert len(file_handlers) > 0, "File handler should be configured in production mode"
-    assert len(console_handlers) > 0, "Console handler should be configured in production mode"
+    assert len(file_handlers) > 0, (
+        "File handler should be configured in production mode"
+    )
+    assert len(console_handlers) > 0, (
+        "Console handler should be configured in production mode"
+    )
 
     print("OK: Production mode configuration works correctly")
 
     print("All logging implementation tests passed!")
+
 
 if __name__ == "__main__":
     test_logging_implementation()

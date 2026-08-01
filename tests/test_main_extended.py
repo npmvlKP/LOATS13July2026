@@ -13,7 +13,9 @@ def trading_system():
 
 @pytest.mark.asyncio
 async def test_trading_system_initialization_failure(trading_system):
-    with patch("src.loats.main.start_metrics_server", side_effect=Exception("Init error")):
+    with patch(
+        "src.loats.main.start_metrics_server", side_effect=Exception("Init error")
+    ):
         with pytest.raises(Exception, match="Init error"):
             await trading_system.initialize()
 

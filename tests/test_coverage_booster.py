@@ -40,7 +40,9 @@ async def test_sentiment_coverage_full():
         sentiment_score=0.5,
         sentiment_label="positive",
     )
-    with patch.object(SentimentAnalyzer, "parse_rss_feed", new_callable=AsyncMock) as mock_parse:
+    with patch.object(
+        SentimentAnalyzer, "parse_rss_feed", new_callable=AsyncMock
+    ) as mock_parse:
         mock_parse.return_value = [news_item]
         result = await analyzer.analyze_symbol_sentiment("TEST", "http://url")
         assert result.sentiment_label == "positive"
@@ -76,7 +78,9 @@ async def test_options_coverage_full():
 async def test_scheduler_coverage():
     sched = TradingScheduler()
     assert not sched.is_running()
-    with patch("src.loats.scheduler.TradingScheduler.is_market_open", return_value=True):
+    with patch(
+        "src.loats.scheduler.TradingScheduler.is_market_open", return_value=True
+    ):
         await sched.check_market_status()
 
 
@@ -106,7 +110,9 @@ async def test_main_coverage_booster():
                 # Run initialization
                 await sys_obj.initialize()
                 # Run start (mock _wait_for_shutdown to avoid hang)
-                with patch.object(TradingSystem, "_wait_for_shutdown", new_callable=AsyncMock):
+                with patch.object(
+                    TradingSystem, "_wait_for_shutdown", new_callable=AsyncMock
+                ):
                     await sys_obj.start()
                 assert sys_obj.running
                 await sys_obj.run_once()

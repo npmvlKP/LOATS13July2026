@@ -28,12 +28,21 @@ def test_configure_logging_test_mode():
 
     # Check file handlers configured
     root_logger = logging.getLogger()
-    file_handlers = [handler for handler in root_logger.handlers if isinstance(handler, logging.FileHandler)]
+    file_handlers = [
+        handler
+        for handler in root_logger.handlers
+        if isinstance(handler, logging.FileHandler)
+    ]
     assert len(file_handlers) == 0, "No file handlers configured test mode"
 
     # Check console handler configured
-    console_handlers = [handler for handler in root_logger.handlers if isinstance(handler, logging.StreamHandler)]
+    console_handlers = [
+        handler
+        for handler in root_logger.handlers
+        if isinstance(handler, logging.StreamHandler)
+    ]
     assert len(console_handlers) > 0, "Console handler not configured"
+
 
 def test_configure_logging_production_mode():
     """Test logging configured correctly production mode."""
@@ -57,11 +66,20 @@ def test_configure_logging_production_mode():
 
     # Check both console file handlers configured
     root_logger = logging.getLogger()
-    file_handlers = [handler for handler in root_logger.handlers if isinstance(handler, logging.FileHandler)]
-    console_handlers = [handler for handler in root_logger.handlers if isinstance(handler, logging.StreamHandler)]
+    file_handlers = [
+        handler
+        for handler in root_logger.handlers
+        if isinstance(handler, logging.FileHandler)
+    ]
+    console_handlers = [
+        handler
+        for handler in root_logger.handlers
+        if isinstance(handler, logging.StreamHandler)
+    ]
 
     assert len(file_handlers) > 0, "File handler configured production mode"
     assert len(console_handlers) > 0, "Console handler configured production mode"
+
 
 def test_logs_directory_not_created_in_test_mode():
     """Test logs directory not created test mode."""
@@ -82,6 +100,7 @@ def test_logs_directory_not_created_in_test_mode():
         # Check mkdir not called
         mock_mkdir.assert_not_called()
 
+
 def test_logs_directory_created_in_production_mode():
     """Test logs directory created production mode."""
     # Reset logging configuration avoid interference
@@ -101,6 +120,7 @@ def test_logs_directory_created_in_production_mode():
 
         # Check mkdir called
         mock_mkdir.assert_called_once()
+
 
 def test_environment_based_logging_configuration():
     """Test logging configuration based ENVIRONMENT variable."""

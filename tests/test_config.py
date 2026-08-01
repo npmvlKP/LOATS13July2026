@@ -50,7 +50,9 @@ class TestConfig:
             test_settings = Settings()
             assert test_settings.environment == "production"
             assert test_settings.sqlite_db_path == pathlib.Path("/custom/path/loats.db")
-            assert test_settings.audit_log_path == pathlib.Path("/custom/path/audit.log")
+            assert test_settings.audit_log_path == pathlib.Path(
+                "/custom/path/audit.log"
+            )
             assert test_settings.retention_days == 365
             assert test_settings.ta_scan_interval == 120
             assert test_settings.sentiment_scan_interval == 600
@@ -59,9 +61,14 @@ class TestConfig:
             assert test_settings.default_timeframe == "5min"
             assert test_settings.sentiment_threshold == 0.1
             assert test_settings.request_timeout == 45.0
-            assert test_settings.openalgo_api_key.get_secret_value() == "test_api_key_123"
+            assert (
+                test_settings.openalgo_api_key.get_secret_value() == "test_api_key_123"
+            )
             assert test_settings.openalgo_base_url == "https://api.testopenalgo.com"
-            assert test_settings.telegram_bot_token.get_secret_value() == "test_bot_token_456"
+            assert (
+                test_settings.telegram_bot_token.get_secret_value()
+                == "test_bot_token_456"
+            )
             assert test_settings.telegram_chat_id == "987654321"
 
     def test_settings_validation(self) -> None:

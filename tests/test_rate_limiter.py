@@ -2,9 +2,10 @@
 Unit tests for rate limiter utility module.
 Tests token bucket and sliding window rate limiting algorithms.
 """
+
 import asyncio
 import time
-from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
 
 from src.loats.config import get_settings
@@ -15,6 +16,7 @@ from src.loats.utils.rate_limiter import (
     get_order_rate_limiter,
     get_smart_order_rate_limiter,
 )
+
 
 class TestRateLimiter:
     """Tests for RateLimiter (token bucket algorithm)."""
@@ -43,7 +45,7 @@ class TestRateLimiter:
     async def test_acquire_success(self, rate_limiter: RateLimiter) -> None:
         """Test successful token acquisition."""
         # Should be able to acquire tokens up to max_ops
-        for i in range(10):
+        for _i in range(10):
             result = await rate_limiter.acquire()
             assert result is True
 
@@ -120,6 +122,7 @@ class TestRateLimiter:
         except asyncio.CancelledError:
             pass  # Expected
 
+
 class TestAsyncRateLimiter:
     """Tests for AsyncRateLimiter (sliding window algorithm)."""
 
@@ -147,7 +150,7 @@ class TestAsyncRateLimiter:
     async def test_acquire_success(self, async_rate_limiter: AsyncRateLimiter) -> None:
         """Test successful token acquisition."""
         # Should be able to acquire tokens up to max_ops
-        for i in range(5):
+        for _i in range(5):
             result = await async_rate_limiter.acquire()
             assert result is True
 
@@ -170,7 +173,9 @@ class TestAsyncRateLimiter:
         assert result is True
 
     @pytest.mark.asyncio
-    async def test_full_window_expiration(self, async_rate_limiter: AsyncRateLimiter) -> None:
+    async def test_full_window_expiration(
+        self, async_rate_limiter: AsyncRateLimiter
+    ) -> None:
         """Test full window expiration."""
         # Fill the window
         for _ in range(5):
@@ -204,7 +209,9 @@ class TestAsyncRateLimiter:
         assert result is True
 
     @pytest.mark.asyncio
-    async def test_wait_for_token_success(self, async_rate_limiter: AsyncRateLimiter) -> None:
+    async def test_wait_for_token_success(
+        self, async_rate_limiter: AsyncRateLimiter
+    ) -> None:
         """Test waiting for token successfully."""
         # Fill the window
         for _ in range(5):
@@ -217,6 +224,7 @@ class TestAsyncRateLimiter:
 
         # Should take approximately the time needed for oldest timestamp to expire
         assert end_time - start_time >= 0.1  # At least 100ms
+
 
 class TestRateLimitExceededError:
     """Tests for RateLimitExceededError exception."""
@@ -263,6 +271,7 @@ class TestGlobalRateLimiters:
 
         # Order and smart order limiters should be different instances
         assert limiter1 is not smart_limiter1
+
 
 class TestRateLimiterConcurrency:
     """Tests for rate limiter concurrency behavior."""
@@ -313,6 +322,7 @@ class TestRateLimiterConcurrency:
         for wait_time in wait_times:
             assert wait_time >= 0.0
             assert wait_time <= 1.0  # Should not take more than window size
+
 
 class TestRateLimiterEdgeCases:
     """Tests for rate limiter edge cases."""
@@ -367,6 +377,7 @@ class TestRateLimiterEdgeCases:
         # Should be able to acquire again
         result = await limiter.acquire()
         assert result is True
+
 
 class TestRateLimiterIntegration:
     """Integration tests for rate limiter with real timing."""

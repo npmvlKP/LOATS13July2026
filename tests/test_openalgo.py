@@ -1,6 +1,7 @@
 """
 Tests OpenAlgo client module.
 """
+
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
@@ -18,6 +19,7 @@ from src.loats.openalgo import (
 )
 
 settings = get_settings()
+
 
 class TestAsyncOpenAlgoClient:
     """Test suite AsyncOpenAlgoClient."""
@@ -61,15 +63,33 @@ class TestAsyncOpenAlgoClient:
             assert async_client.client is None
 
     @pytest.mark.asyncio
-    async def test_get_quotes(self, async_client: AsyncOpenAlgoClient, mock_async_httpx_client: AsyncMock, mock_async_response: MagicMock) -> None:
+    async def test_get_quotes(
+        self,
+        async_client: AsyncOpenAlgoClient,
+        mock_async_httpx_client: AsyncMock,
+        mock_async_response: MagicMock,
+    ) -> None:
         """Test get_quotes method."""
         mock_async_response.json.return_value = {
             "success": True,
             "message": "Success",
-            "data": {"NIFTY": {"last_price": 18000.50, "open": 17950.25, "high": 18050.75, "low": 17900.00, "close": 17980.50, "volume": 1000000, "change": 20.00, "change_percent": 0.11}}
+            "data": {
+                "NIFTY": {
+                    "last_price": 18000.50,
+                    "open": 17950.25,
+                    "high": 18050.75,
+                    "low": 17900.00,
+                    "close": 17980.50,
+                    "volume": 1000000,
+                    "change": 20.00,
+                    "change_percent": 0.11,
+                }
+            },
         }
         mock_async_httpx_client.post.return_value = mock_async_response
-        with patch.object(async_client, "_ensure_client", return_value=mock_async_httpx_client):
+        with patch.object(
+            async_client, "_ensure_client", return_value=mock_async_httpx_client
+        ):
             result = await async_client.get_quotes(["NIFTY"])
             assert result["success"] is True
             assert "NIFTY" in result["data"]
@@ -77,31 +97,51 @@ class TestAsyncOpenAlgoClient:
             mock_async_httpx_client.post.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_error_handling(self, async_client: AsyncOpenAlgoClient, mock_async_httpx_client: AsyncMock) -> None:
+    async def test_error_handling(
+        self, async_client: AsyncOpenAlgoClient, mock_async_httpx_client: AsyncMock
+    ) -> None:
         """Test error handling AsyncOpenAlgoClient."""
         # 1. HTTP Error
         error_response = MagicMock(spec=Response)
         error_response.status_code = 500
         error_response.text = "Internal Server Error"
-        error_response.raise_for_status.side_effect = httpx.HTTPStatusError("Server Error", request=httpx.Request("POST", "http://test/api/v1/quotes"), response=error_response)
+        error_response.raise_for_status.side_effect = httpx.HTTPStatusError(
+            "Server Error",
+            request=httpx.Request("POST", "http://test/api/v1/quotes"),
+            response=error_response,
+        )
 
         mock_async_httpx_client.post.return_value = error_response
-        with patch.object(async_client, "_ensure_client", return_value=mock_async_httpx_client):
+        with patch.object(
+            async_client, "_ensure_client", return_value=mock_async_httpx_client
+        ):
             with pytest.raises(OpenAlgoAPIError):
-                await async_client._request("POST", "quotes", json={"symbols": ["NIFTY"]})
+                await async_client._request(
+                    "POST", "quotes", json={"symbols": ["NIFTY"]}
+                )
 
         # 2. Timeout error
         mock_async_httpx_client.post.side_effect = httpx.TimeoutException("Timeout")
-        with patch.object(async_client, "_ensure_client", return_value=mock_async_httpx_client):
+        with patch.object(
+            async_client, "_ensure_client", return_value=mock_async_httpx_client
+        ):
             with pytest.raises(OpenAlgoError):
-                await async_client._request("POST", "quotes", json={"symbols": ["NIFTY"]})
+                await async_client._request(
+                    "POST", "quotes", json={"symbols": ["NIFTY"]}
+                )
 
     @pytest.mark.asyncio
     async def test_kill_switch_error(self, async_client: AsyncOpenAlgoClient) -> None:
         """Test KillSwitchError handling."""
-        with patch("src.loats.openalgo._async_check_kill_switch", side_effect=KillSwitchError("Kill switch active")):
+        with patch(
+            "src.loats.openalgo._async_check_kill_switch",
+            side_effect=KillSwitchError("Kill switch active"),
+        ):
             with pytest.raises(KillSwitchError):
-                await async_client.place_order(symbol="NIFTY", quantity=1, order_type=OrderType.MARKET)
+                await async_client.place_order(
+                    symbol="NIFTY", quantity=1, order_type=OrderType.MARKET
+                )
+
 
 class TestOpenAlgoClient:
     """Test suite OpenAlgoClient."""

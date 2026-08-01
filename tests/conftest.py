@@ -1,4 +1,5 @@
-""" Pytest configuration fixtures LOATS13July2026. """
+"""Pytest configuration fixtures LOATS13July2026."""
+
 from __future__ import annotations
 
 import collections.abc
@@ -36,6 +37,7 @@ def configure_test_logging() -> None:
     """Configure logging test environment."""
     configure_logging(test_mode=True)
 
+
 @pytest.fixture
 def test_settings() -> Settings:
     """Create test settings for temporary paths."""
@@ -52,22 +54,24 @@ def test_settings() -> Settings:
             openalgo_api_key=SecretStr("test_api_key"),
             openalgo_base_url="https://test.openalgo.com",
             telegram_bot_token=SecretStr("test_bot_token"),
-            telegram_chat_id="123456789"
+            telegram_chat_id="123456789",
         )
         yield test_settings
+
 
 @pytest.fixture
 def db(test_settings) -> collections.abc.Generator[Database, None, None]:
     """Create test database instance."""
     db_instance = Database(
         db_path=test_settings.sqlite_db_path,
-        audit_log_path=test_settings.audit_log_path
+        audit_log_path=test_settings.audit_log_path,
     )
     db_instance.retention_days = 30
     db_instance._initialize_database()
     yield db_instance
     db_instance.close()
     gc.collect()
+
 
 @pytest.fixture
 def sample_trade() -> Trade:
@@ -82,8 +86,9 @@ def sample_trade() -> Trade:
         strategy="test_strategy",
         stop_loss=95.0,
         take_profit=110.0,
-        trailing_stop_loss=5.0
+        trailing_stop_loss=5.0,
     )
+
 
 @pytest.fixture
 def sample_order() -> Order:
@@ -99,8 +104,9 @@ def sample_order() -> Order:
         product_type=ProductType.MIS,
         status=OrderStatus.OPEN,
         timestamp=datetime.datetime(2023, 1, 1, 10, 0),
-        filled_quantity=0
+        filled_quantity=0,
     )
+
 
 @pytest.fixture
 def sample_signal() -> Signal:
@@ -110,14 +116,11 @@ def sample_signal() -> Signal:
         signal_type=SignalType.BUY,
         strength=0.8,
         timestamp=datetime.datetime(2023, 1, 1, 10, 0),
-        indicators={
-            "rsi": 25.0,
-            "macd": 1.5,
-            "supertrend": 99.5
-        },
+        indicators={"rsi": 25.0, "macd": 1.5, "supertrend": 99.5},
         confidence=0.85,
-        metadata={"scan_type": "ta", "timeframe": "1min"}
+        metadata={"scan_type": "ta", "timeframe": "1min"},
     )
+
 
 @pytest.fixture
 def sample_historical_data() -> list[HistoricalData]:
@@ -131,7 +134,7 @@ def sample_historical_data() -> list[HistoricalData]:
             low=99.0,
             close=100.0,
             volume=1000,
-            interval="1min"
+            interval="1min",
         ),
         HistoricalData(
             symbol="TEST",
@@ -141,7 +144,7 @@ def sample_historical_data() -> list[HistoricalData]:
             low=99.5,
             close=100.5,
             volume=1200,
-            interval="1min"
+            interval="1min",
         ),
         HistoricalData(
             symbol="TEST",
@@ -151,9 +154,10 @@ def sample_historical_data() -> list[HistoricalData]:
             low=100.0,
             close=101.0,
             volume=1500,
-            interval="1min"
-        )
+            interval="1min",
+        ),
     ]
+
 
 def pytest_configure(config: pytest.Config) -> None:
     """Pytest configuration hook."""

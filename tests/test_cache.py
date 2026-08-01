@@ -2,22 +2,24 @@
 Unit tests for cache utility module.
 Tests in-memory TTL caching functionality.
 """
-from unittest.mock import AsyncMock, MagicMock, patch
-import json
-import pytest
 
-from pydantic import BaseModel
+import json
+from unittest.mock import patch
+
+import pytest
 from cachetools import TTLCache
+from pydantic import BaseModel
 
 from src.loats.utils.cache import (
     CacheConfig,
     CacheManager,
     cache_manager,
-    initialize_cache,
     close_cache,
+    dict_to_cache_key,
+    initialize_cache,
     model_to_cache_key,
-    dict_to_cache_key
 )
+
 
 class TestCacheConfig:
     """Tests for CacheConfig class."""
@@ -31,14 +33,11 @@ class TestCacheConfig:
 
     def test_custom_config(self) -> None:
         """Test custom cache configuration."""
-        config = CacheConfig(
-            ttl_seconds=600,
-            prefix="test",
-            max_size=2000
-        )
+        config = CacheConfig(ttl_seconds=600, prefix="test", max_size=2000)
         assert config.ttl_seconds == 600
         assert config.prefix == "test"
         assert config.max_size == 2000
+
 
 class TestCacheManager:
     """Tests for CacheManager class."""
@@ -108,6 +107,7 @@ class TestCacheManager:
     @pytest.mark.asyncio
     async def test_set_basemodel(self, cache_manager: CacheManager) -> None:
         """Test setting BaseModel in cache."""
+
         class TestModel(BaseModel):
             name: str
             value: int
@@ -187,7 +187,9 @@ class TestCacheManager:
         async def fetch_func():
             return {"fresh": "value"}
 
-        result = await cache_manager.get_or_set("test_key", fetch_func, force_refresh=True)
+        result = await cache_manager.get_or_set(
+            "test_key", fetch_func, force_refresh=True
+        )
         assert result == {"fresh": "value"}
 
     @pytest.mark.asyncio
@@ -291,11 +293,13 @@ class TestCacheManager:
         assert stats["enabled"] is False
         assert stats["error"] == "Cache not initialized"
 
+
 class TestCacheUtilities:
     """Tests for cache utility functions."""
 
     def test_model_to_cache_key(self) -> None:
         """Test model to cache key conversion."""
+
         class TestModel(BaseModel):
             name: str
             value: int
@@ -313,6 +317,7 @@ class TestCacheUtilities:
 
         assert cache_key.startswith("dict:")
         assert len(cache_key) > len("dict:")
+
 
 class TestGlobalCacheManager:
     """Tests for global cache manager instance."""
