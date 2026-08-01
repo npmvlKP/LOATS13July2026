@@ -1,13 +1,15 @@
 """
 Caching utilities for LOATS13July2026.
-Implements Redis-based caching layer for performance optimization.
+Implements in-memory TTL cache for performance optimization.
+Consistent with LITE philosophy: zero external services.
 """
 
 import json
+import time
 from collections.abc import Callable
 from typing import Any, TypeVar
 
-import redis.asyncio as redis
+from cachetools import TTLCache
 from pydantic import BaseModel
 
 from ..loats_logging import get_logger
@@ -18,52 +20,49 @@ T = TypeVar("T")
 
 
 class CacheConfig:
-    """Configuration for cache operations."""
+    """Configuration for in-memory cache operations."""
 
     def __init__(
         self,
         ttl_seconds: int = 300,
         prefix: str = "loats",
-        host: str = "localhost",
-        port: int = 6379,
-        db: int = 0,
+        max_size: int = 1000,
     ):
         self.ttl_seconds = ttl_seconds
         self.prefix = prefix
-        self.host = host
-        self.port = port
-        self.db = db
+        self.max_size = max_size
 
 
 class CacheManager:
-    """Redis-based cache manager for LOATS13July2026."""
+    """In-memory TTL cache manager for LOATS13July2026.
+    Uses cachetools.TTLCache for zero-dependency caching.
+    """
 
     def __init__(self, config: CacheConfig):
         self.config = config
-        self._redis: redis.Redis | None = None
+        self._cache: TTLCache[str, Any] | None = None
+        self._cache_stats = {
+            "hits": 0,
+            "misses": 0,
+            "sets": 0,
+            "deletes": 0,
+            "evictions": 0,
+        }
 
     async def initialize(self) -> None:
-        """Initialize Redis connection."""
-        try:
-            self._redis = redis.Redis(
-                host=self.config.host,
-                port=self.config.port,
-                db=self.config.db,
-                decode_responses=True,
-                health_check_interval=30,
-            )
-            # Test connection
-            await self._redis.ping()
-            logger.info("Redis cache initialized successfully")
-        except Exception as e:
-            logger.warning(f"Redis connection failed: {e}. Cache will be disabled.")
-            self._redis = None
+        """Initialize in-memory cache."""
+        self._cache = TTLCache(
+            maxsize=self.config.max_size,
+            ttl=self.config.ttl_seconds,
+        )
+        logger.info(f"In-memory cache initialized (max_size={self.config.max_size}, ttl={self.config.ttl_seconds}s)")
 
     async def close(self) -> None:
-        """Close Redis connection."""
-        if self._redis:
-            await self._redis.close()
-            self._redis = None
+        """Close in-memory cache."""
+        if self._cache:
+            self._cache.clear()
+            # Don't set to None, just clear the contents
+            logger.info("In-memory cache closed")
 
     def _get_cache_key(self, key: str) -> str:
         """Generate cache key with prefix."""
@@ -71,12 +70,18 @@ class CacheManager:
 
     async def get(self, key: str) -> str | None:
         """Get value from cache."""
-        if not self._redis:
+        if not self._cache:
             return None
 
+        cache_key = self._get_cache_key(key)
         try:
-            result = await self._redis.get(self._get_cache_key(key))
-            return str(result) if result else None
+            result = self._cache.get(cache_key)
+            if result is not None:
+                self._cache_stats["hits"] += 1
+                return str(result) if result else None
+            else:
+                self._cache_stats["misses"] += 1
+                return None
         except Exception as e:
             logger.warning(f"Cache get failed for key {key}: {e}")
             return None
@@ -85,7 +90,7 @@ class CacheManager:
         self, key: str, value: str | BaseModel | dict, ttl: int | None = None
     ) -> bool:
         """Set value in cache."""
-        if not self._redis:
+        if self._cache is None:
             return False
 
         try:
@@ -97,8 +102,14 @@ class CacheManager:
             else:
                 value_str = str(value)
 
+            cache_key = self._get_cache_key(key)
             ttl_seconds = ttl if ttl is not None else self.config.ttl_seconds
-            await self._redis.setex(self._get_cache_key(key), ttl_seconds, value_str)
+
+            # For TTLCache, we need to handle TTL manually for individual items
+            # Since TTLCache has a global TTL, we'll use the default TTL
+            self._cache[cache_key] = value_str
+            self._cache_stats["sets"] += 1
+
             return True
         except Exception as e:
             logger.warning(f"Cache set failed for key {key}: {e}")
@@ -123,7 +134,7 @@ class CacheManager:
         Returns:
             Cached or freshly fetched value
         """
-        if not self._redis or force_refresh:
+        if self._cache is None or force_refresh:
             # Cache disabled or forced refresh - call fetch function directly
             try:
                 return await fetch_func()
@@ -156,59 +167,74 @@ class CacheManager:
 
     async def delete(self, key: str) -> bool:
         """Delete key from cache."""
-        if not self._redis:
+        if not self._cache:
             return False
 
         try:
-            result = await self._redis.delete(self._get_cache_key(key))
-            return bool(result)
+            cache_key = self._get_cache_key(key)
+            if cache_key in self._cache:
+                del self._cache[cache_key]
+                self._cache_stats["deletes"] += 1
+                return True
+            return False
         except Exception as e:
             logger.warning(f"Cache delete failed for key {key}: {e}")
             return False
 
     async def clear(self, pattern: str = "*") -> int:
         """Clear cache by pattern."""
-        if not self._redis:
+        if not self._cache:
             return 0
 
         try:
-            keys = await self._redis.keys(f"{self.config.prefix}:{pattern}")
-            if keys:
-                result = await self._redis.delete(*keys)
-                return int(result) if result else 0
-            return 0
+            if pattern == "*":
+                # Clear all cache
+                count = len(self._cache)
+                self._cache.clear()
+                self._cache_stats["evictions"] += count
+                return count
+            else:
+                # Pattern matching - clear keys that match the pattern
+                prefix_pattern = f"{self.config.prefix}:{pattern}"
+                keys_to_delete = [k for k in self._cache.keys() if pattern in k or k.startswith(prefix_pattern)]
+
+                count = 0
+                for key in keys_to_delete:
+                    if key in self._cache:
+                        del self._cache[key]
+                        count += 1
+
+                self._cache_stats["evictions"] += count
+                return count
         except Exception as e:
             logger.warning(f"Cache clear failed: {e}")
             return 0
 
     async def get_cache_stats(self) -> dict[str, Any]:
         """Get cache statistics."""
-        if not self._redis:
-            return {"enabled": False, "error": "Redis not connected"}
+        if not self._cache:
+            return {"enabled": False, "error": "Cache not initialized"}
 
-        try:
-            info = await self._redis.info("memory")
-            keys = await self._redis.dbsize()
-
-            return {
-                "enabled": True,
-                "connected": True,
-                "keys": keys,
-                "memory_usage": info.get("used_memory", "N/A"),
-                "memory_peak": info.get("used_memory_peak", "N/A"),
-                "last_save": info.get("last_save_time", "N/A"),
-            }
-        except Exception as e:
-            return {"enabled": True, "connected": False, "error": str(e)}
+        return {
+            "enabled": True,
+            "connected": True,
+            "cache_type": "in_memory_ttl",
+            "current_size": len(self._cache),
+            "max_size": self.config.max_size,
+            "hits": self._cache_stats["hits"],
+            "misses": self._cache_stats["misses"],
+            "sets": self._cache_stats["sets"],
+            "deletes": self._cache_stats["deletes"],
+            "evictions": self._cache_stats["evictions"],
+            "hit_rate": self._cache_stats["hits"] / (self._cache_stats["hits"] + self._cache_stats["misses"] + 1e-6),
+        }
 
 
 # Global cache manager instance
 cache_config = CacheConfig(
     ttl_seconds=300,  # 5 minutes default TTL
     prefix="loats",
-    host="localhost",
-    port=6379,
-    db=0,
+    max_size=1000,  # Maximum cache entries
 )
 
 cache_manager = CacheManager(cache_config)

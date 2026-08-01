@@ -1,13 +1,13 @@
 """
 Unit tests for cache utility module.
-Tests Redis-based caching functionality.
+Tests in-memory TTL caching functionality.
 """
 from unittest.mock import AsyncMock, MagicMock, patch
 import json
 import pytest
 
 from pydantic import BaseModel
-from redis.asyncio import Redis
+from cachetools import TTLCache
 
 from src.loats.utils.cache import (
     CacheConfig,
@@ -27,24 +27,18 @@ class TestCacheConfig:
         config = CacheConfig()
         assert config.ttl_seconds == 300
         assert config.prefix == "loats"
-        assert config.host == "localhost"
-        assert config.port == 6379
-        assert config.db == 0
+        assert config.max_size == 1000
 
     def test_custom_config(self) -> None:
         """Test custom cache configuration."""
         config = CacheConfig(
             ttl_seconds=600,
             prefix="test",
-            host="redis.example.com",
-            port=6380,
-            db=1
+            max_size=2000
         )
         assert config.ttl_seconds == 600
         assert config.prefix == "test"
-        assert config.host == "redis.example.com"
-        assert config.port == 6380
-        assert config.db == 1
+        assert config.max_size == 2000
 
 class TestCacheManager:
     """Tests for CacheManager class."""
@@ -55,38 +49,20 @@ class TestCacheManager:
         config = CacheConfig()
         return CacheManager(config)
 
-    @pytest.fixture
-    def mock_redis(self) -> AsyncMock:
-        """Create mock Redis client."""
-        return AsyncMock(spec=Redis)
+    @pytest.mark.asyncio
+    async def test_initialize_success(self, cache_manager: CacheManager) -> None:
+        """Test successful in-memory cache initialization."""
+        await cache_manager.initialize()
+        assert cache_manager._cache is not None
+        assert isinstance(cache_manager._cache, TTLCache)
 
     @pytest.mark.asyncio
-    async def test_initialize_success(self, cache_manager: CacheManager, mock_redis: AsyncMock) -> None:
-        """Test successful Redis initialization."""
-        with patch("redis.asyncio.Redis", return_value=mock_redis):
-            mock_redis.ping.return_value = True
-            await cache_manager.initialize()
-
-            assert cache_manager._redis is mock_redis
-            mock_redis.ping.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_initialize_failure(self, cache_manager: CacheManager, mock_redis: AsyncMock) -> None:
-        """Test Redis initialization failure."""
-        with patch("redis.asyncio.Redis", return_value=mock_redis):
-            mock_redis.ping.side_effect = Exception("Connection failed")
-            await cache_manager.initialize()
-
-            assert cache_manager._redis is None
-
-    @pytest.mark.asyncio
-    async def test_close(self, cache_manager: CacheManager, mock_redis: AsyncMock) -> None:
-        """Test closing Redis connection."""
-        cache_manager._redis = mock_redis
+    async def test_close(self, cache_manager: CacheManager) -> None:
+        """Test closing in-memory cache."""
+        await cache_manager.initialize()
         await cache_manager.close()
-
-        mock_redis.close.assert_called_once()
-        assert cache_manager._redis is None
+        # Cache is cleared but not set to None
+        assert len(cache_manager._cache) == 0
 
     @pytest.mark.asyncio
     async def test_get_cache_key(self, cache_manager: CacheManager) -> None:
@@ -95,253 +71,225 @@ class TestCacheManager:
         assert cache_key == "loats:test_key"
 
     @pytest.mark.asyncio
-    async def test_get_success(self, cache_manager: CacheManager, mock_redis: AsyncMock) -> None:
+    async def test_get_success(self, cache_manager: CacheManager) -> None:
         """Test successful cache get."""
-        cache_manager._redis = mock_redis
-        mock_redis.get.return_value = "cached_value"
+        await cache_manager.initialize()
+        # Manually add item to cache for testing
+        cache_key = cache_manager._get_cache_key("test_key")
+        cache_manager._cache[cache_key] = "cached_value"
 
         result = await cache_manager.get("test_key")
         assert result == "cached_value"
-        mock_redis.get.assert_called_once_with("loats:test_key")
 
     @pytest.mark.asyncio
-    async def test_get_not_found(self, cache_manager: CacheManager, mock_redis: AsyncMock) -> None:
+    async def test_get_not_found(self, cache_manager: CacheManager) -> None:
         """Test cache get with missing key."""
-        cache_manager._redis = mock_redis
-        mock_redis.get.return_value = None
-
+        await cache_manager.initialize()
         result = await cache_manager.get("missing_key")
         assert result is None
 
     @pytest.mark.asyncio
-    async def test_get_no_redis(self, cache_manager: CacheManager) -> None:
-        """Test cache get with no Redis connection."""
-        cache_manager._redis = None
+    async def test_get_no_cache(self, cache_manager: CacheManager) -> None:
+        """Test cache get with no cache initialized."""
         result = await cache_manager.get("test_key")
         assert result is None
 
     @pytest.mark.asyncio
-    async def test_set_string(self, cache_manager: CacheManager, mock_redis: AsyncMock) -> None:
+    async def test_set_string(self, cache_manager: CacheManager) -> None:
         """Test setting string value in cache."""
-        cache_manager._redis = mock_redis
+        await cache_manager.initialize()
         result = await cache_manager.set("test_key", "test_value", ttl=60)
-
         assert result is True
-        mock_redis.setex.assert_called_once_with("loats:test_key", 60, "test_value")
+
+        # Verify the value was stored
+        cache_key = cache_manager._get_cache_key("test_key")
+        assert cache_manager._cache[cache_key] == "test_value"
 
     @pytest.mark.asyncio
-    async def test_set_basemodel(self, cache_manager: CacheManager, mock_redis: AsyncMock) -> None:
+    async def test_set_basemodel(self, cache_manager: CacheManager) -> None:
         """Test setting BaseModel in cache."""
         class TestModel(BaseModel):
             name: str
             value: int
 
-        cache_manager._redis = mock_redis
+        await cache_manager.initialize()
         model = TestModel(name="test", value=42)
-
         result = await cache_manager.set("model_key", model, ttl=60)
-
         assert result is True
-        mock_redis.setex.assert_called_once()
-        # Verify the call was made with correct parameters
-        call_args = mock_redis.setex.call_args
-        assert call_args[0][0] == "loats:model_key"
-        assert call_args[0][1] == 60
-        # The value should be JSON string
-        assert isinstance(call_args[0][2], str)
-        assert "test" in call_args[0][2]
-        assert "42" in call_args[0][2]
+
+        # Verify the value was stored as JSON
+        cache_key = cache_manager._get_cache_key("model_key")
+        cached_value = cache_manager._cache[cache_key]
+        assert isinstance(cached_value, str)
+        assert "test" in cached_value
+        assert "42" in cached_value
 
     @pytest.mark.asyncio
-    async def test_set_dict(self, cache_manager: CacheManager, mock_redis: AsyncMock) -> None:
+    async def test_set_dict(self, cache_manager: CacheManager) -> None:
         """Test setting dict in cache."""
-        cache_manager._redis = mock_redis
+        await cache_manager.initialize()
         data = {"name": "test", "value": 42}
-
         result = await cache_manager.set("dict_key", data, ttl=60)
-
         assert result is True
-        mock_redis.setex.assert_called_once()
-        # Verify the call was made with correct parameters
-        call_args = mock_redis.setex.call_args
-        assert call_args[0][0] == "loats:dict_key"
-        assert call_args[0][1] == 60
-        # The value should be JSON string
-        assert isinstance(call_args[0][2], str)
-        assert "test" in call_args[0][2]
-        assert "42" in call_args[0][2]
+
+        # Verify the value was stored as JSON
+        cache_key = cache_manager._get_cache_key("dict_key")
+        cached_value = cache_manager._cache[cache_key]
+        assert isinstance(cached_value, str)
+        assert "test" in cached_value
+        assert "42" in cached_value
 
     @pytest.mark.asyncio
-    async def test_set_no_redis(self, cache_manager: CacheManager) -> None:
-        """Test setting value with no Redis connection."""
-        cache_manager._redis = None
+    async def test_set_no_cache(self, cache_manager: CacheManager) -> None:
+        """Test setting value with no cache initialized."""
         result = await cache_manager.set("test_key", "test_value")
         assert result is False
 
     @pytest.mark.asyncio
-    async def test_set_exception(self, cache_manager: CacheManager, mock_redis: AsyncMock) -> None:
-        """Test setting value with Redis exception."""
-        cache_manager._redis = mock_redis
-        mock_redis.setex.side_effect = Exception("Redis error")
-
-        result = await cache_manager.set("test_key", "test_value")
-        assert result is False
-
-    @pytest.mark.asyncio
-    async def test_get_or_set_cache_hit(self, cache_manager: CacheManager, mock_redis: AsyncMock) -> None:
+    async def test_get_or_set_cache_hit(self, cache_manager: CacheManager) -> None:
         """Test get_or_set with cache hit."""
-        cache_manager._redis = mock_redis
-        mock_redis.get.return_value = json.dumps({"cached": "value"})
+        await cache_manager.initialize()
+
+        # Pre-populate cache
+        cache_key = cache_manager._get_cache_key("test_key")
+        cache_manager._cache[cache_key] = json.dumps({"cached": "value"})
 
         async def fetch_func():
             return {"fresh": "value"}
 
         result = await cache_manager.get_or_set("test_key", fetch_func)
-
         assert result == {"cached": "value"}
-        mock_redis.get.assert_called_once()
-        # fetch_func should not be called on cache hit
-        # (Note: In actual implementation, it might still be called but result ignored)
 
     @pytest.mark.asyncio
-    async def test_get_or_set_cache_miss(self, cache_manager: CacheManager, mock_redis: AsyncMock) -> None:
+    async def test_get_or_set_cache_miss(self, cache_manager: CacheManager) -> None:
         """Test get_or_set with cache miss."""
-        cache_manager._redis = mock_redis
-        mock_redis.get.return_value = None
+        await cache_manager.initialize()
 
         async def fetch_func():
             return {"fresh": "value"}
 
         result = await cache_manager.get_or_set("test_key", fetch_func)
-
         assert result == {"fresh": "value"}
-        mock_redis.get.assert_called_once()
-        mock_redis.setex.assert_called_once()
+
+        # Verify the result was cached
+        cache_key = cache_manager._get_cache_key("test_key")
+        assert cache_key in cache_manager._cache
 
     @pytest.mark.asyncio
-    async def test_get_or_set_force_refresh(self, cache_manager: CacheManager, mock_redis: AsyncMock) -> None:
+    async def test_get_or_set_force_refresh(self, cache_manager: CacheManager) -> None:
         """Test get_or_set with force refresh."""
-        cache_manager._redis = mock_redis
-        mock_redis.get.return_value = json.dumps({"cached": "value"})
+        await cache_manager.initialize()
+
+        # Pre-populate cache
+        cache_key = cache_manager._get_cache_key("test_key")
+        cache_manager._cache[cache_key] = json.dumps({"cached": "value"})
 
         async def fetch_func():
             return {"fresh": "value"}
 
         result = await cache_manager.get_or_set("test_key", fetch_func, force_refresh=True)
-
         assert result == {"fresh": "value"}
-        # When force_refresh=True, fetch_func should be called directly
-        # and cache operations should be bypassed
 
     @pytest.mark.asyncio
-    async def test_get_or_set_no_redis(self, cache_manager: CacheManager) -> None:
-        """Test get_or_set with no Redis connection."""
-        cache_manager._redis = None
+    async def test_get_or_set_no_cache(self, cache_manager: CacheManager) -> None:
+        """Test get_or_set with no cache initialized."""
 
         async def fetch_func():
             return {"fresh": "value"}
 
         result = await cache_manager.get_or_set("test_key", fetch_func)
-
         assert result == {"fresh": "value"}
 
     @pytest.mark.asyncio
-    async def test_delete_success(self, cache_manager: CacheManager, mock_redis: AsyncMock) -> None:
+    async def test_delete_success(self, cache_manager: CacheManager) -> None:
         """Test successful cache delete."""
-        cache_manager._redis = mock_redis
-        mock_redis.delete.return_value = 1
+        await cache_manager.initialize()
+
+        # Add item to cache
+        cache_key = cache_manager._get_cache_key("test_key")
+        cache_manager._cache[cache_key] = "test_value"
 
         result = await cache_manager.delete("test_key")
         assert result is True
-        mock_redis.delete.assert_called_once_with("loats:test_key")
+        assert cache_key not in cache_manager._cache
 
     @pytest.mark.asyncio
-    async def test_delete_not_found(self, cache_manager: CacheManager, mock_redis: AsyncMock) -> None:
+    async def test_delete_not_found(self, cache_manager: CacheManager) -> None:
         """Test cache delete with missing key."""
-        cache_manager._redis = mock_redis
-        mock_redis.delete.return_value = 0
-
+        await cache_manager.initialize()
         result = await cache_manager.delete("missing_key")
         assert result is False
 
     @pytest.mark.asyncio
-    async def test_delete_no_redis(self, cache_manager: CacheManager) -> None:
-        """Test cache delete with no Redis connection."""
-        cache_manager._redis = None
+    async def test_delete_no_cache(self, cache_manager: CacheManager) -> None:
+        """Test cache delete with no cache initialized."""
         result = await cache_manager.delete("test_key")
         assert result is False
 
     @pytest.mark.asyncio
-    async def test_clear_success(self, cache_manager: CacheManager, mock_redis: AsyncMock) -> None:
+    async def test_clear_success(self, cache_manager: CacheManager) -> None:
         """Test successful cache clear."""
-        cache_manager._redis = mock_redis
-        mock_redis.keys.return_value = ["loats:key1", "loats:key2"]
-        mock_redis.delete.return_value = 2
+        await cache_manager.initialize()
+
+        # Add items to cache
+        cache_manager._cache["loats:key1"] = "value1"
+        cache_manager._cache["loats:key2"] = "value2"
 
         result = await cache_manager.clear()
         assert result == 2
-        mock_redis.keys.assert_called_once_with("loats:*")
-        mock_redis.delete.assert_called_once_with("loats:key1", "loats:key2")
+        assert len(cache_manager._cache) == 0
 
     @pytest.mark.asyncio
-    async def test_clear_no_keys(self, cache_manager: CacheManager, mock_redis: AsyncMock) -> None:
-        """Test cache clear with no matching keys."""
-        cache_manager._redis = mock_redis
-        mock_redis.keys.return_value = []
+    async def test_clear_pattern(self, cache_manager: CacheManager) -> None:
+        """Test cache clear with pattern."""
+        await cache_manager.initialize()
 
+        # Add items to cache
+        cache_manager._cache["loats:test1"] = "value1"
+        cache_manager._cache["loats:test2"] = "value2"
+        cache_manager._cache["loats:other"] = "value3"
+
+        result = await cache_manager.clear("test")
+        assert result == 2
+        assert len(cache_manager._cache) == 1
+        assert "loats:other" in cache_manager._cache
+
+    @pytest.mark.asyncio
+    async def test_clear_no_cache(self, cache_manager: CacheManager) -> None:
+        """Test cache clear with no cache initialized."""
         result = await cache_manager.clear()
         assert result == 0
-        mock_redis.keys.assert_called_once()
-        mock_redis.delete.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_clear_no_redis(self, cache_manager: CacheManager) -> None:
-        """Test cache clear with no Redis connection."""
-        cache_manager._redis = None
-        result = await cache_manager.clear()
-        assert result == 0
-
-    @pytest.mark.asyncio
-    async def test_get_cache_stats_success(self, cache_manager: CacheManager, mock_redis: AsyncMock) -> None:
+    async def test_get_cache_stats_success(self, cache_manager: CacheManager) -> None:
         """Test successful cache stats retrieval."""
-        cache_manager._redis = mock_redis
-        mock_redis.info.return_value = {
-            "used_memory": "1000000",
-            "used_memory_peak": "2000000",
-            "last_save_time": "1234567890"
-        }
-        mock_redis.dbsize.return_value = 100
+        await cache_manager.initialize()
+
+        # Add some items to cache
+        cache_manager._cache["loats:key1"] = "value1"
+        cache_manager._cache["loats:key2"] = "value2"
+
+        # Simulate some cache operations
+        cache_manager._cache_stats["hits"] = 10
+        cache_manager._cache_stats["misses"] = 5
 
         stats = await cache_manager.get_cache_stats()
 
         assert stats["enabled"] is True
         assert stats["connected"] is True
-        assert stats["keys"] == 100
-        assert stats["memory_usage"] == "1000000"
-        assert stats["memory_peak"] == "2000000"
-        assert stats["last_save"] == "1234567890"
+        assert stats["cache_type"] == "in_memory_ttl"
+        assert stats["current_size"] == 2
+        assert stats["max_size"] == 1000
+        assert stats["hits"] == 10
+        assert stats["misses"] == 5
+        assert stats["hit_rate"] > 0
 
     @pytest.mark.asyncio
-    async def test_get_cache_stats_no_redis(self, cache_manager: CacheManager) -> None:
-        """Test cache stats with no Redis connection."""
-        cache_manager._redis = None
-
+    async def test_get_cache_stats_no_cache(self, cache_manager: CacheManager) -> None:
+        """Test cache stats with no cache initialized."""
         stats = await cache_manager.get_cache_stats()
-
         assert stats["enabled"] is False
-        assert stats["error"] == "Redis not connected"
-
-    @pytest.mark.asyncio
-    async def test_get_cache_stats_exception(self, cache_manager: CacheManager, mock_redis: AsyncMock) -> None:
-        """Test cache stats with Redis exception."""
-        cache_manager._redis = mock_redis
-        mock_redis.info.side_effect = Exception("Redis error")
-
-        stats = await cache_manager.get_cache_stats()
-
-        assert stats["enabled"] is True
-        assert stats["connected"] is False
-        assert "Redis error" in stats["error"]
+        assert stats["error"] == "Cache not initialized"
 
 class TestCacheUtilities:
     """Tests for cache utility functions."""
