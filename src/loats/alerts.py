@@ -174,13 +174,12 @@ class AlertSystem:
         bot: Bot = self.bot
 
         try:
-            await TELEGRAM_CIRCUIT_BREAKER.call_async(
-                retry_async(OPENALGO_RETRY_CONFIG)(
-                    lambda: bot.send_message(
-                        chat_id=chat_id, text=text, parse_mode=parse_mode
-                    )
+            retried_send = retry_async(OPENALGO_RETRY_CONFIG)(
+                lambda: bot.send_message(
+                    chat_id=chat_id, text=text, parse_mode=parse_mode
                 )
             )
+            await TELEGRAM_CIRCUIT_BREAKER.call_async(retried_send)
             return True
         except CircuitBreakerOpenError:
             logger.warning("Telegram circuit breaker open")
@@ -381,11 +380,10 @@ class AlertSystem:
     async def _safe_get_position_book(self) -> dict[str, Any] | None:
         """Get position book circuit breaker retry protection."""
         try:
-            result: dict[str, Any] = await OPENALGO_CIRCUIT_BREAKER.call_async(
-                retry_async(OPENALGO_RETRY_CONFIG)(
-                    lambda: async_client.get_position_book()
-                )
+            retried_get = retry_async(OPENALGO_RETRY_CONFIG)(
+                lambda: async_client.get_position_book()
             )
+            result: dict[str, Any] = await OPENALGO_CIRCUIT_BREAKER.call_async(retried_get)
             return result
         except CircuitBreakerOpenError:
             logger.warning("Circuit breaker open, skipping position book fetch")
@@ -397,11 +395,10 @@ class AlertSystem:
     async def _safe_get_funds(self) -> dict[str, Any] | None:
         """Get funds circuit breaker retry protection."""
         try:
-            result: dict[str, Any] = await OPENALGO_CIRCUIT_BREAKER.call_async(
-                retry_async(OPENALGO_RETRY_CONFIG)(
-                    lambda: async_client.get_funds()
-                )
+            retried_get = retry_async(OPENALGO_RETRY_CONFIG)(
+                lambda: async_client.get_funds()
             )
+            result: dict[str, Any] = await OPENALGO_CIRCUIT_BREAKER.call_async(retried_get)
             return result
         except CircuitBreakerOpenError:
             logger.warning("Circuit breaker open, skipping funds fetch")
@@ -463,11 +460,10 @@ class AlertSystem:
     async def _safe_get_all_orders(self) -> dict[str, Any] | None:
         """Get all orders circuit breaker retry protection."""
         try:
-            result: dict[str, Any] = await OPENALGO_CIRCUIT_BREAKER.call_async(
-                retry_async(OPENALGO_RETRY_CONFIG)(
-                    lambda: async_client.get_all_orders()
-                )
+            retried_get = retry_async(OPENALGO_RETRY_CONFIG)(
+                lambda: async_client.get_all_orders()
             )
+            result: dict[str, Any] = await OPENALGO_CIRCUIT_BREAKER.call_async(retried_get)
             return result
         except CircuitBreakerOpenError:
             logger.warning("Circuit breaker open, skipping orders fetch")
@@ -479,11 +475,10 @@ class AlertSystem:
     async def _safe_cancel_order(self, order_id: str) -> bool:
         """Cancel order circuit breaker retry protection."""
         try:
-            await OPENALGO_CIRCUIT_BREAKER.call_async(
-                retry_async(OPENALGO_RETRY_CONFIG)(
-                    lambda: async_client.cancel_order(order_id)
-                )
+            retried_cancel = retry_async(OPENALGO_RETRY_CONFIG)(
+                lambda: async_client.cancel_order(order_id)
             )
+            await OPENALGO_CIRCUIT_BREAKER.call_async(retried_cancel)
             return True
         except CircuitBreakerOpenError:
             logger.warning("OpenAlgo circuit breaker open cancel_order")
