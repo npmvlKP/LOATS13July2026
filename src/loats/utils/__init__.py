@@ -10,7 +10,6 @@ from .rate_limiter import (
     AsyncRateLimiter,
     RateLimiter,
     RateLimitExceededError,
-    async_rate_limited,
     get_order_rate_limiter,
     get_smart_order_rate_limiter,
     rate_limited,
@@ -30,8 +29,6 @@ __all__ = [
     "RateLimitExceededError",
     "AsyncRateLimiter",
     "RateLimiter",
-    "async_rate_limited",
-    "rate_limited",
     # Retry
     "OPENALGO_RETRY_CONFIG",
     "retry_async",

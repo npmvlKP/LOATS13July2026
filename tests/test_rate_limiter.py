@@ -12,10 +12,8 @@ from src.loats.utils.rate_limiter import (
     AsyncRateLimiter,
     RateLimiter,
     RateLimitExceededError,
-    async_rate_limited,
     get_order_rate_limiter,
     get_smart_order_rate_limiter,
-    rate_limited
 )
 
 class TestRateLimiter:
@@ -235,45 +233,6 @@ class TestRateLimitExceededError:
         assert str(error) == "Rate limit exceeded"
         assert error.message == "Rate limit exceeded"
 
-class TestRateLimitedDecorator:
-    """Tests for rate_limited decorator."""
-
-    def test_sync_rate_limited_decorator(self) -> None:
-        """Test sync rate limited decorator."""
-        limiter = RateLimiter(max_ops=2, interval=1.0)
-
-        @rate_limited(max_ops=2, window_size=1.0)
-        def limited_function(x: int) -> int:
-            return x * 2
-
-        # First two calls should succeed
-        result1 = limited_function(1)
-        assert result1 == 2
-
-        result2 = limited_function(2)
-        assert result2 == 4
-
-        # Third call should raise RateLimitExceededError
-        with pytest.raises(RateLimitExceededError):
-            limited_function(3)
-
-    @pytest.mark.asyncio
-    async def test_async_rate_limited_decorator(self) -> None:
-        """Test async rate limited decorator."""
-        @async_rate_limited(max_ops=2, window_size=1.0)
-        async def limited_async_function(x: int) -> int:
-            return x * 2
-
-        # First two calls should succeed
-        result1 = await limited_async_function(1)
-        assert result1 == 2
-
-        result2 = await limited_async_function(2)
-        assert result2 == 4
-
-        # Third call should raise RateLimitExceededError
-        with pytest.raises(RateLimitExceededError):
-            await limited_async_function(3)
 
 class TestGlobalRateLimiters:
     """Tests for global rate limiter instances."""

@@ -145,6 +145,71 @@ class AsyncRateLimiter:
             wait_time: float = (oldest_timestamp + self.window_size) - time.monotonic()
             return max(wait_time, 0.0)
 
+class SyncRateLimiter:
+    """Synchronous rate limiter using token bucket algorithm.
+
+    This implementation is designed for use with synchronous functions
+    and uses threading.Lock instead of asyncio.Lock.
+    """
+
+    def __init__(self, max_ops: int | None = None, interval: float = 1.0):
+        """Initialize synchronous rate limiter.
+
+        Args:
+            max_ops: Maximum operations per interval (default: from settings)
+            interval: Time interval in seconds (default: 1.0)
+        """
+        import threading
+        settings = get_settings()
+        self.max_ops: int = max_ops if max_ops is not None else settings.max_ops
+        self.interval: float = interval
+        self.tokens: float = float(self.max_ops)
+        self.last_refill_time: float = time.monotonic()
+        self.lock: threading.Lock = threading.Lock()
+
+    def acquire(self) -> bool:
+        """Acquire token for operation.
+
+        Returns:
+            True if token acquired successfully, False if rate limit exceeded
+        """
+        with self.lock:
+            current_time: float = time.monotonic()
+            time_since_refill: float = current_time - self.last_refill_time
+
+            # Refill tokens based on elapsed time
+            if time_since_refill >= self.interval:
+                self.tokens = float(self.max_ops)
+                self.last_refill_time = current_time
+            else:
+                # Partial refill based on elapsed time
+                tokens_to_add: float = (time_since_refill / self.interval) * self.max_ops
+                self.tokens = min(float(self.max_ops), self.tokens + tokens_to_add)
+                self.last_refill_time = current_time
+
+            if self.tokens >= 1:
+                self.tokens -= 1
+                return True
+            else:
+                return False
+
+    def wait_for_token(self) -> None:
+        """Wait until token is available.
+
+        Raises:
+            RateLimitExceededError: if waiting takes too long
+        """
+        import time as time_module
+        start_time = time_module.monotonic()
+        timeout = 10.0  # 10 second timeout
+
+        while True:
+            if self.acquire():
+                return
+            if time_module.monotonic() - start_time > timeout:
+                raise RateLimitExceededError("Timeout waiting for rate limit token")
+            time_module.sleep(0.1)  # Small sleep to prevent busy waiting
+
 class RateLimitExceededError(Exception):
     """Exception raised when rate limit is exceeded."""
 
@@ -152,73 +217,28 @@ class RateLimitExceededError(Exception):
         self.message: str = message
         super().__init__(self.message)
 
-def rate_limited(max_ops: int | None = None, window_size: float = 1.0) -> Callable:
-    """Decorator for rate limiting sync functions.
+def rate_limited(max_ops: int | None = None, window_size: float = 1.0):
+    """Decorator for rate limiting synchronous functions.
 
     Args:
-        max_ops: Maximum operations per window
-        window_size: Time window in seconds
+        max_ops: Maximum operations per window (default: from settings)
+        window_size: Time window in seconds (default: 1.0)
 
     Returns:
-        Decorator function
+        A decorator that can be applied to synchronous functions
     """
-    limiter = RateLimiter(max_ops, window_size)
 
     def decorator(func: Callable) -> Callable:
-        if asyncio.iscoroutinefunction(func):
-            async def wrapper(*args: Any, **kwargs: Any) -> Any:
-                if not await limiter.acquire():
-                    raise RateLimitExceededError(
-                        f"Rate limit exceeded: {max_ops} operations per {window_size} seconds"
-                    )
-                return await func(*args, **kwargs)
-            return wrapper
-        else:
-            def wrapper(*args: Any, **kwargs: Any) -> Any:
-                # For sync functions, we need to run the async acquire in an event loop
-                # This is a common pattern for sync/async compatibility
-                try:
-                    loop = asyncio.get_running_loop()
-                except RuntimeError:
-                    # No running event loop, create a new one for this call
-                    loop = asyncio.new_event_loop()
-                    result = loop.run_until_complete(limiter.acquire())
-                    loop.close()
-                    if not result:
-                        raise RateLimitExceededError(
-                            f"Rate limit exceeded: {max_ops} operations per {window_size} seconds"
-                        )
-                    return func(*args, **kwargs)
-                else:
-                    # Use existing running event loop
-                    if not loop.run_until_complete(limiter.acquire()):
-                        raise RateLimitExceededError(
-                            f"Rate limit exceeded: {max_ops} operations per {window_size} seconds"
-                        )
-                    return func(*args, **kwargs)
-            return wrapper
-    return decorator
+        # Create a sync rate limiter for this function
+        limiter = SyncRateLimiter(max_ops=max_ops, interval=window_size)
 
-def async_rate_limited(max_ops: int | None = None, window_size: float = 1.0) -> Callable:
-    """Decorator for rate limiting async functions.
+        def wrapper(*args, **kwargs):
+            if not limiter.acquire():
+                raise RateLimitExceededError(f"Rate limit exceeded for function {func.__name__}")
+            return func(*args, **kwargs)
 
-    Args:
-        max_ops: Maximum operations per window
-        window_size: Time window in seconds
-
-    Returns:
-        Decorator function
-    """
-    limiter = AsyncRateLimiter(max_ops, window_size)
-
-    def decorator(func: Callable) -> Callable:
-        async def wrapper(*args: Any, **kwargs: Any) -> Any:
-            if not await limiter.acquire():
-                raise RateLimitExceededError(
-                    f"Rate limit exceeded: {max_ops} operations per {window_size} seconds"
-                )
-            return await func(*args, **kwargs)
         return wrapper
+
     return decorator
 
 # Internal global rate limiter instances for dependency injection
