@@ -1,1 +1,475 @@
-All checks passed!
+I001 [*] Import block is un-sorted or un-formatted
+  --> tests\test_cache.py:5:1
+   |
+ 3 |   Tests Redis-based caching functionality.
+ 4 |   """
+ 5 | / from unittest.mock import AsyncMock, MagicMock, patch
+ 6 | | import json
+ 7 | | import pytest
+ 8 | |
+ 9 | | from pydantic import BaseModel
+10 | | from redis.asyncio import Redis
+11 | |
+12 | | from src.loats.utils.cache import (
+13 | |     CacheConfig,
+14 | |     CacheManager,
+15 | |     cache_manager,
+16 | |     initialize_cache,
+17 | |     close_cache,
+18 | |     model_to_cache_key,
+19 | |     dict_to_cache_key
+20 | | )
+   | |_^
+21 |
+22 |   class TestCacheConfig:
+   |
+help: Organize imports
+
+F401 [*] `unittest.mock.MagicMock` imported but unused
+ --> tests\test_cache.py:5:38
+  |
+3 | Tests Redis-based caching functionality.
+4 | """
+5 | from unittest.mock import AsyncMock, MagicMock, patch
+  |                                      ^^^^^^^^^
+6 | import json
+7 | import pytest
+  |
+help: Remove unused import: `unittest.mock.MagicMock`
+
+W292 [*] No newline at end of file
+   --> tests\test_cache.py:391:44
+    |
+389 |         with patch.object(cache_manager, "close") as mock_close:
+390 |             await close_cache()
+391 |             mock_close.assert_called_once()
+    |                                            ^
+    |
+help: Add trailing newline
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> tests\test_openalgo_integration.py:5:1
+   |
+ 3 |   Tests the complete flow of API interactions with proper mocking.
+ 4 |   """
+ 5 | / from unittest.mock import AsyncMock, MagicMock, patch
+ 6 | | import json
+ 7 | |
+ 8 | | import httpx
+ 9 | | import pytest
+10 | | from httpx import Response
+11 | |
+12 | | from src.loats.config import get_settings
+13 | | from src.loats.models import (
+14 | |     OrderType,
+15 | |     OrderVariety,
+16 | |     ProductType,
+17 | |     TransactionType
+18 | | )
+19 | | from src.loats.openalgo import (
+20 | |     AsyncOpenAlgoClient,
+21 | |     OpenAlgoAPIError,
+22 | |     OpenAlgoClient,
+23 | |     OpenAlgoError,
+24 | |     async_client
+25 | | )
+26 | | from src.loats.utils.rate_limiter import RateLimitExceededError
+   | |_______________________________________________________________^
+27 |
+28 |   settings = get_settings()
+   |
+help: Organize imports
+
+F401 [*] `json` imported but unused
+ --> tests\test_openalgo_integration.py:6:8
+  |
+4 | """
+5 | from unittest.mock import AsyncMock, MagicMock, patch
+6 | import json
+  |        ^^^^
+7 |
+8 | import httpx
+  |
+help: Remove unused import: `json`
+
+F401 [*] `src.loats.models.OrderVariety` imported but unused
+  --> tests\test_openalgo_integration.py:15:5
+   |
+13 | from src.loats.models import (
+14 |     OrderType,
+15 |     OrderVariety,
+   |     ^^^^^^^^^^^^
+16 |     ProductType,
+17 |     TransactionType
+   |
+help: Remove unused import: `src.loats.models.OrderVariety`
+
+F401 [*] `src.loats.openalgo.async_client` imported but unused
+  --> tests\test_openalgo_integration.py:24:5
+   |
+22 |     OpenAlgoClient,
+23 |     OpenAlgoError,
+24 |     async_client
+   |     ^^^^^^^^^^^^
+25 | )
+26 | from src.loats.utils.rate_limiter import RateLimitExceededError
+   |
+help: Remove unused import: `src.loats.openalgo.async_client`
+
+F811 Redefinition of unused `async_client` from line 24
+   --> tests\test_openalgo_integration.py:263:52
+    |
+262 |     @pytest.mark.asyncio
+263 |     async def test_async_place_order_success(self, async_client: AsyncOpenAlgoClient, mock_async_httpx_client: AsyncMock, mock_async_…
+    |                                                    ^^^^^^^^^^^^ `async_client` redefined here
+264 |         """Test async successful order placement."""
+265 |         mock_async_response.json.return_value = {
+    |
+   ::: tests\test_openalgo_integration.py:24:5
+    |
+ 22 |     OpenAlgoClient,
+ 23 |     OpenAlgoError,
+ 24 |     async_client
+    |     ------------ previous definition of `async_client` here
+ 25 | )
+ 26 | from src.loats.utils.rate_limiter import RateLimitExceededError
+    |
+help: Remove definition: `async_client`
+
+F811 Redefinition of unused `async_client` from line 24
+   --> tests\test_openalgo_integration.py:288:58
+    |
+287 |     @pytest.mark.asyncio
+288 |     async def test_async_place_smart_order_success(self, async_client: AsyncOpenAlgoClient, mock_async_httpx_client: AsyncMock, mock_…
+    |                                                          ^^^^^^^^^^^^ `async_client` redefined here
+289 |         """Test async successful smart order placement."""
+290 |         mock_async_response.json.return_value = {
+    |
+   ::: tests\test_openalgo_integration.py:24:5
+    |
+ 22 |     OpenAlgoClient,
+ 23 |     OpenAlgoError,
+ 24 |     async_client
+    |     ------------ previous definition of `async_client` here
+ 25 | )
+ 26 | from src.loats.utils.rate_limiter import RateLimitExceededError
+    |
+help: Remove definition: `async_client`
+
+F811 Redefinition of unused `async_client` from line 24
+   --> tests\test_openalgo_integration.py:316:53
+    |
+315 |     @pytest.mark.asyncio
+316 |     async def test_async_modify_order_success(self, async_client: AsyncOpenAlgoClient, mock_async_httpx_client: AsyncMock, mock_async…
+    |                                                     ^^^^^^^^^^^^ `async_client` redefined here
+317 |         """Test async successful order modification."""
+318 |         mock_async_response.json.return_value = {
+    |
+   ::: tests\test_openalgo_integration.py:24:5
+    |
+ 22 |     OpenAlgoClient,
+ 23 |     OpenAlgoError,
+ 24 |     async_client
+    |     ------------ previous definition of `async_client` here
+ 25 | )
+ 26 | from src.loats.utils.rate_limiter import RateLimitExceededError
+    |
+help: Remove definition: `async_client`
+
+F811 Redefinition of unused `async_client` from line 24
+   --> tests\test_openalgo_integration.py:339:53
+    |
+338 |     @pytest.mark.asyncio
+339 |     async def test_async_cancel_order_success(self, async_client: AsyncOpenAlgoClient, mock_async_httpx_client: AsyncMock, mock_async…
+    |                                                     ^^^^^^^^^^^^ `async_client` redefined here
+340 |         """Test async successful order cancellation."""
+341 |         mock_async_response.json.return_value = {
+    |
+   ::: tests\test_openalgo_integration.py:24:5
+    |
+ 22 |     OpenAlgoClient,
+ 23 |     OpenAlgoError,
+ 24 |     async_client
+    |     ------------ previous definition of `async_client` here
+ 25 | )
+ 26 | from src.loats.utils.rate_limiter import RateLimitExceededError
+    |
+help: Remove definition: `async_client`
+
+F811 Redefinition of unused `async_client` from line 24
+   --> tests\test_openalgo_integration.py:358:58
+    |
+357 |     @pytest.mark.asyncio
+358 |     async def test_async_get_position_book_success(self, async_client: AsyncOpenAlgoClient, mock_async_httpx_client: AsyncMock, mock_…
+    |                                                          ^^^^^^^^^^^^ `async_client` redefined here
+359 |         """Test async successful position book retrieval."""
+360 |         mock_async_response.json.return_value = {
+    |
+   ::: tests\test_openalgo_integration.py:24:5
+    |
+ 22 |     OpenAlgoClient,
+ 23 |     OpenAlgoError,
+ 24 |     async_client
+    |     ------------ previous definition of `async_client` here
+ 25 | )
+ 26 | from src.loats.utils.rate_limiter import RateLimitExceededError
+    |
+help: Remove definition: `async_client`
+
+F811 Redefinition of unused `async_client` from line 24
+   --> tests\test_openalgo_integration.py:384:50
+    |
+383 |     @pytest.mark.asyncio
+384 |     async def test_async_get_funds_success(self, async_client: AsyncOpenAlgoClient, mock_async_httpx_client: AsyncMock, mock_async_re…
+    |                                                  ^^^^^^^^^^^^ `async_client` redefined here
+385 |         """Test async successful funds retrieval."""
+386 |         mock_async_response.json.return_value = {
+    |
+   ::: tests\test_openalgo_integration.py:24:5
+    |
+ 22 |     OpenAlgoClient,
+ 23 |     OpenAlgoError,
+ 24 |     async_client
+    |     ------------ previous definition of `async_client` here
+ 25 | )
+ 26 | from src.loats.utils.rate_limiter import RateLimitExceededError
+    |
+help: Remove definition: `async_client`
+
+F811 Redefinition of unused `async_client` from line 24
+   --> tests\test_openalgo_integration.py:405:55
+    |
+404 |     @pytest.mark.asyncio
+405 |     async def test_async_get_all_orders_success(self, async_client: AsyncOpenAlgoClient, mock_async_httpx_client: AsyncMock, mock_asy…
+    |                                                       ^^^^^^^^^^^^ `async_client` redefined here
+406 |         """Test async successful retrieval of all orders."""
+407 |         mock_async_response.json.return_value = {
+    |
+   ::: tests\test_openalgo_integration.py:24:5
+    |
+ 22 |     OpenAlgoClient,
+ 23 |     OpenAlgoError,
+ 24 |     async_client
+    |     ------------ previous definition of `async_client` here
+ 25 | )
+ 26 | from src.loats.utils.rate_limiter import RateLimitExceededError
+    |
+help: Remove definition: `async_client`
+
+F811 Redefinition of unused `async_client` from line 24
+   --> tests\test_openalgo_integration.py:432:55
+    |
+431 |     @pytest.mark.asyncio
+432 |     async def test_async_get_trade_book_success(self, async_client: AsyncOpenAlgoClient, mock_async_httpx_client: AsyncMock, mock_asy…
+    |                                                       ^^^^^^^^^^^^ `async_client` redefined here
+433 |         """Test async successful trade book retrieval."""
+434 |         mock_async_response.json.return_value = {
+    |
+   ::: tests\test_openalgo_integration.py:24:5
+    |
+ 22 |     OpenAlgoClient,
+ 23 |     OpenAlgoError,
+ 24 |     async_client
+    |     ------------ previous definition of `async_client` here
+ 25 | )
+ 26 | from src.loats.utils.rate_limiter import RateLimitExceededError
+    |
+help: Remove definition: `async_client`
+
+F811 Redefinition of unused `async_client` from line 24
+   --> tests\test_openalgo_integration.py:459:51
+    |
+458 |     @pytest.mark.asyncio
+459 |     async def test_async_get_quotes_caching(self, async_client: AsyncOpenAlgoClient, mock_async_httpx_client: AsyncMock, mock_async_r…
+    |                                                   ^^^^^^^^^^^^ `async_client` redefined here
+460 |         """Test async quotes caching functionality."""
+461 |         mock_async_response.json.return_value = {
+    |
+   ::: tests\test_openalgo_integration.py:24:5
+    |
+ 22 |     OpenAlgoClient,
+ 23 |     OpenAlgoError,
+ 24 |     async_client
+    |     ------------ previous definition of `async_client` here
+ 25 | )
+ 26 | from src.loats.utils.rate_limiter import RateLimitExceededError
+    |
+help: Remove definition: `async_client`
+
+F811 Redefinition of unused `async_client` from line 24
+   --> tests\test_openalgo_integration.py:489:46
+    |
+488 |     @pytest.mark.asyncio
+489 |     async def test_async_rate_limiting(self, async_client: AsyncOpenAlgoClient) -> None:
+    |                                              ^^^^^^^^^^^^ `async_client` redefined here
+490 |         """Test async rate limiting functionality."""
+491 |         # Mock the rate limiter to simulate rate limit exceeded
+    |
+   ::: tests\test_openalgo_integration.py:24:5
+    |
+ 22 |     OpenAlgoClient,
+ 23 |     OpenAlgoError,
+ 24 |     async_client
+    |     ------------ previous definition of `async_client` here
+ 25 | )
+ 26 | from src.loats.utils.rate_limiter import RateLimitExceededError
+    |
+help: Remove definition: `async_client`
+
+F811 Redefinition of unused `async_client` from line 24
+   --> tests\test_openalgo_integration.py:550:52
+    |
+549 |     @pytest.mark.asyncio
+550 |     async def test_async_http_error_handling(self, async_client: AsyncOpenAlgoClient, mock_async_httpx_client: AsyncMock) -> None:
+    |                                                    ^^^^^^^^^^^^ `async_client` redefined here
+551 |         """Test async HTTP error handling."""
+552 |         error_response = MagicMock(spec=Response)
+    |
+   ::: tests\test_openalgo_integration.py:24:5
+    |
+ 22 |     OpenAlgoClient,
+ 23 |     OpenAlgoError,
+ 24 |     async_client
+    |     ------------ previous definition of `async_client` here
+ 25 | )
+ 26 | from src.loats.utils.rate_limiter import RateLimitExceededError
+    |
+help: Remove definition: `async_client`
+
+F811 Redefinition of unused `async_client` from line 24
+   --> tests\test_openalgo_integration.py:581:58
+    |
+580 |     @pytest.mark.asyncio
+581 |     async def test_async_connection_error_handling(self, async_client: AsyncOpenAlgoClient, mock_async_httpx_client: AsyncMock) -> No…
+    |                                                          ^^^^^^^^^^^^ `async_client` redefined here
+582 |         """Test async connection error handling."""
+583 |         mock_async_httpx_client.post.side_effect = httpx.ConnectError("Connection failed")
+    |
+   ::: tests\test_openalgo_integration.py:24:5
+    |
+ 22 |     OpenAlgoClient,
+ 23 |     OpenAlgoError,
+ 24 |     async_client
+    |     ------------ previous definition of `async_client` here
+ 25 | )
+ 26 | from src.loats.utils.rate_limiter import RateLimitExceededError
+    |
+help: Remove definition: `async_client`
+
+W292 [*] No newline at end of file
+   --> tests\test_openalgo_integration.py:589:59
+    |
+587 |                 await async_client._request("POST", "quotes", json={"symbols": ["NIFTY"]})
+588 |
+589 |             assert "Request failed" in str(exc_info.value)
+    |                                                           ^
+    |
+help: Add trailing newline
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> tests\test_rate_limiter.py:5:1
+   |
+ 3 |   Tests token bucket and sliding window rate limiting algorithms.
+ 4 |   """
+ 5 | / import asyncio
+ 6 | | import time
+ 7 | | from unittest.mock import AsyncMock, MagicMock, patch
+ 8 | | import pytest
+ 9 | |
+10 | | from src.loats.config import get_settings
+11 | | from src.loats.utils.rate_limiter import (
+12 | |     AsyncRateLimiter,
+13 | |     RateLimiter,
+14 | |     RateLimitExceededError,
+15 | |     async_rate_limited,
+16 | |     get_order_rate_limiter,
+17 | |     get_smart_order_rate_limiter,
+18 | |     rate_limited
+19 | | )
+   | |_^
+20 |
+21 |   class TestRateLimiter:
+   |
+help: Organize imports
+
+F401 [*] `unittest.mock.AsyncMock` imported but unused
+ --> tests\test_rate_limiter.py:7:27
+  |
+5 | import asyncio
+6 | import time
+7 | from unittest.mock import AsyncMock, MagicMock, patch
+  |                           ^^^^^^^^^
+8 | import pytest
+  |
+help: Remove unused import
+
+F401 [*] `unittest.mock.MagicMock` imported but unused
+ --> tests\test_rate_limiter.py:7:38
+  |
+5 | import asyncio
+6 | import time
+7 | from unittest.mock import AsyncMock, MagicMock, patch
+  |                                      ^^^^^^^^^
+8 | import pytest
+  |
+help: Remove unused import
+
+F401 [*] `unittest.mock.patch` imported but unused
+ --> tests\test_rate_limiter.py:7:49
+  |
+5 | import asyncio
+6 | import time
+7 | from unittest.mock import AsyncMock, MagicMock, patch
+  |                                                 ^^^^^
+8 | import pytest
+  |
+help: Remove unused import
+
+B007 Loop control variable `i` not used within loop body
+  --> tests\test_rate_limiter.py:48:13
+   |
+46 |         """Test successful token acquisition."""
+47 |         # Should be able to acquire tokens up to max_ops
+48 |         for i in range(10):
+   |             ^
+49 |             result = await rate_limiter.acquire()
+50 |             assert result is True
+   |
+help: Rename unused `i` to `_i`
+
+B007 Loop control variable `i` not used within loop body
+   --> tests\test_rate_limiter.py:152:13
+    |
+150 |         """Test successful token acquisition."""
+151 |         # Should be able to acquire tokens up to max_ops
+152 |         for i in range(5):
+    |             ^
+153 |             result = await async_rate_limiter.acquire()
+154 |             assert result is True
+    |
+help: Rename unused `i` to `_i`
+
+F841 Local variable `limiter` is assigned to but never used
+   --> tests\test_rate_limiter.py:243:9
+    |
+241 |     def test_sync_rate_limited_decorator(self) -> None:
+242 |         """Test sync rate limited decorator."""
+243 |         limiter = RateLimiter(max_ops=2, interval=1.0)
+    |         ^^^^^^^
+244 |
+245 |         @rate_limited(max_ops=2, window_size=1.0)
+    |
+help: Remove assignment to unused variable `limiter`
+
+W292 [*] No newline at end of file
+   --> tests\test_rate_limiter.py:464:68
+    |
+462 |         second_burst_successful = sum(second_burst_results)
+463 |         assert second_burst_successful >= 1  # Should get at least 1
+464 |         assert second_burst_successful <= 2  # Should get at most 2
+    |                                                                    ^
+    |
+help: Add trailing newline
+
+Found 28 errors.
+[*] 13 fixable with the `--fix` option (3 hidden fixes can be enabled with the `--unsafe-fixes` option).
