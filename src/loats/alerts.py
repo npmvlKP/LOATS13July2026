@@ -17,7 +17,7 @@ from telegram.ext import (
 )
 
 from src.loats.config import get_settings
-from src.loats.database import Database, db
+from src.loats.database import Database, db  # noqa: F401
 from src.loats.loats_logging import get_logger
 from src.loats.models import Order, Signal, SignalType, Trade
 from src.loats.openalgo import async_client
