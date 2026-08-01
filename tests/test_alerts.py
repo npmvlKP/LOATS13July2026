@@ -653,7 +653,7 @@ class TestAlertSystem:
             await alert_system._kill_switch(mock_update, mock_context)
 
         mock_update.message.reply_text.assert_called_once_with(
-            "⚠️ Kill switch is already active."
+            "⚠️ Kill switch already active."
         )
 
     @pytest.mark.asyncio

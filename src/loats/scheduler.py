@@ -11,6 +11,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 
 from .alerts import alerts
 from .config import get_settings
+
 settings = get_settings()
 from .database import Database
 from .loats_logging import get_logger

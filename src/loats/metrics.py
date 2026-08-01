@@ -2,9 +2,10 @@
 Metrics collection LOATS13July2026 using prometheus_client.
 """
 import time
-import typing
 from typing import Any, Optional
+
 from prometheus_client import Counter, Gauge, Summary, start_http_server
+
 from src.loats.loats_logging import get_logger
 
 logger = get_logger(__name__)
@@ -16,7 +17,7 @@ class MetricsManager:
 
     def __new__(cls) -> 'MetricsManager':
         if cls._instance is None:
-            cls._instance = super(MetricsManager, cls).__new__(cls)
+            cls._instance = super().__new__(cls)
             cls._instance._initialized = False
         return cls._instance
 

@@ -2,7 +2,8 @@
 import asyncio
 import time
 from collections import deque
-from typing import Any, Callable, Coroutine, Optional
+from collections.abc import Callable
+from typing import Any
 
 from ..config import get_settings
 from ..loats_logging import get_logger
@@ -16,7 +17,7 @@ class RateLimiter:
     settings (max_ops).
     """
 
-    def __init__(self, max_ops: Optional[int] = None, interval: float = 1.0):
+    def __init__(self, max_ops: int | None = None, interval: float = 1.0):
         """Initialize rate limiter.
         
         Args:
@@ -39,7 +40,7 @@ class RateLimiter:
         async with self.lock:
             current_time: float = time.monotonic()
             time_since_refill: float = current_time - self.last_refill_time
-            
+
             # Refill tokens based on elapsed time
             if time_since_refill >= self.interval:
                 self.tokens = float(self.max_ops)
@@ -49,7 +50,7 @@ class RateLimiter:
                 tokens_to_add: float = (time_since_refill / self.interval) * self.max_ops
                 self.tokens = min(float(self.max_ops), self.tokens + tokens_to_add)
                 self.last_refill_time = current_time
-            
+
             if self.tokens >= 1:
                 self.tokens -= 1
                 return True
@@ -74,7 +75,7 @@ class AsyncRateLimiter:
     provides better control over rate limiting.
     """
 
-    def __init__(self, max_ops: Optional[int] = None, window_size: float = 1.0):
+    def __init__(self, max_ops: int | None = None, window_size: float = 1.0):
         """Initialize async rate limiter.
         
         Args:
@@ -95,11 +96,11 @@ class AsyncRateLimiter:
         """
         async with self.lock:
             current_time: float = time.monotonic()
-            
+
             # Remove timestamps outside current window
             while self.timestamps and (current_time - self.timestamps[0]) > self.window_size:
                 self.timestamps.popleft()
-            
+
             if len(self.timestamps) < self.max_ops:
                 self.timestamps.append(current_time)
                 return True
@@ -122,19 +123,19 @@ class AsyncRateLimiter:
         async with self.lock:
             if not self.timestamps:
                 return 0.0
-            
+
             oldest_timestamp: float = self.timestamps[0]
             wait_time: float = (oldest_timestamp + self.window_size) - time.monotonic()
             return max(wait_time, 0.0)
 
 class RateLimitExceededError(Exception):
     """Exception raised when rate limit is exceeded."""
-    
+
     def __init__(self, message: str = "Rate limit exceeded"):
         self.message: str = message
         super().__init__(self.message)
 
-def rate_limited(max_ops: Optional[int] = None, window_size: float = 1.0) -> Callable:
+def rate_limited(max_ops: int | None = None, window_size: float = 1.0) -> Callable:
     """Decorator for rate limiting sync functions.
     
     Args:
@@ -145,7 +146,7 @@ def rate_limited(max_ops: Optional[int] = None, window_size: float = 1.0) -> Cal
         Decorator function
     """
     limiter = RateLimiter(max_ops, window_size)
-    
+
     def decorator(func: Callable) -> Callable:
         async def wrapper(*args: Any, **kwargs: Any) -> Any:
             if not await limiter.acquire():
@@ -156,7 +157,7 @@ def rate_limited(max_ops: Optional[int] = None, window_size: float = 1.0) -> Cal
         return wrapper
     return decorator
 
-def async_rate_limited(max_ops: Optional[int] = None, window_size: float = 1.0) -> Callable:
+def async_rate_limited(max_ops: int | None = None, window_size: float = 1.0) -> Callable:
     """Decorator for rate limiting async functions.
     
     Args:
@@ -167,7 +168,7 @@ def async_rate_limited(max_ops: Optional[int] = None, window_size: float = 1.0) 
         Decorator function
     """
     limiter = AsyncRateLimiter(max_ops, window_size)
-    
+
     def decorator(func: Callable) -> Callable:
         async def wrapper(*args: Any, **kwargs: Any) -> Any:
             if not await limiter.acquire():

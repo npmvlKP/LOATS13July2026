@@ -28,6 +28,7 @@ from .models import (
 )
 
 logger = get_logger(__name__)
+
 T = TypeVar("T", bound=BaseModel)
 
 # -------------------------------------------------------------------------
@@ -57,6 +58,7 @@ _PRAGMAS: tuple[str, ...] = (
     "PRAGMA cache_size=-10000",  # 10MB cache
 )
 
+
 class Database:
     """SQLite database audit trail functionality."""
 
@@ -69,9 +71,9 @@ class Database:
         """
         Initialize Database.
         Args:
-            db_path: Path to SQLite database file
-            audit_log_path: Path to audit log JSONL file
-            retention_days: Number of days to retain data (defaults to settings)
+            db_path: Path SQLite database file
+            audit_log_path: Path audit log JSONL file
+            retention_days: Number days retain data (defaults to settings)
         """
         settings = get_settings()
         self.db_path = db_path or Path(settings.sqlite_db_path)
@@ -80,17 +82,17 @@ class Database:
 
         self._thread_local = threading.local()
 
-        # Thread registry to track all connections across threads
-        # enables proper cleanup of all connections on shutdown
-        # (FIX-WINDOWS-SHUTDOWN: Connections held by APScheduler worker threads
-        # must be closed to prevent file-handle leaks on Windows)
+        # Thread registry track all connections across threads
+        # enables proper cleanup all connections shutdown
+        # (FIX-WINDOWS-SHUTDOWN: Connections held APScheduler worker threads
+        # must closed prevent file-handle leaks Windows)
         self._thread_registry: dict[int, sqlite3.Connection] = {}
         self._registry_lock = threading.Lock()
 
         # Per-instance PRAGMA tracking (F-PERF-1)
-        # Each distinct connection object is keyed by id(conn)
-        # PRAGMAs are applied exactly once per connection lifecycle, while
-        # still correctly applied when new connections are opened.
+        # Each distinct connection object keyed id(conn)
+        # PRAGMAs applied exactly once per connection lifecycle, while
+        # correctly applied when new connections opened.
         self._pragmas_applied: set[int] = set()
         self._pragmas_lock = threading.Lock()
 
@@ -98,7 +100,7 @@ class Database:
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self.audit_log_path.parent.mkdir(parents=True, exist_ok=True)
 
-        # Create audit log file if it doesn't exist
+        # Create audit log file doesn't exist
         if not self.audit_log_path.exists():
             self.audit_log_path.touch()
 
@@ -114,7 +116,7 @@ class Database:
         self._cleanup_old_data()
 
     def vacuum(self) -> None:
-        """Vacuum database to reclaim space."""
+        """Vacuum database reclaim space."""
         conn = self._get_connection()
         conn.execute("VACUUM")
         conn.commit()
@@ -124,7 +126,7 @@ class Database:
         conn = self._get_connection()
         cursor = conn.cursor()
 
-        # Create tables if they don't exist
+        # Create tables don't exist
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS trades (
                 trade_id TEXT PRIMARY KEY,
@@ -275,7 +277,7 @@ class Database:
             )
         """)
 
-        # Create indexes for performance
+        # Create indexes performance
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_trades_symbol ON trades(symbol)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_trades_status ON trades(status)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_signals_symbol ON signals(symbol)")
@@ -288,39 +290,39 @@ class Database:
 
     def _get_connection(self) -> sqlite3.Connection:
         """
-        Get database connection with thread-local caching.
+        Get database connection thread-local caching.
 
-        Optimization strategy (F-PERF-1):
-        - Thread-local caching (``self._thread_local``) ensures each thread
-          reuses its connection, avoiding connection-open overhead.
-        - Per-instance PRAGMA tracking (`self._pragmas_applied`) keyed by
-          `id(conn)` ensures each *new* connection runs PRAGMAs exactly once.
-        - Reusing a thread-local connection is the fast path with zero PRAGMA cost.
+        Optimization strategy (F-PERF-1)
+        Thread-local caching (``self._thread_local``) ensures each thread
+        reuses connection, avoiding connection-open overhead.
+        Per-instance PRAGMA tracking ``self._pragmas_applied`` keyed
+        ``id(conn)`` ensures each *new* connection runs PRAGMAs exactly once.
+        Reusing thread-local connection fast path zero PRAGMA cost.
 
         Why per-instance (not module-level) tracking:
-        - SQLite PRAGMAs (e.g., `journal_mode=WAL`, `cache_size`) are
-          **per-connection** settings; opening a new connection object resets defaults.
-        - A module-level flag would incorrectly skip PRAGMAs for later connections
-          in long-running processes or across Database instances.
+        SQLite PRAGMAs (e.g., ``journal_mode=WAL`` ``cache_size``)
+        **per-connection** settings; opening new connection object resets defaults.
+        module-level flag incorrectly skip PRAGMAs later connections
+        long-running processes across Database instances.
 
-        Thread safety:
-        - `self._pragmas_lock` guards the check-and-set so concurrent threads
-          racing to create their first connection pay the PRAGMA cost once
-          per *new* connection object only.
+        Thread safety: ``self._pragmas_lock`` guards check-and-set concurrent threads
+        racing create first connection pay PRAGMA cost once
+        per *new* connection object only.
 
         FIX-WINDOWS-SHUTDOWN:
-        - Connections are registered in `self._thread_registry` to be
-          properly closed during shutdown, preventing file-handle leaks on
-          Windows where worker threads hold connections open.
+        Connections registered ``self._thread_registry``
+        properly closed during shutdown, preventing file-handle leaks
+        Windows where worker threads hold connections open.
         """
         # Fast path: use thread-local connection (most common case)
         thread_local_conn: sqlite3.Connection | None = getattr(
             self._thread_local, "connection", None
         )
+
         if thread_local_conn is not None:
             return thread_local_conn
 
-        # Slow path: open new connection for this thread
+        # Slow path: open new connection thread
         conn = sqlite3.connect(self.db_path)
 
         # Apply PRAGMAs exactly once per connection object (F-PERF-1)
@@ -331,7 +333,7 @@ class Database:
                     conn.execute(pragma)
                 self._pragmas_applied.add(conn_id)
 
-        # Register connection for proper cleanup on shutdown (FIX-WINDOWS-SHUTDOWN)
+        # Register connection proper cleanup shutdown (FIX-WINDOWS-SHUTDOWN)
         thread_id = threading.get_ident()
         with self._registry_lock:
             self._thread_registry[thread_id] = conn
@@ -340,86 +342,87 @@ class Database:
         return conn
 
     def _model_to_dict(self, model: BaseModel) -> dict[str, Any]:
-        """Convert Pydantic model to dictionary."""
+        """Convert Pydantic model dictionary."""
         result = json.loads(model.model_dump_json())
         if not isinstance(result, dict):
-            raise TypeError(f"Expected dict from model_dump_json, got {type(result)}")
+            raise TypeError(f"Expected dict model_dump_json, got {type(result)}")
         return result
 
     def _dict_to_model(self, data: dict[str, Any], model_class: type[T]) -> T:
-        """Convert dictionary to Pydantic model."""
+        """Convert dictionary Pydantic model."""
         return model_class(**data)
 
     def _canonical_serialize(self, data: dict[str, Any]) -> str:
         """
-        Serialize dictionary to canonical JSON string for hashing.
+        Serialize dictionary canonical JSON string hashing.
         ensures deterministic serialization across Python/Pydantic versions:
-        - Datetime values serialized to ISO-8601 format in UTC timezone
-        - Float values use fixed decimal representation to avoid precision issues
-        - Keys sorted alphabetically
-        - None values serialized as null
-        - Lists and nested dicts are recursively processed
-        - Provides a stable canonical form that doesn't depend on:
-            - Pydantic's datetime serialization format
-            - Python's float representation
-            - Dictionary ordering (keys are sorted)
+        Datetime values serialized ISO-8601 format UTC timezone
+        Float values use fixed decimal representation avoid precision issues
+        Keys sorted alphabetically
+        None values serialized null
+        Lists nested dicts recursively processed
+        Provides stable canonical form doesn't depend on:
+        Pydantic's datetime serialization format
+        Python's float representation
+        Dictionary ordering (keys are sorted)
 
         Args:
-            data: Dictionary to serialize
+            data: Dictionary serialize
+
         Returns:
-            Canonical JSON string suitable for hashing
+            Canonical JSON string suitable hashing
         """
         return json.dumps(self._canonical_normalize(data), sort_keys=True)
 
     def _get_canonical_format_documentation(self) -> str:
         """
-        Returns documentation for canonical serialization format for audit hashes.
-        This format ensures deterministic audit hash computation across different
-        Python versions, platforms, and Pydantic model versions.
+        Returns documentation canonical serialization format audit hashes.
+        format ensures deterministic audit hash computation across different
+        Python versions, platforms, Pydantic model versions.
 
         CANONICAL JSON FORMAT SPECIFICATION:
         ====================================
         1. Key Ordering: Keys sorted alphabetically (sort_keys=True)
-           Example: {"a": 1, "b": 2} not {"b": 2, "a": 1}
-        2. Datetime Serialization: All datetime objects converted to ISO-8601 UTC format
-           Naive datetimes (no timezone) assumed UTC
-           Timezone-aware datetimes converted to UTC
-           Format: "2024-01-15T10:30:00Z" (ISO-8601 suffix for UTC)
-        3. Numeric Types: Decimal values converted to float with trailing zeros preserved
-           (1.0 becomes 1.0, not 1)
-           Scientific notation avoided where possible
-        4. Null Handling: None values serialized as JSON null
-           Absent keys are not included (only explicit None)
+        Example: {"a": 1, "b": 2} not {"b": 2, "a": 1}
+        2. Datetime Serialization: All datetime objects converted ISO-8601 UTC format
+        Naive datetimes (no timezone) assumed UTC
+        Timezone-aware datetimes converted UTC
+        Format: "2024-01-15T10:30:00Z" (ISO-8601 suffix UTC)
+        3. Numeric Types: Decimal values converted float trailing zeros preserved
+        1.0 becomes 1.0 not 1)
+        Scientific notation avoided where possible
+        4. Null Handling: None values serialized JSON null
+        Absent keys not included (only explicit None)
         5. String Escaping: Special characters escaped per JSON specification
-           Unicode characters preserved
-           Control characters escaped \\uXXXX
+        Unicode characters preserved
+        Control characters escaped \\uXXXX
         6. Nested Structures: Dictionaries within dicts recursively processed
-           Lists recursively processed
-           Nested keys sorted within each dict
+        Lists recursively processed
+        Nested keys sorted within each dict
 
         EXAMPLE TRANSFORMATION:
         -----------------------
-        Input (Python dict):
-            "order_id": "123",
-            "timestamp": datetime(2024, 1, 15, 10, 30, 0, tzinfo=UTC)
-            "amount": Decimal("100.50"),
-            "nested": {"z_key": 1, "a_key": 2},
-            "items": [1, 2, 3]
+        Input (Python dict)
+        "order_id": "123",
+        "timestamp": datetime(2024, 1, 15, 10, 30, 0, tzinfo=UTC)
+        "amount": Decimal("100.50"),
+        "nested": {"z_key": 1, "a_key": 2},
+        "items": [1, 2, 3]
 
         Canonical JSON output:
-            "amount": 100.5,
-            "items": [1, 2, 3],
-            "nested": {"a_key": 2, "z_key": 1},
-            "order_id": "123",
-            "timestamp": "2024-01-15T10:30:00Z"
+        "amount": 100.5
+        "items": [1, 2, 3],
+        "nested": {"a_key": 2, "z_key": 1},
+        "order_id": "123",
+        "timestamp": "2024-01-15T10:30:00Z"
 
         HASH COMPUTATION:
         -----------------
         SHA-256 hash computed over UTF-8 encoded canonical JSON string.
         produces 64-character hexadecimal hash that:
-            - is deterministic across Python versions
-            - Survives serialization/deserialization cycles
-            - can be independently verified by external systems
+        deterministic across Python versions
+        Survives serialization/deserialization cycles
+        independently verified external systems
 
         Returns:
             Human-readable documentation string
@@ -431,26 +434,27 @@ class Database:
 
     def _canonical_normalize(self, value: Any) -> Any:
         """
-        Recursively normalize a value to canonical form.
-        - datetime objects: ISO-8601 UTC string
-        - Decimal objects: float with fixed precision
-        - None: None
-        - dict: recursively normalized dict
-        - list: recursively normalized list
-        - other: unchanged
+        Recursively normalize value canonical form.
+        datetime objects: ISO-8601 UTC string
+        Decimal objects: float fixed precision
+        None: None
+        dict: recursively normalized dict
+        list: recursively normalized list
+        other: unchanged
 
         Args:
-            value: Value to normalize
+            value: Value normalize
+
         Returns:
-            Normalized value in canonical form
+            Normalized value canonical form
         """
         if isinstance(value, datetime):
-            # Normalize to UTC and convert to ISO-8601
+            # Normalize UTC convert ISO-8601
             if value.tzinfo is None:
                 value = value.replace(tzinfo=UTC)
             return value.isoformat().replace("+00:00", "Z")
         elif isinstance(value, Decimal):
-            # Convert Decimal to float with fixed precision
+            # Convert Decimal float fixed precision
             return float(value)
         elif isinstance(value, dict):
             return {k: self._canonical_normalize(v) for k, v in value.items()}
@@ -463,16 +467,17 @@ class Database:
 
     def _calculate_sha256(self, data: dict[str, Any]) -> str:
         """
-        Calculate SHA-256 hash of dictionary using canonical serialization.
-        Uses canonical JSON serialization to ensure:
-        - Deterministic hash across Python/Pydantic versions
-        - No dependency on internal serialization details
-        - Stable hash for audit log entries
+        Calculate SHA-256 hash dictionary using canonical serialization.
+        Uses canonical JSON serialization ensure:
+        Deterministic hash across Python/Pydantic versions
+        dependency internal serialization details
+        Stable hash audit log entries
 
         Args:
-            data: Dictionary to hash
+            data: Dictionary hash
+
         Returns:
-            SHA-256 hash as a hex string
+            SHA-256 hash hex string
         """
         data_str = self._canonical_serialize(data)
         return hashlib.sha256(data_str.encode()).hexdigest()
@@ -488,11 +493,11 @@ class Database:
         new_state: dict[str, Any] | None = None,
     ) -> None:
         """
-        Log an audit entry and write to JSONL file.
+        Log audit entry write JSONL file.
         Args:
             action: Action performed
-            entity_type: Type of entity
-            entity_id: ID of entity
+            entity_type: Type entity
+            entity_id: entity
             user: User performing action
             metadata: Additional metadata
             previous_state: State before action
@@ -506,28 +511,28 @@ class Database:
             entity_id=entity_id,
             user=user,
             metadata=metadata or {},
-            previous_state=previous_state,
-            new_state=new_state,
+            previous_state=previous_state or {},
+            new_state=new_state or {},
         )
 
-        # Calculate hash over entry data WITHOUT the sha256_hash field
+        # Calculate hash over entry data WITHOUT sha256_hash field
         hash_data = self._model_to_dict(entry)
-        # Remove sha256_hash (which is currently None) for hashing
+        # Remove sha256_hash (which is currently None) hashing
         hash_data.pop("sha256_hash", None)
         entry.sha256_hash = self._calculate_sha256(hash_data)
 
-        # Re-serialize the fully populated model (including hash)
+        # Re-serialize fully populated model (including hash)
         entry_data = self._model_to_dict(entry)
 
-        # Write to database
+        # Write database
         conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute(
             """
-            INSERT INTO audit_log (
-                entry_id, timestamp, action, entity_type, entity_id, user,
-                metadata, previous_state, new_state, sha256_hash, timestamp_ms
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO audit_log
+            (entry_id, timestamp, action, entity_type, entity_id, user,
+             metadata, previous_state, new_state, sha256_hash, timestamp_ms)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 entry.entry_id,
@@ -545,14 +550,14 @@ class Database:
         )
         conn.commit()
 
-        # Write to JSONL file (append-only)
+        # Write JSONL file (append-only)
         with Path(self.audit_log_path).open("a", encoding="utf-8") as f:
             f.write(json.dumps(entry_data) + "\n")
 
     def _cleanup_old_data(self) -> None:
         """
         Clean data older than retention period.
-        Trades are filtered by entry_time, other tables by created_at.
+        Trades filtered entry_time, other tables created_at.
         """
         cutoff_date = datetime.now(UTC) - timedelta(days=self.retention_days)
         cutoff_timestamp_ms = int(cutoff_date.timestamp() * 1000)
@@ -579,11 +584,11 @@ class Database:
 
     def create_trade(self, trade: Trade) -> bool:
         """
-        Create a new trade record.
+        Create new trade record.
         Args:
             trade: Trade model instance
         Returns:
-            True if successful
+            True successful
         """
         now = datetime.now(UTC)
         now_iso = now.isoformat()
@@ -603,13 +608,13 @@ class Database:
         cursor = conn.cursor()
         cursor.execute(
             """
-            INSERT INTO trades (
-                trade_id, symbol, quantity, entry_price, exit_price,
-                entry_time, exit_time, transaction_type, product_type,
-                pnl, status, strategy, stop_loss, take_profit,
-                trailing_stop_loss, metadata, created_at, updated_at,
-                created_at_ms, updated_at_ms, entry_time_ms, exit_time_ms
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO trades
+            (trade_id, symbol, quantity, entry_price, exit_price,
+             entry_time, exit_time, transaction_type, product_type,
+             pnl, status, strategy, stop_loss, take_profit,
+             trailing_stop_loss, metadata, created_at, updated_at,
+             created_at_ms, updated_at_ms, entry_time_ms, exit_time_ms)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 trade.trade_id,
@@ -617,16 +622,8 @@ class Database:
                 trade.quantity,
                 trade.entry_price,
                 trade.exit_price,
-                (
-                    trade.entry_time.isoformat()
-                    if isinstance(trade.entry_time, datetime)
-                    else str(trade.entry_time)
-                ),
-                (
-                    trade.exit_time.isoformat()
-                    if isinstance(trade.exit_time, datetime)
-                    else trade.exit_time
-                ),
+                trade.entry_time.isoformat() if isinstance(trade.entry_time, datetime) else str(trade.entry_time),
+                trade.exit_time.isoformat() if isinstance(trade.exit_time, datetime) else trade.exit_time,
                 trade.transaction_type.value if trade.transaction_type else None,
                 trade.product_type.value if trade.product_type else None,
                 trade.pnl,
@@ -655,11 +652,11 @@ class Database:
 
     def get_trade(self, trade_id: str) -> Trade | None:
         """
-        Retrieve a trade by ID.
+        Retrieve trade ID.
         Args:
             trade_id: Trade identifier
         Returns:
-            Trade model or None if not found
+            Trade model None not found
         """
         conn = self._get_connection()
         cursor = conn.cursor()
@@ -671,17 +668,17 @@ class Database:
 
     def update_trade(self, trade: Trade) -> bool:
         """
-        Update an existing trade record.
+        Update existing trade record.
         Args:
-            trade: Trade model instance with updated fields
+            trade: Trade model instance updated fields
         Returns:
-            True if successful
+            True successful
         """
         now = datetime.now(UTC)
         now_iso = now.isoformat()
         now_ms = int(now.timestamp() * 1000)
 
-        # Get previous state for audit
+        # Get previous state audit
         previous = self.get_trade(trade.trade_id)
         previous_state = self._model_to_dict(previous) if previous else None
 
@@ -714,16 +711,8 @@ class Database:
                 trade.quantity,
                 trade.entry_price,
                 trade.exit_price,
-                (
-                    trade.entry_time.isoformat()
-                    if isinstance(trade.entry_time, datetime)
-                    else str(trade.entry_time)
-                ),
-                (
-                    trade.exit_time.isoformat()
-                    if isinstance(trade.exit_time, datetime)
-                    else trade.exit_time
-                ),
+                trade.entry_time.isoformat() if isinstance(trade.entry_time, datetime) else str(trade.entry_time),
+                trade.exit_time.isoformat() if isinstance(trade.exit_time, datetime) else trade.exit_time,
                 trade.transaction_type.value if trade.transaction_type else None,
                 trade.product_type.value if trade.product_type else None,
                 trade.pnl,
@@ -752,11 +741,11 @@ class Database:
 
     def get_open_trades(self, symbol: str | None = None) -> list[Trade]:
         """
-        Get all open trades, optionally filtered by symbol.
+        Get all open trades, optionally filtered symbol.
         Args:
             symbol: Optional symbol filter
         Returns:
-            List of open Trade models
+            List open Trade models
         """
         conn = self._get_connection()
         cursor = conn.cursor()
@@ -771,22 +760,24 @@ class Database:
         return [self._row_to_trade(row) for row in rows]
 
     def _row_to_trade(self, row: Any) -> Trade:
-        """Convert database row to Trade model."""
+        """Convert database row Trade model."""
         from .models import ProductType, TransactionType
 
-        # Use the stored ms timestamps if available
+        # Use stored timestamps available
         entry_time = None
-        if row[20]:  # entry_time_ms
-            entry_time = datetime.fromtimestamp(row[20] / 1000, tz=UTC)
-        elif row[5]:  # entry_time (iso)
+        if row[20]:
+            entry_time_ms = row[20]
+            entry_time = datetime.fromtimestamp(entry_time_ms / 1000, tz=UTC)
+        elif row[5]:
             entry_time = datetime.fromisoformat(row[5])
         else:
             entry_time = datetime.now(UTC)
 
         exit_time = None
-        if row[21]:  # exit_time_ms
-            exit_time = datetime.fromtimestamp(row[21] / 1000, tz=UTC)
-        elif row[6]:  # exit_time (iso)
+        if row[21]:
+            exit_time_ms = row[21]
+            exit_time = datetime.fromtimestamp(exit_time_ms / 1000, tz=UTC)
+        elif row[6]:
             exit_time = datetime.fromisoformat(row[6])
 
         return Trade(
@@ -814,11 +805,11 @@ class Database:
 
     def create_signal(self, signal: Signal) -> bool:
         """
-        Create a new signal record.
+        Create new signal record.
         Args:
             signal: Signal model instance
         Returns:
-            True if successful
+            True successful
         """
         now = datetime.now(UTC)
         now_iso = now.isoformat()
@@ -829,10 +820,10 @@ class Database:
         cursor = conn.cursor()
         cursor.execute(
             """
-            INSERT INTO signals (
-                signal_id, symbol, signal_type, strength, timestamp,
-                indicators, metadata, confidence, created_at, created_at_ms, timestamp_ms
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO signals
+            (signal_id, symbol, signal_type, strength, timestamp,
+             indicators, metadata, confidence, created_at, created_at_ms, timestamp_ms)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 signal.signal_id,
@@ -859,12 +850,12 @@ class Database:
 
     def get_latest_signals(self, symbol: str, limit: int = 10) -> list[Signal]:
         """
-        Get latest signals for symbol.
+        Get latest signals symbol.
         Args:
             symbol: Symbol filter
-            limit: Maximum number of signals to return
+            limit: Maximum number signals return
         Returns:
-            List of Signal models ordered by timestamp descending
+            List Signal models ordered timestamp descending
         """
         conn = self._get_connection()
         cursor = conn.cursor()
@@ -879,13 +870,14 @@ class Database:
         return [self._row_to_signal(row) for row in rows]
 
     def _row_to_signal(self, row: Any) -> Signal:
-        """Convert database row to Signal model."""
+        """Convert database row Signal model."""
         from .models import SignalType
 
-        # Use the stored ms timestamps if available
+        # Use stored timestamps available
         timestamp = None
-        if len(row) > 10 and row[10]:  # timestamp_ms
-            timestamp = datetime.fromtimestamp(row[10] / 1000, tz=UTC)
+        if len(row) > 10 and row[10]:
+            timestamp_ms = row[10]
+            timestamp = datetime.fromtimestamp(timestamp_ms / 1000, tz=UTC)
         else:
             timestamp = datetime.fromisoformat(row[4])
 
@@ -908,9 +900,9 @@ class Database:
         """
         Store historical data records.
         Args:
-            data: List of HistoricalData models
+            data: List HistoricalData models
         Returns:
-            True if successful
+            True successful
         """
         now = datetime.now(UTC)
         now_iso = now.isoformat()
@@ -922,10 +914,10 @@ class Database:
             ts_ms = int(item.timestamp.timestamp() * 1000)
             cursor.execute(
                 """
-                INSERT OR REPLACE INTO historical_data (
-                    symbol, timestamp, open, high, low, close, volume,
-                    interval, created_at, created_at_ms, timestamp_ms
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT OR REPLACE INTO historical_data
+                (symbol, timestamp, open, high, low, close, volume,
+                 interval, created_at, created_at_ms, timestamp_ms)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     item.symbol,
@@ -948,14 +940,14 @@ class Database:
         self, symbol: str, interval: str, start_date: datetime, end_date: datetime
     ) -> list[HistoricalData]:
         """
-        Get historical data for symbol within date range.
+        Get historical data symbol within date range.
         Args:
             symbol: Symbol filter
             interval: Time interval
             start_date: Start date range
             end_date: End date range
         Returns:
-            List of HistoricalData models
+            List HistoricalData models
         """
         start_ms = int(start_date.timestamp() * 1000)
         end_ms = int(end_date.timestamp() * 1000)
@@ -975,9 +967,9 @@ class Database:
         rows = cursor.fetchall()
         result = []
         for row in rows:
-            ts = None
-            if row[8]:  # timestamp_ms
-                ts = datetime.fromtimestamp(row[8] / 1000, tz=UTC)
+            if row[8]:
+                timestamp_ms = row[8]
+                ts = datetime.fromtimestamp(timestamp_ms / 1000, tz=UTC)
             else:
                 ts = datetime.fromisoformat(row[1])
             result.append(
@@ -1004,7 +996,7 @@ class Database:
         Args:
             quote: QuoteData model instance
         Returns:
-            True if successful
+            True successful
         """
         now = datetime.now(UTC)
         now_iso = now.isoformat()
@@ -1015,10 +1007,10 @@ class Database:
         cursor = conn.cursor()
         cursor.execute(
             """
-            INSERT OR REPLACE INTO quotes (
-                symbol, last_price, open, high, low, close, volume,
-                timestamp, change, change_percent, created_at, created_at_ms, timestamp_ms
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT OR REPLACE INTO quotes
+            (symbol, last_price, open, high, low, close, volume, timestamp,
+             change, change_percent, created_at, created_at_ms, timestamp_ms)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 quote.symbol,
@@ -1041,34 +1033,30 @@ class Database:
 
     def get_latest_quote(self, symbol: str) -> QuoteData | None:
         """
-        Get latest quote for symbol.
+        Get latest quote symbol.
         Args:
             symbol: Symbol query
         Returns:
-            QuoteData model or None
+            QuoteData model None
         """
         conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute(
             """
-            SELECT symbol, last_price, open, high, low, close, volume,
-                   timestamp, change, change_percent, timestamp_ms
-            FROM quotes
-            WHERE symbol = ?
-            ORDER BY timestamp DESC LIMIT 1
+            SELECT symbol, last_price, open, high, low, close, volume, timestamp,
+                   change, change_percent, timestamp_ms
+            FROM quotes WHERE symbol = ? ORDER BY timestamp DESC LIMIT 1
             """,
             (symbol,),
         )
         row = cursor.fetchone()
         if row is None:
             return None
-
-        ts = None
-        if row[10]:  # timestamp_ms
-            ts = datetime.fromtimestamp(row[10] / 1000, tz=UTC)
+        if row[10]:
+            timestamp_ms = row[10]
+            ts = datetime.fromtimestamp(timestamp_ms / 1000, tz=UTC)
         else:
             ts = datetime.fromisoformat(row[7])
-
         return QuoteData(
             symbol=row[0],
             last_price=row[1],
@@ -1092,13 +1080,12 @@ class Database:
         Args:
             position: Position model instance
         Returns:
-            True if successful
+            True successful
         """
         now = datetime.now(UTC)
         now_iso = now.isoformat()
         now_ms = int(now.timestamp() * 1000)
-
-        # Handle potential missing timestamp in Pydantic model by ensuring a value
+        # Handle potential missing timestamp Pydantic model ensuring value
         ts = getattr(position, "timestamp", None) or now
         ts_str = ts.isoformat() if isinstance(ts, datetime) else str(ts)
         ts_ms = int(ts.timestamp() * 1000) if isinstance(ts, datetime) else now_ms
@@ -1107,10 +1094,10 @@ class Database:
         cursor = conn.cursor()
         cursor.execute(
             """
-            INSERT OR REPLACE INTO positions (
-                symbol, quantity, average_price, last_price, pnl, product_type,
-                buy_quantity, sell_quantity, timestamp, created_at, created_at_ms, timestamp_ms
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT OR REPLACE INTO positions
+            (symbol, quantity, average_price, last_price, pnl, product_type,
+             buy_quantity, sell_quantity, timestamp, created_at, created_at_ms, timestamp_ms)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 position.symbol,
@@ -1132,11 +1119,11 @@ class Database:
 
     def get_position(self, symbol: str) -> Position | None:
         """
-        Get latest position for symbol.
+        Get latest position symbol.
         Args:
             symbol: Symbol query
         Returns:
-            Position model or None
+            Position model None
         """
         from .models import ProductType
 
@@ -1144,19 +1131,16 @@ class Database:
         cursor = conn.cursor()
         cursor.execute(
             """
-            SELECT symbol, quantity, average_price, last_price, pnl,
-                   product_type, buy_quantity, sell_quantity, timestamp_ms
-            FROM positions
-            WHERE symbol = ?
-            ORDER BY timestamp DESC LIMIT 1
+            SELECT symbol, quantity, average_price, last_price, pnl, product_type,
+                   buy_quantity, sell_quantity, timestamp_ms
+            FROM positions WHERE symbol = ? ORDER BY timestamp DESC LIMIT 1
             """,
             (symbol,),
         )
         row = cursor.fetchone()
         if row is None:
             return None
-        # Note: Position model in models.py does NOT have a timestamp field.
-        # Adding it would cause a validation error if not in constructor.
+        # Note: Position model models.py NOT timestamp field. Adding cause validation error not constructor.
         return Position(
             symbol=row[0],
             quantity=row[1],
@@ -1178,7 +1162,7 @@ class Database:
         Args:
             funds: FundsData model instance
         Returns:
-            True if successful
+            True successful
         """
         now = datetime.now(UTC)
         now_iso = now.isoformat()
@@ -1189,10 +1173,10 @@ class Database:
         cursor = conn.cursor()
         cursor.execute(
             """
-            INSERT OR REPLACE INTO funds (
-                available_cash, utilized_margin, available_margin,
-                total_equity, timestamp, created_at, created_at_ms, timestamp_ms
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT OR REPLACE INTO funds
+            (available_cash, utilized_margin, available_margin, total_equity,
+             timestamp, created_at, created_at_ms, timestamp_ms)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 funds.available_cash,
@@ -1212,28 +1196,25 @@ class Database:
         """
         Get latest funds data.
         Returns:
-            FundsData model or None
+            FundsData model None
         """
         conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute(
             """
-            SELECT available_cash, utilized_margin, available_margin,
-                   total_equity, timestamp, timestamp_ms
-            FROM funds
-            ORDER BY timestamp DESC LIMIT 1
+            SELECT available_cash, utilized_margin, available_margin, total_equity,
+                   timestamp, timestamp_ms
+            FROM funds ORDER BY timestamp DESC LIMIT 1
             """
         )
         row = cursor.fetchone()
         if row is None:
             return None
-
-        ts = None
-        if row[5]:  # timestamp_ms
-            ts = datetime.fromtimestamp(row[5] / 1000, tz=UTC)
+        if row[5]:
+            timestamp_ms = row[5]
+            ts = datetime.fromtimestamp(timestamp_ms / 1000, tz=UTC)
         else:
             ts = datetime.fromisoformat(row[4])
-
         return FundsData(
             available_cash=row[0],
             utilized_margin=row[1],
@@ -1252,7 +1233,7 @@ class Database:
         Args:
             order: Order model instance
         Returns:
-            True if successful
+            True successful
         """
         now = datetime.now(UTC)
         now_iso = now.isoformat()
@@ -1263,13 +1244,13 @@ class Database:
         cursor = conn.cursor()
         cursor.execute(
             """
-            INSERT OR REPLACE INTO orders (
-                order_id, symbol, quantity, order_type, price, trigger_price,
-                variety, transaction_type, product_type, status, timestamp,
-                filled_quantity, average_price, stop_loss, take_profit,
-                trailing_stop_loss, created_at, updated_at, created_at_ms,
-                updated_at_ms, timestamp_ms
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT OR REPLACE INTO orders
+            (order_id, symbol, quantity, order_type, price, trigger_price,
+             variety, transaction_type, product_type, status, timestamp,
+             filled_quantity, average_price, stop_loss, take_profit,
+             trailing_stop_loss, created_at, updated_at, created_at_ms,
+             updated_at_ms, timestamp_ms)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 order.order_id,
@@ -1344,11 +1325,11 @@ class Database:
 
     def get_open_orders(self, symbol: str | None = None) -> list[Order]:
         """
-        Get all open orders, optionally filtered by symbol.
+        Get all open orders, optionally filtered symbol.
         Args:
             symbol: Optional symbol filter
         Returns:
-            List of open Order models
+            List open Order models
         """
         conn = self._get_connection()
         cursor = conn.cursor()
@@ -1367,7 +1348,7 @@ class Database:
         return [self._row_to_order(row) for row in rows]
 
     def _row_to_order(self, row: Any) -> Order:
-        """Convert database row to Order model."""
+        """Convert database row Order model."""
         from .models import (
             OrderStatus,
             OrderType,
@@ -1376,10 +1357,11 @@ class Database:
             TransactionType,
         )
 
-        # Use the stored ms timestamps if available
+        # Use stored timestamps available
         timestamp = None
-        if len(row) > 20 and row[20]:  # timestamp_ms
-            timestamp = datetime.fromtimestamp(row[20] / 1000, tz=UTC)
+        if len(row) > 20 and row[20]:
+            timestamp_ms = row[20]
+            timestamp = datetime.fromtimestamp(timestamp_ms / 1000, tz=UTC)
         else:
             timestamp = datetime.fromisoformat(row[10])
 
@@ -1413,9 +1395,9 @@ class Database:
         Get audit log entries.
         Args:
             entity_type: Optional entity type filter
-            limit: Maximum number of entries
+            limit: Maximum number entries
         Returns:
-            List of AuditLogEntry models
+            List AuditLogEntry models
         """
         conn = self._get_connection()
         cursor = conn.cursor()
@@ -1430,10 +1412,11 @@ class Database:
         return [self._row_to_audit_entry(row) for row in rows]
 
     def _row_to_audit_entry(self, row: Any) -> AuditLogEntry:
-        """Convert database row to AuditLogEntry model."""
+        """Convert database row AuditLogEntry model."""
         timestamp = None
-        if len(row) > 10 and row[10]:  # timestamp_ms
-            timestamp = datetime.fromtimestamp(row[10] / 1000, tz=UTC)
+        if len(row) > 10 and row[10]:
+            timestamp_ms = row[10]
+            timestamp = datetime.fromtimestamp(timestamp_ms / 1000, tz=UTC)
         else:
             timestamp = datetime.fromisoformat(row[1])
 
@@ -1452,9 +1435,9 @@ class Database:
 
     def verify_audit_log_integrity(self) -> bool:
         """
-        Verify integrity of audit log by checking SHA-256 hashes.
+        Verify integrity audit log checking SHA-256 hashes.
         Returns:
-            True if all entries valid, False if corruption detected
+            True all entries valid, False corruption detected
         """
         try:
             with Path(self.audit_log_path).open(encoding="utf-8") as f:
@@ -1466,8 +1449,7 @@ class Database:
                     stored_hash = data.get("sha256_hash")
                     if stored_hash is None:
                         return False
-
-                    # Recalculate hash excluding the hash field itself
+                    # Recalculate hash excluding hash field itself
                     check_data = {k: v for k, v in data.items() if k != "sha256_hash"}
                     calculated_hash = self._calculate_sha256(check_data)
                     if calculated_hash != stored_hash:
@@ -1477,7 +1459,7 @@ class Database:
             return False
 
     def close(self) -> None:
-        """Close database connection for current thread."""
+        """Close database connection current thread."""
         if hasattr(self._thread_local, "connection"):
             self._thread_local.connection.close()
             del self._thread_local.connection
@@ -1485,11 +1467,12 @@ class Database:
     def close_all(self) -> None:
         """
         Close ALL database connections across all threads.
-        This method ensures proper cleanup on shutdown, preventing file-handle leaks
-        on Windows where worker threads hold connections open. (FIX-WINDOWS-SHUTDOWN)
+        method ensures proper cleanup shutdown, preventing file-handle leaks
+        Windows where worker threads hold connections open. (FIX-WINDOWS-SHUTDOWN)
         called during application shutdown.
         """
         closed_count = 0
+
         # Close current thread's connection first
         if hasattr(self._thread_local, "connection"):
             try:
@@ -1499,80 +1482,83 @@ class Database:
             except Exception as e:
                 logger.warning(f"Error closing current thread connection: {e}")
 
-        # Close all tracked connections in other threads
+        # Close all tracked connections other threads
         with self._registry_lock:
             for thread_id, conn in list(self._thread_registry.items()):
                 try:
                     conn.close()
                     closed_count += 1
                 except Exception as e:
-                    logger.warning(f"Error closing connection for thread {thread_id}: {e}")
+                    logger.warning(f"Error closing connection thread {thread_id}: {e}")
             self._thread_registry.clear()
+
         logger.info(f"Closed {closed_count} database connections")
 
-        # Additional cleanup: ensure thread-local storage is reset
-        # prevents potential issues with thread reuse
+        # Additional cleanup: ensure thread-local storage reset prevents potential issues thread reuse
         if hasattr(self._thread_local, "__dict__"):
             self._thread_local.__dict__.clear()
 
     async def async_close_all(self) -> None:
         """
-        Async wrapper for close_all() to avoid blocking the event loop.
+        Async wrapper close_all() avoid blocking event loop.
         called during async application shutdown.
         """
         await asyncio.to_thread(self.close_all)
 
     # -------------------------------------------------------------------------
-    # Async wrapper methods for non-blocking I/O
+    # Async wrapper methods non-blocking I/O
     # -------------------------------------------------------------------------
 
     async def async_initialize(self) -> None:
-        """Async wrapper for initialize() to avoid blocking the event loop."""
+        """Async wrapper initialize() avoid blocking event loop."""
         await asyncio.to_thread(self.initialize)
 
     async def async_cleanup(self) -> None:
-        """Async wrapper for cleanup() to avoid blocking the event loop."""
+        """Async wrapper cleanup() avoid blocking event loop."""
         await asyncio.to_thread(self.cleanup)
 
     async def async_vacuum(self) -> None:
-        """Async wrapper for vacuum() to avoid blocking the event loop."""
+        """Async wrapper vacuum() avoid blocking event loop."""
         await asyncio.to_thread(self.vacuum)
 
     async def async_create_signal(self, signal: Signal) -> bool:
-        """Async wrapper for create_signal() to avoid blocking the event loop."""
+        """Async wrapper create_signal() avoid blocking event loop."""
         return await asyncio.to_thread(self.create_signal, signal)
 
     async def async_store_historical_data(self, data: list[HistoricalData]) -> bool:
-        """Async wrapper for store_historical_data() to avoid blocking the event loop."""
+        """Async wrapper store_historical_data() avoid blocking event loop."""
         return await asyncio.to_thread(self.store_historical_data, data)
 
     async def async_store_quote(self, quote: QuoteData) -> bool:
-        """Async wrapper for store_quote() to avoid blocking the event loop."""
+        """Async wrapper store_quote() avoid blocking event loop."""
         return await asyncio.to_thread(self.store_quote, quote)
 
     async def async_store_position(self, position: Position) -> bool:
-        """Async wrapper for store_position() to avoid blocking the event loop."""
+        """Async wrapper store_position() avoid blocking event loop."""
         return await asyncio.to_thread(self.store_position, position)
 
     async def async_store_funds(self, funds: FundsData) -> bool:
-        """Async wrapper for store_funds() to avoid blocking the event loop."""
+        """Async wrapper store_funds() avoid blocking event loop."""
         return await asyncio.to_thread(self.store_funds, funds)
 
-    async def async_get_latest_signals(
-        self, symbol: str, limit: int = 10
-    ) -> list[Signal]:
-        """Async wrapper for get_latest_signals() to avoid blocking the event loop."""
+    async def async_get_latest_signals(self, symbol: str, limit: int = 10) -> list[Signal]:
+        """Async wrapper get_latest_signals() avoid blocking event loop."""
         return await asyncio.to_thread(self.get_latest_signals, symbol, limit)
 
     async def async_verify_audit_log_integrity(self) -> bool:
-        """Async wrapper for verify_audit_log_integrity() to avoid blocking the event loop."""
+        """Async wrapper verify_audit_log_integrity() avoid blocking event loop."""
         return await asyncio.to_thread(self.verify_audit_log_integrity)
 
     async def async_update_trade(self, trade: Trade) -> bool:
-        """Async wrapper for update_trade() to avoid blocking the event loop."""
+        """Async wrapper update_trade() avoid blocking event loop."""
         return await asyncio.to_thread(self.update_trade, trade)
 
     async def async_update_order_status(self, order_id: str, status: str) -> bool:
-        """Async wrapper for update_order_status() to avoid blocking the event loop."""
+        """Async wrapper update_order_status() avoid blocking event loop."""
         return await asyncio.to_thread(self.update_order_status, order_id, status)
 
+
+# Module-level singleton Database instance (F-CONC-3).
+# Importing ``db`` avoids repeated Database() instantiation across modules
+# (alerts.py/scheduler.py) reducing connection/file-handle churn on Windows.
+db: Database = Database()

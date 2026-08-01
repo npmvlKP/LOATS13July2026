@@ -5,17 +5,12 @@ from __future__ import annotations
 
 import json
 from datetime import UTC, datetime
-from typing import Any, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import httpx
 
 from .config import get_settings
 from .loats_logging import get_logger
-from .utils.rate_limiter import (
-    get_order_rate_limiter,
-    get_smart_order_rate_limiter,
-    RateLimitExceededError,
-)
 from .models import (
     HistoricalData,
     Order,
@@ -28,6 +23,11 @@ from .models import (
     TransactionType,
 )
 from .utils.cache import cache_manager
+from .utils.rate_limiter import (
+    RateLimitExceededError,
+    get_order_rate_limiter,
+    get_smart_order_rate_limiter,
+)
 
 if TYPE_CHECKING:
     from .alerts import AlertSystem
@@ -51,7 +51,7 @@ class OpenAlgoAPIError(OpenAlgoError):
         self,
         status_code: int,
         message: str,
-        details: Optional[dict[str, Any]] = None,
+        details: dict[str, Any] | None = None,
     ) -> None:
         self.status_code = status_code
         self.message = message
@@ -80,12 +80,12 @@ async def _async_check_kill_switch() -> None:
 class OpenAlgoClient:
     """Client interacting OpenAlgo API."""
 
-    def __init__(self, api_key: Optional[str] = None, base_url: Optional[str] = None) -> None:
+    def __init__(self, api_key: str | None = None, base_url: str | None = None) -> None:
         settings = get_settings()
         self.api_key: str = api_key or settings.openalgo_api_key.get_secret_value()
         self.base_url: str = base_url or settings.openalgo_base_url
         self.timeout: float = settings.request_timeout
-        self.client: Optional[httpx.Client] = None
+        self.client: httpx.Client | None = None
 
     def __enter__(self) -> OpenAlgoClient:
         self.client = httpx.Client(
@@ -221,8 +221,8 @@ class OpenAlgoClient:
         self,
         symbol: str,
         interval: str,
-        from_date: Optional[str] = None,
-        to_date: Optional[str] = None,
+        from_date: str | None = None,
+        to_date: str | None = None,
     ) -> dict[str, Any]:
         payload = {
             "symbol": symbol,
@@ -232,7 +232,7 @@ class OpenAlgoClient:
         }
         return self._request("POST", "history", json=payload)
 
-    def get_option_chain(self, symbol: str, expiry: Optional[str] = None) -> dict[str, Any]:
+    def get_option_chain(self, symbol: str, expiry: str | None = None) -> dict[str, Any]:
         payload = {"symbol": symbol, "expiry": expiry}
         return self._request("POST", "option_chain", json=payload)
 
@@ -247,14 +247,14 @@ class OpenAlgoClient:
         symbol: str,
         quantity: int,
         order_type: str | OrderType,
-        price: Optional[float] = None,
+        price: float | None = None,
         variety: str | OrderVariety = "regular",
         transaction_type: str | TransactionType = "BUY",
         product_type: str | ProductType = "MIS",
-        trigger_price: Optional[float] = None,
-        stop_loss: Optional[float] = None,
-        take_profit: Optional[float] = None,
-        trailing_stop_loss: Optional[float] = None,
+        trigger_price: float | None = None,
+        stop_loss: float | None = None,
+        take_profit: float | None = None,
+        trailing_stop_loss: float | None = None,
     ) -> dict[str, Any]:
         _check_kill_switch()
         if isinstance(order_type, OrderType):
@@ -292,15 +292,15 @@ class OpenAlgoClient:
         symbol: str,
         quantity: int,
         order_type: str | OrderType,
-        price: Optional[float] = None,
-        trigger_price: Optional[float] = None,
-        stop_loss: Optional[float] = None,
-        take_profit: Optional[float] = None,
-        trailing_stop_loss: Optional[float] = None,
+        price: float | None = None,
+        trigger_price: float | None = None,
+        stop_loss: float | None = None,
+        take_profit: float | None = None,
+        trailing_stop_loss: float | None = None,
         strategy: str = "simple",
         transaction_type: str | TransactionType = "BUY",
         product_type: str | ProductType = "MIS",
-        metadata: Optional[dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         _check_kill_switch()
         if isinstance(order_type, OrderType):
@@ -336,13 +336,13 @@ class OpenAlgoClient:
     def modify_order(
         self,
         order_id: str,
-        quantity: Optional[int] = None,
-        order_type: Optional[str | OrderType] = None,
-        price: Optional[float] = None,
-        trigger_price: Optional[float] = None,
-        stop_loss: Optional[float] = None,
-        take_profit: Optional[float] = None,
-        trailing_stop_loss: Optional[float] = None,
+        quantity: int | None = None,
+        order_type: str | OrderType | None = None,
+        price: float | None = None,
+        trigger_price: float | None = None,
+        stop_loss: float | None = None,
+        take_profit: float | None = None,
+        trailing_stop_loss: float | None = None,
     ) -> dict[str, Any]:
         _check_kill_switch()
         if isinstance(order_type, OrderType):
@@ -384,12 +384,12 @@ class OpenAlgoClient:
 class AsyncOpenAlgoClient:
     """Async client interacting OpenAlgo API."""
 
-    def __init__(self, api_key: Optional[str] = None, base_url: Optional[str] = None) -> None:
+    def __init__(self, api_key: str | None = None, base_url: str | None = None) -> None:
         settings = get_settings()
         self.api_key: str = api_key or settings.openalgo_api_key.get_secret_value()
         self.base_url: str = base_url or settings.openalgo_base_url
         self.timeout: float = settings.request_timeout
-        self.client: Optional[httpx.AsyncClient] = None
+        self.client: httpx.AsyncClient | None = None
 
     async def __aenter__(self) -> AsyncOpenAlgoClient:
         self.client = httpx.AsyncClient(
@@ -457,8 +457,8 @@ class AsyncOpenAlgoClient:
         self,
         symbol: str,
         interval: str,
-        from_date: Optional[str] = None,
-        to_date: Optional[str] = None,
+        from_date: str | None = None,
+        to_date: str | None = None,
     ) -> dict[str, Any]:
         payload = {
             "symbol": symbol,
@@ -468,7 +468,7 @@ class AsyncOpenAlgoClient:
         }
         return await self._request("POST", "history", json=payload)
 
-    async def get_option_chain(self, symbol: str, expiry: Optional[str] = None) -> dict[str, Any]:
+    async def get_option_chain(self, symbol: str, expiry: str | None = None) -> dict[str, Any]:
         payload = {"symbol": symbol, "expiry": expiry}
         return await self._request("POST", "option_chain", json=payload)
 
@@ -483,14 +483,14 @@ class AsyncOpenAlgoClient:
         symbol: str,
         quantity: int,
         order_type: str | OrderType,
-        price: Optional[float] = None,
+        price: float | None = None,
         variety: str | OrderVariety = "regular",
         transaction_type: str | TransactionType = "BUY",
         product_type: str | ProductType = "MIS",
-        trigger_price: Optional[float] = None,
-        stop_loss: Optional[float] = None,
-        take_profit: Optional[float] = None,
-        trailing_stop_loss: Optional[float] = None,
+        trigger_price: float | None = None,
+        stop_loss: float | None = None,
+        take_profit: float | None = None,
+        trailing_stop_loss: float | None = None,
     ) -> dict[str, Any]:
         await _async_check_kill_switch()
         if not await get_order_rate_limiter().acquire():
@@ -531,15 +531,15 @@ class AsyncOpenAlgoClient:
         symbol: str,
         quantity: int,
         order_type: str | OrderType,
-        price: Optional[float] = None,
-        trigger_price: Optional[float] = None,
-        stop_loss: Optional[float] = None,
-        take_profit: Optional[float] = None,
-        trailing_stop_loss: Optional[float] = None,
+        price: float | None = None,
+        trigger_price: float | None = None,
+        stop_loss: float | None = None,
+        take_profit: float | None = None,
+        trailing_stop_loss: float | None = None,
         strategy: str = "simple",
         transaction_type: str | TransactionType = "BUY",
         product_type: str | ProductType = "MIS",
-        metadata: Optional[dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         await _async_check_kill_switch()
         if not await get_smart_order_rate_limiter().acquire():
@@ -578,13 +578,13 @@ class AsyncOpenAlgoClient:
     async def modify_order(
         self,
         order_id: str,
-        quantity: Optional[int] = None,
-        order_type: Optional[str | OrderType] = None,
-        price: Optional[float] = None,
-        trigger_price: Optional[float] = None,
-        stop_loss: Optional[float] = None,
-        take_profit: Optional[float] = None,
-        trailing_stop_loss: Optional[float] = None,
+        quantity: int | None = None,
+        order_type: str | OrderType | None = None,
+        price: float | None = None,
+        trigger_price: float | None = None,
+        stop_loss: float | None = None,
+        take_profit: float | None = None,
+        trailing_stop_loss: float | None = None,
     ) -> dict[str, Any]:
         await _async_check_kill_switch()
         if isinstance(order_type, OrderType):

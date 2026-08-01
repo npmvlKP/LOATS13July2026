@@ -14,6 +14,7 @@ from newspaper import Article
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 
 from src.loats.config import get_settings
+
 settings = get_settings()
 from .loats_logging import get_logger
 from .models import NewsItem, SentimentAnalysisResult

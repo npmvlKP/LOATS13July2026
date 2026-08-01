@@ -1,7 +1,8 @@
 """
 Alerts module LOATS13July2026.
-Implements Telegram alerts kill switch functionality circuit breaker protection.
+Implements Telegram alerts kill switch functionality with circuit breaker protection.
 """
+
 import asyncio
 import html
 from datetime import UTC, datetime
@@ -17,37 +18,43 @@ from telegram.ext import (
 )
 
 from src.loats.config import get_settings
-from src.loats.database import Database, db
-from src.loats.loats_logging import get_logger
-from src.loats.models import Order, Signal, SignalType, Trade
-from src.loats.openalgo import async_client
-from src.loats.utils.circuit_breaker import (
+settings = get_settings()
+from .database import Database, db
+from .loats_logging import get_logger
+from .models import Order, Signal, SignalType, Trade
+from .openalgo import async_client
+from .utils.circuit_breaker import (
     OPENALGO_CIRCUIT_BREAKER,
     TELEGRAM_CIRCUIT_BREAKER,
     CircuitBreakerOpenError,
 )
-from src.loats.utils.retry import OPENALGO_RETRY_CONFIG, retry_async
+from .utils.retry import OPENALGO_RETRY_CONFIG, retry_async
 
 logger = get_logger(__name__)
 
-# Settings must be accessed after all imports to avoid circular imports
-settings = get_settings()
-
 
 class AlertSystem:
-    """Alert system using Telegram bot notifications kill switch.
-    `AlertSystem` accepts an optional ``Database` instance constructor.
-    When omitted, shared module-level `db` singleton (so original ``AlertSystem()` call-site continues work unchanged).
-    active database reference exposed :attr:`db` property, which **looked dynamically** access time test-time
-    patches `src.loats.alerts.db` continue honored when explicit instance not injected.
-    eliminates per-command `Database()` instantiation previously caused connection / file-handle churn Windows (NEW-M5).
+    """Alert system using Telegram bot notifications and kill switch.
+
+    The ``AlertSystem`` accepts an optional ``Database`` instance via its
+    constructor. When omitted, the shared module-level ``db`` singleton
+    is used (so the original ``AlertSystem()`` call-site continues to
+    work unchanged). The active database reference is exposed via the
+    :attr:`db` property and is **looked up dynamically** so test-time
+    patches of ``src.loats.alerts.db`` continue to be honored when an
+    explicit instance is not injected. This eliminates the per-command
+    ``Database()`` instantiation that previously caused connection /
+    file-handle churn on Windows (NEW-M5).
     """
 
     def __init__(self, database: Database | None = None) -> None:
         """Initialize AlertSystem.
+
         Args:
-            database: Optional `Database` instance. When ``None`` (the default), module-level `db` singleton
-            resolved attribute-access time callers pass explicit fixture (preferred for proper dependency injection).
+            database: Optional ``Database`` instance. When ``None`` (the
+                default), the module-level ``db`` singleton is used at
+                attribute-access time so callers may also pass an explicit
+                fixture (preferred for proper dependency injection).
         """
         self._explicit_db: Database | None = database
         self.bot: Bot | None = None
@@ -59,26 +66,32 @@ class AlertSystem:
 
     @property
     def db(self) -> Database:
-        """Return active :class:`Database` instance.
-        Order resolution:
-        1. Explicitly injected `Database` passed to ``__init__``.
-        2. Module-level `db` singleton imported top module, resolved **at access time**
-        patches like `patch("src.loats.alerts.db")` remain effective.
+        """Return the active :class:`Database` instance.
+
+        Order of resolution:
+
+        1. An explicitly injected ``Database`` passed to ``__init__``.
+        2. The module-level ``db`` singleton imported at the top of this
+           module, resolved **at access time** so patches like
+           ``patch("src.loats.alerts.db")`` remain effective.
         """
         if self._explicit_db is not None:
             return self._explicit_db
-        # Late binding unit-test patches `db` keep working.
-        from src.loats.alerts import db as module_db
-        return module_db
+        # Late binding so unit-test patches of ``db`` keep working.
+        return db
 
     async def initialize(self) -> None:
         """Initialize Telegram bot."""
         try:
             if not settings.telegram_bot_token:
-                logger.warning("Telegram bot token not configured. Alerts not sent.")
+                logger.warning(
+                    "Telegram bot token not configured. Alerts will not be sent."
+                )
                 return
             if not settings.telegram_chat_id:
-                logger.warning("Telegram chat not configured. Alerts not sent.")
+                logger.warning(
+                    "Telegram chat ID not configured. Alerts will not be sent."
+                )
                 return
 
             self.bot = Bot(token=settings.telegram_bot_token.get_secret_value())
@@ -98,66 +111,66 @@ class AlertSystem:
 
             logger.info("Telegram alert system initialized")
         except Exception as e:
-            logger.error(f"Failed initialize Telegram bot: {e}")
+            logger.error(f"Failed to initialize Telegram bot: {e}")
             raise
 
     async def start(self) -> None:
-        """Start Telegram bot non-blocking mode.
-        Uses v20+ lifecycle: `initialize()` → ``start()`` → ``updater.start_polling()``.
-        Starts polling background, allowing other async tasks (like scheduler) run concurrently.
-        FIX-F-CONC-2: Original implementation blocking ``start_polling()``. Now uses ``start_polling()``
-        separate task avoid blocking event loop.
+        """Start Telegram bot in non-blocking mode.
+
+        Uses the v20+ lifecycle: initialize() → start() → updater.start_polling().
+        This starts polling in the background, allowing other async tasks
+        (like scheduler) to run concurrently.
+
+        FIX-F-CONC-2: The original implementation used start_polling() which is blocking.
+        We now use start_polling() in a separate task to avoid blocking the event loop.
         """
         if not self.application:
             return
         if self._running:
-            logger.warning("Telegram bot running")
+            logger.warning("Telegram bot already running")
             return
-
         try:
-            # Initialize application (required before start)
+            # Initialize the application (required before start)
             await self.application.initialize()
-            # Start application (starts async processing)
+            # Start the application - this starts the async processing
             await self.application.start()
-            # Start polling updater (v20+ lifecycle) separate task
+            # Start polling via updater (v20+ lifecycle) in a separate task
             if self.application.updater is not None:
-                # Run polling background task avoid blocking event loop
+                # Run polling in background task to avoid blocking event loop
                 polling_task = asyncio.create_task(self.application.updater.start_polling())
-                # Store reference cleanup
+                # Store reference to task for cleanup
                 self._polling_task = polling_task
             else:
-                logger.warning("Telegram updater not available, bot commands disabled")
-
+                logger.warning("Telegram updater not available - bot commands disabled")
             self._running = True
             logger.info("Telegram bot started")
         except Exception as e:
-            logger.error(f"Failed start Telegram bot: {e}")
+            logger.error(f"Failed to start Telegram bot: {e}")
             raise
-
     async def shutdown(self) -> None:
         """Shutdown Telegram bot gracefully.
-        Uses v20+ shutdown lifecycle: `updater.stop()` → ``application.stop()``.
-        FIX-F-CONC-2: Properly cancel polling task avoid resource leaks.
+
+        Uses the v20+ shutdown lifecycle: updater.stop() → application.stop().
+
+        FIX-F-CONC-2: Properly cancel the polling task to avoid resource leaks.
         """
         if not self.application:
             return
         if not self._running:
             return
-
         try:
-            # Stop updater first (v20+ lifecycle)
+            # Stop the updater first (v20+ lifecycle)
             if self.application.updater is not None:
                 await self.application.updater.stop()
-            # Stop application gracefully
+            # Stop the application gracefully
             await self.application.stop()
-            # Cancel polling task exists
-            if hasattr(self, "_polling_task") and self._polling_task:
+            # Cancel polling task if it exists
+            if hasattr(self, '_polling_task') and self._polling_task:
                 self._polling_task.cancel()
                 try:
                     await self._polling_task
                 except asyncio.CancelledError:
                     pass
-
             self._running = False
             logger.info("Telegram bot shutdown complete")
         except Exception as e:
@@ -167,31 +180,32 @@ class AlertSystem:
     async def _safe_send_message(
         self, chat_id: str, text: str, parse_mode: str = "HTML"
     ) -> bool:
-        """Send message circuit breaker retry protection."""
+        """Send message with circuit breaker and retry protection."""
         if not self.bot:
             return False
 
-        # Capture bot reference ensure type narrowing
+        # Capture bot reference to ensure type narrowing in lambda
         bot: Bot = self.bot
-
         try:
             await TELEGRAM_CIRCUIT_BREAKER.call_async(
                 retry_async(OPENALGO_RETRY_CONFIG)(
                     lambda: bot.send_message(
-                        chat_id=chat_id, text=text, parse_mode=parse_mode
+                        chat_id=chat_id,
+                        text=text,
+                        parse_mode=parse_mode,
                     )
                 )
             )
             return True
-        except CircuitBreakerOpenError:
-            logger.warning("Telegram circuit breaker open: %s", )
+        except CircuitBreakerOpenError as e:
+            logger.warning("Telegram circuit breaker open: %s", e)
             return False
-        except Exception:
-            logger.error("Failed send Telegram message after retries: %s", )
+        except Exception as e:
+            logger.error("Failed to send Telegram message after retries: %s", e)
             return False
 
     async def send_alert(self, message: str, alert_type: str = "info") -> bool:
-        """Send alert Telegram circuit breaker protection."""
+        """Send alert via Telegram with circuit breaker protection."""
         if not self.bot or not settings.telegram_chat_id:
             logger.debug(f"Alert not sent (bot not configured): {message}")
             return False
@@ -199,8 +213,10 @@ class AlertSystem:
         # Check cooldown
         now = datetime.now(UTC)
         if alert_type in self.alert_cooldown:
-            if (now - self.alert_cooldown[alert_type]).total_seconds() < self.cooldown_period:
-                logger.debug(f"Alert cooldown active {alert_type}: {message}")
+            if (
+                now - self.alert_cooldown[alert_type]
+            ).total_seconds() < self.cooldown_period:
+                logger.debug(f"Alert cooldown active for {alert_type}: {message}")
                 return False
 
         try:
@@ -210,14 +226,12 @@ class AlertSystem:
                 text=formatted_message,
                 parse_mode="HTML",
             )
-
             if success:
                 self.alert_cooldown[alert_type] = now
                 logger.info(f"Alert sent: [{alert_type}] {message}")
-
             return success
         except Exception as e:
-            logger.error(f"Failed send alert: {e}")
+            logger.error(f"Failed to send alert: {e}")
             return False
 
     def _format_alert_message(self, message: str, alert_type: str) -> str:
@@ -232,7 +246,7 @@ class AlertSystem:
             return f"ℹ️ <b>INFO</b> [{timestamp}]\n\n{message}"
 
     async def send_signal_alert(self, signal: Signal) -> bool:
-        """Send alert trading signal."""
+        """Send alert for trading signal."""
         try:
             if signal.signal_type == SignalType.BUY:
                 alert_type = "success"
@@ -245,13 +259,17 @@ class AlertSystem:
                 emoji = "⚪"
 
             indicators = "\n".join(
-                f"{html.escape(name)}: {value:.4f}"
-                for name, value in signal.indicators.items()
+                [
+                    f"{html.escape(name)}: {value:.4f}"
+                    for name, value in signal.indicators.items()
+                ]
             )
             metadata = "\n".join(
-                f"{html.escape(key)}: {html.escape(str(value))}"
-                for key, value in signal.metadata.items()
-                if key != "indicators_count"
+                [
+                    f"{html.escape(key)}: {html.escape(str(value))}"
+                    for key, value in signal.metadata.items()
+                    if key != "indicators_count"
+                ]
             )
 
             message = (
@@ -264,14 +282,13 @@ class AlertSystem:
                 f"<b>Indicators:</b>\n{indicators}\n\n"
                 f"<b>Metadata:</b>\n{metadata}"
             )
-
             return await self.send_alert(message, alert_type)
         except Exception as e:
-            logger.error(f"Failed format signal alert: {e}")
+            logger.error(f"Failed to format signal alert: {e}")
             return False
 
     async def send_order_alert(self, order: Order, action: str = "created") -> bool:
-        """Send alert order."""
+        """Send alert for order."""
         try:
             if action == "filled":
                 alert_type = "success"
@@ -310,14 +327,14 @@ class AlertSystem:
 
             return await self.send_alert(message, alert_type)
         except Exception as e:
-            logger.error(f"Failed format order alert: {e}")
+            logger.error(f"Failed to format order alert: {e}")
             return False
 
     async def send_trade_alert(self, trade: Trade, action: str = "opened") -> bool:
-        """Send alert trade."""
+        """Send alert for trade."""
         try:
             if action == "closed":
-                if trade.pnl is not None and trade.pnl > 0:
+                if trade.pnl is not None and trade.pnl >= 0:
                     alert_type = "success"
                     emoji = "💰"
                 elif trade.pnl is not None and trade.pnl < 0:
@@ -350,8 +367,10 @@ class AlertSystem:
             if trade.exit_time:
                 message += f"\n<b>Exit Time:</b> {trade.exit_time.strftime('%Y-%m-%d %H:%M:%S')}"
             if trade.pnl is not None:
-                pnl_color = "green" if trade.pnl > 0 else "red"
-                message += f"\n<b>PnL:</b> <span color='{pnl_color}'>{trade.pnl:.2f}</span>"
+                pnl_color = "green" if trade.pnl >= 0 else "red"
+                message += (
+                    f"\n<b>PnL:</b> <span color='{pnl_color}'>{trade.pnl:.2f}</span>"
+                )
             if trade.stop_loss:
                 message += f"\n<b>Stop Loss:</b> {trade.stop_loss:.2f}"
             if trade.take_profit:
@@ -361,7 +380,7 @@ class AlertSystem:
 
             return await self.send_alert(message, alert_type)
         except Exception as e:
-            logger.error(f"Failed format trade alert: {e}")
+            logger.error(f"Failed to format trade alert: {e}")
             return False
 
     async def send_system_alert(self, message: str, alert_type: str = "info") -> bool:
@@ -376,41 +395,39 @@ class AlertSystem:
             full_message = f"{header}\n\n{message}"
             return await self.send_alert(full_message, alert_type)
         except Exception as e:
-            logger.error(f"Failed format system alert: {e}")
+            logger.error(f"Failed to format system alert: {e}")
             return False
 
     async def _safe_get_position_book(self) -> dict[str, Any] | None:
-        """Get position book circuit breaker retry protection."""
+        """Get position book with circuit breaker and retry protection."""
         try:
-            return await OPENALGO_CIRCUIT_BREAKER.call_async(
+            return await OPENALGO_CIRCUIT_BREAKER.call_async(  # type: ignore[no-any-return]
                 retry_async(OPENALGO_RETRY_CONFIG)(
                     lambda: async_client.get_position_book()
                 )
             )
-        except CircuitBreakerOpenError:
-            logger.warning("OpenAlgo circuit breaker open get_position_book: %s", )
+        except CircuitBreakerOpenError as e:
+            logger.warning("OpenAlgo circuit breaker open for get_position_book: %s", e)
             return None
-        except Exception:
-            logger.error("Failed get position book after retries: %s", )
+        except Exception as e:
+            logger.error("Failed to get position book after retries: %s", e)
             return None
 
     async def _safe_get_funds(self) -> dict[str, Any] | None:
-        """Get funds circuit breaker retry protection."""
+        """Get funds with circuit breaker and retry protection."""
         try:
-            return await OPENALGO_CIRCUIT_BREAKER.call_async(
-                retry_async(OPENALGO_RETRY_CONFIG)(
-                    lambda: async_client.get_funds()
-                )
+            return await OPENALGO_CIRCUIT_BREAKER.call_async(  # type: ignore[no-any-return]
+                retry_async(OPENALGO_RETRY_CONFIG)(lambda: async_client.get_funds())
             )
-        except CircuitBreakerOpenError:
-            logger.warning("OpenAlgo circuit breaker open get_funds: %s", )
+        except CircuitBreakerOpenError as e:
+            logger.warning("OpenAlgo circuit breaker open for get_funds: %s", e)
             return None
-        except Exception:
-            logger.error("Failed get funds after retries: %s", )
+        except Exception as e:
+            logger.error("Failed to get funds after retries: %s", e)
             return None
 
     async def send_position_alert(self) -> bool:
-        """Send alert current positions."""
+        """Send alert for current positions."""
         try:
             position_data = await self._safe_get_position_book()
             if not position_data or not position_data.get("data"):
@@ -418,10 +435,9 @@ class AlertSystem:
 
             positions = position_data["data"]
             message = "📊 <b>CURRENT POSITIONS</b>\n\n"
-
             for pos in positions:
                 pnl_color = "green" if pos.get("pnl", 0) >= 0 else "red"
-                # Escape all external data prevent HTML injection
+                # Escape all external data to prevent HTML injection
                 symbol = html.escape(str(pos.get("symbol", "N/A")))
                 product_type = html.escape(str(pos.get("product_type", "N/A")))
                 message += (
@@ -432,18 +448,19 @@ class AlertSystem:
                     f"<b>PnL:</b> <span color='{pnl_color}'>{pos.get('pnl', 0):.2f}</span>\n"
                     f"<b>Product:</b> {product_type}\n\n"
                 )
-
             return await self.send_alert(message, "info")
         except Exception as e:
-            logger.error(f"Failed get positions alert: {e}")
+            logger.error(f"Failed to get positions alert: {e}")
             return False
 
     async def send_funds_alert(self) -> bool:
-        """Send alert current funds."""
+        """Send alert for current funds."""
         try:
             funds_data = await self._safe_get_funds()
             if not funds_data or not funds_data.get("data"):
-                return await self.send_system_alert("No funds data available", "warning")
+                return await self.send_system_alert(
+                    "No funds data available", "warning"
+                )
 
             funds = funds_data["data"]
             message = (
@@ -453,29 +470,28 @@ class AlertSystem:
                 f"<b>Available Margin:</b> {funds['available_margin']:.2f}\n"
                 f"<b>Total Equity:</b> {funds['total_equity']:.2f}\n"
             )
-
             return await self.send_alert(message, "info")
         except Exception as e:
-            logger.error(f"Failed get funds alert: {e}")
+            logger.error(f"Failed to get funds alert: {e}")
             return False
 
     async def _safe_get_all_orders(self) -> dict[str, Any] | None:
-        """Get all orders circuit breaker retry protection."""
+        """Get all orders with circuit breaker and retry protection."""
         try:
-            return await OPENALGO_CIRCUIT_BREAKER.call_async(
+            return await OPENALGO_CIRCUIT_BREAKER.call_async(  # type: ignore[no-any-return]
                 retry_async(OPENALGO_RETRY_CONFIG)(
                     lambda: async_client.get_all_orders()
                 )
             )
-        except CircuitBreakerOpenError:
-            logger.warning("OpenAlgo circuit breaker open get_all_orders: %s", )
+        except CircuitBreakerOpenError as e:
+            logger.warning("OpenAlgo circuit breaker open for get_all_orders: %s", e)
             return None
-        except Exception:
-            logger.error("Failed get all orders after retries: %s", )
+        except Exception as e:
+            logger.error("Failed to get all orders after retries: %s", e)
             return None
 
     async def _safe_cancel_order(self, order_id: str) -> bool:
-        """Cancel order circuit breaker retry protection."""
+        """Cancel order with circuit breaker and retry protection."""
         try:
             await OPENALGO_CIRCUIT_BREAKER.call_async(
                 retry_async(OPENALGO_RETRY_CONFIG)(
@@ -483,29 +499,28 @@ class AlertSystem:
                 )
             )
             return True
-        except CircuitBreakerOpenError:
-            logger.warning("OpenAlgo circuit breaker open cancel_order: %s", )
+        except CircuitBreakerOpenError as e:
+            logger.warning("OpenAlgo circuit breaker open for cancel_order: %s", e)
             return False
         except Exception as e:
-            logger.error("Failed cancel order after retries: %s", order_id, exc_info=e)
+            logger.error("Failed to cancel order %s after retries: %s", order_id, e)
             return False
 
     async def activate_kill_switch(self, reason: str = "Manual activation") -> bool:
-        """Activate kill switch stop all trading activities."""
+        """Activate kill switch to stop all trading activities."""
         if self.kill_switch_active:
-            logger.warning("Kill switch active.")
+            logger.warning("Kill switch already active.")
             return False
-
         try:
             self.kill_switch_active = True
             logger.warning(f"Kill switch activated: {reason}")
 
-            # Cancel all open orders retry circuit breaker
+            # Cancel all open orders with retry and circuit breaker
             orders_data = await self._safe_get_all_orders()
             if orders_data is None:
-                # Failed fetch orders, rollback kill switch
+                # Could not fetch orders - rollback kill switch
                 self.kill_switch_active = False
-                logger.error("Failed fetch orders kill switch, rolled back")
+                logger.error("Failed to fetch orders - kill switch rollback")
                 return False
 
             if orders_data.get("data"):
@@ -514,53 +529,50 @@ class AlertSystem:
                     if order["status"] in ["OPEN", "PENDING"]:
                         await self._safe_cancel_order(order["order_id"])
 
-            # Escape user-supplied reason prevent HTML injection
+            # Escape user-supplied reason to prevent HTML injection
             escaped_reason = html.escape(reason)
             message = (
                 f"🚨 <b>KILL SWITCH ACTIVATED</b> 🚨\n\n"
                 f"<b>Reason:</b> {escaped_reason}\n"
                 f"<b>Timestamp:</b> {datetime.now(UTC).strftime('%Y-%m-%d %H:%M:%S')}\n\n"
-                "All open orders cancelled. No new orders placed."
+                "All open orders cancelled. No new orders will be placed."
             )
-
             return await self.send_alert(message, "error")
         except Exception as e:
-            logger.error(f"Failed activate kill switch: {e}")
+            logger.error(f"Failed to activate kill switch: {e}")
             self.kill_switch_active = False
             return False
 
     async def deactivate_kill_switch(self, reason: str = "Manual deactivation") -> bool:
-        """Deactivate kill switch resume trading activities."""
+        """Deactivate kill switch to resume trading activities."""
         if not self.kill_switch_active:
             logger.warning("Kill switch not active.")
             return False
-
         try:
             self.kill_switch_active = False
             logger.info(f"Kill switch deactivated: {reason}")
-
-            # Escape user-supplied reason prevent HTML injection
+            # Escape user-supplied reason to prevent HTML injection
             escaped_reason = html.escape(reason)
             message = (
-                f"✅ <b>KILL SWITCH DEACTIVATED</b> ✅\n\n"
+                f"<b>KILL SWITCH DEACTIVATED</b> ✅\n\n"
                 f"<b>Reason:</b> {escaped_reason}\n"
                 f"<b>Timestamp:</b> {datetime.now(UTC).strftime('%Y-%m-%d %H:%M:%S')}\n\n"
-                "Trading activities now resume."
+                "Trading activities can now resume."
             )
-
             return await self.send_alert(message, "success")
         except Exception as e:
-            logger.error(f"Failed deactivate kill switch: {e}")
+            logger.error(f"Failed to deactivate kill switch: {e}")
             return False
 
     def is_kill_switch_active(self) -> bool:
-        """Check kill switch active."""
+        """Check if kill switch is active."""
         return self.kill_switch_active
 
     def get_circuit_breaker_status(self) -> dict[str, Any]:
-        """Get circuit breaker status monitoring.
+        """Get circuit breaker status for monitoring.
+
         Returns:
-            Dictionary OpenAlgo Telegram circuit breaker status.
+            Dictionary with OpenAlgo and Telegram circuit breaker status
         """
         return {
             "openalgo": OPENALGO_CIRCUIT_BREAKER.get_status(),
@@ -568,12 +580,12 @@ class AlertSystem:
         }
 
     def _is_authorized_admin(self, update: Update) -> bool:
-        """Check user authorized admin based telegram_admin_ids setting."""
+        """Check if user is authorized admin based on telegram_admin_ids setting."""
         if not settings.telegram_admin_ids:
-            # admin list configured reject all commands safety
+            # No admin list configured - reject all commands for safety
             logger.warning(
-                "Telegram admin allow-list empty. "
-                "Configure TELEGRAM_ADMIN_IDS security."
+                "Telegram admin ID allow-list is empty. "
+                "Configure TELEGRAM_ADMIN_IDS for security."
             )
             return False
 
@@ -589,25 +601,27 @@ class AlertSystem:
         try:
             message = (
                 "📈 <b>LOATS13July2026 Trading System</b> 📈\n\n"
-                "Welcome LOATS trading system alert bot!\n\n"
+                "Welcome to LOATS trading system alert bot!\n\n"
                 "Available commands:\n"
-                "/status Get system status\n"
-                "/positions View current positions\n"
-                "/orders View open orders\n"
-                "/signals View recent signals\n"
-                "/kill Activate kill switch\n"
-                "/resume Resume trading\n"
-                "/help Show help message"
+                "/status - Get system status\n"
+                "/positions - View current positions\n"
+                "/orders - View open orders\n"
+                "/signals - View recent signals\n"
+                "/kill - Activate kill switch\n"
+                "/resume - Resume trading\n"
+                "/help - Show help message"
             )
             if update.message:
                 await update.message.reply_text(message, parse_mode="HTML")
         except Exception as e:
-            logger.error(f"Error /start command: {e}")
+            logger.error(f"Error in /start command: {e}")
 
     async def _status(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle /status command."""
         try:
-            status = "🟢 ACTIVE" if not self.kill_switch_active else "🔴 KILL SWITCH ACTIVE"
+            status = (
+                "🟢 ACTIVE" if not self.kill_switch_active else "🔴 KILL SWITCH ACTIVE"
+            )
             message = (
                 f"📊 <b>SYSTEM STATUS</b>\n\n"
                 f"<b>Status:</b> {status}\n"
@@ -616,7 +630,7 @@ class AlertSystem:
             if update.message:
                 await update.message.reply_text(message, parse_mode="HTML")
         except Exception as e:
-            logger.error(f"Error /status command: {e}")
+            logger.error(f"Error in /status command: {e}")
 
     async def _kill_switch(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
@@ -626,31 +640,36 @@ class AlertSystem:
             # Check admin authorization
             if not self._is_authorized_admin(update):
                 logger.warning(
-                    f"Unauthorized kill switch attempt user: "
+                    f"Unauthorized kill switch attempt from user: "
                     f"{update.effective_user.id if update.effective_user else 'unknown'}"
                 )
                 if update.message:
                     await update.message.reply_text(
-                        "Unauthorized: You are not authorized to issue this command. "
-                        "Configure TELEGRAM_ADMIN_IDS to include your user ID."
+                        "⛔ Unauthorized: You are not authorized to issue this command. "
+                        "Configure TELEGRAM_ADMIN_IDS with your user ID."
                     )
                 return
 
             if self.kill_switch_active:
                 if update.message:
-                    await update.message.reply_text("⚠️ Kill switch already active.")
+                    await update.message.reply_text("⚠️ Kill switch is already active.")
                 return
 
-            reason = html.escape(" ".join(context.args)) if context.args else "Manual activation via Telegram"
+            reason = (
+                html.escape(" ".join(context.args))
+                if context.args
+                else "Manual activation via Telegram"
+            )
             success = await self.activate_kill_switch(reason)
-
             if update.message:
                 if success:
-                    await update.message.reply_text("🚨 Kill switch activated successfully.")
+                    await update.message.reply_text(
+                        "🚨 Kill switch activated successfully."
+                    )
                 else:
                     await update.message.reply_text("Failed to activate kill switch.")
         except Exception as e:
-            logger.error(f"Error /kill command: {e}")
+            logger.error(f"Error in /kill command: {e}")
             if update.message:
                 await update.message.reply_text(f"❌ Error: {e!s}")
 
@@ -660,31 +679,36 @@ class AlertSystem:
             # Check admin authorization
             if not self._is_authorized_admin(update):
                 logger.warning(
-                    f"Unauthorized resume attempt user: "
+                    f"Unauthorized resume attempt from user: "
                     f"{update.effective_user.id if update.effective_user else 'unknown'}"
                 )
                 if update.message:
                     await update.message.reply_text(
-                        "Unauthorized: You are not authorized to issue this command. "
-                        "Configure TELEGRAM_ADMIN_IDS to include your user ID."
+                        "⛔ Unauthorized: You are not authorized to issue this command. "
+                        "Configure TELEGRAM_ADMIN_IDS with your user ID."
                     )
                 return
 
             if not self.kill_switch_active:
                 if update.message:
-                    await update.message.reply_text("ℹ️ Kill switch not active.")
+                    await update.message.reply_text("ℹ️ Kill switch is not active.")
                 return
 
-            reason = html.escape(" ".join(context.args)) if context.args else "Manual deactivation via Telegram"
+            reason = (
+                html.escape(" ".join(context.args))
+                if context.args
+                else "Manual deactivation via Telegram"
+            )
             success = await self.deactivate_kill_switch(reason)
-
             if update.message:
                 if success:
-                    await update.message.reply_text("✅ Kill switch deactivated successfully.")
+                    await update.message.reply_text(
+                        "✅ Kill switch deactivated successfully."
+                    )
                 else:
                     await update.message.reply_text("Failed to deactivate kill switch.")
         except Exception as e:
-            logger.error(f"Error /resume command: {e}")
+            logger.error(f"Error in /resume command: {e}")
             if update.message:
                 await update.message.reply_text(f"❌ Error: {e!s}")
 
@@ -697,7 +721,7 @@ class AlertSystem:
             if not success and update.message:
                 await update.message.reply_text("Failed to get positions.")
         except Exception as e:
-            logger.error(f"Error /positions command: {e}")
+            logger.error(f"Error in /positions command: {e}")
             if update.message:
                 await update.message.reply_text(f"❌ Error: {e!s}")
 
@@ -712,10 +736,9 @@ class AlertSystem:
 
             orders = orders_data["data"]
             message = "📋 <b>OPEN ORDERS</b>\n\n"
-
             for order in orders:
                 if order["status"] in ["OPEN", "PENDING"]:
-                    # Escape all external data prevent HTML injection
+                    # Escape all external data to prevent HTML injection
                     order_id = html.escape(str(order["order_id"]))
                     symbol = html.escape(str(order["symbol"]))
                     order_type = html.escape(str(order["order_type"]))
@@ -735,7 +758,7 @@ class AlertSystem:
             if update.message:
                 await update.message.reply_text(message, parse_mode="HTML")
         except Exception as e:
-            logger.error(f"Error /orders command: {e}")
+            logger.error(f"Error in /orders command: {e}")
             if update.message:
                 await update.message.reply_text(f"❌ Error: {e!s}")
 
@@ -744,16 +767,14 @@ class AlertSystem:
     ) -> None:
         """Handle /signals command."""
         try:
-            # NEW-M5: use injected database avoid per-command connection churn
+            # NEW-M5: use injected database to avoid per-command connection churn
             signals = await self.db.async_get_latest_signals(settings.default_symbol, limit=5)
-
             if not signals:
                 if update.message:
                     await update.message.reply_text("ℹ️ No recent signals found.")
                 return
 
             message = "📈 <b>RECENT SIGNALS</b>\n\n"
-
             for signal in signals:
                 emoji = {
                     SignalType.BUY: "🟢",
@@ -761,7 +782,6 @@ class AlertSystem:
                     SignalType.HOLD: "⚪",
                     SignalType.NEUTRAL: "⚪",
                 }.get(signal.signal_type, "ℹ️")
-
                 message += (
                     f"{emoji} <b>{signal.signal_type.value}</b> (Strength: {signal.strength:.2f})\n"
                     f"<b>Time:</b> {signal.timestamp.strftime('%H:%M:%S')}\n"
@@ -771,7 +791,7 @@ class AlertSystem:
             if update.message:
                 await update.message.reply_text(message, parse_mode="HTML")
         except Exception as e:
-            logger.error(f"Error /signals command: {e}")
+            logger.error(f"Error in /signals command: {e}")
             if update.message:
                 await update.message.reply_text(f"❌ Error: {e!s}")
 
@@ -780,7 +800,7 @@ class AlertSystem:
         try:
             await self._start(update, context)
         except Exception as e:
-            logger.error(f"Error /help command: {e}")
+            logger.error(f"Error in /help command: {e}")
             if update.message:
                 await update.message.reply_text(f"❌ Error: {e!s}")
 
@@ -791,7 +811,6 @@ class AlertSystem:
         try:
             if update.message and update.message.text:
                 message_text = update.message.text.lower()
-
                 if "status" in message_text:
                     await self._status(update, context)
                 elif "position" in message_text or "holdings" in message_text:
@@ -813,6 +832,7 @@ class AlertSystem:
             logger.error(f"Error handling message: {e}")
             if update.message:
                 await update.message.reply_text(f"❌ Error: {e!s}")
+
 
 # Export a default instance
 alerts = AlertSystem()

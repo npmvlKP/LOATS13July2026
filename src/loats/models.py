@@ -1,11 +1,11 @@
-"""
-Data models LOATS13July2026 using Pydantic.
-"""
+"""Data models LOATS13July2026 using Pydantic."""
 from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
 from uuid import uuid4
+
 from pydantic import BaseModel, Field, field_validator, model_validator
+
 
 class OrderType(StrEnum):
     """Order type enumeration."""
@@ -14,10 +14,12 @@ class OrderType(StrEnum):
     SL = "SL"
     SL_M = "SL-M"
 
+
 class TransactionType(StrEnum):
     """Transaction type enumeration."""
     BUY = "BUY"
     SELL = "SELL"
+
 
 class ProductType(StrEnum):
     """Product type enumeration."""
@@ -25,10 +27,12 @@ class ProductType(StrEnum):
     NRML = "NRML"
     CNC = "CNC"
 
+
 class OrderVariety(StrEnum):
     """Order variety enumeration."""
     REGULAR = "regular"
     AMO = "amo"
+
 
 class OrderStatus(StrEnum):
     """Order status enumeration."""
@@ -37,6 +41,7 @@ class OrderStatus(StrEnum):
     CANCELLED = "CANCELLED"
     REJECTED = "REJECTED"
     PENDING = "PENDING"
+
 
 class QuoteData(BaseModel):
     """Quote data model."""
@@ -74,6 +79,7 @@ class QuoteData(BaseModel):
             data["change"] = data["last_price"] - close_raw
         return data
 
+
 class HistoricalData(BaseModel):
     """Historical data model."""
     symbol: str
@@ -85,10 +91,12 @@ class HistoricalData(BaseModel):
     volume: int = Field(ge=0)
     interval: str
 
+
 class OptionType(StrEnum):
     """Option type enumeration."""
     CALL = "CE"
     PUT = "PE"
+
 
 class OptionContract(BaseModel):
     """Option contract model."""
@@ -99,12 +107,12 @@ class OptionContract(BaseModel):
     last_price: float
     open_interest: int
     volume: int
-    implied_volatility: float = None
-    delta: float = None
-    gamma: float = None
-    theta: float = None
-    vega: float = None
-    rho: float = None
+    implied_volatility: float | None = None
+    delta: float | None = None
+    gamma: float | None = None
+    theta: float | None = None
+    vega: float | None = None
+    rho: float | None = None
     quantity: int = Field(default=1, ge=1, description="Position quantity/lots")
 
     @field_validator("last_price", mode="before")
@@ -120,6 +128,7 @@ class OptionContract(BaseModel):
         except (ValueError, TypeError) as e:
             raise ValueError(f"Invalid price value: {v}") from e
 
+
 class OptionChain(BaseModel):
     """Option chain model."""
     symbol: str
@@ -128,6 +137,7 @@ class OptionChain(BaseModel):
     underlying_price: float
     calls: list[OptionContract]
     puts: list[OptionContract]
+
 
 class Position(BaseModel):
     """Position model."""
@@ -141,6 +151,7 @@ class Position(BaseModel):
     sell_quantity: int
     timestamp: datetime = Field(default_factory=datetime.now)
 
+
 class FundsData(BaseModel):
     """Funds data model."""
     available_cash: float
@@ -149,58 +160,60 @@ class FundsData(BaseModel):
     total_equity: float
     timestamp: datetime
 
+
 class Order(BaseModel):
     """Order model."""
     order_id: str
     symbol: str
     quantity: int = Field(gt=0)
     order_type: OrderType
-    price: float = Field(default=None, gt=0)
-    trigger_price: float = Field(default=None, gt=0)
+    price: float | None = Field(default=None, gt=0)
+    trigger_price: float | None = Field(default=None, gt=0)
     variety: OrderVariety
     transaction_type: TransactionType
     product_type: ProductType
     status: OrderStatus
     timestamp: datetime
     filled_quantity: int = Field(ge=0)
-    average_price: float = Field(default=None, gt=0)
-    stop_loss: float = Field(default=None, gt=0)
-    take_profit: float = Field(default=None, gt=0)
-    trailing_stop_loss: float = Field(default=None, gt=0)
+    average_price: float | None = Field(default=None, gt=0)
+    stop_loss: float | None = Field(default=None, gt=0)
+    take_profit: float | None = Field(default=None, gt=0)
+    trailing_stop_loss: float | None = Field(default=None, gt=0)
+
 
 class Trade(BaseModel):
     """Trade model database storage."""
     trade_id: str = Field(
         default_factory=lambda: f"trade_{datetime.now(UTC).strftime('%Y%m%d%H%M%S%f')}_{uuid4().hex[:8]}"
     )
+
     symbol: str
     quantity: int = Field(gt=0)
     entry_price: float = Field(gt=0)
-    exit_price: float = Field(default=None, gt=0)
+    exit_price: float | None = Field(default=None, gt=0)
     entry_time: datetime
-    exit_time: datetime = None
-    transaction_type: TransactionType = None
-    product_type: ProductType = None
-    pnl: float = Field(default=None)
+    exit_time: datetime | None = None
+    transaction_type: TransactionType | None = None
+    product_type: ProductType | None = None
+    pnl: float | None = Field(default=None)
     status: str = "OPEN"
-    strategy: str = None
-    stop_loss: float = Field(default=None, gt=0)
-    take_profit: float = Field(default=None, gt=0)
-    trailing_stop_loss: float = Field(default=None, gt=0)
+    strategy: str | None = None
+    stop_loss: float | None = Field(default=None, gt=0)
+    take_profit: float | None = Field(default=None, gt=0)
+    trailing_stop_loss: float | None = Field(default=None, gt=0)
     metadata: dict[str, Any] = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def calculate_pnl_validator(self) -> "Trade":
         """Calculate PnL after model initialization."""
-        self.pnl = None
-        if self.exit_price is not None:
+        if self.pnl is None and self.exit_price is not None:
             side = str(self.transaction_type).upper()
             multiplier = 1 if side == "BUY" else -1
             self.pnl = (self.exit_price - self.entry_price) * self.quantity * multiplier
         return self
 
     def calculate_pnl_method(self, current_price: float) -> float:
-        """Calculate PnL trade, handling both enum/string side (H7)."""
+        """Calculate PnL trade, handling both enum/stringside (H7)."""
         if self.transaction_type is None:
             return 0.0
         side_str = self.transaction_type.value if hasattr(self.transaction_type, "value") else str(self.transaction_type)
@@ -209,6 +222,7 @@ class Trade(BaseModel):
         else:
             return (self.entry_price - current_price) * self.quantity
 
+
 class SignalType(StrEnum):
     """Signal type enumeration."""
     BUY = "BUY"
@@ -216,18 +230,21 @@ class SignalType(StrEnum):
     HOLD = "HOLD"
     NEUTRAL = "NEUTRAL"
 
+
 class Signal(BaseModel):
     """Trading signal model."""
     signal_id: str = Field(
         default_factory=lambda: f"signal_{datetime.now(UTC).strftime('%Y%m%d%H%M%S%f')}_{uuid4().hex[:8]}"
     )
+
     symbol: str
     signal_type: SignalType
     strength: float = Field(ge=0, le=1)
     timestamp: datetime
     indicators: dict[str, float] = Field(default_factory=dict)
     metadata: dict[str, Any] = Field(default_factory=dict)
-    confidence: float = Field(default=None, ge=0, le=1)
+    confidence: float | None = Field(default=None, ge=0, le=1)
+
 
 class NewsItem(BaseModel):
     """News item model."""
@@ -239,20 +256,23 @@ class NewsItem(BaseModel):
     sentiment_score: float
     sentiment_label: str
 
+
 class AuditLogEntry(BaseModel):
     """Audit log entry model."""
     entry_id: str = Field(
         default_factory=lambda: f"audit_{datetime.now(UTC).strftime('%Y%m%d%H%M%S%f')}_{uuid4().hex[:8]}"
     )
+
     timestamp: datetime
     action: str
     entity_type: str
     entity_id: str
     user: str = "system"
     metadata: dict[str, Any] = Field(default_factory=dict)
-    previous_state: dict[str, Any] = None
-    new_state: dict[str, Any] = None
-    sha256_hash: str = None
+    previous_state: dict[str, Any] | None = None
+    new_state: dict[str, Any] | None = None
+    sha256_hash: str | None = None
+
 
 class TAIndicator(BaseModel):
     """Technical analysis indicator model."""
@@ -260,6 +280,7 @@ class TAIndicator(BaseModel):
     value: float
     timestamp: datetime
     metadata: dict[str, Any] = Field(default_factory=dict)
+
 
 class Greeks(BaseModel):
     """Greeks model options."""
@@ -270,6 +291,7 @@ class Greeks(BaseModel):
     rho: float
     implied_volatility: float
 
+
 class VaRResult(BaseModel):
     """Value Risk result model."""
     confidence_level: float
@@ -279,6 +301,7 @@ class VaRResult(BaseModel):
     historical_var: float
     method: str
     timestamp: datetime
+
 
 class SentimentAnalysisResult(BaseModel):
     """Sentiment analysis result model."""
