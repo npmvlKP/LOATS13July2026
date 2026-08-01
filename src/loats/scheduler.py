@@ -57,7 +57,7 @@ class TradingScheduler:
         """Initialize TradingScheduler."""
         self.scheduler = AsyncIOScheduler()
         self.running = False
-        self.scan_tasks: dict[str, asyncio.Task[Any]] = {}
+        self.scan_tasks: dict[str, asyncio.Task[dict[str, Any] | None]] = {}
         self.db = Database()
 
     async def initialize(self) -> None:

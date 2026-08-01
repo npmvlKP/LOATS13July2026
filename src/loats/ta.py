@@ -6,6 +6,7 @@ Provides standalone indicator calculation functions.
 
 import numpy as np
 import pandas as pd
+from pandas import Series
 
 from .loats_logging import get_logger
 from .models import HistoricalData, TAIndicator
@@ -13,10 +14,10 @@ from .models import HistoricalData, TAIndicator
 logger = get_logger(__name__)
 
 
-def calculate_rsi(df: pd.DataFrame, period: int = 14) -> pd.Series:
+def calculate_rsi(df: pd.DataFrame, period: int = 14) -> Series:
     """Calculate Relative Strength Index (RSI)."""
     if len(df) < period:
-        return pd.Series([np.nan] * len(df), index=df.index, dtype=np.float64)
+        return Series([np.nan] * len(df), index=df.index, dtype=np.float64)
 
     close = df["close"]
     delta = close.diff()
@@ -158,8 +159,8 @@ def calculate_supertrend(
             supertrend_arr[i] = st_val
 
     # Convert back to pandas Series with proper index
-    supertrend = pd.Series(supertrend_arr, index=df.index, dtype=np.float64)
-    direction = pd.Series(direction_arr, index=df.index, dtype=np.float64)
+    supertrend = Series(supertrend_arr, index=df.index, dtype=np.float64)
+    direction = Series(direction_arr, index=df.index, dtype=np.float64)
 
     return supertrend, direction
 

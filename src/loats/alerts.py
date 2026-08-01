@@ -50,7 +50,7 @@ class AlertSystem:
         """
         self._explicit_db: Database | None = database
         self.bot: Bot | None = None
-        self.application: Application[Any, Any, Any, Any, Any, Any] | None = None
+        self.application: Application | None = None
         self.kill_switch_active: bool = False
         self.alert_cooldown: dict[str, datetime] = {}
         self.cooldown_period: int = 300  # 5 minutes

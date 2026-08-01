@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import json
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Dict
 
 import httpx
 
@@ -118,7 +118,7 @@ class OpenAlgoClient:
             else:
                 response = client.request(method, url, **kwargs)
             response.raise_for_status()
-            return response.json()  # type: ignore[no-any-return]
+            return response.json()  # type: ignore[no-any-return, unused-ignore]
         except httpx.HTTPStatusError as e:
             logger.error(f"API HTTP error {e.response.status_code}: {e.response.text}")
             raise OpenAlgoAPIError(
@@ -422,7 +422,7 @@ class AsyncOpenAlgoClient:
             else:
                 response = await client.request(method, url, **kwargs)
             response.raise_for_status()
-            return response.json()  # type: ignore[no-any-return]
+            return response.json()  # type: ignore[no-any-return, unused-ignore]
         except httpx.HTTPStatusError as e:
             logger.error(f"API HTTP error {e.response.status_code}: {e.response.text}")
             raise OpenAlgoAPIError(
