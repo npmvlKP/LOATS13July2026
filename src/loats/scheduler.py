@@ -11,8 +11,6 @@ from apscheduler.triggers.interval import IntervalTrigger
 
 from .alerts import alerts
 from .config import get_settings
-
-settings = get_settings()
 from .database import Database
 from .loats_logging import get_logger
 from .metrics import record_signal, track_job
@@ -32,6 +30,8 @@ from .utils.circuit_breaker import (
     CircuitBreakerOpenError,
 )
 from .utils.retry import OPENALGO_RETRY_CONFIG, retry_async
+
+settings = get_settings()
 
 logger = get_logger(__name__)
 

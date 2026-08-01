@@ -125,21 +125,21 @@ class OpenAlgoClient:
                 status_code=e.response.status_code,
                 message=f"HTTP error: {e.response.status_code}",
                 details={"response": e.response.text},
-            )
+            ) from e
         except ValueError as e:
             logger.error(f"JSON decode error: {e}")
-            raise OpenAlgoError(f"JSON decode error: {e}")
+            raise OpenAlgoError(f"JSON decode error: {e}") from e
         except httpx.TimeoutException as e:
             logger.error(f"Request timed out: {e}")
-            raise OpenAlgoError(f"Timeout error: {e}")
+            raise OpenAlgoError(f"Timeout error: {e}") from e
         except httpx.ConnectError as e:
             logger.error(f"Connection error: {e}")
-            raise OpenAlgoError(f"Connection error: {e}")
+            raise OpenAlgoError(f"Connection error: {e}") from e
         except OpenAlgoError:
             raise
         except Exception as e:
             logger.error(f"Request failed: {e}")
-            raise OpenAlgoError(f"Request failed: {e}")
+            raise OpenAlgoError(f"Request failed: {e}") from e
 
     def _convert_to_quote(self, symbol: str, data: dict[str, Any]) -> QuoteData:
         return QuoteData(
@@ -429,10 +429,10 @@ class AsyncOpenAlgoClient:
                 status_code=e.response.status_code,
                 message=f"HTTP error: {e.response.status_code}",
                 details={"response": e.response.text},
-            )
+            ) from e
         except Exception as e:
             logger.error(f"Request failed: {e}")
-            raise OpenAlgoError(f"Request failed: {e}")
+            raise OpenAlgoError(f"Request failed: {e}") from e
 
     async def get_quotes(self, symbols: list[str]) -> dict[str, Any]:
         symbols_sorted = sorted(symbols)

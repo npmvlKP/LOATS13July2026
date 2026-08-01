@@ -12,14 +12,14 @@ logger = get_logger(__name__)
 
 class RateLimiter:
     """Rate limiter implementation using token bucket algorithm.
-    
+
     The rate limiter enforces maximum operations per second limits specified in
     settings (max_ops).
     """
 
     def __init__(self, max_ops: int | None = None, interval: float = 1.0):
         """Initialize rate limiter.
-        
+
         Args:
             max_ops: Maximum operations per interval (default: from settings)
             interval: Time interval in seconds (default: 1.0)
@@ -33,7 +33,7 @@ class RateLimiter:
 
     async def acquire(self) -> bool:
         """Acquire token for operation.
-        
+
         Returns:
             True if token acquired successfully, False if rate limit exceeded
         """
@@ -59,7 +59,7 @@ class RateLimiter:
 
     async def wait_for_token(self) -> None:
         """Wait until token is available.
-        
+
         Raises:
             RateLimitExceededError: if waiting takes too long
         """
@@ -70,14 +70,14 @@ class RateLimiter:
 
 class AsyncRateLimiter:
     """Async rate limiter using sliding window algorithm.
-    
+
     This implementation is more precise for async operations and
     provides better control over rate limiting.
     """
 
     def __init__(self, max_ops: int | None = None, window_size: float = 1.0):
         """Initialize async rate limiter.
-        
+
         Args:
             max_ops: Maximum operations per window (default: from settings)
             window_size: Time window in seconds (default: 1.0)
@@ -90,7 +90,7 @@ class AsyncRateLimiter:
 
     async def acquire(self) -> bool:
         """Acquire permission for operation.
-        
+
         Returns:
             True if operation is allowed, False if rate limit exceeded
         """
@@ -109,7 +109,7 @@ class AsyncRateLimiter:
 
     async def wait_for_token(self) -> None:
         """Wait until operation is allowed.
-        
+
         Raises:
             RateLimitExceededError: if waiting takes too long
         """
@@ -137,11 +137,11 @@ class RateLimitExceededError(Exception):
 
 def rate_limited(max_ops: int | None = None, window_size: float = 1.0) -> Callable:
     """Decorator for rate limiting sync functions.
-    
+
     Args:
         max_ops: Maximum operations per window
         window_size: Time window in seconds
-        
+
     Returns:
         Decorator function
     """
@@ -159,11 +159,11 @@ def rate_limited(max_ops: int | None = None, window_size: float = 1.0) -> Callab
 
 def async_rate_limited(max_ops: int | None = None, window_size: float = 1.0) -> Callable:
     """Decorator for rate limiting async functions.
-    
+
     Args:
         max_ops: Maximum operations per window
         window_size: Time window in seconds
-        
+
     Returns:
         Decorator function
     """

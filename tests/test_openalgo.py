@@ -1,20 +1,20 @@
 """
 Tests OpenAlgo client module.
 """
-import unittest.mock
 from unittest.mock import AsyncMock, MagicMock, patch
+
 import httpx
 import pytest
 from httpx import Response
 
 from src.loats.config import get_settings
-from src.loats.models import (
-    HistoricalData, Order, OrderStatus, OrderType, OrderVariety, 
-    Position, ProductType, QuoteData, TransactionType
-)
+from src.loats.models import OrderType
 from src.loats.openalgo import (
-    AsyncOpenAlgoClient, KillSwitchError, OpenAlgoAPIError, 
-    OpenAlgoClient, OpenAlgoError
+    AsyncOpenAlgoClient,
+    KillSwitchError,
+    OpenAlgoAPIError,
+    OpenAlgoClient,
+    OpenAlgoError,
 )
 
 settings = get_settings()
@@ -64,8 +64,8 @@ class TestAsyncOpenAlgoClient:
     async def test_get_quotes(self, async_client: AsyncOpenAlgoClient, mock_async_httpx_client: AsyncMock, mock_async_response: MagicMock) -> None:
         """Test get_quotes method."""
         mock_async_response.json.return_value = {
-            "success": True, 
-            "message": "Success", 
+            "success": True,
+            "message": "Success",
             "data": {"NIFTY": {"last_price": 18000.50, "open": 17950.25, "high": 18050.75, "low": 17900.00, "close": 17980.50, "volume": 1000000, "change": 20.00, "change_percent": 0.11}}
         }
         mock_async_httpx_client.post.return_value = mock_async_response
@@ -84,7 +84,7 @@ class TestAsyncOpenAlgoClient:
         error_response.status_code = 500
         error_response.text = "Internal Server Error"
         error_response.raise_for_status.side_effect = httpx.HTTPStatusError("Server Error", request=httpx.Request("POST", "http://test/api/v1/quotes"), response=error_response)
-        
+
         mock_async_httpx_client.post.return_value = error_response
         with patch.object(async_client, "_ensure_client", return_value=mock_async_httpx_client):
             with pytest.raises(OpenAlgoAPIError):

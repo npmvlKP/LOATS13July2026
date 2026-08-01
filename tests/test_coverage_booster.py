@@ -27,7 +27,7 @@ async def test_sentiment_coverage_full():
         items = await analyzer.parse_rss_feed("http://invalid.url")
         assert isinstance(items, list)
     # Test _extract_article_content (sync)
-    with patch("src.loats.sentiment.Article") as mock_article:
+    with patch("src.loats.sentiment.Article"):
         content = analyzer._extract_article_content("http://invalid.url")
         assert content is not None
     # Test analyze_symbol_sentiment

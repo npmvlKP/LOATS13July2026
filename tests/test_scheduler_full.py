@@ -1,8 +1,11 @@
 import datetime
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
+
 from src.loats.models import SentimentAnalysisResult
 from src.loats.scheduler import TradingScheduler
+
 
 @pytest.fixture
 def scheduler():
@@ -16,21 +19,21 @@ async def test_run_ta_scan_success(scheduler):
     with patch("src.loats.scheduler.async_client", new_callable=AsyncMock) as mock_client, \
          patch("src.loats.scheduler.Database") as mock_db, \
          patch("src.loats.scheduler.technical_analysis") as mock_ta:
-        
+
         mock_client.get_history.return_value = {"data": [{"timestamp": "2026-07-19T10:00:00", "open": 100, "high": 110, "low": 90, "close": 105, "volume": 1000}]}
         mock_client.get_quotes.return_value = {"data": {"NSE:NIFTY50": {"last_price": 105, "open": 100, "high": 110, "low": 90, "close": 105, "volume": 1000}}}
-        
+
         mock_ta.calculate_indicators.return_value = []
         mock_ta.generate_signal.return_value = ("BUY", 0.8)
-        
+
         db_instance = mock_db.return_value
         db_instance.async_store_historical_data = AsyncMock(return_value=True)
         db_instance.async_create_signal = AsyncMock(return_value=True)
         db_instance.async_store_quote = AsyncMock(return_value=True)
-        
+
         scheduler.db = db_instance
         await scheduler.run_ta_scan()
-        
+
         assert scheduler.db.async_create_signal.called
         assert scheduler.db.async_store_historical_data.called
 
@@ -38,10 +41,10 @@ async def test_run_ta_scan_success(scheduler):
 async def test_run_sentiment_scan_success(scheduler):
     with patch("src.loats.scheduler.sentiment", new_callable=AsyncMock) as mock_sentiment, \
          patch("src.loats.scheduler.Database") as mock_db:
-        
+
         mock_result = SentimentAnalysisResult(
             symbol="NSE:NIFTY50",
-            timestamp=datetime.datetime.now(datetime.timezone.utc),
+            timestamp=datetime.datetime.now(datetime.UTC),
             sentiment_score=0.5,
             sentiment_label="POSITIVE",
             news_count=10,
@@ -50,13 +53,13 @@ async def test_run_sentiment_scan_success(scheduler):
             neutral_count=1,
             top_news=[]
         )
-        
+
         mock_sentiment.analyze_symbol_sentiment.return_value = mock_result
-        
+
         db_instance = mock_db.return_value
         db_instance.async_create_signal = AsyncMock(return_value=True)
         scheduler.db = db_instance
-        
+
         await scheduler.run_sentiment_scan()
         assert scheduler.db.async_create_signal.called
 
@@ -64,7 +67,7 @@ async def test_run_sentiment_scan_success(scheduler):
 async def test_run_signal_generation_success(scheduler):
     with patch("src.loats.scheduler.async_client", new_callable=AsyncMock) as mock_client, \
          patch("src.loats.scheduler.Database") as mock_db:
-        
+
         db_instance = mock_db.return_value
         db_instance.async_get_latest_signals = AsyncMock(return_value=[MagicMock(strength=0.8, indicators={})])
         db_instance.async_store_position = AsyncMock(return_value=True)
@@ -72,11 +75,11 @@ async def test_run_signal_generation_success(scheduler):
         db_instance.async_create_signal = AsyncMock(return_value=True)
         db_instance.async_store_quote = AsyncMock(return_value=True)
         scheduler.db = db_instance
-        
+
         mock_client.get_quotes.return_value = {"data": {"NSE:NIFTY50": {"last_price": 105}}}
         mock_client.get_position_book.return_value = {"data": []}
         mock_client.get_funds.return_value = {"data": {"available_cash": 100000, "utilized_margin": 0, "available_margin": 100000, "total_equity": 100000}}
-        
+
         await scheduler.run_signal_generation()
         assert scheduler.db.async_create_signal.called
 

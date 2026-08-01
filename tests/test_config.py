@@ -1,10 +1,12 @@
 import os
 import pathlib
-import unittest.mock
 from unittest.mock import patch
+
 import pytest
 from pydantic import ValidationError
+
 from src.loats.config import Settings, get_settings
+
 
 class TestConfig:
     def test_settings_initialization(self) -> None:

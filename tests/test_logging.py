@@ -6,6 +6,7 @@ import logging
 import os
 from unittest.mock import patch
 
+
 def test_configure_logging_test_mode():
     """Test logging configured correctly test mode."""
     # Reset logging configuration avoid interference
@@ -110,7 +111,7 @@ def test_environment_based_logging_configuration():
     with patch("pathlib.Path.mkdir") as mock_mkdir:
         # Import package (this will trigger initialization)
         from src.loats.loats_logging import configure_logging
-        
+
         # Check mkdir notcalled (test mode should not create logs directory)
         mock_mkdir.assert_not_called()
 

@@ -15,10 +15,11 @@ from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 
 from src.loats.config import get_settings
 
-settings = get_settings()
 from .loats_logging import get_logger
 from .models import NewsItem, SentimentAnalysisResult
 from .utils.cache import cache_manager
+
+settings = get_settings()
 
 logger = get_logger(__name__)
 
