@@ -55,6 +55,7 @@ class AlertSystem:
         self.alert_cooldown: dict[str, datetime] = {}
         self.cooldown_period: int = 300  # 5 minutes
         self._running: bool = False
+        self._polling_task: asyncio.Task[Any] | None = None
 
     @property
     def db(self) -> Database:
@@ -149,8 +150,8 @@ class AlertSystem:
                 await self.application.updater.stop()
             # Stop application gracefully
             await self.application.stop()
-            # Cancel polling task exists
-            if hasattr(self, "_polling_task") and self._polling_task:
+            # Cancel polling task if it exists
+            if self._polling_task:
                 self._polling_task.cancel()
                 try:
                     await self._polling_task
