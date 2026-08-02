@@ -25,20 +25,38 @@ try:
     except TypeError:
         # Fallback for older numba versions that don't support cache parameter
         NJIT_SUPPORTS_CACHE = False
+
+    # Test if fastmath parameter is supported in this numba version
+    try:
+        # Test fastmath support by trying to compile a simple function
+        def _test_fastmath_support_func(x):
+            return x
+        njit(fastmath=True)(_test_fastmath_support_func)
+        NJIT_SUPPORTS_FASTMATH = True
+    except TypeError:
+        # Fallback for numba versions that don't support fastmath parameter
+        NJIT_SUPPORTS_FASTMATH = False
 except ImportError:
     NUMBA_AVAILABLE = False
     NJIT_SUPPORTS_CACHE = False
+    NJIT_SUPPORTS_FASTMATH = False
     # Define dummy decorator if Numba not available
     def njit(func):
         return func
 
-# Create the appropriate decorator based on cache support
-if NJIT_SUPPORTS_CACHE:
+# Create the appropriate decorator based on cache and fastmath support
+if NJIT_SUPPORTS_CACHE and NJIT_SUPPORTS_FASTMATH:
     def _supertrend_njit_decorator(func):
         return njit(cache=True, fastmath=True)(func)
-else:
+elif NJIT_SUPPORTS_CACHE:
+    def _supertrend_njit_decorator(func):
+        return njit(cache=True)(func)
+elif NJIT_SUPPORTS_FASTMATH:
     def _supertrend_njit_decorator(func):
         return njit(fastmath=True)(func)
+else:
+    def _supertrend_njit_decorator(func):
+        return njit()(func)
 
 logger = get_logger(__name__)
 
