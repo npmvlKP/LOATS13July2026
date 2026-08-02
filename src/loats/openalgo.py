@@ -504,6 +504,7 @@ class AsyncOpenAlgoClient:
         trailing_stop_loss: float | None = None,
     ) -> dict[str, Any]:
         await _async_check_kill_switch()
+        # Use higher rate limits for order operations (50 ops per second)
         if not await get_order_rate_limiter().acquire():
             logger.warning("Rate limit exceeded order placement")
             raise RateLimitExceededError("Rate limit exceeded")
@@ -553,6 +554,7 @@ class AsyncOpenAlgoClient:
         metadata: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         await _async_check_kill_switch()
+        # Use higher rate limits for smart order operations (50 ops per second)
         if not await get_smart_order_rate_limiter().acquire():
             logger.warning("Rate limit exceeded smart order placement")
             raise RateLimitExceededError("Rate limit exceeded")

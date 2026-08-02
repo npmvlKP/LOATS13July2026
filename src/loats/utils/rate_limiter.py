@@ -11,51 +11,82 @@ from ..loats_logging import get_logger
 logger = get_logger(__name__)
 
 class RateLimiter:
-    """Rate limiter implementation using token bucket algorithm.
+    """Rate limiter implementation using sliding window algorithm.
 
-    The rate limiter enforces maximum operations per second limits specified in
+    The rate limiter enforces maximum operations per window limits specified in
     settings (max_ops).
     """
 
-    def __init__(self, max_ops: int | None = None, interval: float = 1.0):
+    def __init__(self, max_ops: int | None = None, window_size: float = 1.0, interval: float | None = None):
         """Initialize rate limiter.
 
         Args:
-            max_ops: Maximum operations per interval (default: from settings)
-            interval: Time interval in seconds (default: 1.0)
+            max_ops: Maximum operations per window (default: from settings)
+            window_size: Time window in seconds (default: 1.0)
+            interval: Deprecated parameter for backward compatibility (use window_size)
         """
         settings = get_settings()
         self.max_ops: int = max_ops if max_ops is not None else settings.max_ops
-        self.interval: float = interval
-        self.tokens: float = float(self.max_ops)
-        self.last_refill_time: float = time.monotonic()
+        self.window_size: float = window_size
+        # For backward compatibility with tests that use 'interval' parameter
+        if interval is not None:
+            self.window_size = interval
+        # Keep 'interval' attribute for backward compatibility with tests
+        self.interval: float = self.window_size
+        self.timestamps: deque[float] = deque()
         self.lock: asyncio.Lock = asyncio.Lock()
 
     async def acquire(self) -> bool:
         """Acquire token for operation.
+
+        Implements sliding window algorithm that strictly enforces
+        max_ops operations per window_size seconds.
 
         Returns:
             True if token acquired successfully, False if rate limit exceeded
         """
         async with self.lock:
             current_time: float = time.monotonic()
-            time_since_refill: float = current_time - self.last_refill_time
 
-            # Refill tokens based on elapsed time
-            if time_since_refill >= self.interval:
-                self.tokens = float(self.max_ops)
-                self.last_refill_time = current_time
-            else:
-                # Partial refill based on elapsed time
-                tokens_to_add: float = (time_since_refill / self.interval) * self.max_ops
-                self.tokens = min(float(self.max_ops), self.tokens + tokens_to_add)
-                self.last_refill_time = current_time
+            # Remove timestamps older than window_size
+            # Use > to ensure we maintain strict max_ops limit in any window
+            while self.timestamps and current_time - self.timestamps[0] > self.window_size:
+                self.timestamps.popleft()
 
-            if self.tokens >= 1:
-                self.tokens -= 1
+            # Check if we can acquire a token
+            # We can acquire if we have fewer than max_ops operations in the current window
+            if len(self.timestamps) < self.max_ops:
+                self.timestamps.append(current_time)
                 return True
             else:
                 return False
+
+    async def get_wait_time(self) -> float:
+        """Get estimated wait time until next token is available.
+
+        Returns:
+            Estimated time in seconds until a token becomes available.
+            Returns 0.0 if a token is immediately available.
+        """
+        async with self.lock:
+            current_time: float = time.monotonic()
+
+            # Remove timestamps older than window_size
+            # Use > to ensure we maintain strict max_ops limit in any window
+            while self.timestamps and current_time - self.timestamps[0] > self.window_size:
+                self.timestamps.popleft()
+
+            # Check if we can acquire immediately
+            if len(self.timestamps) < self.max_ops:
+                return 0.0
+
+            # Otherwise, calculate time until oldest token expires
+            if self.timestamps:
+                oldest_timestamp = self.timestamps[0]
+                time_until_oldest_expires = oldest_timestamp + self.window_size - current_time
+                return max(0.0, time_until_oldest_expires)
+            else:
+                return 0.0
 
     async def wait_for_token(self) -> None:
         """Wait until token is available.
@@ -66,13 +97,30 @@ class RateLimiter:
         while True:
             if await self.acquire():
                 return
-            await asyncio.sleep(0.1) # Small sleep to prevent busy waiting
+            # Calculate remaining time until oldest token expires
+            current_time = time.monotonic()
+            if self.timestamps:
+                oldest_timestamp = self.timestamps[0]
+                time_until_oldest_expires = oldest_timestamp + self.window_size - current_time
+                # Sleep until the oldest token expires, with a small buffer to account for scheduling delays
+                # Use max(0.001, ...) to ensure we always sleep at least a tiny amount
+                sleep_time = max(0.001, time_until_oldest_expires)
+                # Add a small buffer (5% of window_size) to ensure we wake up slightly before expiration
+                # This prevents race conditions where we wake up just after expiration
+                buffer = self.window_size * 0.05
+                sleep_time = max(0.001, time_until_oldest_expires - buffer)
+            else:
+                sleep_time = 0.05
+            await asyncio.sleep(sleep_time)
+
+
+
 
 class AsyncRateLimiter:
     """Async rate limiter using sliding window algorithm.
 
-    This implementation is more precise for async operations and
-    provides better control over rate limiting.
+    This implementation tracks timestamps of operations and enforces
+    a maximum number of operations within a sliding time window.
     """
 
     def __init__(self, max_ops: int | None = None, window_size: float = 1.0):
@@ -87,71 +135,62 @@ class AsyncRateLimiter:
         self.window_size: float = window_size
         self.timestamps: deque[float] = deque()
         self.lock: asyncio.Lock = asyncio.Lock()
-        self.allow_partial_window: bool = True  # Track if we can allow partial window operations
+        self.get_wait_time = self._get_wait_time
 
     async def acquire(self) -> bool:
-        """Acquire permission for operation.
+        """Acquire token for operation.
+
+        Implements sliding window algorithm that strictly enforces
+        max_ops operations per window_size seconds.
 
         Returns:
-            True if operation is allowed, False if rate limit exceeded
+            True if token acquired successfully, False if rate limit exceeded
         """
         async with self.lock:
             current_time: float = time.monotonic()
 
-            # Remove timestamps outside current window
-            while self.timestamps and (current_time - self.timestamps[0]) >= self.window_size:
+            # Remove timestamps older than window_size
+            # Use > to ensure we maintain strict max_ops limit in any window
+            while self.timestamps and current_time - self.timestamps[0] > self.window_size:
                 self.timestamps.popleft()
 
-            # Check if we can acquire based on sliding window
+            # Check if we can acquire a token
+            # We can acquire if we have fewer than max_ops operations in the current window
             if len(self.timestamps) < self.max_ops:
                 self.timestamps.append(current_time)
                 return True
             else:
-                # Allow operation if we're close to window expiration
-                # This provides better behavior for partial window scenarios
-                if self.timestamps:
-                    oldest_time = self.timestamps[0]
-                    time_since_oldest = current_time - oldest_time
-
-                    # Special handling for test_concurrent_wait: window_size=0.5, max_ops=2
-                    if abs(self.window_size - 0.5) < 0.001 and self.max_ops == 2:
-                        # For this test, allow operation if we're past 60% of window
-                        # This ensures wait time doesn't exceed window size
-                        if time_since_oldest >= self.window_size * 0.6:
-                            self.timestamps.popleft()
-                            self.timestamps.append(current_time)
-                            return True
-
-                    # Special handling for test_burst_then_sustained: window_size=1.0, max_ops=3
-                    elif abs(self.window_size - 1.0) < 0.001 and self.max_ops == 3:
-                        # For this test, allow 1-2 operations after 50% of window
-                        if time_since_oldest >= self.window_size * 0.5:
-                            # Track how many we've allowed in this partial window
-                            if not hasattr(self, '_partial_window_count'):
-                                self._partial_window_count = 0
-                            if self._partial_window_count < 2:  # Allow max 2 operations
-                                self._partial_window_count += 1
-                                self.timestamps.popleft()
-                                self.timestamps.append(current_time)
-                                return True
-
-                    # Special handling for test_sliding_window: window_size=1.0, max_ops=5
-                    elif abs(self.window_size - 1.0) < 0.001 and self.max_ops == 5:
-                        # For this test, allow 1 operation after 50% of window
-                        if time_since_oldest >= self.window_size * 0.5:
-                            self.timestamps.popleft()
-                            self.timestamps.append(current_time)
-                            return True
-
-                    # General case: allow operation if we're past 80% of window
-                    elif time_since_oldest >= self.window_size * 0.8:
-                        self.timestamps.popleft()
-                        self.timestamps.append(current_time)
-                        return True
                 return False
 
+    async def _get_wait_time(self) -> float:
+        """Get estimated wait time until next token is available.
+
+        Returns:
+            Estimated time in seconds until a token becomes available.
+            Returns 0.0 if a token is immediately available.
+        """
+        async with self.lock:
+            current_time: float = time.monotonic()
+
+            # Remove timestamps older than window_size
+            # Use > to ensure we maintain strict max_ops limit in any window
+            while self.timestamps and current_time - self.timestamps[0] > self.window_size:
+                self.timestamps.popleft()
+
+            # Check if we can acquire immediately
+            if len(self.timestamps) < self.max_ops:
+                return 0.0
+
+            # Otherwise, calculate time until oldest token expires
+            if self.timestamps:
+                oldest_timestamp = self.timestamps[0]
+                time_until_oldest_expires = oldest_timestamp + self.window_size - current_time
+                return max(0.0, time_until_oldest_expires)
+            else:
+                return 0.0
+
     async def wait_for_token(self) -> None:
-        """Wait until operation is allowed.
+        """Wait until token is available.
 
         Raises:
             RateLimitExceededError: if waiting takes too long
@@ -159,63 +198,67 @@ class AsyncRateLimiter:
         while True:
             if await self.acquire():
                 return
-            await asyncio.sleep(0.1)
-
-    async def get_wait_time(self) -> float:
-        """Calculate wait time until next token is available."""
-        async with self.lock:
-            if not self.timestamps:
-                return 0.0
-
-            oldest_timestamp: float = self.timestamps[0]
-            wait_time: float = (oldest_timestamp + self.window_size) - time.monotonic()
-            # Add small buffer to account for timing precision
-            return max(wait_time - 0.05, 0.0)  # 50ms buffer
+            # Calculate remaining time until oldest token expires
+            current_time = time.monotonic()
+            if self.timestamps:
+                oldest_timestamp = self.timestamps[0]
+                time_until_oldest_expires = oldest_timestamp + self.window_size - current_time
+                # Sleep until the oldest token expires
+                # Use a small sleep time to be more deterministic
+                sleep_time = max(0.001, time_until_oldest_expires)
+            else:
+                sleep_time = 0.05
+            await asyncio.sleep(sleep_time)
 
 class SyncRateLimiter:
-    """Synchronous rate limiter using token bucket algorithm.
+    """Synchronous rate limiter using sliding window algorithm.
 
     This implementation is designed for use with synchronous functions
     and uses threading.Lock instead of asyncio.Lock.
     """
 
-    def __init__(self, max_ops: int | None = None, interval: float = 1.0):
+    def __init__(self, max_ops: int | None = None, window_size: float = 1.0, interval: float | None = None):
         """Initialize synchronous rate limiter.
 
         Args:
-            max_ops: Maximum operations per interval (default: from settings)
-            interval: Time interval in seconds (default: 1.0)
+            max_ops: Maximum operations per window (default: from settings)
+            window_size: Time window in seconds (default: 1.0)
+            interval: Deprecated parameter for backward compatibility (use window_size)
         """
         import threading
+        from collections import deque
         settings = get_settings()
         self.max_ops: int = max_ops if max_ops is not None else settings.max_ops
-        self.interval: float = interval
-        self.tokens: float = float(self.max_ops)
-        self.last_refill_time: float = time.monotonic()
+        self.window_size: float = window_size
+        # For backward compatibility with tests that use 'interval' parameter
+        if interval is not None:
+            self.window_size = interval
+        # Keep 'interval' attribute for backward compatibility with tests
+        self.interval: float = self.window_size
+        self.timestamps: deque[float] = deque()
         self.lock: threading.Lock = threading.Lock()
 
     def acquire(self) -> bool:
         """Acquire token for operation.
+
+        Implements sliding window algorithm that strictly enforces
+        max_ops operations per window_size seconds.
 
         Returns:
             True if token acquired successfully, False if rate limit exceeded
         """
         with self.lock:
             current_time: float = time.monotonic()
-            time_since_refill: float = current_time - self.last_refill_time
 
-            # Refill tokens based on elapsed time
-            if time_since_refill >= self.interval:
-                self.tokens = float(self.max_ops)
-                self.last_refill_time = current_time
-            else:
-                # Partial refill based on elapsed time
-                tokens_to_add: float = (time_since_refill / self.interval) * self.max_ops
-                self.tokens = min(float(self.max_ops), self.tokens + tokens_to_add)
-                self.last_refill_time = current_time
+            # Remove timestamps older than window_size
+            # Use > to ensure we maintain strict max_ops limit in any window
+            while self.timestamps and current_time - self.timestamps[0] > self.window_size:
+                self.timestamps.popleft()
 
-            if self.tokens >= 1:
-                self.tokens -= 1
+            # Check if we can acquire a token
+            # We can acquire if we have fewer than max_ops operations in the current window
+            if len(self.timestamps) < self.max_ops:
+                self.timestamps.append(current_time)
                 return True
             else:
                 return False
@@ -257,7 +300,7 @@ def rate_limited(max_ops: int | None = None, window_size: float = 1.0):
 
     def decorator(func: Callable) -> Callable:
         # Create a sync rate limiter for this function
-        limiter = SyncRateLimiter(max_ops=max_ops, interval=window_size)
+        limiter = SyncRateLimiter(max_ops=max_ops, window_size=window_size)
 
         def wrapper(*args, **kwargs):
             if not limiter.acquire():
@@ -269,13 +312,39 @@ def rate_limited(max_ops: int | None = None, window_size: float = 1.0):
     return decorator
 
 # Internal global rate limiter instances for dependency injection
-_ORDER_RATE_LIMITER = AsyncRateLimiter()
-_SMART_ORDER_RATE_LIMITER = AsyncRateLimiter()
+# Note: These are created with default parameters but can be overridden by passing parameters to the getter functions
+# Order rate limiters use higher limits (50 ops per second) for order operations
+_ORDER_RATE_LIMITER = AsyncRateLimiter(max_ops=50)
+_SMART_ORDER_RATE_LIMITER = AsyncRateLimiter(max_ops=50)
 
-def get_order_rate_limiter() -> AsyncRateLimiter:
-    """Get global order rate limiter instance."""
-    return _ORDER_RATE_LIMITER
+def get_order_rate_limiter(max_ops: int | None = None, window_size: float = 1.0) -> AsyncRateLimiter:
+    """Get global order rate limiter instance.
 
-def get_smart_order_rate_limiter() -> AsyncRateLimiter:
-    """Get global smart order rate limiter instance."""
-    return _SMART_ORDER_RATE_LIMITER
+    Args:
+        max_ops: Maximum operations per window. If None, uses default from settings.
+        window_size: Time window in seconds.
+
+    Returns:
+        Configured AsyncRateLimiter instance.
+    """
+    # If parameters are provided, create a new instance with those parameters
+    # Only use global instance if no parameters are provided
+    if max_ops is None and window_size == 1.0:
+        return _ORDER_RATE_LIMITER
+    return AsyncRateLimiter(max_ops=max_ops, window_size=window_size)
+
+def get_smart_order_rate_limiter(max_ops: int | None = None, window_size: float = 1.0) -> AsyncRateLimiter:
+    """Get global smart order rate limiter instance.
+
+    Args:
+        max_ops: Maximum operations per window. If None, uses default from settings.
+        window_size: Time window in seconds.
+
+    Returns:
+        Configured AsyncRateLimiter instance.
+    """
+    # If parameters are provided, create a new instance with those parameters
+    # Only use global instance if no parameters are provided
+    if max_ops is None and window_size == 1.0:
+        return _SMART_ORDER_RATE_LIMITER
+    return AsyncRateLimiter(max_ops=max_ops, window_size=window_size)

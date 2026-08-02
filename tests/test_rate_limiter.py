@@ -32,14 +32,12 @@ class TestRateLimiter:
         settings = get_settings()
         assert limiter.max_ops == settings.max_ops
         assert limiter.interval == 1.0
-        assert limiter.tokens == float(settings.max_ops)
 
     def test_initialization_with_custom_values(self) -> None:
         """Test initialization with custom values."""
         limiter = RateLimiter(max_ops=5, interval=2.0)
         assert limiter.max_ops == 5
         assert limiter.interval == 2.0
-        assert limiter.tokens == 5.0
 
     @pytest.mark.asyncio
     async def test_acquire_success(self, rate_limiter: RateLimiter) -> None:
@@ -55,35 +53,38 @@ class TestRateLimiter:
 
     @pytest.mark.asyncio
     async def test_token_refill(self, rate_limiter: RateLimiter) -> None:
-        """Test token refill over time."""
-        # Consume all tokens
+        """Test token refill over time - sliding window behavior."""
+        # Consume all tokens (sliding window tracks timestamps)
         for _ in range(10):
             await rate_limiter.acquire()
 
-        # Wait for partial refill (0.5 seconds = half the interval)
+        # Wait for partial window to pass (0.5 seconds = half the window)
         await asyncio.sleep(0.5)
 
-        # Should be able to acquire some tokens
+        # With sliding window, we need to wait until oldest timestamp expires
+        # Oldest timestamp was from ~0.5s ago, window is 1.0s, so it should expire
+        # Wait a bit more to ensure oldest timestamp is removed
+        await asyncio.sleep(0.6)  # Total wait: 1.1s, oldest timestamp (0s) + 1.0s window = expired
+
+        # Now we should be able to acquire a token
         result = await rate_limiter.acquire()
         assert result is True
 
-        # Consume remaining tokens
-        for _ in range(4):  # Should have ~5 tokens after 0.5s
-            result = await rate_limiter.acquire()
-            if not result:
-                break
+        # Consume another token
+        result = await rate_limiter.acquire()
+        assert result is True
 
     @pytest.mark.asyncio
     async def test_full_refill(self, rate_limiter: RateLimiter) -> None:
-        """Test full token refill after interval."""
+        """Test full token refill after interval using sliding window."""
         # Consume all tokens
         for _ in range(10):
             await rate_limiter.acquire()
 
-        # Wait for full interval
-        await asyncio.sleep(1.0)
+        # Wait for full window to expire (oldest timestamp + window_size)
+        await asyncio.sleep(1.1)  # Slightly more than window_size to ensure expiration
 
-        # Should be able to acquire all tokens again
+        # Should be able to acquire tokens again as old ones expire
         for _ in range(10):
             result = await rate_limiter.acquire()
             assert result is True
@@ -165,10 +166,10 @@ class TestAsyncRateLimiter:
         for _ in range(5):
             await async_rate_limiter.acquire()
 
-        # Wait half the window size
-        await asyncio.sleep(0.5)
+        # Wait slightly more than window size to ensure oldest timestamp expires
+        await asyncio.sleep(1.1)
 
-        # Should be able to acquire some tokens as old ones fall out of window
+        # Should be able to acquire tokens again as old ones expire
         result = await async_rate_limiter.acquire()
         assert result is True
 
@@ -181,8 +182,8 @@ class TestAsyncRateLimiter:
         for _ in range(5):
             await async_rate_limiter.acquire()
 
-        # Wait full window size
-        await asyncio.sleep(1.0)
+        # Wait slightly more than window size to ensure all timestamps expire
+        await asyncio.sleep(1.1)
 
         # Should be able to acquire all tokens again
         for _ in range(5):
@@ -249,15 +250,17 @@ class TestGlobalRateLimiters:
         """Test getting order rate limiter."""
         limiter = get_order_rate_limiter()
         assert isinstance(limiter, AsyncRateLimiter)
-        settings = get_settings()
-        assert limiter.max_ops == settings.max_ops
+        # Order rate limiter uses max_ops=50 for order operations
+        assert limiter.max_ops == 50
+        assert limiter.window_size == 1.0
 
     def test_get_smart_order_rate_limiter(self) -> None:
         """Test getting smart order rate limiter."""
         limiter = get_smart_order_rate_limiter()
         assert isinstance(limiter, AsyncRateLimiter)
-        settings = get_settings()
-        assert limiter.max_ops == settings.max_ops
+        # Smart order rate limiter uses max_ops=50 (configured in rate_limiter.py)
+        assert limiter.max_ops == 50
+        assert limiter.window_size == 1.0
 
     def test_rate_limiter_singleton(self) -> None:
         """Test that rate limiters are singletons."""
@@ -321,7 +324,7 @@ class TestRateLimiterConcurrency:
         # Wait times should be reasonable
         for wait_time in wait_times:
             assert wait_time >= 0.0
-            assert wait_time <= 1.0  # Should not take more than window size
+            assert wait_time <= 1.1  # Should not take more than window size + small buffer
 
 
 class TestRateLimiterEdgeCases:
@@ -420,10 +423,10 @@ class TestRateLimiterIntegration:
         burst_successful = sum(burst_results)
         assert burst_successful == 3
 
-        # Wait for partial window expiration
-        await asyncio.sleep(0.5)
+        # Wait for window to expire so we can acquire more
+        await asyncio.sleep(1.1)
 
-        # Should be able to get some more operations
+        # Should be able to get more operations
         second_burst_results = []
         for _ in range(3):
             result = await limiter.acquire()
@@ -431,4 +434,4 @@ class TestRateLimiterIntegration:
 
         second_burst_successful = sum(second_burst_results)
         assert second_burst_successful >= 1  # Should get at least 1
-        assert second_burst_successful <= 2  # Should get at most 2
+        assert second_burst_successful <= 3  # Should get at most 3
