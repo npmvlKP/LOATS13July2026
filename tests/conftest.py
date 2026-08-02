@@ -162,13 +162,8 @@ def sample_historical_data() -> list[HistoricalData]:
 def pytest_configure(config: pytest.Config) -> None:
     """Pytest configuration hook."""
     os.environ["ENVIRONMENT"] = "test"
-    env_path = Path(__file__).parent.parent / ".env.test"
-    if not env_path.exists():
-        with open(env_path, "w", encoding="utf-8") as f:
-            f.write("""# Test environment configuration
-ENVIRONMENT=test
-OPENALGO_API_KEY=test_api_key
-OPENALGO_BASE_URL=https://test.openalgo.com
-TELEGRAM_BOT_TOKEN=test_bot_token
-TELEGRAM_CHAT_ID=123456789
-""")
+    # Set test environment variables directly instead of writing to disk
+    os.environ["OPENALGO_API_KEY"] = "test_api_key"
+    os.environ["OPENALGO_BASE_URL"] = "https://test.openalgo.com"
+    os.environ["TELEGRAM_BOT_TOKEN"] = "test_bot_token"
+    os.environ["TELEGRAM_CHAT_ID"] = "123456789"
