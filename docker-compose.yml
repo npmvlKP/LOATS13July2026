@@ -37,6 +37,7 @@ services:
       - loats_data:/app/data
     ports:
       - "8000:8000"  # If web server is added
+      - "8001:8001"  # Prometheus metrics server
     healthcheck:
       test: ["CMD", "python", "quick_health_check.py"]
       interval: 30s
@@ -97,13 +98,8 @@ volumes:
       device: ./data
 
 # Development profile - includes development tools
-profiles:
-  dev:
-    description: "Development environment with hot-reload"
-    # Runs with source mounts for development
-  test:
-    description: "Testing environment"
-    # Optimized for CI/CD testing
-  prod:
-    description: "Production environment (use cloud deployment instead)"
-    # Note: This is just a placeholder - use cloud services for production
+# Note: Profiles section removed due to Docker Compose validation issues
+# The application can be run in different modes using environment variables
+# dev: Development environment with hot-reload
+# test: Testing environment
+# prod: Production environment (use cloud deployment instead)
