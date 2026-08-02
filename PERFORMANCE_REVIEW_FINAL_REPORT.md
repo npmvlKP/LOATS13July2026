@@ -12,7 +12,7 @@ LOATS utilizes an event-driven architecture with:
 
 ## 3. Root Cause Analysis
 - **F-PERF-1:** Module-level flag caused SQLite PRAGMAs to be skipped for connections opened after the first, leading to inconsistent configurations and race conditions.
-- **F-PERF-2:** Supertrend indicator used Pandas `iloc` in a loop, causing significant overhead.
+- **F-PERF-2:** Supertrend indicator used Pandas `iloc` in a loop, causing significant overhead. Additionally, the fallback implementation had suboptimal state management and array access patterns.
 - **F-PERF-3:** Synchronous RSS parsing blocked the event loop, causing latency in trading signals.
 
 ## 4. Modified Files
