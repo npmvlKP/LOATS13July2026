@@ -173,7 +173,7 @@ class CacheManager:
                     # Fall through to in-memory cache
 
             # Use in-memory cache
-            if self._cache:
+            if self._cache is not None:
                 self._cache[cache_key] = value_str
                 self._cache_stats["sets"] += 1
                 return True
