@@ -168,9 +168,20 @@ def pytest_configure(config: pytest.Config) -> None:
     os.environ["TELEGRAM_BOT_TOKEN"] = "test_bot_token"
     os.environ["TELEGRAM_CHAT_ID"] = "123456789"
 
+
 @pytest.fixture(autouse=True, scope="function")
 async def clear_cache_before_each_test() -> None:
     """Clear cache before each test to prevent stale data."""
     from src.loats.utils.cache import cache_manager
+
     if cache_manager._cache:
         await cache_manager.clear()
+
+
+@pytest.fixture(autouse=True, scope="function")
+def reset_metrics_before_each_test() -> None:
+    """Reset metrics manager state before each test to ensure isolation."""
+    from src.loats.metrics import MetricsManager
+
+    manager = MetricsManager()
+    manager.reset_for_testing()

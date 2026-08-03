@@ -45,9 +45,9 @@ def test_logging_implementation():
     ]
 
     assert len(file_handlers) == 0, "No file handlers configured in test mode"
-    assert len(console_handlers) > 0, (
-        "Console handler should be configured in test mode"
-    )
+    assert (
+        len(console_handlers) > 0
+    ), "Console handler should be configured in test mode"
 
     print("OK: Test mode configuration works correctly")
 
@@ -78,12 +78,12 @@ def test_logging_implementation():
         h for h in root_logger.handlers if isinstance(h, logging.StreamHandler)
     ]
 
-    assert len(file_handlers) > 0, (
-        "File handler should be configured in production mode"
-    )
-    assert len(console_handlers) > 0, (
-        "Console handler should be configured in production mode"
-    )
+    assert (
+        len(file_handlers) > 0
+    ), "File handler should be configured in production mode"
+    assert (
+        len(console_handlers) > 0
+    ), "Console handler should be configured in production mode"
 
     print("OK: Production mode configuration works correctly")
 

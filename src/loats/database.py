@@ -2,6 +2,7 @@
 Database module LOATS13July2026.
 Implements SQLite database audit trail JSONL dual-write.
 """
+
 import asyncio
 import hashlib
 import json
@@ -280,12 +281,22 @@ class Database:
         # Create indexes performance
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_trades_symbol ON trades(symbol)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_trades_status ON trades(status)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_signals_symbol ON signals(symbol)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_signals_timestamp ON signals(timestamp)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_historical_symbol ON historical_data(symbol)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_historical_timestamp ON historical_data(timestamp)")
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_signals_symbol ON signals(symbol)"
+        )
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_signals_timestamp ON signals(timestamp)"
+        )
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_historical_symbol ON historical_data(symbol)"
+        )
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_historical_timestamp ON historical_data(timestamp)"
+        )
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_quotes_symbol ON quotes(symbol)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_quotes_timestamp ON quotes(timestamp)")
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_quotes_timestamp ON quotes(timestamp)"
+        )
         conn.commit()
 
     def _get_connection(self) -> sqlite3.Connection:
@@ -566,15 +577,26 @@ class Database:
         cursor = conn.cursor()
 
         # Delete old trades (by entry_time as the business timestamp)
-        cursor.execute("DELETE FROM trades WHERE entry_time_ms < ?", (cutoff_timestamp_ms,))
+        cursor.execute(
+            "DELETE FROM trades WHERE entry_time_ms < ?", (cutoff_timestamp_ms,)
+        )
         # Delete old signals
-        cursor.execute("DELETE FROM signals WHERE created_at_ms < ?", (cutoff_timestamp_ms,))
+        cursor.execute(
+            "DELETE FROM signals WHERE created_at_ms < ?", (cutoff_timestamp_ms,)
+        )
         # Delete old historical data
-        cursor.execute("DELETE FROM historical_data WHERE created_at_ms < ?", (cutoff_timestamp_ms,))
+        cursor.execute(
+            "DELETE FROM historical_data WHERE created_at_ms < ?",
+            (cutoff_timestamp_ms,),
+        )
         # Delete old quotes
-        cursor.execute("DELETE FROM quotes WHERE created_at_ms < ?", (cutoff_timestamp_ms,))
+        cursor.execute(
+            "DELETE FROM quotes WHERE created_at_ms < ?", (cutoff_timestamp_ms,)
+        )
         # Delete old orders
-        cursor.execute("DELETE FROM orders WHERE updated_at_ms < ?", (cutoff_timestamp_ms,))
+        cursor.execute(
+            "DELETE FROM orders WHERE updated_at_ms < ?", (cutoff_timestamp_ms,)
+        )
         conn.commit()
         logger.info(f"Cleaned data older than {cutoff_timestamp_ms} epoch.")
 
@@ -622,8 +644,16 @@ class Database:
                 trade.quantity,
                 trade.entry_price,
                 trade.exit_price,
-                trade.entry_time.isoformat() if isinstance(trade.entry_time, datetime) else str(trade.entry_time),
-                trade.exit_time.isoformat() if isinstance(trade.exit_time, datetime) else trade.exit_time,
+                (
+                    trade.entry_time.isoformat()
+                    if isinstance(trade.entry_time, datetime)
+                    else str(trade.entry_time)
+                ),
+                (
+                    trade.exit_time.isoformat()
+                    if isinstance(trade.exit_time, datetime)
+                    else trade.exit_time
+                ),
                 trade.transaction_type.value if trade.transaction_type else None,
                 trade.product_type.value if trade.product_type else None,
                 trade.pnl,
@@ -711,8 +741,16 @@ class Database:
                 trade.quantity,
                 trade.entry_price,
                 trade.exit_price,
-                trade.entry_time.isoformat() if isinstance(trade.entry_time, datetime) else str(trade.entry_time),
-                trade.exit_time.isoformat() if isinstance(trade.exit_time, datetime) else trade.exit_time,
+                (
+                    trade.entry_time.isoformat()
+                    if isinstance(trade.entry_time, datetime)
+                    else str(trade.entry_time)
+                ),
+                (
+                    trade.exit_time.isoformat()
+                    if isinstance(trade.exit_time, datetime)
+                    else trade.exit_time
+                ),
                 trade.transaction_type.value if trade.transaction_type else None,
                 trade.product_type.value if trade.product_type else None,
                 trade.pnl,
@@ -755,7 +793,9 @@ class Database:
                 (symbol,),
             )
         else:
-            cursor.execute("SELECT * FROM trades WHERE status = 'OPEN' ORDER BY entry_time DESC")
+            cursor.execute(
+                "SELECT * FROM trades WHERE status = 'OPEN' ORDER BY entry_time DESC"
+            )
         rows = cursor.fetchall()
         return [self._row_to_trade(row) for row in rows]
 
@@ -1200,13 +1240,11 @@ class Database:
         """
         conn = self._get_connection()
         cursor = conn.cursor()
-        cursor.execute(
-            """
+        cursor.execute("""
             SELECT available_cash, utilized_margin, available_margin, total_equity,
                    timestamp, timestamp_ms
             FROM funds ORDER BY timestamp DESC LIMIT 1
-            """
-        )
+            """)
         row = cursor.fetchone()
         if row is None:
             return None
@@ -1407,7 +1445,9 @@ class Database:
                 (entity_type, limit),
             )
         else:
-            cursor.execute("SELECT * FROM audit_log ORDER BY timestamp DESC LIMIT ?", (limit,))
+            cursor.execute(
+                "SELECT * FROM audit_log ORDER BY timestamp DESC LIMIT ?", (limit,)
+            )
         rows = cursor.fetchall()
         return [self._row_to_audit_entry(row) for row in rows]
 
@@ -1541,7 +1581,9 @@ class Database:
         """Async wrapper store_funds() avoid blocking event loop."""
         return await asyncio.to_thread(self.store_funds, funds)
 
-    async def async_get_latest_signals(self, symbol: str, limit: int = 10) -> list[Signal]:
+    async def async_get_latest_signals(
+        self, symbol: str, limit: int = 10
+    ) -> list[Signal]:
         """Async wrapper get_latest_signals() avoid blocking event loop."""
         return await asyncio.to_thread(self.get_latest_signals, symbol, limit)
 

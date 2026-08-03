@@ -64,7 +64,9 @@ class TestRateLimiter:
         # With sliding window, we need to wait until oldest timestamp expires
         # Oldest timestamp was from ~0.5s ago, window is 1.0s, so it should expire
         # Wait a bit more to ensure oldest timestamp is removed
-        await asyncio.sleep(0.6)  # Total wait: 1.1s, oldest timestamp (0s) + 1.0s window = expired
+        await asyncio.sleep(
+            0.6
+        )  # Total wait: 1.1s, oldest timestamp (0s) + 1.0s window = expired
 
         # Now we should be able to acquire a token
         result = await rate_limiter.acquire()
@@ -324,7 +326,9 @@ class TestRateLimiterConcurrency:
         # Wait times should be reasonable
         for wait_time in wait_times:
             assert wait_time >= 0.0
-            assert wait_time <= 1.1  # Should not take more than window size + small buffer
+            assert (
+                wait_time <= 1.1
+            )  # Should not take more than window size + small buffer
 
 
 class TestRateLimiterEdgeCases:

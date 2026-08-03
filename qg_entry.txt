@@ -1,0 +1,2 @@
+2026-08-03T15:05:14.128462Z [info     ] Using requests library for http requests (alternative cloudscraper library is recommended for bypassing Cloudflare protection) [newspaper.network]
+entry-point OK

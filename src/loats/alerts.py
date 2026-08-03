@@ -2,6 +2,7 @@
 Alerts module LOATS13July2026.
 Implements Telegram alerts kill switch functionality circuit breaker protection.
 """
+
 import asyncio
 import html
 from datetime import UTC, datetime
@@ -16,22 +17,23 @@ from telegram.ext import (
     filters,
 )
 
-from src.loats.config import get_settings
-from src.loats.database import Database, db  # noqa: F401
-from src.loats.loats_logging import get_logger
-from src.loats.models import Order, Signal, SignalType, Trade
-from src.loats.openalgo import async_client
-from src.loats.utils.circuit_breaker import (
+from .config import get_settings
+from .database import Database, db
+from .loats_logging import get_logger
+from .models import Order, Signal, SignalType, Trade
+from .openalgo import async_client
+from .utils.circuit_breaker import (
     OPENALGO_CIRCUIT_BREAKER,
     TELEGRAM_CIRCUIT_BREAKER,
     CircuitBreakerOpenError,
 )
-from src.loats.utils.retry import OPENALGO_RETRY_CONFIG, retry_async
+from .utils.retry import OPENALGO_RETRY_CONFIG, retry_async
 
 logger = get_logger(__name__)
 
 # Settings must be accessed after all imports to avoid circular imports
 settings = get_settings()
+
 
 class AlertSystem:
     """Alert system using Telegram bot notifications kill switch.
@@ -50,7 +52,7 @@ class AlertSystem:
         """
         self._explicit_db: Database | None = database
         self.bot: Bot | None = None
-        self.application: Application | None = None
+        self.application: Application[Any, Any, Any, Any, Any, Any] | None = None
         self.kill_switch_active: bool = False
         self.alert_cooldown: dict[str, datetime] = {}
         self.cooldown_period: int = 300  # 5 minutes
@@ -69,6 +71,7 @@ class AlertSystem:
             return self._explicit_db
         # Late binding unit-test patches `db` keep working.
         from src.loats.alerts import db as module_db
+
         return module_db
 
     async def initialize(self) -> None:
@@ -122,7 +125,9 @@ class AlertSystem:
             # Start polling updater (v20+ lifecycle) separate task
             if self.application.updater is not None:
                 # Run polling background task avoid blocking event loop
-                polling_task = asyncio.create_task(self.application.updater.start_polling())
+                polling_task = asyncio.create_task(
+                    self.application.updater.start_polling()
+                )
                 # Store reference cleanup
                 self._polling_task = polling_task
             else:
@@ -198,7 +203,9 @@ class AlertSystem:
         # Check cooldown
         now = datetime.now(UTC)
         if alert_type in self.alert_cooldown:
-            if (now - self.alert_cooldown[alert_type]).total_seconds() < self.cooldown_period:
+            if (
+                now - self.alert_cooldown[alert_type]
+            ).total_seconds() < self.cooldown_period:
                 logger.debug(f"Alert cooldown active {alert_type}: {message}")
                 return False
 
@@ -350,7 +357,9 @@ class AlertSystem:
                 message += f"\n<b>Exit Time:</b> {trade.exit_time.strftime('%Y-%m-%d %H:%M:%S')}"
             if trade.pnl is not None:
                 pnl_color = "green" if trade.pnl > 0 else "red"
-                message += f"\n<b>PnL:</b> <span color='{pnl_color}'>{trade.pnl:.2f}</span>"
+                message += (
+                    f"\n<b>PnL:</b> <span color='{pnl_color}'>{trade.pnl:.2f}</span>"
+                )
             if trade.stop_loss:
                 message += f"\n<b>Stop Loss:</b> {trade.stop_loss:.2f}"
             if trade.take_profit:
@@ -384,7 +393,9 @@ class AlertSystem:
             retried_get = retry_async(OPENALGO_RETRY_CONFIG)(
                 lambda: async_client.get_position_book()
             )
-            result: dict[str, Any] = await OPENALGO_CIRCUIT_BREAKER.call_async(retried_get)
+            result: dict[str, Any] = await OPENALGO_CIRCUIT_BREAKER.call_async(
+                retried_get
+            )
             return result
         except CircuitBreakerOpenError:
             logger.warning("Circuit breaker open, skipping position book fetch")
@@ -399,7 +410,9 @@ class AlertSystem:
             retried_get = retry_async(OPENALGO_RETRY_CONFIG)(
                 lambda: async_client.get_funds()
             )
-            result: dict[str, Any] = await OPENALGO_CIRCUIT_BREAKER.call_async(retried_get)
+            result: dict[str, Any] = await OPENALGO_CIRCUIT_BREAKER.call_async(
+                retried_get
+            )
             return result
         except CircuitBreakerOpenError:
             logger.warning("Circuit breaker open, skipping funds fetch")
@@ -442,7 +455,9 @@ class AlertSystem:
         try:
             funds_data = await self._safe_get_funds()
             if not funds_data or not funds_data.get("data"):
-                return await self.send_system_alert("No funds data available", "warning")
+                return await self.send_system_alert(
+                    "No funds data available", "warning"
+                )
 
             funds = funds_data["data"]
             message = (
@@ -464,7 +479,9 @@ class AlertSystem:
             retried_get = retry_async(OPENALGO_RETRY_CONFIG)(
                 lambda: async_client.get_all_orders()
             )
-            result: dict[str, Any] = await OPENALGO_CIRCUIT_BREAKER.call_async(retried_get)
+            result: dict[str, Any] = await OPENALGO_CIRCUIT_BREAKER.call_async(
+                retried_get
+            )
             return result
         except CircuitBreakerOpenError:
             logger.warning("Circuit breaker open, skipping orders fetch")
@@ -605,7 +622,9 @@ class AlertSystem:
     async def _status(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle /status command."""
         try:
-            status = "🟢 ACTIVE" if not self.kill_switch_active else "🔴 KILL SWITCH ACTIVE"
+            status = (
+                "🟢 ACTIVE" if not self.kill_switch_active else "🔴 KILL SWITCH ACTIVE"
+            )
             message = (
                 f"📊 <b>SYSTEM STATUS</b>\n\n"
                 f"<b>Status:</b> {status}\n"
@@ -639,12 +658,18 @@ class AlertSystem:
                     await update.message.reply_text("⚠️ Kill switch already active.")
                 return
 
-            reason = html.escape(" ".join(context.args)) if context.args else "Manual activation via Telegram"
+            reason = (
+                html.escape(" ".join(context.args))
+                if context.args
+                else "Manual activation via Telegram"
+            )
             success = await self.activate_kill_switch(reason)
 
             if update.message:
                 if success:
-                    await update.message.reply_text("🚨 Kill switch activated successfully.")
+                    await update.message.reply_text(
+                        "🚨 Kill switch activated successfully."
+                    )
                 else:
                     await update.message.reply_text("Failed to activate kill switch.")
         except Exception as e:
@@ -673,12 +698,18 @@ class AlertSystem:
                     await update.message.reply_text("ℹ️ Kill switch not active.")
                 return
 
-            reason = html.escape(" ".join(context.args)) if context.args else "Manual deactivation via Telegram"
+            reason = (
+                html.escape(" ".join(context.args))
+                if context.args
+                else "Manual deactivation via Telegram"
+            )
             success = await self.deactivate_kill_switch(reason)
 
             if update.message:
                 if success:
-                    await update.message.reply_text("✅ Kill switch deactivated successfully.")
+                    await update.message.reply_text(
+                        "✅ Kill switch deactivated successfully."
+                    )
                 else:
                     await update.message.reply_text("Failed to deactivate kill switch.")
         except Exception as e:
@@ -743,7 +774,9 @@ class AlertSystem:
         """Handle /signals command."""
         try:
             # NEW-M5: use injected database avoid per-command connection churn
-            signals = await self.db.async_get_latest_signals(settings.default_symbol, limit=5)
+            signals = await self.db.async_get_latest_signals(
+                settings.default_symbol, limit=5
+            )
 
             if not signals:
                 if update.message:
@@ -812,5 +845,13 @@ class AlertSystem:
             if update.message:
                 await update.message.reply_text(f"❌ Error: {e!s}")
 
+
 # Export a default instance
 alerts = AlertSystem()
+
+# Explicitly export public API for type checking
+__all__ = [
+    "AlertSystem",
+    "alerts",
+    "db",  # Explicitly export db for type checking
+]

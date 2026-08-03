@@ -1,0 +1,1905 @@
+
+    ○
+    │╲
+    │ ○
+    ○ ░
+    ░    gitleaks
+
+Finding:     oauth_signature="74KNZJeDHnMBp0EMJ9ZHt/XKycU="
+Secret:      74KNZJeDHnMBp0EMJ9ZHt/XKycU=
+RuleID:      generic-api-key
+Entropy:     4.450212
+Tags:        [decoded:percent decode-depth:1]
+File:        LOATS13July2026/Lib/site-packages/authlib/oauth1/rfc5849/parameters.py
+Line:        32
+Fingerprint: LOATS13July2026/Lib/site-packages/authlib/oauth1/rfc5849/parameters.py:generic-api-key:32
+
+Finding:     ...ample.net/authorize?oauth_token=[1;3;mhh5s93j4hdidpola[0m
+Secret:      [1;3;mhh5s93j4hdidpola[0m
+RuleID:      generic-api-key
+Entropy:     3.577820
+File:        LOATS13July2026/Lib/site-packages/authlib/oauth1/rfc5849/authorization_server.py
+Line:        135
+Fingerprint: LOATS13July2026/Lib/site-packages/authlib/oauth1/rfc5849/authorization_server.py:generic-api-key:135
+
+Finding:     oauth_token="[1;3;mhh5s93j4hdidpola[0m"
+Secret:      [1;3;mhh5s93j4hdidpola[0m
+RuleID:      generic-api-key
+Entropy:     3.577820
+File:        LOATS13July2026/Lib/site-packages/authlib/oauth1/rfc5849/authorization_server.py
+Line:        215
+Fingerprint: LOATS13July2026/Lib/site-packages/authlib/oauth1/rfc5849/authorization_server.py:generic-api-key:215
+
+Finding:     oauth_signature="bYT5CMsGcbgUdFHObYMEfcx6bsw="
+Secret:      bYT5CMsGcbgUdFHObYMEfcx6bsw=
+RuleID:      generic-api-key
+Entropy:     4.235926
+Tags:        [decoded:percent decode-depth:1]
+File:        LOATS13July2026/Lib/site-packages/authlib/oauth1/rfc5849/signature.py
+Line:        43
+Fingerprint: LOATS13July2026/Lib/site-packages/authlib/oauth1/rfc5849/signature.py:generic-api-key:43
+
+Finding:     ...en=nnch734d00sl2jdk&oauth_token_secret=[1;3;mpfkkdhi9sl3r4s00[0m
+Secret:      [1;3;mpfkkdhi9sl3r4s00[0m
+RuleID:      generic-api-key
+Entropy:     3.625000
+File:        LOATS13July2026/Lib/site-packages/authlib/oauth1/rfc5849/authorization_server.py
+Line:        230
+Fingerprint: LOATS13July2026/Lib/site-packages/authlib/oauth1/rfc5849/authorization_server.py:generic-api-key:230
+
+Finding:     oauth_signature="74KNZJeDHnMBp0EMJ9ZHt/XKycU="
+Secret:      74KNZJeDHnMBp0EMJ9ZHt/XKycU=
+RuleID:      generic-api-key
+Entropy:     4.450212
+Tags:        [decoded:percent decode-depth:1]
+File:        LOATS13July2026/Lib/site-packages/authlib/oauth1/rfc5849/authorization_server.py
+Line:        85
+Fingerprint: LOATS13July2026/Lib/site-packages/authlib/oauth1/rfc5849/authorization_server.py:generic-api-key:85
+
+Finding:     oauth_signature="gKgrFCywp7rO0OXSjdot/IHF7IU="
+Secret:      gKgrFCywp7rO0OXSjdot/IHF7IU=
+RuleID:      generic-api-key
+Entropy:     4.378784
+Tags:        [decoded:percent decode-depth:1]
+File:        LOATS13July2026/Lib/site-packages/authlib/oauth1/rfc5849/authorization_server.py
+Line:        220
+Fingerprint: LOATS13July2026/Lib/site-packages/authlib/oauth1/rfc5849/authorization_server.py:generic-api-key:220
+
+Finding:     oauth_signature="bYT5CMsGcbgUdFHObYMEfcx6bsw="
+Secret:      bYT5CMsGcbgUdFHObYMEfcx6bsw=
+RuleID:      generic-api-key
+Entropy:     4.235926
+Tags:        [decoded:percent decode-depth:1]
+File:        LOATS13July2026/Lib/site-packages/authlib/oauth1/rfc5849/__pycache__/signature.cpython-312.pyc
+Line:        25
+Fingerprint: LOATS13July2026/Lib/site-packages/authlib/oauth1/rfc5849/__pycache__/signature.cpython-312.pyc:generic-api-key:25
+
+Finding:     oauth_signature="74KNZJeDHnMBp0EMJ9ZHt/XKycU="
+Secret:      74KNZJeDHnMBp0EMJ9ZHt/XKycU=
+RuleID:      generic-api-key
+Entropy:     4.450212
+Tags:        [decoded:percent decode-depth:1]
+File:        LOATS13July2026/Lib/site-packages/authlib/oauth1/rfc5849/__pycache__/parameters.cpython-312.pyc
+Line:        26
+Fingerprint: LOATS13July2026/Lib/site-packages/authlib/oauth1/rfc5849/__pycache__/parameters.cpython-312.pyc:generic-api-key:26
+
+Finding:     ...ample.net/authorize?oauth_token=[1;3;mhh5s93j4hdidpola[0m
+Secret:      [1;3;mhh5s93j4hdidpola[0m
+RuleID:      generic-api-key
+Entropy:     3.577820
+File:        LOATS13July2026/Lib/site-packages/authlib/oauth1/rfc5849/__pycache__/authorization_server.cpython-312.pyc
+Line:        56
+Fingerprint: LOATS13July2026/Lib/site-packages/authlib/oauth1/rfc5849/__pycache__/authorization_server.cpython-312.pyc:generic-api-key:56
+
+Finding:     oauth_token="[1;3;mhh5s93j4hdidpola[0m"
+Secret:      [1;3;mhh5s93j4hdidpola[0m
+RuleID:      generic-api-key
+Entropy:     3.577820
+File:        LOATS13July2026/Lib/site-packages/authlib/oauth1/rfc5849/__pycache__/authorization_server.cpython-312.pyc
+Line:        87
+Fingerprint: LOATS13July2026/Lib/site-packages/authlib/oauth1/rfc5849/__pycache__/authorization_server.cpython-312.pyc:generic-api-key:87
+
+Finding:     ...en=nnch734d00sl2jdk&oauth_token_secret=[1;3;mpfkkdhi9sl3r4s00[0m
+Secret:      [1;3;mpfkkdhi9sl3r4s00[0m
+RuleID:      generic-api-key
+Entropy:     3.625000
+File:        LOATS13July2026/Lib/site-packages/authlib/oauth1/rfc5849/__pycache__/authorization_server.cpython-312.pyc
+Line:        102
+Fingerprint: LOATS13July2026/Lib/site-packages/authlib/oauth1/rfc5849/__pycache__/authorization_server.cpython-312.pyc:generic-api-key:102
+
+Finding:     oauth_signature="74KNZJeDHnMBp0EMJ9ZHt/XKycU="
+Secret:      74KNZJeDHnMBp0EMJ9ZHt/XKycU=
+RuleID:      generic-api-key
+Entropy:     4.450212
+Tags:        [decoded:percent decode-depth:1]
+File:        LOATS13July2026/Lib/site-packages/authlib/oauth1/rfc5849/__pycache__/authorization_server.cpython-312.pyc
+Line:        26
+Fingerprint: LOATS13July2026/Lib/site-packages/authlib/oauth1/rfc5849/__pycache__/authorization_server.cpython-312.pyc:generic-api-key:26
+
+Finding:     oauth_signature="gKgrFCywp7rO0OXSjdot/IHF7IU="
+Secret:      gKgrFCywp7rO0OXSjdot/IHF7IU=
+RuleID:      generic-api-key
+Entropy:     4.378784
+Tags:        [decoded:percent decode-depth:1]
+File:        LOATS13July2026/Lib/site-packages/authlib/oauth1/rfc5849/__pycache__/authorization_server.cpython-312.pyc
+Line:        92
+Fingerprint: LOATS13July2026/Lib/site-packages/authlib/oauth1/rfc5849/__pycache__/authorization_server.cpython-312.pyc:generic-api-key:92
+
+Finding:     "access_token":"[1;3;m2YotnFZFEjr1zCsicMWpAA[0m"
+Secret:      [1;3;m2YotnFZFEjr1zCsicMWpAA[0m
+RuleID:      generic-api-key
+Entropy:     4.277614
+File:        LOATS13July2026/Lib/site-packages/authlib/oauth2/rfc6749/grants/authorization_code.py
+Line:        262
+Fingerprint: LOATS13July2026/Lib/site-packages/authlib/oauth2/rfc6749/grants/authorization_code.py:generic-api-key:262
+
+Finding:     "refresh_token":"[1;3;mtGzv3JOkF0XG5Qx2TlKWIA[0m"
+Secret:      [1;3;mtGzv3JOkF0XG5Qx2TlKWIA[0m
+RuleID:      generic-api-key
+Entropy:     4.368523
+File:        LOATS13July2026/Lib/site-packages/authlib/oauth2/rfc6749/grants/authorization_code.py
+Line:        265
+Fingerprint: LOATS13July2026/Lib/site-packages/authlib/oauth2/rfc6749/grants/authorization_code.py:generic-api-key:265
+
+Finding:     ..._type=refresh_token&refresh_token=[1;3;mtGzv3JOkF0XG5Qx2TlKWIA[0m
+Secret:      [1;3;mtGzv3JOkF0XG5Qx2TlKWIA[0m
+RuleID:      generic-api-key
+Entropy:     4.368523
+File:        LOATS13July2026/Lib/site-packages/authlib/oauth2/rfc6749/grants/__pycache__/refresh_token.cpython-312.pyc
+Line:        55
+Fingerprint: LOATS13July2026/Lib/site-packages/authlib/oauth2/rfc6749/grants/__pycache__/refresh_token.cpython-312.pyc:generic-api-key:55
+
+Finding:     "access_token":"[1;3;m2YotnFZFEjr1zCsicMWpAA[0m"
+Secret:      [1;3;m2YotnFZFEjr1zCsicMWpAA[0m
+RuleID:      generic-api-key
+Entropy:     4.277614
+File:        LOATS13July2026/Lib/site-packages/authlib/oauth2/rfc6749/grants/__pycache__/resource_owner_password_credentials.cpython-312.pyc
+Line:        92
+Fingerprint: LOATS13July2026/Lib/site-packages/authlib/oauth2/rfc6749/grants/__pycache__/resource_owner_password_credentials.cpython-312.pyc:generic-api-key:92
+
+Finding:     "refresh_token":"[1;3;mtGzv3JOkF0XG5Qx2TlKWIA[0m"
+Secret:      [1;3;mtGzv3JOkF0XG5Qx2TlKWIA[0m
+RuleID:      generic-api-key
+Entropy:     4.368523
+File:        LOATS13July2026/Lib/site-packages/authlib/oauth2/rfc6749/grants/__pycache__/resource_owner_password_credentials.cpython-312.pyc
+Line:        95
+Fingerprint: LOATS13July2026/Lib/site-packages/authlib/oauth2/rfc6749/grants/__pycache__/resource_owner_password_credentials.cpython-312.pyc:generic-api-key:95
+
+Finding:     ...tp://example.com/cb#access_token=[1;3;m2YotnFZFEjr1zCsicMWpAA[0m
+Secret:      [1;3;m2YotnFZFEjr1zCsicMWpAA[0m
+RuleID:      generic-api-key
+Entropy:     4.277614
+File:        LOATS13July2026/Lib/site-packages/authlib/oauth2/rfc6749/grants/__pycache__/implicit.cpython-312.pyc
+Line:        144
+Fingerprint: LOATS13July2026/Lib/site-packages/authlib/oauth2/rfc6749/grants/__pycache__/implicit.cpython-312.pyc:generic-api-key:144
+
+Finding:     "access_token":"[1;3;m2YotnFZFEjr1zCsicMWpAA[0m"
+Secret:      [1;3;m2YotnFZFEjr1zCsicMWpAA[0m
+RuleID:      generic-api-key
+Entropy:     4.277614
+File:        LOATS13July2026/Lib/site-packages/authlib/oauth2/rfc6749/grants/__pycache__/client_credentials.cpython-312.pyc
+Line:        68
+Fingerprint: LOATS13July2026/Lib/site-packages/authlib/oauth2/rfc6749/grants/__pycache__/client_credentials.cpython-312.pyc:generic-api-key:68
+
+Finding:     "access_token":"[1;3;mmF_9.B5f-4.1JqM[0m"
+Secret:      [1;3;mmF_9.B5f-4.1JqM[0m
+RuleID:      generic-api-key
+Entropy:     3.773557
+File:        LOATS13July2026/Lib/site-packages/authlib/oauth2/rfc6750/__pycache__/token.cpython-312.pyc
+Line:        15
+Fingerprint: LOATS13July2026/Lib/site-packages/authlib/oauth2/rfc6750/__pycache__/token.cpython-312.pyc:generic-api-key:15
+
+Finding:     "refresh_token":"[1;3;mtGzv3JOkF0XG5Qx2TlKWIA[0m"
+Secret:      [1;3;mtGzv3JOkF0XG5Qx2TlKWIA[0m
+RuleID:      generic-api-key
+Entropy:     4.368523
+File:        LOATS13July2026/Lib/site-packages/authlib/oauth2/rfc6750/__pycache__/token.cpython-312.pyc
+Line:        18
+Fingerprint: LOATS13July2026/Lib/site-packages/authlib/oauth2/rfc6750/__pycache__/token.cpython-312.pyc:generic-api-key:18
+
+Finding:     ...tp://example.com/cb#access_token=[1;3;m2YotnFZFEjr1zCsicMWpAA[0m
+Secret:      [1;3;m2YotnFZFEjr1zCsicMWpAA[0m
+RuleID:      generic-api-key
+Entropy:     4.277614
+File:        LOATS13July2026/Lib/site-packages/authlib/oauth2/rfc6749/__pycache__/parameters.cpython-312.pyc
+Line:        143
+Fingerprint: LOATS13July2026/Lib/site-packages/authlib/oauth2/rfc6749/__pycache__/parameters.cpython-312.pyc:generic-api-key:143
+
+Finding:     "access_token":"[1;3;m2YotnFZFEjr1zCsicMWpAA[0m"
+Secret:      [1;3;m2YotnFZFEjr1zCsicMWpAA[0m
+RuleID:      generic-api-key
+Entropy:     4.277614
+File:        LOATS13July2026/Lib/site-packages/authlib/oauth2/rfc6749/grants/resource_owner_password_credentials.py
+Line:        130
+Fingerprint: LOATS13July2026/Lib/site-packages/authlib/oauth2/rfc6749/grants/resource_owner_password_credentials.py:generic-api-key:130
+
+Finding:     "refresh_token":"[1;3;mtGzv3JOkF0XG5Qx2TlKWIA[0m"
+Secret:      [1;3;mtGzv3JOkF0XG5Qx2TlKWIA[0m
+RuleID:      generic-api-key
+Entropy:     4.368523
+File:        LOATS13July2026/Lib/site-packages/authlib/oauth2/rfc6749/grants/resource_owner_password_credentials.py
+Line:        133
+Fingerprint: LOATS13July2026/Lib/site-packages/authlib/oauth2/rfc6749/grants/resource_owner_password_credentials.py:generic-api-key:133
+
+Finding:     "access_token":"[1;3;m2YotnFZFEjr1zCsicMWpAA[0m"
+Secret:      [1;3;m2YotnFZFEjr1zCsicMWpAA[0m
+RuleID:      generic-api-key
+Entropy:     4.277614
+File:        LOATS13July2026/Lib/site-packages/authlib/oauth2/rfc6749/grants/__pycache__/authorization_code.cpython-312.pyc
+Line:        183
+Fingerprint: LOATS13July2026/Lib/site-packages/authlib/oauth2/rfc6749/grants/__pycache__/authorization_code.cpython-312.pyc:generic-api-key:183
+
+Finding:     "refresh_token":"[1;3;mtGzv3JOkF0XG5Qx2TlKWIA[0m"
+Secret:      [1;3;mtGzv3JOkF0XG5Qx2TlKWIA[0m
+RuleID:      generic-api-key
+Entropy:     4.368523
+File:        LOATS13July2026/Lib/site-packages/authlib/oauth2/rfc6749/grants/__pycache__/authorization_code.cpython-312.pyc
+Line:        186
+Fingerprint: LOATS13July2026/Lib/site-packages/authlib/oauth2/rfc6749/grants/__pycache__/authorization_code.cpython-312.pyc:generic-api-key:186
+
+Finding:     "access_token":"[1;3;m2YotnFZFEjr1zCsicMWpAA[0m"
+Secret:      [1;3;m2YotnFZFEjr1zCsicMWpAA[0m
+RuleID:      generic-api-key
+Entropy:     4.277614
+File:        LOATS13July2026/Lib/site-packages/authlib/oauth2/rfc6749/grants/client_credentials.py
+Line:        96
+Fingerprint: LOATS13July2026/Lib/site-packages/authlib/oauth2/rfc6749/grants/client_credentials.py:generic-api-key:96
+
+Finding:     ...tp://example.com/cb#access_token=[1;3;m2YotnFZFEjr1zCsicMWpAA[0m
+Secret:      [1;3;m2YotnFZFEjr1zCsicMWpAA[0m
+RuleID:      generic-api-key
+Entropy:     4.277614
+File:        LOATS13July2026/Lib/site-packages/authlib/oauth2/rfc6749/grants/implicit.py
+Line:        194
+Fingerprint: LOATS13July2026/Lib/site-packages/authlib/oauth2/rfc6749/grants/implicit.py:generic-api-key:194
+
+Finding:     "access_token":"[1;3;mmF_9.B5f-4.1JqM[0m"
+Secret:      [1;3;mmF_9.B5f-4.1JqM[0m
+RuleID:      generic-api-key
+Entropy:     3.773557
+File:        LOATS13July2026/Lib/site-packages/authlib/oauth2/rfc6750/token.py
+Line:        16
+Fingerprint: LOATS13July2026/Lib/site-packages/authlib/oauth2/rfc6750/token.py:generic-api-key:16
+
+Finding:     "refresh_token":"[1;3;mtGzv3JOkF0XG5Qx2TlKWIA[0m"
+Secret:      [1;3;mtGzv3JOkF0XG5Qx2TlKWIA[0m
+RuleID:      generic-api-key
+Entropy:     4.368523
+File:        LOATS13July2026/Lib/site-packages/authlib/oauth2/rfc6750/token.py
+Line:        19
+Fingerprint: LOATS13July2026/Lib/site-packages/authlib/oauth2/rfc6750/token.py:generic-api-key:19
+
+Finding:     ..._type=refresh_token&refresh_token=[1;3;mtGzv3JOkF0XG5Qx2TlKWIA[0m
+Secret:      [1;3;mtGzv3JOkF0XG5Qx2TlKWIA[0m
+RuleID:      generic-api-key
+Entropy:     4.368523
+File:        LOATS13July2026/Lib/site-packages/authlib/oauth2/rfc6749/grants/refresh_token.py
+Line:        105
+Fingerprint: LOATS13July2026/Lib/site-packages/authlib/oauth2/rfc6749/grants/refresh_token.py:generic-api-key:105
+
+Finding:     ...tp://example.com/cb#access_token=[1;3;m2YotnFZFEjr1zCsicMWpAA[0m
+Secret:      [1;3;m2YotnFZFEjr1zCsicMWpAA[0m
+RuleID:      generic-api-key
+Entropy:     4.277614
+File:        LOATS13July2026/Lib/site-packages/authlib/oauth2/rfc6749/parameters.py
+Line:        199
+Fingerprint: LOATS13July2026/Lib/site-packages/authlib/oauth2/rfc6749/parameters.py:generic-api-key:199
+
+Finding:     private_key: [1;3;mx25519.X25519PrivateKey[0m
+Secret:      [1;3;mx25519.X25519PrivateKey[0m
+RuleID:      generic-api-key
+Entropy:     3.827910
+File:        LOATS13July2026/Lib/site-packages/cryptography/hazmat/bindings/_rust/openssl/hpke.pyi
+Line:        77
+Fingerprint: LOATS13July2026/Lib/site-packages/cryptography/hazmat/bindings/_rust/openssl/hpke.pyi:generic-api-key:77
+
+Finding:     private_key: [1;3;mx25519.X25519PrivateKey[0m
+Secret:      [1;3;mx25519.X25519PrivateKey[0m
+RuleID:      generic-api-key
+Entropy:     3.827910
+File:        LOATS13July2026/Lib/site-packages/cryptography/hazmat/bindings/_rust/openssl/hpke.pyi
+Line:        101
+Fingerprint: LOATS13July2026/Lib/site-packages/cryptography/hazmat/bindings/_rust/openssl/hpke.pyi:generic-api-key:101
+
+Finding:     "license_key": "[1;3;m389-exception[0m"
+Secret:      [1;3;m389-exception[0m
+RuleID:      generic-api-key
+Entropy:     3.546594
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        3
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:3
+
+Finding:     "spdx_license_key": "[1;3;m389-exception[0m"
+Secret:      [1;3;m389-exception[0m
+RuleID:      generic-api-key
+Entropy:     3.546594
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        5
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:5
+
+Finding:     "license_key": "[1;3;m3dslicer-1.0[0m"
+Secret:      [1;3;m3dslicer-1.0[0m
+RuleID:      generic-api-key
+Entropy:     3.584963
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        27
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:27
+
+Finding:     "spdx_license_key": "[1;3;m3D-Slicer-1.0[0m"
+Secret:      [1;3;m3D-Slicer-1.0[0m
+RuleID:      generic-api-key
+Entropy:     3.546594
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        29
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:29
+
+Finding:     "license_key": "[1;3;macter-psl-1.0[0m"
+Secret:      [1;3;macter-psl-1.0[0m
+RuleID:      generic-api-key
+Entropy:     3.546594
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        199
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:199
+
+Finding:     "license_key": "[1;3;mago-private-1.0[0m"
+Secret:      [1;3;mago-private-1.0[0m
+RuleID:      generic-api-key
+Entropy:     3.640224
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        789
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:789
+
+Finding:     "spdx_license_key": "[1;3;mAGPL-1.0-or-later[0m"
+Secret:      [1;3;mAGPL-1.0-or-later[0m
+RuleID:      generic-api-key
+Entropy:     3.690116
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        817
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:817
+
+Finding:     "spdx_license_key": "[1;3;mAGPL-3.0-or-later[0m"
+Secret:      [1;3;mAGPL-3.0-or-later[0m
+RuleID:      generic-api-key
+Entropy:     3.690116
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        894
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:894
+
+Finding:     "license_key": "[1;3;malfresco-exception-0.5[0m"
+Secret:      [1;3;malfresco-exception-0.5[0m
+RuleID:      generic-api-key
+Entropy:     3.970573
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        979
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:979
+
+Finding:     "license_key": "[1;3;mamplication-ee-2022[0m"
+Secret:      [1;3;mamplication-ee-2022[0m
+RuleID:      generic-api-key
+Entropy:     3.576618
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        1175
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:1175
+
+Finding:     "license_key": "[1;3;manepokis-1.0[0m"
+Secret:      [1;3;manepokis-1.0[0m
+RuleID:      generic-api-key
+Entropy:     3.584963
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        1271
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:1271
+
+Finding:     "license_key": "[1;3;maptana-exception-3.0[0m"
+Secret:      [1;3;maptana-exception-3.0[0m
+RuleID:      generic-api-key
+Entropy:     3.584184
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        1732
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:1732
+
+Finding:     "license_key": "[1;3;marachni-psl-1.0[0m"
+Secret:      [1;3;marachni-psl-1.0[0m
+RuleID:      generic-api-key
+Entropy:     3.640224
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        1744
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:1744
+
+Finding:     "license_key": "[1;3;masn1cc-exception-gpl-2.0[0m"
+Secret:      [1;3;masn1cc-exception-gpl-2.0[0m
+RuleID:      generic-api-key
+Entropy:     3.938722
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        1988
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:1988
+
+Finding:     "license_key": "[1;3;mbison-exception-2.0[0m"
+Secret:      [1;3;mbison-exception-2.0[0m
+RuleID:      generic-api-key
+Entropy:     3.721612
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        2662
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:2662
+
+Finding:     "spdx_license_key": "[1;3;mBison-exception-1.24[0m"
+Secret:      [1;3;mBison-exception-1.24[0m
+RuleID:      generic-api-key
+Entropy:     3.821928
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        2664
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:2664
+
+Finding:     "license_key": "[1;3;mbison-exception-2.2[0m"
+Secret:      [1;3;mbison-exception-2.2[0m
+RuleID:      generic-api-key
+Entropy:     3.616349
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        2676
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:2676
+
+Finding:     "spdx_license_key": "[1;3;mBison-exception-2.2[0m"
+Secret:      [1;3;mBison-exception-2.2[0m
+RuleID:      generic-api-key
+Entropy:     3.616349
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        2678
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:2678
+
+Finding:     "spdx_license_key": "[1;3;mBitTorrent-1.0[0m"
+Secret:      [1;3;mBitTorrent-1.0[0m
+RuleID:      generic-api-key
+Entropy:     3.521641
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        2704
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:2704
+
+Finding:     "license_key": "[1;3;mbitwarden-1.0[0m"
+Secret:      [1;3;mbitwarden-1.0[0m
+RuleID:      generic-api-key
+Entropy:     3.700440
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        2750
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:2750
+
+Finding:     "license_key": "[1;3;mboutell-libgd-2021[0m"
+Secret:      [1;3;mboutell-libgd-2021[0m
+RuleID:      generic-api-key
+Entropy:     3.572431
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        2930
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:2930
+
+Finding:     "license_key": "[1;3;mbrad-martinez-vb-32[0m"
+Secret:      [1;3;mbrad-martinez-vb-32[0m
+RuleID:      generic-api-key
+Entropy:     3.681881
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        2966
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:2966
+
+Finding:     "spdx_license_key": "[1;3;mBSD-4.3TAHOE[0m"
+Secret:      [1;3;mBSD-4.3TAHOE[0m
+RuleID:      generic-api-key
+Entropy:     3.584963
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        4107
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:4107
+
+Finding:     "license_key": "[1;3;mcc-devnations-2.0[0m"
+Secret:      [1;3;mcc-devnations-2.0[0m
+RuleID:      generic-api-key
+Entropy:     3.734522
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        5157
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:5157
+
+Finding:     "license_key": "[1;3;mcc-nc-sampling-plus-1.0[0m"
+Secret:      [1;3;mcc-nc-sampling-plus-1.0[0m
+RuleID:      generic-api-key
+Entropy:     3.621176
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        5205
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:5205
+
+Finding:     "license_key": "[1;3;mcc-sampling-1.0[0m"
+Secret:      [1;3;mcc-sampling-1.0[0m
+RuleID:      generic-api-key
+Entropy:     3.640224
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        5269
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:5269
+
+Finding:     "license_key": "[1;3;mcc-sampling-plus-1.0[0m"
+Secret:      [1;3;mcc-sampling-plus-1.0[0m
+RuleID:      generic-api-key
+Entropy:     3.684184
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        5281
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:5281
+
+Finding:     "license_key": "[1;3;mcdla-permissive-1.0[0m"
+Secret:      [1;3;mcdla-permissive-1.0[0m
+RuleID:      generic-api-key
+Entropy:     3.826875
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        5365
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:5365
+
+Finding:     "spdx_license_key": "[1;3;mCDLA-Permissive-1.0[0m"
+Secret:      [1;3;mCDLA-Permissive-1.0[0m
+RuleID:      generic-api-key
+Entropy:     3.826875
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        5367
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:5367
+
+Finding:     "license_key": "[1;3;mcdla-permissive-2.0[0m"
+Secret:      [1;3;mcdla-permissive-2.0[0m
+RuleID:      generic-api-key
+Entropy:     3.826875
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        5377
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:5377
+
+Finding:     "spdx_license_key": "[1;3;mCDLA-Permissive-2.0[0m"
+Secret:      [1;3;mCDLA-Permissive-2.0[0m
+RuleID:      generic-api-key
+Entropy:     3.826875
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        5379
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:5379
+
+Finding:     "license_key": "[1;3;mcern-attribution-1995[0m"
+Secret:      [1;3;mcern-attribution-1995[0m
+RuleID:      generic-api-key
+Entropy:     3.689704
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        5533
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:5533
+
+Finding:     "license_key": "[1;3;mcharmpp-converse-2017[0m"
+Secret:      [1;3;mcharmpp-converse-2017[0m
+RuleID:      generic-api-key
+Entropy:     3.916127
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        5677
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:5677
+
+Finding:     "license_key": "[1;3;mchicken-dl-0.2[0m"
+Secret:      [1;3;mchicken-dl-0.2[0m
+RuleID:      generic-api-key
+Entropy:     3.521641
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        5737
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:5737
+
+Finding:     "license_key": "[1;3;mchillicream-1.0[0m"
+Secret:      [1;3;mchillicream-1.0[0m
+RuleID:      generic-api-key
+Entropy:     3.506891
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        5749
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:5749
+
+Finding:     "license_key": "[1;3;mcisco-avch264-patent[0m"
+Secret:      [1;3;mcisco-avch264-patent[0m
+RuleID:      generic-api-key
+Entropy:     3.784184
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        5797
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:5797
+
+Finding:     "license_key": "[1;3;mclearthought-2.0[0m"
+Secret:      [1;3;mclearthought-2.0[0m
+RuleID:      generic-api-key
+Entropy:     3.750000
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        5895
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:5895
+
+Finding:     "license_key": "[1;3;mcncf-corporate-cla-1.0[0m"
+Secret:      [1;3;mcncf-corporate-cla-1.0[0m
+RuleID:      generic-api-key
+Entropy:     3.606937
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        6081
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:6081
+
+Finding:     "license_key": "[1;3;mcncf-individual-cla-1.0[0m"
+Secret:      [1;3;mcncf-individual-cla-1.0[0m
+RuleID:      generic-api-key
+Entropy:     3.555533
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        6093
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:6093
+
+Finding:     "license_key": "[1;3;mcockroachdb-2024-10-01[0m"
+Secret:      [1;3;mcockroachdb-2024-10-01[0m
+RuleID:      generic-api-key
+Entropy:     3.538311
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        6153
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:6153
+
+Finding:     "license_key": "[1;3;mconcursive-pl-1.0[0m"
+Secret:      [1;3;mconcursive-pl-1.0[0m
+RuleID:      generic-api-key
+Entropy:     3.852169
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        6399
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:6399
+
+Finding:     "license_key": "[1;3;mcooperative-non-violent-4.0[0m"
+Secret:      [1;3;mcooperative-non-violent-4.0[0m
+RuleID:      generic-api-key
+Entropy:     3.708048
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        6435
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:6435
+
+Finding:     "license_key": "[1;3;mcooperative-non-violent-6.0[0m"
+Secret:      [1;3;mcooperative-non-violent-6.0[0m
+RuleID:      generic-api-key
+Entropy:     3.708048
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        6447
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:6447
+
+Finding:     "license_key": "[1;3;mcooperative-non-violent-7.0[0m"
+Secret:      [1;3;mcooperative-non-violent-7.0[0m
+RuleID:      generic-api-key
+Entropy:     3.708048
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        6459
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:6459
+
+Finding:     "license_key": "[1;3;mcrashlytics-agreement-2018[0m"
+Secret:      [1;3;mcrashlytics-agreement-2018[0m
+RuleID:      generic-api-key
+Entropy:     4.056021
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        6689
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:6689
+
+Finding:     "license_key": "[1;3;mdbmx-foss-exception-1.0.9[0m"
+Secret:      [1;3;mdbmx-foss-exception-1.0.9[0m
+RuleID:      generic-api-key
+Entropy:     4.053661
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        7201
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:7201
+
+Finding:     "license_key": "[1;3;mdefensive-patent-1.1[0m"
+Secret:      [1;3;mdefensive-patent-1.1[0m
+RuleID:      generic-api-key
+Entropy:     3.521928
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        7273
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:7273
+
+Finding:     "license_key": "[1;3;mdhb-limited-bsd-2015[0m"
+Secret:      [1;3;mdhb-limited-bsd-2015[0m
+RuleID:      generic-api-key
+Entropy:     3.646439
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        7369
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:7369
+
+Finding:     "license_key": "[1;3;mdigia-qt-exception-lgpl-2.1[0m"
+Secret:      [1;3;mdigia-qt-exception-lgpl-2.1[0m
+RuleID:      generic-api-key
+Entropy:     3.912114
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        7417
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:7417
+
+Finding:     "license_key": "[1;3;mdwtfnmfpl-3.0[0m"
+Secret:      [1;3;mdwtfnmfpl-3.0[0m
+RuleID:      generic-api-key
+Entropy:     3.546594
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        7915
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:7915
+
+Finding:     "license_key": "[1;3;mecos-exception-2.0[0m"
+Secret:      [1;3;mecos-exception-2.0[0m
+RuleID:      generic-api-key
+Entropy:     3.572431
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        8215
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:8215
+
+Finding:     "spdx_license_key": "[1;3;meCos-exception-2.0[0m"
+Secret:      [1;3;meCos-exception-2.0[0m
+RuleID:      generic-api-key
+Entropy:     3.683542
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        8217
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:8217
+
+Finding:     "license_key": "[1;3;mekiga-exception-2.0-plus[0m"
+Secret:      [1;3;mekiga-exception-2.0-plus[0m
+RuleID:      generic-api-key
+Entropy:     4.022055
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        8359
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:8359
+
+Finding:     "license_key": "[1;3;mepson-avasys-pl-2008[0m"
+Secret:      [1;3;mepson-avasys-pl-2008[0m
+RuleID:      generic-api-key
+Entropy:     3.546439
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        8639
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:8639
+
+Finding:     "license_key": "[1;3;mfltk-exception-lgpl-2.0[0m"
+Secret:      [1;3;mfltk-exception-lgpl-2.0[0m
+RuleID:      generic-api-key
+Entropy:     3.849224
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        9270
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:9270
+
+Finding:     "license_key": "[1;3;mframeworx-1.0[0m"
+Secret:      [1;3;mframeworx-1.0[0m
+RuleID:      generic-api-key
+Entropy:     3.546594
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        9366
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:9366
+
+Finding:     "spdx_license_key": "[1;3;mFrameworx-1.0[0m"
+Secret:      [1;3;mFrameworx-1.0[0m
+RuleID:      generic-api-key
+Entropy:     3.546594
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        9368
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:9368
+
+Finding:     "license_key": "[1;3;mgaussian-splatting-2024[0m"
+Secret:      [1;3;mgaussian-splatting-2024[0m
+RuleID:      generic-api-key
+Entropy:     3.588354
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        9870
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:9870
+
+Finding:     "license_key": "[1;3;mgcc-exception-3.0[0m"
+Secret:      [1;3;mgcc-exception-3.0[0m
+RuleID:      generic-api-key
+Entropy:     3.572469
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        9906
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:9906
+
+Finding:     "license_key": "[1;3;mgcc-exception-3.1[0m"
+Secret:      [1;3;mgcc-exception-3.1[0m
+RuleID:      generic-api-key
+Entropy:     3.572469
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        9920
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:9920
+
+Finding:     "spdx_license_key": "[1;3;mGCC-exception-3.1[0m"
+Secret:      [1;3;mGCC-exception-3.1[0m
+RuleID:      generic-api-key
+Entropy:     3.734522
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        9922
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:9922
+
+Finding:     "spdx_license_key": "[1;3;mGCC-exception-2.0[0m"
+Secret:      [1;3;mGCC-exception-2.0[0m
+RuleID:      generic-api-key
+Entropy:     3.734522
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        9934
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:9934
+
+Finding:     "license_key": "[1;3;mgeant4-sl-1.0[0m"
+Secret:      [1;3;mgeant4-sl-1.0[0m
+RuleID:      generic-api-key
+Entropy:     3.546594
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        9992
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:9992
+
+Finding:     "license_key": "[1;3;mgfdl-1.1-invariants-or-later[0m"
+Secret:      [1;3;mgfdl-1.1-invariants-or-later[0m
+RuleID:      generic-api-key
+Entropy:     3.824863
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        10212
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:10212
+
+Finding:     "spdx_license_key": "[1;3;mGFDL-1.1-invariants-or-later[0m"
+Secret:      [1;3;mGFDL-1.1-invariants-or-later[0m
+RuleID:      generic-api-key
+Entropy:     3.896291
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        10214
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:10214
+
+Finding:     "license_key": "[1;3;mgfdl-1.1-no-invariants-or-later[0m"
+Secret:      [1;3;mgfdl-1.1-no-invariants-or-later[0m
+RuleID:      generic-api-key
+Entropy:     3.796961
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        10236
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:10236
+
+Finding:     "spdx_license_key": "[1;3;mGFDL-1.1-no-invariants-or-later[0m"
+Secret:      [1;3;mGFDL-1.1-no-invariants-or-later[0m
+RuleID:      generic-api-key
+Entropy:     3.861477
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        10238
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:10238
+
+Finding:     "spdx_license_key": "[1;3;mGFDL-1.1-or-later[0m"
+Secret:      [1;3;mGFDL-1.1-or-later[0m
+RuleID:      generic-api-key
+Entropy:     3.572469
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        10250
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:10250
+
+Finding:     "license_key": "[1;3;mgfdl-1.2-invariants-or-later[0m"
+Secret:      [1;3;mgfdl-1.2-invariants-or-later[0m
+RuleID:      generic-api-key
+Entropy:     3.896291
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        10288
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:10288
+
+Finding:     "spdx_license_key": "[1;3;mGFDL-1.2-invariants-or-later[0m"
+Secret:      [1;3;mGFDL-1.2-invariants-or-later[0m
+RuleID:      generic-api-key
+Entropy:     3.967720
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        10290
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:10290
+
+Finding:     "license_key": "[1;3;mgfdl-1.2-no-invariants-or-later[0m"
+Secret:      [1;3;mgfdl-1.2-no-invariants-or-later[0m
+RuleID:      generic-api-key
+Entropy:     3.861477
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        10312
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:10312
+
+Finding:     "spdx_license_key": "[1;3;mGFDL-1.2-no-invariants-or-later[0m"
+Secret:      [1;3;mGFDL-1.2-no-invariants-or-later[0m
+RuleID:      generic-api-key
+Entropy:     3.925993
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        10314
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:10314
+
+Finding:     "spdx_license_key": "[1;3;mGFDL-1.2-or-later[0m"
+Secret:      [1;3;mGFDL-1.2-or-later[0m
+RuleID:      generic-api-key
+Entropy:     3.690116
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        10326
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:10326
+
+Finding:     "license_key": "[1;3;mgfdl-1.3-invariants-or-later[0m"
+Secret:      [1;3;mgfdl-1.3-invariants-or-later[0m
+RuleID:      generic-api-key
+Entropy:     3.896291
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        10364
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:10364
+
+Finding:     "spdx_license_key": "[1;3;mGFDL-1.3-invariants-or-later[0m"
+Secret:      [1;3;mGFDL-1.3-invariants-or-later[0m
+RuleID:      generic-api-key
+Entropy:     3.967720
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        10366
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:10366
+
+Finding:     "license_key": "[1;3;mgfdl-1.3-no-invariants-or-later[0m"
+Secret:      [1;3;mgfdl-1.3-no-invariants-or-later[0m
+RuleID:      generic-api-key
+Entropy:     3.861477
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        10388
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:10388
+
+Finding:     "spdx_license_key": "[1;3;mGFDL-1.3-no-invariants-or-later[0m"
+Secret:      [1;3;mGFDL-1.3-no-invariants-or-later[0m
+RuleID:      generic-api-key
+Entropy:     3.925993
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        10390
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:10390
+
+Finding:     "spdx_license_key": "[1;3;mGFDL-1.3-or-later[0m"
+Secret:      [1;3;mGFDL-1.3-or-later[0m
+RuleID:      generic-api-key
+Entropy:     3.690116
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        10402
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:10402
+
+Finding:     "spdx_license_key": "[1;3;mGPL-1.0-or-later[0m"
+Secret:      [1;3;mGPL-1.0-or-later[0m
+RuleID:      generic-api-key
+Entropy:     3.577820
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        11068
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:11068
+
+Finding:     "license_key": "[1;3;mgpl-2.0-adaptec[0m"
+Secret:      [1;3;mgpl-2.0-adaptec[0m
+RuleID:      generic-api-key
+Entropy:     3.506891
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        11098
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:11098
+
+Finding:     "license_key": "[1;3;mgpl-2.0-bison[0m"
+Secret:      [1;3;mgpl-2.0-bison[0m
+RuleID:      generic-api-key
+Entropy:     3.546594
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        11134
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:11134
+
+Finding:     "license_key": "[1;3;mgpl-2.0-cygwin[0m"
+Secret:      [1;3;mgpl-2.0-cygwin[0m
+RuleID:      generic-api-key
+Entropy:     3.521641
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        11182
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:11182
+
+Finding:     "spdx_license_key": "[1;3;mGPL-2.0-with-GCC-exception[0m"
+Secret:      [1;3;mGPL-2.0-with-GCC-exception[0m
+RuleID:      generic-api-key
+Entropy:     4.008132
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        11232
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:11232
+
+Finding:     "license_key": "[1;3;mgpl-2.0-koterov[0m"
+Secret:      [1;3;mgpl-2.0-koterov[0m
+RuleID:      generic-api-key
+Entropy:     3.640224
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        11350
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:11350
+
+Finding:     "license_key": "[1;3;mgpl-2.0-lmbench[0m"
+Secret:      [1;3;mgpl-2.0-lmbench[0m
+RuleID:      generic-api-key
+Entropy:     3.640224
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        11398
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:11398
+
+Finding:     "spdx_license_key": "[1;3;mGPL-2.0-or-later[0m"
+Secret:      [1;3;mGPL-2.0-or-later[0m
+RuleID:      generic-api-key
+Entropy:     3.577820
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        11484
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:11484
+
+Finding:     "license_key": "[1;3;mgpl-2.0-plus-ekiga[0m"
+Secret:      [1;3;mgpl-2.0-plus-ekiga[0m
+RuleID:      generic-api-key
+Entropy:     3.572431
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        11509
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:11509
+
+Finding:     "license_key": "[1;3;mgpl-2.0-redhat[0m"
+Secret:      [1;3;mgpl-2.0-redhat[0m
+RuleID:      generic-api-key
+Entropy:     3.664498
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        11665
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:11665
+
+Finding:     "license_key": "[1;3;mgpl-3.0-bison[0m"
+Secret:      [1;3;mgpl-3.0-bison[0m
+RuleID:      generic-api-key
+Entropy:     3.546594
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        11752
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:11752
+
+Finding:     "license_key": "[1;3;mgpl-3.0-cygwin[0m"
+Secret:      [1;3;mgpl-3.0-cygwin[0m
+RuleID:      generic-api-key
+Entropy:     3.521641
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        11764
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:11764
+
+Finding:     "spdx_license_key": "[1;3;mGPL-3.0-with-GCC-exception[0m"
+Secret:      [1;3;mGPL-3.0-with-GCC-exception[0m
+RuleID:      generic-api-key
+Entropy:     4.008132
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        11790
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:11790
+
+Finding:     "spdx_license_key": "[1;3;mGPL-3.0-or-later[0m"
+Secret:      [1;3;mGPL-3.0-or-later[0m
+RuleID:      generic-api-key
+Entropy:     3.577820
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        11850
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:11850
+
+Finding:     "license_key": "[1;3;mguile-exception-2.0[0m"
+Secret:      [1;3;mguile-exception-2.0[0m
+RuleID:      generic-api-key
+Entropy:     3.787144
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        12093
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:12093
+
+Finding:     "license_key": "[1;3;mgumroad-cl-1.0[0m"
+Secret:      [1;3;mgumroad-cl-1.0[0m
+RuleID:      generic-api-key
+Entropy:     3.664498
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        12107
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:12107
+
+Finding:     "license_key": "[1;3;mhippocratic-1.0[0m"
+Secret:      [1;3;mhippocratic-1.0[0m
+RuleID:      generic-api-key
+Entropy:     3.506891
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        12403
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:12403
+
+Finding:     "license_key": "[1;3;mhippocratic-1.2[0m"
+Secret:      [1;3;mhippocratic-1.2[0m
+RuleID:      generic-api-key
+Entropy:     3.506891
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        12427
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:12427
+
+Finding:     "license_key": "[1;3;mhippocratic-2.0[0m"
+Secret:      [1;3;mhippocratic-2.0[0m
+RuleID:      generic-api-key
+Entropy:     3.506891
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        12439
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:12439
+
+Finding:     "license_key": "[1;3;mhippocratic-2.1[0m"
+Secret:      [1;3;mhippocratic-2.1[0m
+RuleID:      generic-api-key
+Entropy:     3.506891
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        12451
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:12451
+
+Finding:     "spdx_license_key": "[1;3;mHippocratic-2.1[0m"
+Secret:      [1;3;mHippocratic-2.1[0m
+RuleID:      generic-api-key
+Entropy:     3.506891
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        12453
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:12453
+
+Finding:     "license_key": "[1;3;mhippocratic-3.0[0m"
+Secret:      [1;3;mhippocratic-3.0[0m
+RuleID:      generic-api-key
+Entropy:     3.506891
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        12463
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:12463
+
+Finding:     "license_key": "[1;3;mhuggingface-tos-20220915[0m"
+Secret:      [1;3;mhuggingface-tos-20220915[0m
+RuleID:      generic-api-key
+Entropy:     4.022055
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        12883
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:12883
+
+Finding:     "license_key": "[1;3;mindiana-extreme-1.2[0m"
+Secret:      [1;3;mindiana-extreme-1.2[0m
+RuleID:      generic-api-key
+Entropy:     3.576618
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        13356
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:13356
+
+Finding:     "spdx_license_key": "[1;3;mQPL-1.0-INRIA-2004-exception[0m"
+Secret:      [1;3;mQPL-1.0-INRIA-2004-exception[0m
+RuleID:      generic-api-key
+Entropy:     4.208966
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        13566
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:13566
+
+Finding:     "license_key": "[1;3;mintel-bsd-2-clause[0m"
+Secret:      [1;3;mintel-bsd-2-clause[0m
+RuleID:      generic-api-key
+Entropy:     3.572431
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        13652
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:13652
+
+Finding:     "license_key": "[1;3;mintel-mcu-2018[0m"
+Secret:      [1;3;mintel-mcu-2018[0m
+RuleID:      generic-api-key
+Entropy:     3.664498
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        13736
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:13736
+
+Finding:     "license_key": "[1;3;mla-opt-nxp-v51-2023[0m"
+Secret:      [1;3;mla-opt-nxp-v51-2023[0m
+RuleID:      generic-api-key
+Entropy:     3.616349
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        14882
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:14882
+
+Finding:     "license_key": "[1;3;mlattice-osl-2017[0m"
+Secret:      [1;3;mlattice-osl-2017[0m
+RuleID:      generic-api-key
+Entropy:     3.625000
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        14978
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:14978
+
+Finding:     "spdx_license_key": "[1;3;mLGPL-2.0-or-later[0m"
+Secret:      [1;3;mLGPL-2.0-or-later[0m
+RuleID:      generic-api-key
+Entropy:     3.572469
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        15188
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:15188
+
+Finding:     "license_key": "[1;3;mlgpl-2.1-nokia-qt[0m"
+Secret:      [1;3;mlgpl-2.1-nokia-qt[0m
+RuleID:      generic-api-key
+Entropy:     3.690116
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        15240
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:15240
+
+Finding:     "license_key": "[1;3;mlgpl-2.1-nokia-qt-1.0[0m"
+Secret:      [1;3;mlgpl-2.1-nokia-qt-1.0[0m
+RuleID:      generic-api-key
+Entropy:     3.725651
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        15252
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:15252
+
+Finding:     "license_key": "[1;3;mlgpl-2.1-nokia-qt-1.1[0m"
+Secret:      [1;3;mlgpl-2.1-nokia-qt-1.1[0m
+RuleID:      generic-api-key
+Entropy:     3.594466
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        15264
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:15264
+
+Finding:     "spdx_license_key": "[1;3;mLGPL-2.1-or-later[0m"
+Secret:      [1;3;mLGPL-2.1-or-later[0m
+RuleID:      generic-api-key
+Entropy:     3.572469
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        15278
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:15278
+
+Finding:     "license_key": "[1;3;mlgpl-2.1-qt-company[0m"
+Secret:      [1;3;mlgpl-2.1-qt-company[0m
+RuleID:      generic-api-key
+Entropy:     3.787144
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        15314
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:15314
+
+Finding:     "license_key": "[1;3;mlgpl-3.0-cygwin[0m"
+Secret:      [1;3;mlgpl-3.0-cygwin[0m
+RuleID:      generic-api-key
+Entropy:     3.506891
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        15388
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:15388
+
+Finding:     "spdx_license_key": "[1;3;mLGPL-3.0-or-later[0m"
+Secret:      [1;3;mLGPL-3.0-or-later[0m
+RuleID:      generic-api-key
+Entropy:     3.572469
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        15417
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:15417
+
+Finding:     "license_key": "[1;3;mlibticables2-exception-gpl-2.0[0m"
+Secret:      [1;3;mlibticables2-exception-gpl-2.0[0m
+RuleID:      generic-api-key
+Entropy:     3.939572
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        15649
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:15649
+
+Finding:     "license_key": "[1;3;mlmbench-exception-2.0[0m"
+Secret:      [1;3;mlmbench-exception-2.0[0m
+RuleID:      generic-api-key
+Entropy:     3.880180
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        16147
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:16147
+
+Finding:     "license_key": "[1;3;mltxv-owl-2025-04-17[0m"
+Secret:      [1;3;mltxv-owl-2025-04-17[0m
+RuleID:      generic-api-key
+Entropy:     3.511086
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        16279
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:16279
+
+Finding:     "license_key": "[1;3;mlucent-pl-1.02[0m"
+Secret:      [1;3;mlucent-pl-1.02[0m
+RuleID:      generic-api-key
+Entropy:     3.521641
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        16315
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:16315
+
+Finding:     "license_key": "[1;3;mmagpie-exception-1.0[0m"
+Secret:      [1;3;mmagpie-exception-1.0[0m
+RuleID:      generic-api-key
+Entropy:     3.784184
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        16521
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:16521
+
+Finding:     "license_key": "[1;3;mms-direct3d-d3d120n7-1.1.0[0m"
+Secret:      [1;3;mms-direct3d-d3d120n7-1.1.0[0m
+RuleID:      generic-api-key
+Entropy:     3.796218
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        18159
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:18159
+
+Finding:     "license_key": "[1;3;mms-invisible-eula-1.0[0m"
+Secret:      [1;3;mms-invisible-eula-1.0[0m
+RuleID:      generic-api-key
+Entropy:     3.653757
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        18319
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:18319
+
+Finding:     "license_key": "[1;3;mms-opus-patent-2012[0m"
+Secret:      [1;3;mms-opus-patent-2012[0m
+RuleID:      generic-api-key
+Entropy:     3.576618
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        18575
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:18575
+
+Finding:     "spdx_license_key": "[1;3;mMulanPSL-1.0[0m"
+Secret:      [1;3;mMulanPSL-1.0[0m
+RuleID:      generic-api-key
+Entropy:     3.584963
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        19277
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:19277
+
+Finding:     "license_key": "[1;3;mmulanpsl-1.0-en[0m"
+Secret:      [1;3;mmulanpsl-1.0-en[0m
+RuleID:      generic-api-key
+Entropy:     3.506891
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        19287
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:19287
+
+Finding:     "spdx_license_key": "[1;3;mMulanPSL-2.0[0m"
+Secret:      [1;3;mMulanPSL-2.0[0m
+RuleID:      generic-api-key
+Entropy:     3.584963
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        19301
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:19301
+
+Finding:     "license_key": "[1;3;mmulanpsl-2.0-en[0m"
+Secret:      [1;3;mmulanpsl-2.0-en[0m
+RuleID:      generic-api-key
+Entropy:     3.506891
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        19311
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:19311
+
+Finding:     "license_key": "[1;3;mnokia-qt-exception-1.1[0m"
+Secret:      [1;3;mnokia-qt-exception-1.1[0m
+RuleID:      generic-api-key
+Entropy:     3.697846
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        20065
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:20065
+
+Finding:     "license_key": "[1;3;mnorthwoods-evaluation-2024[0m"
+Secret:      [1;3;mnorthwoods-evaluation-2024[0m
+RuleID:      generic-api-key
+Entropy:     4.008132
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        20137
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:20137
+
+Finding:     "license_key": "[1;3;mnorthwoods-sla-2021[0m"
+Secret:      [1;3;mnorthwoods-sla-2021[0m
+RuleID:      generic-api-key
+Entropy:     3.681881
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        20149
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:20149
+
+Finding:     "license_key": "[1;3;mnorthwoods-sla-2024[0m"
+Secret:      [1;3;mnorthwoods-sla-2024[0m
+RuleID:      generic-api-key
+Entropy:     3.681881
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        20161
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:20161
+
+Finding:     "license_key": "[1;3;mnpsl-exception-0.92[0m"
+Secret:      [1;3;mnpsl-exception-0.92[0m
+RuleID:      generic-api-key
+Entropy:     3.826875
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        20245
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:20245
+
+Finding:     "license_key": "[1;3;mnpsl-exception-0.93[0m"
+Secret:      [1;3;mnpsl-exception-0.93[0m
+RuleID:      generic-api-key
+Entropy:     3.826875
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        20257
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:20257
+
+Finding:     "license_key": "[1;3;mnpsl-exception-0.94[0m"
+Secret:      [1;3;mnpsl-exception-0.94[0m
+RuleID:      generic-api-key
+Entropy:     3.826875
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        20269
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:20269
+
+Finding:     "license_key": "[1;3;mnpsl-exception-0.95[0m"
+Secret:      [1;3;mnpsl-exception-0.95[0m
+RuleID:      generic-api-key
+Entropy:     3.826875
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        20281
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:20281
+
+Finding:     "license_key": "[1;3;mnvidia-isaac-eula-2019.1[0m"
+Secret:      [1;3;mnvidia-isaac-eula-2019.1[0m
+RuleID:      generic-api-key
+Entropy:     3.772055
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        20489
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:20489
+
+Finding:     "license_key": "[1;3;mnvidia-nccl-sla-2016[0m"
+Secret:      [1;3;mnvidia-nccl-sla-2016[0m
+RuleID:      generic-api-key
+Entropy:     3.584184
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        20501
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:20501
+
+Finding:     "license_key": "[1;3;mnvidia-ngx-eula-2019[0m"
+Secret:      [1;3;mnvidia-ngx-eula-2019[0m
+RuleID:      generic-api-key
+Entropy:     3.784184
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        20513
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:20513
+
+Finding:     "license_key": "[1;3;mnysl-0.9982-jp[0m"
+Secret:      [1;3;mnysl-0.9982-jp[0m
+RuleID:      generic-api-key
+Entropy:     3.521641
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        20671
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:20671
+
+Finding:     "license_key": "[1;3;moasis-ipr-policy-2014[0m"
+Secret:      [1;3;moasis-ipr-policy-2014[0m
+RuleID:      generic-api-key
+Entropy:     3.653757
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        20719
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:20719
+
+Finding:     "license_key": "[1;3;mocb-non-military-2013[0m"
+Secret:      [1;3;mocb-non-military-2013[0m
+RuleID:      generic-api-key
+Entropy:     3.880180
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        20793
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:20793
+
+Finding:     "spdx_license_key": "[1;3;mOCCT-exception-1.0[0m"
+Secret:      [1;3;mOCCT-exception-1.0[0m
+RuleID:      generic-api-key
+Entropy:     3.836592
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        20831
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:20831
+
+Finding:     "license_key": "[1;3;mogdl-taiwan-1.0[0m"
+Secret:      [1;3;mogdl-taiwan-1.0[0m
+RuleID:      generic-api-key
+Entropy:     3.640224
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        21215
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:21215
+
+Finding:     "spdx_license_key": "[1;3;mOGDL-Taiwan-1.0[0m"
+Secret:      [1;3;mOGDL-Taiwan-1.0[0m
+RuleID:      generic-api-key
+Entropy:     3.640224
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        21217
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:21217
+
+Finding:     "license_key": "[1;3;mogl-canada-2.0-fr[0m"
+Secret:      [1;3;mogl-canada-2.0-fr[0m
+RuleID:      generic-api-key
+Entropy:     3.528064
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        21239
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:21239
+
+Finding:     "license_key": "[1;3;mopera-eula-2018[0m"
+Secret:      [1;3;mopera-eula-2018[0m
+RuleID:      generic-api-key
+Entropy:     3.506891
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        22175
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:22175
+
+Finding:     "license_key": "[1;3;motn-early-adopter-2018[0m"
+Secret:      [1;3;motn-early-adopter-2018[0m
+RuleID:      generic-api-key
+Entropy:     3.788755
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        22801
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:22801
+
+Finding:     "spdx_license_key": "[1;3;mPCRE2-exception[0m"
+Secret:      [1;3;mPCRE2-exception[0m
+RuleID:      generic-api-key
+Entropy:     3.773557
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        23203
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:23203
+
+Finding:     "license_key": "[1;3;mpipedream-sal-1.0[0m"
+Secret:      [1;3;mpipedream-sal-1.0[0m
+RuleID:      generic-api-key
+Entropy:     3.616875
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        23469
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:23469
+
+Finding:     "license_key": "[1;3;mprosperity-2.0[0m"
+Secret:      [1;3;mprosperity-2.0[0m
+RuleID:      generic-api-key
+Entropy:     3.521641
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        23834
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:23834
+
+Finding:     "license_key": "[1;3;mprosperity-3.0[0m"
+Secret:      [1;3;mprosperity-3.0[0m
+RuleID:      generic-api-key
+Entropy:     3.521641
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        23846
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:23846
+
+Finding:     "license_key": "[1;3;mpsion-s3aemul[0m"
+Secret:      [1;3;mpsion-s3aemul[0m
+RuleID:      generic-api-key
+Entropy:     3.546594
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        23918
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:23918
+
+Finding:     "license_key": "[1;3;mqpl-1.0-inria-2004[0m"
+Secret:      [1;3;mqpl-1.0-inria-2004[0m
+RuleID:      generic-api-key
+Entropy:     3.530493
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        24211
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:24211
+
+Finding:     "spdx_license_key": "[1;3;mQPL-1.0-INRIA-2004[0m"
+Secret:      [1;3;mQPL-1.0-INRIA-2004[0m
+RuleID:      generic-api-key
+Entropy:     3.530493
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        24213
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:24213
+
+Finding:     "license_key": "[1;3;mqt-commercial-1.1[0m"
+Secret:      [1;3;mqt-commercial-1.1[0m
+RuleID:      generic-api-key
+Entropy:     3.616875
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        24247
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:24247
+
+Finding:     "license_key": "[1;3;mqt-commercial-agreement-4.4.1[0m"
+Secret:      [1;3;mqt-commercial-agreement-4.4.1[0m
+RuleID:      generic-api-key
+Entropy:     3.840403
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        24259
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:24259
+
+Finding:     "spdx_license_key": "[1;3;mDigia-Qt-LGPL-exception-1.1[0m"
+Secret:      [1;3;mDigia-Qt-LGPL-exception-1.1[0m
+RuleID:      generic-api-key
+Entropy:     3.986188
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        24285
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:24285
+
+Finding:     "license_key": "[1;3;mqt-gpl-exception-1.0[0m"
+Secret:      [1;3;mqt-gpl-exception-1.0[0m
+RuleID:      generic-api-key
+Entropy:     3.784184
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        24297
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:24297
+
+Finding:     "spdx_license_key": "[1;3;mQt-GPL-exception-1.0[0m"
+Secret:      [1;3;mQt-GPL-exception-1.0[0m
+RuleID:      generic-api-key
+Entropy:     3.884184
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        24299
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:24299
+
+Finding:     "license_key": "[1;3;mqt-lgpl-exception-1.1[0m"
+Secret:      [1;3;mqt-lgpl-exception-1.1[0m
+RuleID:      generic-api-key
+Entropy:     3.689704
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        24321
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:24321
+
+Finding:     "spdx_license_key": "[1;3;mQt-LGPL-exception-1.1[0m"
+Secret:      [1;3;mQt-LGPL-exception-1.1[0m
+RuleID:      generic-api-key
+Entropy:     3.784942
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        24323
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:24323
+
+Finding:     "license_key": "[1;3;mqt-qca-exception-2.0[0m"
+Secret:      [1;3;mqt-qca-exception-2.0[0m
+RuleID:      generic-api-key
+Entropy:     3.684184
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        24335
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:24335
+
+Finding:     "license_key": "[1;3;mquadratic-sal-2024[0m"
+Secret:      [1;3;mquadratic-sal-2024[0m
+RuleID:      generic-api-key
+Entropy:     3.683542
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        24359
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:24359
+
+Finding:     "license_key": "[1;3;mqwt-exception-1.0[0m"
+Secret:      [1;3;mqwt-exception-1.0[0m
+RuleID:      generic-api-key
+Entropy:     3.734522
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        24455
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:24455
+
+Finding:     "spdx_license_key": "[1;3;mQwt-exception-1.0[0m"
+Secret:      [1;3;mQwt-exception-1.0[0m
+RuleID:      generic-api-key
+Entropy:     3.734522
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        24457
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:24457
+
+Finding:     "license_key": "[1;3;mradiance-sl-v1.0[0m"
+Secret:      [1;3;mradiance-sl-v1.0[0m
+RuleID:      generic-api-key
+Entropy:     3.750000
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        24479
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:24479
+
+Finding:     "license_key": "[1;3;mradiance-sl-v2.0[0m"
+Secret:      [1;3;mradiance-sl-v2.0[0m
+RuleID:      generic-api-key
+Entropy:     3.750000
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        24491
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:24491
+
+Finding:     "license_key": "[1;3;mrh-ubi-eula-2019[0m"
+Secret:      [1;3;mrh-ubi-eula-2019[0m
+RuleID:      generic-api-key
+Entropy:     3.577820
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        24857
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:24857
+
+Finding:     "license_key": "[1;3;mrockchip-proprietary-2019[0m"
+Secret:      [1;3;mrockchip-proprietary-2019[0m
+RuleID:      generic-api-key
+Entropy:     3.813661
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        24941
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:24941
+
+Finding:     "license_key": "[1;3;mrockchip-proprietary-2022[0m"
+Secret:      [1;3;mrockchip-proprietary-2022[0m
+RuleID:      generic-api-key
+Entropy:     3.623465
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        24953
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:24953
+
+Finding:     "license_key": "[1;3;mrockchip-proprietary-2023[0m"
+Secret:      [1;3;mrockchip-proprietary-2023[0m
+RuleID:      generic-api-key
+Entropy:     3.733661
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        24965
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:24965
+
+Finding:     "license_key": "[1;3;mrtems-exception-2.0[0m"
+Secret:      [1;3;mrtems-exception-2.0[0m
+RuleID:      generic-api-key
+Entropy:     3.787144
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        25159
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:25159
+
+Finding:     "license_key": "[1;3;mrxtx-exception-lgpl-2.1[0m"
+Secret:      [1;3;mrxtx-exception-lgpl-2.1[0m
+RuleID:      generic-api-key
+Entropy:     3.762267
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        25255
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:25255
+
+Finding:     "license_key": "[1;3;msane-exception-2.0-plus[0m"
+Secret:      [1;3;msane-exception-2.0-plus[0m
+RuleID:      generic-api-key
+Entropy:     3.849224
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        25375
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:25375
+
+Finding:     "license_key": "[1;3;msignal-gpl-3.0-exception[0m"
+Secret:      [1;3;msignal-gpl-3.0-exception[0m
+RuleID:      generic-api-key
+Entropy:     3.886842
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        26087
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:26087
+
+Finding:     "license_key": "[1;3;msix-labors-split-1.0[0m"
+Secret:      [1;3;msix-labors-split-1.0[0m
+RuleID:      generic-api-key
+Entropy:     3.646439
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        26135
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:26135
+
+Finding:     "license_key": "[1;3;mslint-commercial-2.0[0m"
+Secret:      [1;3;mslint-commercial-2.0[0m
+RuleID:      generic-api-key
+Entropy:     3.821928
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        26207
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:26207
+
+Finding:     "license_key": "[1;3;msmsc-non-commercial-2012[0m"
+Secret:      [1;3;msmsc-non-commercial-2012[0m
+RuleID:      generic-api-key
+Entropy:     3.657268
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        26281
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:26281
+
+Finding:     "license_key": "[1;3;msnowplow-person-academic-1.0[0m"
+Secret:      [1;3;msnowplow-person-academic-1.0[0m
+RuleID:      generic-api-key
+Entropy:     3.967720
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        26365
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:26365
+
+Finding:     "license_key": "[1;3;msplunk-mint-tos-2018[0m"
+Secret:      [1;3;msplunk-mint-tos-2018[0m
+RuleID:      generic-api-key
+Entropy:     3.784184
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        26613
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:26613
+
+Finding:     "license_key": "[1;3;mstability-ai-nc-2023-12-06[0m"
+Secret:      [1;3;mstability-ai-nc-2023-12-06[0m
+RuleID:      generic-api-key
+Entropy:     3.657385
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        26747
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:26747
+
+Finding:     "license_key": "[1;3;msun-bcl-j2re-1.2.x[0m"
+Secret:      [1;3;msun-bcl-j2re-1.2.x[0m
+RuleID:      generic-api-key
+Entropy:     3.683542
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        27007
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:27007
+
+Finding:     "license_key": "[1;3;msun-bcl-j2re-1.4.2[0m"
+Secret:      [1;3;msun-bcl-j2re-1.4.2[0m
+RuleID:      generic-api-key
+Entropy:     3.683542
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        27019
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:27019
+
+Finding:     "license_key": "[1;3;msun-bcl-j2re-1.4.x[0m"
+Secret:      [1;3;msun-bcl-j2re-1.4.x[0m
+RuleID:      generic-api-key
+Entropy:     3.794653
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        27031
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:27031
+
+Finding:     "license_key": "[1;3;msun-bcl-j2re-5.0[0m"
+Secret:      [1;3;msun-bcl-j2re-5.0[0m
+RuleID:      generic-api-key
+Entropy:     3.702820
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        27043
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:27043
+
+Finding:     "license_key": "[1;3;mtencent-hunyuan-3d-2.0-cla[0m"
+Secret:      [1;3;mtencent-hunyuan-3d-2.0-cla[0m
+RuleID:      generic-api-key
+Entropy:     3.700440
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        28105
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:28105
+
+Finding:     "license_key": "[1;3;mtongyi-qianwen-2023[0m"
+Secret:      [1;3;mtongyi-qianwen-2023[0m
+RuleID:      generic-api-key
+Entropy:     3.681881
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        28413
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:28413
+
+Finding:     "spdx_license_key": "[1;3;mTU-Berlin-1.0[0m"
+Secret:      [1;3;mTU-Berlin-1.0[0m
+RuleID:      generic-api-key
+Entropy:     3.546594
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        28777
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:28777
+
+Finding:     "license_key": "[1;3;mtu-berlin-2.0[0m"
+Secret:      [1;3;mtu-berlin-2.0[0m
+RuleID:      generic-api-key
+Entropy:     3.546594
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        28787
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:28787
+
+Finding:     "spdx_license_key": "[1;3;mTU-Berlin-2.0[0m"
+Secret:      [1;3;mTU-Berlin-2.0[0m
+RuleID:      generic-api-key
+Entropy:     3.546594
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        28789
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:28789
+
+Finding:     "license_key": "[1;3;mupx-exception-2.0-plus[0m"
+Secret:      [1;3;mupx-exception-2.0-plus[0m
+RuleID:      generic-api-key
+Entropy:     3.754442
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        29338
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:29338
+
+Finding:     "license_key": "[1;3;mvanderbilt-sla-1.0[0m"
+Secret:      [1;3;mvanderbilt-sla-1.0[0m
+RuleID:      generic-api-key
+Entropy:     3.836592
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        29446
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:29446
+
+Finding:     "license_key": "[1;3;mvuforia-2013-07-29[0m"
+Secret:      [1;3;mvuforia-2013-07-29[0m
+RuleID:      generic-api-key
+Entropy:     3.683542
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        29761
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:29761
+
+Finding:     "spdx_license_key": "[1;3;mX11-distribute-modifications-variant[0m"
+Secret:      [1;3;mX11-distribute-modifications-variant[0m
+RuleID:      generic-api-key
+Entropy:     3.919382
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        30513
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:30513
+
+Finding:     "license_key": "[1;3;mx11-lucent-variant[0m"
+Secret:      [1;3;mx11-lucent-variant[0m
+RuleID:      generic-api-key
+Entropy:     3.614369
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        30575
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:30575
+
+Finding:     "license_key": "[1;3;mx11-xconsortium[0m"
+Secret:      [1;3;mx11-xconsortium[0m
+RuleID:      generic-api-key
+Entropy:     3.506891
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        30737
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:30737
+
+Finding:     "license_key": "[1;3;mx11-xconsortium-veillard[0m"
+Secret:      [1;3;mx11-xconsortium-veillard[0m
+RuleID:      generic-api-key
+Entropy:     4.001629
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        30749
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:30749
+
+Finding:     "license_key": "[1;3;mx11-xconsortium_veillard[0m"
+Secret:      [1;3;mx11-xconsortium_veillard[0m
+RuleID:      generic-api-key
+Entropy:     4.084962
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        30763
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:30763
+
+Finding:     "license_key": "[1;3;mxmos-commercial-2017[0m"
+Secret:      [1;3;mxmos-commercial-2017[0m
+RuleID:      generic-api-key
+Entropy:     3.784184
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        30919
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:30919
+
+Finding:     "license_key": "[1;3;mzrythm-exception-agpl-3.0[0m"
+Secret:      [1;3;mzrythm-exception-agpl-3.0[0m
+RuleID:      generic-api-key
+Entropy:     4.213661
+File:        LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json
+Line:        31359
+Fingerprint: LOATS13July2026/Lib/site-packages/license_expression/data/scancode-licensedb-index.json:generic-api-key:31359
+
+[90m7:27PM[0m [32mINF[0m [1mscanned ~178034127 bytes (178.03 MB) in 44.4s[0m
+[90m7:27PM[0m [33mWRN[0m [1mleaks found: 236[0m

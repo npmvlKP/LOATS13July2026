@@ -1,22 +1,106 @@
-Run started:2026-08-01 08:16:19.966866+00:00
+Run started:2026-08-03 11:46:48.270370+00:00
 
 Test results:
-	No issues identified.
+>> Issue: [B110:try_except_pass] Try, Except, Pass detected.
+   Severity: Low   Confidence: High
+   CWE: CWE-703 (https://cwe.mitre.org/data/definitions/703.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b110_try_except_pass.html
+   Location: src/loats\metrics.py:107:16
+106	                    ).inc()
+107	                except Exception:
+108	                    # Silently handle metrics errors to not interfere with job execution
+109	                    pass
+110	                try:
+
+--------------------------------------------------
+>> Issue: [B110:try_except_pass] Try, Except, Pass detected.
+   Severity: Low   Confidence: High
+   CWE: CWE-703 (https://cwe.mitre.org/data/definitions/703.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b110_try_except_pass.html
+   Location: src/loats\metrics.py:112:16
+111	                    metrics.job_latency_summary.labels(job_id=job_id).observe(duration)
+112	                except Exception:
+113	                    # Silently handle metrics errors to not interfere with job execution
+114	                    pass
+115	
+
+--------------------------------------------------
+>> Issue: [B110:try_except_pass] Try, Except, Pass detected.
+   Severity: Low   Confidence: High
+   CWE: CWE-703 (https://cwe.mitre.org/data/definitions/703.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b110_try_except_pass.html
+   Location: src/loats\metrics.py:127:4
+126	        ).inc()
+127	    except Exception:
+128	        # Silently handle metrics errors to not interfere with application flow
+129	        pass
+130	
+
+--------------------------------------------------
+>> Issue: [B110:try_except_pass] Try, Except, Pass detected.
+   Severity: Low   Confidence: High
+   CWE: CWE-703 (https://cwe.mitre.org/data/definitions/703.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b110_try_except_pass.html
+   Location: src/loats\metrics.py:136:4
+135	        metrics.kill_switch_status.set(1 if active else 0)
+136	    except Exception:
+137	        # Silently handle metrics errors to not interfere with application flow
+138	        pass
+139	
+
+--------------------------------------------------
+>> Issue: [B110:try_except_pass] Try, Except, Pass detected.
+   Severity: Low   Confidence: High
+   CWE: CWE-703 (https://cwe.mitre.org/data/definitions/703.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b110_try_except_pass.html
+   Location: src/loats\metrics.py:147:4
+146	        )
+147	    except Exception:
+148	        # Silently handle metrics errors to not interfere with application flow
+149	        pass
+
+--------------------------------------------------
+>> Issue: [B107:hardcoded_password_default] Possible hardcoded password: ''
+   Severity: Low   Confidence: Medium
+   CWE: CWE-259 (https://cwe.mitre.org/data/definitions/259.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b107_hardcoded_password_default.html
+   Location: src/loats\utils\cache.py:31:4
+30	
+31	    def __init__(
+32	        self,
+33	        ttl_seconds: int = 300,
+34	        prefix: str = "loats",
+35	        max_size: int = 1000,
+36	        cache_type: str = "memory",
+37	        redis_host: str = "localhost",
+38	        redis_port: int = 6379,
+39	        redis_password: str = "",
+40	    ):
+41	        self.ttl_seconds = ttl_seconds
+42	        self.prefix = prefix
+43	        self.max_size = max_size
+44	        self.cache_type = cache_type
+45	        self.redis_host = redis_host
+46	        self.redis_port = redis_port
+47	        self.redis_password = redis_password
+48	
+
+--------------------------------------------------
 
 Code scanned:
-	Total lines of code: 5807
+	Total lines of code: 6935
 	Total lines skipped (#nosec): 0
 	Total potential issues skipped due to specifically being disabled (e.g., #nosec BXXX): 1
 
 Run metrics:
 	Total issues (by severity):
 		Undefined: 0
-		Low: 0
+		Low: 6
 		Medium: 0
 		High: 0
 	Total issues (by confidence):
 		Undefined: 0
 		Low: 0
-		Medium: 0
-		High: 0
+		Medium: 1
+		High: 5
 Files skipped (0):

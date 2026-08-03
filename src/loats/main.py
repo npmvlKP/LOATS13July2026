@@ -1,23 +1,24 @@
 """Main entry point LOATS13July2026 trading system."""
+
 import asyncio
 import signal
 import sys
 from typing import Any
 
-from src.loats.alerts import alerts
-from src.loats.config import get_settings
-from src.loats.database import Database
-from src.loats.loats_logging import logger
-from src.loats.metrics import start_metrics_server
-from src.loats.scheduler import scheduler
-from src.loats.utils.cache import close_cache, initialize_cache
+from .alerts import alerts
+from .config import get_settings
+from .database import Database
+from .loats_logging import logger
+from .metrics import start_metrics_server
+from .scheduler import scheduler
+from .utils.cache import close_cache, initialize_cache
 
 # Module-level exports for testing (F-CONC-3)
 settings = get_settings()
 db = Database(
     db_path=settings.sqlite_db_path,
     audit_log_path=settings.audit_log_path,
-    retention_days=settings.retention_days
+    retention_days=settings.retention_days,
 )
 
 
@@ -55,7 +56,9 @@ class TradingSystem:
             logger.info("Starting LOATS13July2026 trading system")
             await alerts.start()
             await scheduler.start()
-            await alerts.send_system_alert("LOATS13July2026 trading system started successfully", "success")
+            await alerts.send_system_alert(
+                "LOATS13July2026 trading system started successfully", "success"
+            )
             self.running = True
             logger.info("Trading system started successfully")
             await self._wait_for_shutdown()
@@ -76,7 +79,10 @@ class TradingSystem:
             signal.signal(signal.SIGTERM, signal_handler)
         else:
             for sig in (signal.SIGINT, signal.SIGTERM):
-                loop.add_signal_handler(sig, lambda s=sig: asyncio.create_task(self._handle_shutdown_signal(s)))
+                loop.add_signal_handler(
+                    sig,
+                    lambda s=sig: asyncio.create_task(self._handle_shutdown_signal(s)),
+                )
 
         await self.shutdown_event.wait()
 
@@ -92,7 +98,9 @@ class TradingSystem:
             return
         try:
             logger.info("Shutting down LOATS13July2026 trading system")
-            await alerts.send_system_alert("LOATS13July2026 trading system shutting down", "warning")
+            await alerts.send_system_alert(
+                "LOATS13July2026 trading system shutting down", "warning"
+            )
             await scheduler.shutdown()
             await alerts.shutdown()
             await close_cache()

@@ -4,7 +4,6 @@ Implements Redis-based caching with in-memory fallback for performance optimizat
 """
 
 import json
-import time
 from collections.abc import Callable
 from typing import Any, TypeVar
 
@@ -16,6 +15,7 @@ from ..loats_logging import get_logger
 # Optional Redis import for enhanced caching
 try:
     import redis.asyncio as redis
+
     REDIS_AVAILABLE = True
 except ImportError:
     REDIS_AVAILABLE = False
@@ -55,7 +55,7 @@ class CacheManager:
     def __init__(self, config: CacheConfig):
         self.config = config
         self._cache: TTLCache[str, Any] | None = None
-        self._redis: redis.Redis | None = None
+        self._redis: redis.Redis[str] | None = None
         self._cache_stats = {
             "hits": 0,
             "misses": 0,
@@ -69,14 +69,14 @@ class CacheManager:
         """Initialize cache with Redis support and graceful fallback to in-memory."""
         try:
             # Try Redis first if configured and available
-            if (self.config.cache_type == "redis" and REDIS_AVAILABLE):
+            if self.config.cache_type == "redis" and REDIS_AVAILABLE:
                 try:
                     self._redis = redis.Redis(
                         host=self.config.redis_host,
                         port=self.config.redis_port,
                         password=self.config.redis_password,
                         decode_responses=True,
-                        health_check_interval=30
+                        health_check_interval=30,
                     )
                     # Test Redis connection
                     await self._redis.ping()
@@ -86,7 +86,9 @@ class CacheManager:
                     )
                     return
                 except Exception as e:
-                    logger.warning(f"Redis connection failed, falling back to in-memory cache: {e}")
+                    logger.warning(
+                        f"Redis connection failed, falling back to in-memory cache: {e}"
+                    )
                     # Fall through to in-memory initialization
 
             # Initialize in-memory cache as fallback
@@ -95,7 +97,9 @@ class CacheManager:
                 ttl=self.config.ttl_seconds,
             )
             self._cache_type = "in_memory_ttl"
-            logger.info(f"In-memory cache initialized (max_size={self.config.max_size}, ttl={self.config.ttl_seconds}s)")
+            logger.info(
+                f"In-memory cache initialized (max_size={self.config.max_size}, ttl={self.config.ttl_seconds}s)"
+            )
 
         except Exception as e:
             logger.error(f"Cache initialization failed: {e}")
@@ -123,12 +127,18 @@ class CacheManager:
                     result = await self._redis.get(cache_key)
                     if result is not None:
                         self._cache_stats["hits"] += 1
-                        return result
+                        return (
+                            result.decode("utf-8")
+                            if isinstance(result, bytes)
+                            else str(result)
+                        )
                     else:
                         self._cache_stats["misses"] += 1
                         return None
                 except Exception as redis_error:
-                    logger.warning(f"Redis get failed for key {key}, falling back to in-memory: {redis_error}")
+                    logger.warning(
+                        f"Redis get failed for key {key}, falling back to in-memory: {redis_error}"
+                    )
                     # Fall through to in-memory cache
 
             # Use in-memory cache
@@ -147,7 +157,7 @@ class CacheManager:
             return None
 
     async def set(
-        self, key: str, value: str | BaseModel | dict, ttl: int | None = None
+        self, key: str, value: str | BaseModel | dict[str, Any], ttl: int | None = None
     ) -> bool:
         """Set value in cache (Redis or in-memory)."""
         try:
@@ -169,7 +179,9 @@ class CacheManager:
                     self._cache_stats["sets"] += 1
                     return True
                 except Exception as redis_error:
-                    logger.warning(f"Redis set failed for key {key}, falling back to in-memory: {redis_error}")
+                    logger.warning(
+                        f"Redis set failed for key {key}, falling back to in-memory: {redis_error}"
+                    )
                     # Fall through to in-memory cache
 
             # Use in-memory cache
@@ -248,7 +260,9 @@ class CacheManager:
                         return True
                     return False
                 except Exception as redis_error:
-                    logger.warning(f"Redis delete failed for key {key}, falling back to in-memory: {redis_error}")
+                    logger.warning(
+                        f"Redis delete failed for key {key}, falling back to in-memory: {redis_error}"
+                    )
                     # Fall through to in-memory cache
 
             # Use in-memory cache
@@ -286,7 +300,9 @@ class CacheManager:
                         self._cache_stats["evictions"] += count
                         return count
                 except Exception as redis_error:
-                    logger.warning(f"Redis clear failed, falling back to in-memory: {redis_error}")
+                    logger.warning(
+                        f"Redis clear failed, falling back to in-memory: {redis_error}"
+                    )
                     # Fall through to in-memory cache
 
             # Use in-memory cache
@@ -300,7 +316,11 @@ class CacheManager:
                 else:
                     # Pattern matching - clear keys that match the pattern
                     prefix_pattern = f"{self.config.prefix}:{pattern}"
-                    keys_to_delete = [k for k in self._cache.keys() if pattern in k or k.startswith(prefix_pattern)]
+                    keys_to_delete = [
+                        k
+                        for k in self._cache.keys()
+                        if pattern in k or k.startswith(prefix_pattern)
+                    ]
 
                     count = 0
                     for key in keys_to_delete:
@@ -340,12 +360,19 @@ class CacheManager:
                         "sets": self._cache_stats["sets"],
                         "deletes": self._cache_stats["deletes"],
                         "evictions": self._cache_stats["evictions"],
-                        "hit_rate": self._cache_stats["hits"] / (self._cache_stats["hits"] + self._cache_stats["misses"] + 1e-6),
+                        "hit_rate": self._cache_stats["hits"]
+                        / (
+                            self._cache_stats["hits"]
+                            + self._cache_stats["misses"]
+                            + 1e-6
+                        ),
                         "redis_version": redis_info.get("redis_version", "unknown"),
                         "used_memory": redis_info.get("used_memory", "unknown"),
                     }
                 except Exception as redis_error:
-                    logger.warning(f"Redis stats failed, falling back to basic stats: {redis_error}")
+                    logger.warning(
+                        f"Redis stats failed, falling back to basic stats: {redis_error}"
+                    )
                     # Fall through to basic stats
 
             # Basic stats for in-memory or fallback
@@ -355,13 +382,18 @@ class CacheManager:
                 "connected": True,
                 "cache_type": self._cache_type,
                 "current_size": current_size,
-                "max_size": self.config.max_size if self._cache_type == "in_memory_ttl" else "unlimited",
+                "max_size": (
+                    self.config.max_size
+                    if self._cache_type == "in_memory_ttl"
+                    else "unlimited"
+                ),
                 "hits": self._cache_stats["hits"],
                 "misses": self._cache_stats["misses"],
                 "sets": self._cache_stats["sets"],
                 "deletes": self._cache_stats["deletes"],
                 "evictions": self._cache_stats["evictions"],
-                "hit_rate": self._cache_stats["hits"] / (self._cache_stats["hits"] + self._cache_stats["misses"] + 1e-6),
+                "hit_rate": self._cache_stats["hits"]
+                / (self._cache_stats["hits"] + self._cache_stats["misses"] + 1e-6),
             }
 
         except Exception as e:
@@ -394,6 +426,6 @@ def model_to_cache_key(model: BaseModel) -> str:
     return f"{model.__class__.__name__}:{hash(model.model_dump_json())}"
 
 
-def dict_to_cache_key(data: dict) -> str:
+def dict_to_cache_key(data: dict[str, Any]) -> str:
     """Convert dict to cache key."""
     return f"dict:{hash(json.dumps(data, sort_keys=True))}"

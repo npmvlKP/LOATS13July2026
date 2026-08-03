@@ -2,6 +2,7 @@
 Integration tests for OpenAlgo API client.
 Tests the complete flow of API interactions with proper mocking.
 """
+
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
@@ -19,6 +20,7 @@ from src.loats.openalgo import (
 from src.loats.utils.rate_limiter import RateLimitExceededError
 
 settings = get_settings()
+
 
 class TestOpenAlgoClientIntegration:
     """Integration tests for OpenAlgoClient."""
@@ -134,7 +136,11 @@ class TestOpenAlgoClientIntegration:
         mock_response.json.return_value = {
             "success": True,
             "message": "Smart order placed successfully",
-            "data": {"order_id": "SMART12345", "status": "PENDING", "strategy": "simple"},
+            "data": {
+                "order_id": "SMART12345",
+                "status": "PENDING",
+                "strategy": "simple",
+            },
         }
         mock_httpx_client.post.return_value = mock_response
 
@@ -423,6 +429,7 @@ class TestOpenAlgoClientIntegration:
             payload = call_args[1]["json"]
             assert payload["symbol"] == "NIFTY"
 
+
 class TestAsyncOpenAlgoClientIntegration:
     """Integration tests for AsyncOpenAlgoClient."""
 
@@ -462,7 +469,9 @@ class TestAsyncOpenAlgoClientIntegration:
         with patch.object(
             async_client, "_ensure_client", return_value=mock_async_httpx_client
         ):
-            with patch("src.loats.openalgo.get_order_rate_limiter") as mock_rate_limiter:
+            with patch(
+                "src.loats.openalgo.get_order_rate_limiter"
+            ) as mock_rate_limiter:
                 mock_limiter = AsyncMock()
                 mock_limiter.acquire.return_value = True
                 mock_rate_limiter.return_value = mock_limiter
@@ -505,7 +514,9 @@ class TestAsyncOpenAlgoClientIntegration:
         with patch.object(
             async_client, "_ensure_client", return_value=mock_async_httpx_client
         ):
-            with patch("src.loats.openalgo.get_order_rate_limiter") as mock_rate_limiter:
+            with patch(
+                "src.loats.openalgo.get_order_rate_limiter"
+            ) as mock_rate_limiter:
                 mock_limiter = AsyncMock()
                 mock_limiter.acquire.return_value = True
                 mock_rate_limiter.return_value = mock_limiter
@@ -554,14 +565,20 @@ class TestAsyncOpenAlgoClientIntegration:
         mock_async_response.json.return_value = {
             "success": True,
             "message": "Smart order placed successfully",
-            "data": {"order_id": "SMART12345", "status": "PENDING", "strategy": "simple"},
+            "data": {
+                "order_id": "SMART12345",
+                "status": "PENDING",
+                "strategy": "simple",
+            },
         }
         mock_async_httpx_client.post.return_value = mock_async_response
 
         with patch.object(
             async_client, "_ensure_client", return_value=mock_async_httpx_client
         ):
-            with patch("src.loats.openalgo.get_smart_order_rate_limiter") as mock_rate_limiter:
+            with patch(
+                "src.loats.openalgo.get_smart_order_rate_limiter"
+            ) as mock_rate_limiter:
                 mock_limiter = AsyncMock()
                 mock_limiter.acquire.return_value = True
                 mock_rate_limiter.return_value = mock_limiter
@@ -904,7 +921,9 @@ class TestAsyncOpenAlgoClientIntegration:
 
             # Second call - should use cache
             with patch("src.loats.utils.cache.cache_manager.get") as mock_cache_get:
-                mock_cache_get.return_value = '{"success": true, "data": {"NIFTY": {"last_price": 18000.0}}}'
+                mock_cache_get.return_value = (
+                    '{"success": true, "data": {"NIFTY": {"last_price": 18000.0}}}'
+                )
                 result2 = await async_client.get_quotes(["NIFTY"])
                 assert result2["success"] is True
 
@@ -922,6 +941,7 @@ class TestAsyncOpenAlgoClientIntegration:
                     quantity=1,
                     order_type=OrderType.MARKET,
                 )
+
 
 class TestOpenAlgoErrorHandling:
     """Tests for error handling in OpenAlgo clients."""

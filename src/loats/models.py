@@ -1,4 +1,5 @@
 """Data models LOATS13July2026 using Pydantic."""
+
 from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
@@ -9,6 +10,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 class OrderType(StrEnum):
     """Order type enumeration."""
+
     MARKET = "MARKET"
     LIMIT = "LIMIT"
     SL = "SL"
@@ -17,12 +19,14 @@ class OrderType(StrEnum):
 
 class TransactionType(StrEnum):
     """Transaction type enumeration."""
+
     BUY = "BUY"
     SELL = "SELL"
 
 
 class ProductType(StrEnum):
     """Product type enumeration."""
+
     MIS = "MIS"
     NRML = "NRML"
     CNC = "CNC"
@@ -30,12 +34,14 @@ class ProductType(StrEnum):
 
 class OrderVariety(StrEnum):
     """Order variety enumeration."""
+
     REGULAR = "regular"
     AMO = "amo"
 
 
 class OrderStatus(StrEnum):
     """Order status enumeration."""
+
     OPEN = "OPEN"
     COMPLETED = "COMPLETED"
     CANCELLED = "CANCELLED"
@@ -45,6 +51,7 @@ class OrderStatus(StrEnum):
 
 class QuoteData(BaseModel):
     """Quote data model."""
+
     symbol: str
     last_price: float
     open: float
@@ -71,17 +78,27 @@ class QuoteData(BaseModel):
         if not isinstance(data, dict):
             return data
         close_raw = data.get("close")
-        if "change_percent" not in data and isinstance(close_raw, (int, float)) and close_raw != 0:
+        if (
+            "change_percent" not in data
+            and isinstance(close_raw, (int, float))
+            and close_raw != 0
+        ):
             last_price = data.get("last_price")
             if isinstance(last_price, (int, float)):
                 data["change_percent"] = (last_price - close_raw) / close_raw * 100
-        if "change" not in data and "last_price" in data and isinstance(data["last_price"], (int, float)) and close_raw is not None:
+        if (
+            "change" not in data
+            and "last_price" in data
+            and isinstance(data["last_price"], (int, float))
+            and close_raw is not None
+        ):
             data["change"] = data["last_price"] - close_raw
         return data
 
 
 class HistoricalData(BaseModel):
     """Historical data model."""
+
     symbol: str
     timestamp: datetime
     open: float = Field(gt=0)
@@ -94,12 +111,14 @@ class HistoricalData(BaseModel):
 
 class OptionType(StrEnum):
     """Option type enumeration."""
+
     CALL = "CE"
     PUT = "PE"
 
 
 class OptionContract(BaseModel):
     """Option contract model."""
+
     symbol: str
     strike_price: float
     expiry: datetime
@@ -131,6 +150,7 @@ class OptionContract(BaseModel):
 
 class OptionChain(BaseModel):
     """Option chain model."""
+
     symbol: str
     expiry: datetime
     timestamp: datetime
@@ -141,6 +161,7 @@ class OptionChain(BaseModel):
 
 class Position(BaseModel):
     """Position model."""
+
     symbol: str
     quantity: int
     average_price: float
@@ -154,6 +175,7 @@ class Position(BaseModel):
 
 class FundsData(BaseModel):
     """Funds data model."""
+
     available_cash: float
     utilized_margin: float
     available_margin: float
@@ -163,6 +185,7 @@ class FundsData(BaseModel):
 
 class Order(BaseModel):
     """Order model."""
+
     order_id: str
     symbol: str
     quantity: int = Field(gt=0)
@@ -183,8 +206,11 @@ class Order(BaseModel):
 
 class Trade(BaseModel):
     """Trade model database storage."""
+
     trade_id: str = Field(
-        default_factory=lambda: f"trade_{datetime.now(UTC).strftime('%Y%m%d%H%M%S%f')}_{uuid4().hex[:8]}"
+        default_factory=lambda: (
+            f"trade_{datetime.now(UTC).strftime('%Y%m%d%H%M%S%f')}_{uuid4().hex[:8]}"
+        )
     )
 
     symbol: str
@@ -216,7 +242,11 @@ class Trade(BaseModel):
         """Calculate PnL trade, handling both enum/stringside (H7)."""
         if self.transaction_type is None:
             return 0.0
-        side_str = self.transaction_type.value if hasattr(self.transaction_type, "value") else str(self.transaction_type)
+        side_str = (
+            self.transaction_type.value
+            if hasattr(self.transaction_type, "value")
+            else str(self.transaction_type)
+        )
         if side_str.upper() == "BUY":
             return (current_price - self.entry_price) * self.quantity
         else:
@@ -225,6 +255,7 @@ class Trade(BaseModel):
 
 class SignalType(StrEnum):
     """Signal type enumeration."""
+
     BUY = "BUY"
     SELL = "SELL"
     HOLD = "HOLD"
@@ -233,8 +264,11 @@ class SignalType(StrEnum):
 
 class Signal(BaseModel):
     """Trading signal model."""
+
     signal_id: str = Field(
-        default_factory=lambda: f"signal_{datetime.now(UTC).strftime('%Y%m%d%H%M%S%f')}_{uuid4().hex[:8]}"
+        default_factory=lambda: (
+            f"signal_{datetime.now(UTC).strftime('%Y%m%d%H%M%S%f')}_{uuid4().hex[:8]}"
+        )
     )
 
     symbol: str
@@ -248,6 +282,7 @@ class Signal(BaseModel):
 
 class NewsItem(BaseModel):
     """News item model."""
+
     title: str
     content: str
     source: str
@@ -259,8 +294,11 @@ class NewsItem(BaseModel):
 
 class AuditLogEntry(BaseModel):
     """Audit log entry model."""
+
     entry_id: str = Field(
-        default_factory=lambda: f"audit_{datetime.now(UTC).strftime('%Y%m%d%H%M%S%f')}_{uuid4().hex[:8]}"
+        default_factory=lambda: (
+            f"audit_{datetime.now(UTC).strftime('%Y%m%d%H%M%S%f')}_{uuid4().hex[:8]}"
+        )
     )
 
     timestamp: datetime
@@ -276,6 +314,7 @@ class AuditLogEntry(BaseModel):
 
 class TAIndicator(BaseModel):
     """Technical analysis indicator model."""
+
     name: str
     value: float
     timestamp: datetime
@@ -284,6 +323,7 @@ class TAIndicator(BaseModel):
 
 class Greeks(BaseModel):
     """Greeks model options."""
+
     delta: float
     gamma: float
     theta: float
@@ -294,6 +334,7 @@ class Greeks(BaseModel):
 
 class VaRResult(BaseModel):
     """Value Risk result model."""
+
     confidence_level: float
     time_horizon: int = Field(description="days")
     var_value: float
@@ -305,6 +346,7 @@ class VaRResult(BaseModel):
 
 class SentimentAnalysisResult(BaseModel):
     """Sentiment analysis result model."""
+
     symbol: str
     timestamp: datetime
     sentiment_score: float
