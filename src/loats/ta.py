@@ -56,7 +56,7 @@ elif NJIT_SUPPORTS_FASTMATH:
         return njit(fastmath=True)(func)
 else:
     def _supertrend_njit_decorator(func):
-        return njit()(func)
+        return njit(func)
 
 logger = get_logger(__name__)
 

@@ -94,7 +94,7 @@ class CacheManager:
                 maxsize=self.config.max_size,
                 ttl=self.config.ttl_seconds,
             )
-            self._cache_type = "memory"
+            self._cache_type = "in_memory_ttl"
             logger.info(f"In-memory cache initialized (max_size={self.config.max_size}, ttl={self.config.ttl_seconds}s)")
 
         except Exception as e:
@@ -355,7 +355,7 @@ class CacheManager:
                 "connected": True,
                 "cache_type": self._cache_type,
                 "current_size": current_size,
-                "max_size": self.config.max_size if self._cache_type == "memory" else "unlimited",
+                "max_size": self.config.max_size if self._cache_type == "in_memory_ttl" else "unlimited",
                 "hits": self._cache_stats["hits"],
                 "misses": self._cache_stats["misses"],
                 "sets": self._cache_stats["sets"],
