@@ -1,0 +1,196 @@
+F841 Local variable `mock_redis` is assigned to but never used
+   --> tests\test_cache_redis_coverage.py:199:55
+    |
+198 |         # Mock Redis connection
+199 |         with patch.object(cache_manager, '_redis') as mock_redis:
+    |                                                       ^^^^^^^^^^
+200 |             cache_manager._cache_type = "redis"
+    |
+help: Remove assignment to unused variable `mock_redis`
+
+F841 Local variable `start_time` is assigned to but never used
+   --> tests\test_metrics.py:211:13
+    |
+209 |             # Execute the job
+210 |             import asyncio
+211 |             start_time = time.time()
+    |             ^^^^^^^^^^
+212 |             result = asyncio.run(test_job())
+213 |             end_time = time.time()
+    |
+help: Remove assignment to unused variable `start_time`
+
+F841 Local variable `result` is assigned to but never used
+   --> tests\test_metrics.py:212:13
+    |
+210 |             import asyncio
+211 |             start_time = time.time()
+212 |             result = asyncio.run(test_job())
+    |             ^^^^^^
+213 |             end_time = time.time()
+    |
+help: Remove assignment to unused variable `result`
+
+F841 Local variable `end_time` is assigned to but never used
+   --> tests\test_metrics.py:213:13
+    |
+211 |             start_time = time.time()
+212 |             result = asyncio.run(test_job())
+213 |             end_time = time.time()
+    |             ^^^^^^^^
+214 |
+215 |             # Should have recorded latency
+    |
+help: Remove assignment to unused variable `end_time`
+
+F841 Local variable `mock_client` is assigned to but never used
+  --> tests\test_openalgo_fixed.py:61:35
+   |
+59 | def test_openalgo_client_ensure_client(openalgo_client):
+60 |     """Test _ensure_client method."""
+61 |     with patch('httpx.Client') as mock_client:
+   |                                   ^^^^^^^^^^^
+62 |         client = openalgo_client._ensure_client()
+63 |         assert client is not None
+   |
+help: Remove assignment to unused variable `mock_client`
+
+F841 Local variable `mock_client` is assigned to but never used
+   --> tests\test_openalgo_fixed.py:287:40
+    |
+285 | async def test_async_openalgo_client_ensure_client(async_openalgo_client):
+286 |     """Test async _ensure_client method."""
+287 |     with patch('httpx.AsyncClient') as mock_client:
+    |                                        ^^^^^^^^^^^
+288 |         client = await async_openalgo_client._ensure_client()
+289 |         assert client is not None
+    |
+help: Remove assignment to unused variable `mock_client`
+
+B007 Loop control variable `i` not used within loop body
+  --> tests\test_rate_limiter_additional.py:67:13
+   |
+66 |         # Should be able to acquire many tokens
+67 |         for i in range(100):
+   |             ^
+68 |             result = await limiter.acquire()
+69 |             assert result is True
+   |
+help: Rename unused `i` to `_i`
+
+B007 Loop control variable `i` not used within loop body
+   --> tests\test_rate_limiter_additional.py:102:13
+    |
+101 |         # Should work normally
+102 |         for i in range(5):
+    |             ^
+103 |             result = await limiter.acquire()
+104 |             assert result is True
+    |
+help: Rename unused `i` to `_i`
+
+B007 Loop control variable `i` not used within loop body
+   --> tests\test_rate_limiter_additional.py:121:13
+    |
+120 |         # Should be able to acquire 10 tokens
+121 |         for i in range(10):
+    |             ^
+122 |             result = await limiter.acquire()
+123 |             assert result is True
+    |
+help: Rename unused `i` to `_i`
+
+B007 Loop control variable `i` not used within loop body
+   --> tests\test_rate_limiter_additional.py:150:13
+    |
+148 |         # Burst: acquire all tokens
+149 |         results = []
+150 |         for i in range(5):
+    |             ^
+151 |             result = await limiter.acquire()
+152 |             results.append(result)
+    |
+help: Rename unused `i` to `_i`
+
+B007 Loop control variable `i` not used within loop body
+   --> tests\test_rate_limiter_additional.py:208:13
+    |
+207 |         # Should be able to acquire 3 tokens
+208 |         for i in range(3):
+    |             ^
+209 |             result = limiter.acquire()
+210 |             assert result is True
+    |
+help: Rename unused `i` to `_i`
+
+B007 Loop control variable `i` not used within loop body
+   --> tests\test_rate_limiter_additional.py:248:13
+    |
+247 |         # Should work normally
+248 |         for i in range(5):
+    |             ^
+249 |             result = limiter.acquire()
+250 |             assert result is True
+    |
+help: Rename unused `i` to `_i`
+
+B007 Loop control variable `i` not used within loop body
+   --> tests\test_rate_limiter_additional.py:396:13
+    |
+394 |         # Try to acquire many more than max_ops
+395 |         results = []
+396 |         for i in range(100):
+    |             ^
+397 |             result = await limiter.acquire()
+398 |             results.append(result)
+    |
+help: Rename unused `i` to `_i`
+
+B007 Loop control variable `i` not used within loop body
+   --> tests\test_rate_limiter_additional.py:419:17
+    |
+417 |             """Worker that makes multiple requests."""
+418 |             successful = 0
+419 |             for i in range(num_requests):
+    |                 ^
+420 |                 result = await limiter.acquire()
+421 |                 if result:
+    |
+help: Rename unused `i` to `_i`
+
+B007 Loop control variable `i` not used within loop body
+   --> tests\test_rate_limiter_additional.py:470:13
+    |
+468 |         # Phase 1: Burst
+469 |         burst_results = []
+470 |         for i in range(5):
+    |             ^
+471 |             result = await limiter.acquire()
+472 |             burst_results.append(result)
+    |
+help: Rename unused `i` to `_i`
+
+B007 Loop control variable `i` not used within loop body
+   --> tests\test_rate_limiter_additional.py:481:13
+    |
+480 |         second_burst_results = []
+481 |         for i in range(3):
+    |             ^
+482 |             result = await limiter.acquire()
+483 |             second_burst_results.append(result)
+    |
+help: Rename unused `i` to `_i`
+
+B007 Loop control variable `i` not used within loop body
+   --> tests\test_rate_limiter_additional.py:495:13
+    |
+494 |         third_burst_results = []
+495 |         for i in range(3):
+    |             ^
+496 |             result = await limiter.acquire()
+497 |             third_burst_results.append(result)
+    |
+help: Rename unused `i` to `_i`
+
+Found 17 errors.
+No fixes available (17 hidden fixes can be enabled with the `--unsafe-fixes` option).

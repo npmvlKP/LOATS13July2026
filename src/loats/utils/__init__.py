@@ -29,6 +29,7 @@ __all__ = [
     "RateLimitExceededError",
     "AsyncRateLimiter",
     "RateLimiter",
+    "rate_limited",
     # Retry
     "OPENALGO_RETRY_CONFIG",
     "retry_async",

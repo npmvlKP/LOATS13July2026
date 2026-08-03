@@ -1,4 +1,5 @@
 """Rate limiter implementation LOATS13July2026."""
+
 import asyncio
 import time
 from collections import deque
@@ -10,6 +11,7 @@ from ..loats_logging import get_logger
 
 logger = get_logger(__name__)
 
+
 class RateLimiter:
     """Rate limiter implementation using sliding window algorithm.
 
@@ -17,7 +19,12 @@ class RateLimiter:
     settings (max_ops).
     """
 
-    def __init__(self, max_ops: int | None = None, window_size: float = 1.0, interval: float | None = None):
+    def __init__(
+        self,
+        max_ops: int | None = None,
+        window_size: float = 1.0,
+        interval: float | None = None,
+    ):
         """Initialize rate limiter.
 
         Args:
@@ -50,7 +57,9 @@ class RateLimiter:
 
             # Remove timestamps older than window_size
             # Use > to ensure we maintain strict max_ops limit in any window
-            while self.timestamps and current_time - self.timestamps[0] > self.window_size:
+            while (
+                self.timestamps and current_time - self.timestamps[0] > self.window_size
+            ):
                 self.timestamps.popleft()
 
             # Check if we can acquire a token
@@ -73,7 +82,9 @@ class RateLimiter:
 
             # Remove timestamps older than window_size
             # Use > to ensure we maintain strict max_ops limit in any window
-            while self.timestamps and current_time - self.timestamps[0] > self.window_size:
+            while (
+                self.timestamps and current_time - self.timestamps[0] > self.window_size
+            ):
                 self.timestamps.popleft()
 
             # Check if we can acquire immediately
@@ -83,7 +94,9 @@ class RateLimiter:
             # Otherwise, calculate time until oldest token expires
             if self.timestamps:
                 oldest_timestamp = self.timestamps[0]
-                time_until_oldest_expires = oldest_timestamp + self.window_size - current_time
+                time_until_oldest_expires = (
+                    oldest_timestamp + self.window_size - current_time
+                )
                 return max(0.0, time_until_oldest_expires)
             else:
                 return 0.0
@@ -101,7 +114,9 @@ class RateLimiter:
             current_time = time.monotonic()
             if self.timestamps:
                 oldest_timestamp = self.timestamps[0]
-                time_until_oldest_expires = oldest_timestamp + self.window_size - current_time
+                time_until_oldest_expires = (
+                    oldest_timestamp + self.window_size - current_time
+                )
                 # Sleep until the oldest token expires, with a small buffer to account for scheduling delays
                 # Use max(0.001, ...) to ensure we always sleep at least a tiny amount
                 sleep_time = max(0.001, time_until_oldest_expires)
@@ -112,8 +127,6 @@ class RateLimiter:
             else:
                 sleep_time = 0.05
             await asyncio.sleep(sleep_time)
-
-
 
 
 class AsyncRateLimiter:
@@ -151,7 +164,9 @@ class AsyncRateLimiter:
 
             # Remove timestamps older than window_size
             # Use > to ensure we maintain strict max_ops limit in any window
-            while self.timestamps and current_time - self.timestamps[0] > self.window_size:
+            while (
+                self.timestamps and current_time - self.timestamps[0] > self.window_size
+            ):
                 self.timestamps.popleft()
 
             # Check if we can acquire a token
@@ -174,7 +189,9 @@ class AsyncRateLimiter:
 
             # Remove timestamps older than window_size
             # Use > to ensure we maintain strict max_ops limit in any window
-            while self.timestamps and current_time - self.timestamps[0] > self.window_size:
+            while (
+                self.timestamps and current_time - self.timestamps[0] > self.window_size
+            ):
                 self.timestamps.popleft()
 
             # Check if we can acquire immediately
@@ -184,7 +201,9 @@ class AsyncRateLimiter:
             # Otherwise, calculate time until oldest token expires
             if self.timestamps:
                 oldest_timestamp = self.timestamps[0]
-                time_until_oldest_expires = oldest_timestamp + self.window_size - current_time
+                time_until_oldest_expires = (
+                    oldest_timestamp + self.window_size - current_time
+                )
                 return max(0.0, time_until_oldest_expires)
             else:
                 return 0.0
@@ -202,13 +221,16 @@ class AsyncRateLimiter:
             current_time = time.monotonic()
             if self.timestamps:
                 oldest_timestamp = self.timestamps[0]
-                time_until_oldest_expires = oldest_timestamp + self.window_size - current_time
+                time_until_oldest_expires = (
+                    oldest_timestamp + self.window_size - current_time
+                )
                 # Sleep until the oldest token expires
                 # Use a small sleep time to be more deterministic
                 sleep_time = max(0.001, time_until_oldest_expires)
             else:
                 sleep_time = 0.05
             await asyncio.sleep(sleep_time)
+
 
 class SyncRateLimiter:
     """Synchronous rate limiter using sliding window algorithm.
@@ -217,7 +239,12 @@ class SyncRateLimiter:
     and uses threading.Lock instead of asyncio.Lock.
     """
 
-    def __init__(self, max_ops: int | None = None, window_size: float = 1.0, interval: float | None = None):
+    def __init__(
+        self,
+        max_ops: int | None = None,
+        window_size: float = 1.0,
+        interval: float | None = None,
+    ):
         """Initialize synchronous rate limiter.
 
         Args:
@@ -227,6 +254,7 @@ class SyncRateLimiter:
         """
         import threading
         from collections import deque
+
         settings = get_settings()
         self.max_ops: int = max_ops if max_ops is not None else settings.max_ops
         self.window_size: float = window_size
@@ -252,7 +280,9 @@ class SyncRateLimiter:
 
             # Remove timestamps older than window_size
             # Use > to ensure we maintain strict max_ops limit in any window
-            while self.timestamps and current_time - self.timestamps[0] > self.window_size:
+            while (
+                self.timestamps and current_time - self.timestamps[0] > self.window_size
+            ):
                 self.timestamps.popleft()
 
             # Check if we can acquire a token
@@ -270,6 +300,7 @@ class SyncRateLimiter:
             RateLimitExceededError: if waiting takes too long
         """
         import time as time_module
+
         start_time = time_module.monotonic()
         timeout = 10.0  # 10 second timeout
 
@@ -280,6 +311,7 @@ class SyncRateLimiter:
                 raise RateLimitExceededError("Timeout waiting for rate limit token")
             time_module.sleep(0.1)  # Small sleep to prevent busy waiting
 
+
 class RateLimitExceededError(Exception):
     """Exception raised when rate limit is exceeded."""
 
@@ -287,7 +319,10 @@ class RateLimitExceededError(Exception):
         self.message: str = message
         super().__init__(self.message)
 
-def rate_limited(max_ops: int | None = None, window_size: float = 1.0):
+
+def rate_limited(
+    max_ops: int | None = None, window_size: float = 1.0
+) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
     """Decorator for rate limiting synchronous functions.
 
     Args:
@@ -298,18 +333,21 @@ def rate_limited(max_ops: int | None = None, window_size: float = 1.0):
         A decorator that can be applied to synchronous functions
     """
 
-    def decorator(func: Callable) -> Callable:
+    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
         # Create a sync rate limiter for this function
         limiter = SyncRateLimiter(max_ops=max_ops, window_size=window_size)
 
-        def wrapper(*args, **kwargs):
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
             if not limiter.acquire():
-                raise RateLimitExceededError(f"Rate limit exceeded for function {func.__name__}")
+                raise RateLimitExceededError(
+                    f"Rate limit exceeded for function {func.__name__}"
+                )
             return func(*args, **kwargs)
 
         return wrapper
 
     return decorator
+
 
 # Internal global rate limiter instances for dependency injection
 # Note: These are created with default parameters but can be overridden by passing parameters to the getter functions
@@ -317,7 +355,10 @@ def rate_limited(max_ops: int | None = None, window_size: float = 1.0):
 _ORDER_RATE_LIMITER = AsyncRateLimiter(max_ops=50)
 _SMART_ORDER_RATE_LIMITER = AsyncRateLimiter(max_ops=50)
 
-def get_order_rate_limiter(max_ops: int | None = None, window_size: float = 1.0) -> AsyncRateLimiter:
+
+def get_order_rate_limiter(
+    max_ops: int | None = None, window_size: float = 1.0
+) -> AsyncRateLimiter:
     """Get global order rate limiter instance.
 
     Args:
@@ -333,7 +374,10 @@ def get_order_rate_limiter(max_ops: int | None = None, window_size: float = 1.0)
         return _ORDER_RATE_LIMITER
     return AsyncRateLimiter(max_ops=max_ops, window_size=window_size)
 
-def get_smart_order_rate_limiter(max_ops: int | None = None, window_size: float = 1.0) -> AsyncRateLimiter:
+
+def get_smart_order_rate_limiter(
+    max_ops: int | None = None, window_size: float = 1.0
+) -> AsyncRateLimiter:
     """Get global smart order rate limiter instance.
 
     Args:

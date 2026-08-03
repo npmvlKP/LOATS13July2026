@@ -2,14 +2,15 @@
 Fixed test to verify kill switch functionality.
 """
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
+
 
 def test_kill_switch_check():
     """Test _check_kill_switch function raises KillSwitchError when active."""
     with patch("src.loats.alerts.alerts") as mock_alerts:
         mock_alerts.is_kill_switch_active.return_value = True
 
-        from src.loats.openalgo import _check_kill_switch, KillSwitchError
+        from src.loats.openalgo import KillSwitchError, _check_kill_switch
 
         try:
             _check_kill_switch()
@@ -22,13 +23,15 @@ def test_kill_switch_check():
             print(f"ERROR: Unexpected exception: {e}")
             return False
 
+
 def test_async_kill_switch_check():
     """Test _async_check_kill_switch function raises KillSwitchError when active."""
     with patch("src.loats.alerts.alerts") as mock_alerts:
         mock_alerts.is_kill_switch_active.return_value = True
 
-        from src.loats.openalgo import _async_check_kill_switch, KillSwitchError
         import asyncio
+
+        from src.loats.openalgo import KillSwitchError, _async_check_kill_switch
 
         try:
             asyncio.run(_async_check_kill_switch())
@@ -40,6 +43,7 @@ def test_async_kill_switch_check():
         except Exception as e:
             print(f"ERROR: Unexpected exception: {e}")
             return False
+
 
 if __name__ == "__main__":
     success1 = test_kill_switch_check()

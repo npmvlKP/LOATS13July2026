@@ -22,6 +22,7 @@ from src.loats.openalgo import (
 
 settings = get_settings()
 
+
 class TestOpenAlgoClientComprehensive:
     """Comprehensive tests for OpenAlgoClient covering missing coverage."""
 
@@ -46,24 +47,31 @@ class TestOpenAlgoClientComprehensive:
     def test_kill_switch_check(self) -> None:
         """Test _check_kill_switch function raises KillSwitchError when active."""
         from src.loats.openalgo import _check_kill_switch
+
         with patch("src.loats.openalgo._get_alerts") as mock_get_alerts:
             mock_alerts = MagicMock()
             mock_alerts.is_kill_switch_active.return_value = True
             mock_get_alerts.return_value = mock_alerts
 
-            with pytest.raises(KillSwitchError, match="Kill switch active, order placement blocked"):
+            with pytest.raises(
+                KillSwitchError, match="Kill switch active, order placement blocked"
+            ):
                 _check_kill_switch()
 
     def test_async_kill_switch_check(self) -> None:
         """Test _async_check_kill_switch function raises KillSwitchError when active."""
         from src.loats.openalgo import _async_check_kill_switch
+
         with patch("src.loats.openalgo._get_alerts") as mock_get_alerts:
             mock_alerts = MagicMock()
             mock_alerts.is_kill_switch_active.return_value = True
             mock_get_alerts.return_value = mock_alerts
 
-            with pytest.raises(KillSwitchError, match="Kill switch active, order placement blocked"):
+            with pytest.raises(
+                KillSwitchError, match="Kill switch active, order placement blocked"
+            ):
                 import asyncio
+
                 asyncio.run(_async_check_kill_switch())
 
     def test_client_context_manager(self, client: OpenAlgoClient) -> None:
@@ -108,8 +116,13 @@ class TestOpenAlgoClientComprehensive:
         self, client: OpenAlgoClient, mock_httpx_client: MagicMock
     ) -> None:
         """Test place_order raises KillSwitchError when kill switch active."""
-        with patch("src.loats.openalgo._check_kill_switch", side_effect=KillSwitchError("Kill switch active, order placement blocked")):
-            with pytest.raises(KillSwitchError, match="Kill switch active, order placement blocked"):
+        with patch(
+            "src.loats.openalgo._check_kill_switch",
+            side_effect=KillSwitchError("Kill switch active, order placement blocked"),
+        ):
+            with pytest.raises(
+                KillSwitchError, match="Kill switch active, order placement blocked"
+            ):
                 client.place_order(
                     symbol="NIFTY",
                     quantity=1,
@@ -117,7 +130,10 @@ class TestOpenAlgoClientComprehensive:
                 )
 
     def test_place_order_success_all_params(
-        self, client: OpenAlgoClient, mock_httpx_client: MagicMock, mock_response: MagicMock
+        self,
+        client: OpenAlgoClient,
+        mock_httpx_client: MagicMock,
+        mock_response: MagicMock,
     ) -> None:
         """Test place_order with all parameters successfully."""
         mock_response.json.return_value = {
@@ -162,7 +178,10 @@ class TestOpenAlgoClientComprehensive:
             assert payload["trailing_stop_loss"] == 50.0
 
     def test_place_order_minimal_params(
-        self, client: OpenAlgoClient, mock_httpx_client: MagicMock, mock_response: MagicMock
+        self,
+        client: OpenAlgoClient,
+        mock_httpx_client: MagicMock,
+        mock_response: MagicMock,
     ) -> None:
         """Test place_order with minimal parameters successfully."""
         mock_response.json.return_value = {
@@ -223,8 +242,13 @@ class TestOpenAlgoClientComprehensive:
         self, client: OpenAlgoClient, mock_httpx_client: MagicMock
     ) -> None:
         """Test place_smart_order raises KillSwitchError when kill switch active."""
-        with patch("src.loats.openalgo._check_kill_switch", side_effect=KillSwitchError("Kill switch active, order placement blocked")):
-            with pytest.raises(KillSwitchError, match="Kill switch active, order placement blocked"):
+        with patch(
+            "src.loats.openalgo._check_kill_switch",
+            side_effect=KillSwitchError("Kill switch active, order placement blocked"),
+        ):
+            with pytest.raises(
+                KillSwitchError, match="Kill switch active, order placement blocked"
+            ):
                 client.place_smart_order(
                     symbol="NIFTY",
                     quantity=1,
@@ -232,7 +256,10 @@ class TestOpenAlgoClientComprehensive:
                 )
 
     def test_place_smart_order_success_all_params(
-        self, client: OpenAlgoClient, mock_httpx_client: MagicMock, mock_response: MagicMock
+        self,
+        client: OpenAlgoClient,
+        mock_httpx_client: MagicMock,
+        mock_response: MagicMock,
     ) -> None:
         """Test place_smart_order with all parameters successfully."""
         mock_response.json.return_value = {
@@ -287,12 +314,20 @@ class TestOpenAlgoClientComprehensive:
         self, client: OpenAlgoClient, mock_httpx_client: MagicMock
     ) -> None:
         """Test modify_order raises KillSwitchError when kill switch active."""
-        with patch("src.loats.openalgo._check_kill_switch", side_effect=KillSwitchError("Kill switch active, order placement blocked")):
-            with pytest.raises(KillSwitchError, match="Kill switch active, order placement blocked"):
+        with patch(
+            "src.loats.openalgo._check_kill_switch",
+            side_effect=KillSwitchError("Kill switch active, order placement blocked"),
+        ):
+            with pytest.raises(
+                KillSwitchError, match="Kill switch active, order placement blocked"
+            ):
                 client.modify_order(order_id="ORD12345", quantity=2)
 
     def test_modify_order_success_all_params(
-        self, client: OpenAlgoClient, mock_httpx_client: MagicMock, mock_response: MagicMock
+        self,
+        client: OpenAlgoClient,
+        mock_httpx_client: MagicMock,
+        mock_response: MagicMock,
     ) -> None:
         """Test modify_order with all parameters successfully."""
         mock_response.json.return_value = {
@@ -334,12 +369,20 @@ class TestOpenAlgoClientComprehensive:
         self, client: OpenAlgoClient, mock_httpx_client: MagicMock
     ) -> None:
         """Test cancel_order raises KillSwitchError when kill switch active."""
-        with patch("src.loats.openalgo._check_kill_switch", side_effect=KillSwitchError("Kill switch active, order placement blocked")):
-            with pytest.raises(KillSwitchError, match="Kill switch active, order placement blocked"):
+        with patch(
+            "src.loats.openalgo._check_kill_switch",
+            side_effect=KillSwitchError("Kill switch active, order placement blocked"),
+        ):
+            with pytest.raises(
+                KillSwitchError, match="Kill switch active, order placement blocked"
+            ):
                 client.cancel_order("ORD12345")
 
     def test_cancel_order_success(
-        self, client: OpenAlgoClient, mock_httpx_client: MagicMock, mock_response: MagicMock
+        self,
+        client: OpenAlgoClient,
+        mock_httpx_client: MagicMock,
+        mock_response: MagicMock,
     ) -> None:
         """Test cancel_order successfully."""
         mock_response.json.return_value = {
@@ -383,6 +426,7 @@ class TestOpenAlgoClientComprehensive:
             assert exc_info.value.status_code == 404
             assert "Order not found" in str(exc_info.value)
 
+
 class TestAsyncOpenAlgoClientComprehensive:
     """Comprehensive tests for AsyncOpenAlgoClient covering missing coverage."""
 
@@ -405,7 +449,9 @@ class TestAsyncOpenAlgoClientComprehensive:
         return response
 
     @pytest.mark.asyncio
-    async def test_async_client_context_manager(self, async_client: AsyncOpenAlgoClient) -> None:
+    async def test_async_client_context_manager(
+        self, async_client: AsyncOpenAlgoClient
+    ) -> None:
         """Test AsyncOpenAlgoClient context manager enter/exit."""
         with patch("httpx.AsyncClient") as mock_client_class:
             mock_client = AsyncMock()
@@ -423,7 +469,9 @@ class TestAsyncOpenAlgoClientComprehensive:
             assert async_client.client is None
 
     @pytest.mark.asyncio
-    async def test_async_client_ensure_client(self, async_client: AsyncOpenAlgoClient) -> None:
+    async def test_async_client_ensure_client(
+        self, async_client: AsyncOpenAlgoClient
+    ) -> None:
         """Test AsyncOpenAlgoClient._ensure_client method."""
         with patch("httpx.AsyncClient") as mock_client_class:
             mock_client = AsyncMock()
@@ -445,12 +493,17 @@ class TestAsyncOpenAlgoClientComprehensive:
             mock_client_class.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_async_place_order_kill_switch(self, async_client: AsyncOpenAlgoClient) -> None:
+    async def test_async_place_order_kill_switch(
+        self, async_client: AsyncOpenAlgoClient
+    ) -> None:
         """Test async place_order raises KillSwitchError when kill switch active."""
         with patch(
-            "src.loats.openalgo._async_check_kill_switch", side_effect=KillSwitchError("Kill switch active, order placement blocked")
+            "src.loats.openalgo._async_check_kill_switch",
+            side_effect=KillSwitchError("Kill switch active, order placement blocked"),
         ):
-            with pytest.raises(KillSwitchError, match="Kill switch active, order placement blocked"):
+            with pytest.raises(
+                KillSwitchError, match="Kill switch active, order placement blocked"
+            ):
                 await async_client.place_order(
                     symbol="NIFTY",
                     quantity=1,
@@ -492,7 +545,9 @@ class TestAsyncOpenAlgoClientComprehensive:
         with patch.object(
             async_client, "_ensure_client", return_value=mock_async_httpx_client
         ):
-            with patch("src.loats.openalgo.get_order_rate_limiter") as mock_rate_limiter:
+            with patch(
+                "src.loats.openalgo.get_order_rate_limiter"
+            ) as mock_rate_limiter:
                 mock_limiter = AsyncMock()
                 mock_limiter.acquire.return_value = True
                 mock_rate_limiter.return_value = mock_limiter
@@ -548,7 +603,9 @@ class TestAsyncOpenAlgoClientComprehensive:
         with patch.object(
             async_client, "_ensure_client", return_value=mock_async_httpx_client
         ):
-            with patch("src.loats.openalgo.get_order_rate_limiter") as mock_rate_limiter:
+            with patch(
+                "src.loats.openalgo.get_order_rate_limiter"
+            ) as mock_rate_limiter:
                 mock_limiter = AsyncMock()
                 mock_limiter.acquire.return_value = True
                 mock_rate_limiter.return_value = mock_limiter
@@ -608,9 +665,12 @@ class TestAsyncOpenAlgoClientComprehensive:
     ) -> None:
         """Test async place_smart_order raises KillSwitchError when kill switch active."""
         with patch(
-            "src.loats.openalgo._async_check_kill_switch", side_effect=KillSwitchError("Kill switch active, order placement blocked")
+            "src.loats.openalgo._async_check_kill_switch",
+            side_effect=KillSwitchError("Kill switch active, order placement blocked"),
         ):
-            with pytest.raises(KillSwitchError, match="Kill switch active, order placement blocked"):
+            with pytest.raises(
+                KillSwitchError, match="Kill switch active, order placement blocked"
+            ):
                 await async_client.place_smart_order(
                     symbol="NIFTY",
                     quantity=1,
@@ -622,7 +682,9 @@ class TestAsyncOpenAlgoClientComprehensive:
         self, async_client: AsyncOpenAlgoClient
     ) -> None:
         """Test async place_smart_order raises RateLimitExceededError when rate limit exceeded."""
-        with patch("src.loats.openalgo.get_smart_order_rate_limiter") as mock_rate_limiter:
+        with patch(
+            "src.loats.openalgo.get_smart_order_rate_limiter"
+        ) as mock_rate_limiter:
             mock_limiter = AsyncMock()
             mock_limiter.acquire.return_value = False
             mock_rate_limiter.return_value = mock_limiter
@@ -656,7 +718,9 @@ class TestAsyncOpenAlgoClientComprehensive:
         with patch.object(
             async_client, "_ensure_client", return_value=mock_async_httpx_client
         ):
-            with patch("src.loats.openalgo.get_smart_order_rate_limiter") as mock_rate_limiter:
+            with patch(
+                "src.loats.openalgo.get_smart_order_rate_limiter"
+            ) as mock_rate_limiter:
                 mock_limiter = AsyncMock()
                 mock_limiter.acquire.return_value = True
                 mock_rate_limiter.return_value = mock_limiter
@@ -703,9 +767,12 @@ class TestAsyncOpenAlgoClientComprehensive:
     ) -> None:
         """Test async modify_order raises KillSwitchError when kill switch active."""
         with patch(
-            "src.loats.openalgo._async_check_kill_switch", side_effect=KillSwitchError("Kill switch active, order placement blocked")
+            "src.loats.openalgo._async_check_kill_switch",
+            side_effect=KillSwitchError("Kill switch active, order placement blocked"),
         ):
-            with pytest.raises(KillSwitchError, match="Kill switch active, order placement blocked"):
+            with pytest.raises(
+                KillSwitchError, match="Kill switch active, order placement blocked"
+            ):
                 await async_client.modify_order(order_id="ORD12345", quantity=2)
 
     @pytest.mark.asyncio
@@ -759,9 +826,12 @@ class TestAsyncOpenAlgoClientComprehensive:
     ) -> None:
         """Test async cancel_order raises KillSwitchError when kill switch active."""
         with patch(
-            "src.loats.openalgo._async_check_kill_switch", side_effect=KillSwitchError("Kill switch active, order placement blocked")
+            "src.loats.openalgo._async_check_kill_switch",
+            side_effect=KillSwitchError("Kill switch active, order placement blocked"),
         ):
-            with pytest.raises(KillSwitchError, match="Kill switch active, order placement blocked"):
+            with pytest.raises(
+                KillSwitchError, match="Kill switch active, order placement blocked"
+            ):
                 await async_client.cancel_order("ORD12345")
 
     @pytest.mark.asyncio
@@ -818,6 +888,7 @@ class TestAsyncOpenAlgoClientComprehensive:
             assert exc_info.value.status_code == 404
             assert "Order not found" in str(exc_info.value)
 
+
 class TestOpenAlgoErrorScenarios:
     """Tests for various error scenarios in OpenAlgo clients."""
 
@@ -858,13 +929,17 @@ class TestOpenAlgoErrorScenarios:
         self, async_client: AsyncOpenAlgoClient, mock_async_httpx_client: AsyncMock
     ) -> None:
         """Test async timeout error handling."""
-        mock_async_httpx_client.post.side_effect = httpx.TimeoutException("Request timed out")
+        mock_async_httpx_client.post.side_effect = httpx.TimeoutException(
+            "Request timed out"
+        )
 
         with patch.object(
             async_client, "_ensure_client", return_value=mock_async_httpx_client
         ):
             with pytest.raises(OpenAlgoError) as exc_info:
-                await async_client._request("POST", "quotes", json={"symbols": ["NIFTY"]})
+                await async_client._request(
+                    "POST", "quotes", json={"symbols": ["NIFTY"]}
+                )
 
             assert "Timeout error" in str(exc_info.value)
 
@@ -897,7 +972,9 @@ class TestOpenAlgoErrorScenarios:
             async_client, "_ensure_client", return_value=mock_async_httpx_client
         ):
             with pytest.raises(OpenAlgoError) as exc_info:
-                await async_client._request("POST", "quotes", json={"symbols": ["NIFTY"]})
+                await async_client._request(
+                    "POST", "quotes", json={"symbols": ["NIFTY"]}
+                )
 
             assert "JSON decode error" in str(exc_info.value)
 
@@ -924,6 +1001,8 @@ class TestOpenAlgoErrorScenarios:
             async_client, "_ensure_client", return_value=mock_async_httpx_client
         ):
             with pytest.raises(OpenAlgoError) as exc_info:
-                await async_client._request("POST", "quotes", json={"symbols": ["NIFTY"]})
+                await async_client._request(
+                    "POST", "quotes", json={"symbols": ["NIFTY"]}
+                )
 
             assert "Request failed" in str(exc_info.value)

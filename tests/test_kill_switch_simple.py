@@ -8,6 +8,7 @@ import pytest
 
 from src.loats.openalgo import KillSwitchError
 
+
 def test_kill_switch_check():
     """Test _check_kill_switch function raises KillSwitchError when active."""
     with patch("src.loats.openalgo._get_alerts") as mock_get_alerts:
@@ -19,6 +20,7 @@ def test_kill_switch_check():
 
         with pytest.raises(KillSwitchError):
             _check_kill_switch()
+
 
 if __name__ == "__main__":
     test_kill_switch_check()

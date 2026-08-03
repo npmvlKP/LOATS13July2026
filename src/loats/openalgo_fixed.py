@@ -1,11 +1,12 @@
 """
 OpenAlgo client implementation LOATS13July2026.
 """
+
 from __future__ import annotations
 
 import json
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any, Dict
+from typing import TYPE_CHECKING, Any
 
 import httpx
 
@@ -34,15 +35,20 @@ if TYPE_CHECKING:
 
 logger = get_logger(__name__)
 
+
 class OpenAlgoError(Exception):
     """Base exception OpenAlgo client errors."""
+
 
 class KillSwitchError(OpenAlgoError):
     """Exception raised when order placement attempted while kill switch active."""
 
-    def __init__(self, message: str = "Kill switch active, order placement blocked") -> None:
+    def __init__(
+        self, message: str = "Kill switch active, order placement blocked"
+    ) -> None:
         self.message = message
         super().__init__(self.message)
+
 
 class OpenAlgoAPIError(OpenAlgoError):
     """Exception API response errors."""
@@ -58,10 +64,13 @@ class OpenAlgoAPIError(OpenAlgoError):
         self.details = details
         super().__init__(f"API Error {status_code}: {message}")
 
+
 def _get_alerts() -> AlertSystem:
     """Lazy import alerts avoid circular import."""
     from .alerts import alerts
+
     return alerts
+
 
 def _check_kill_switch() -> None:
     """Check kill switch active."""
@@ -70,12 +79,14 @@ def _check_kill_switch() -> None:
         logger.error("Kill switch active, order placement blocked")
         raise KillSwitchError("Kill switch active, order placement blocked")
 
+
 async def _async_check_kill_switch() -> None:
     """Async version: Check kill switch active."""
     alerts = _get_alerts()
     if alerts.is_kill_switch_active():
         logger.error("Kill switch active, order placement blocked")
         raise KillSwitchError("Kill switch active, order placement blocked")
+
 
 class OpenAlgoClient:
     """Client interacting OpenAlgo API."""
@@ -232,7 +243,9 @@ class OpenAlgoClient:
         }
         return self._request("POST", "history", json=payload)
 
-    def get_option_chain(self, symbol: str, expiry: str | None = None) -> dict[str, Any]:
+    def get_option_chain(
+        self, symbol: str, expiry: str | None = None
+    ) -> dict[str, Any]:
         payload = {"symbol": symbol, "expiry": expiry}
         return self._request("POST", "option_chain", json=payload)
 
@@ -381,6 +394,7 @@ class OpenAlgoClient:
     def get_trade_book(self) -> dict[str, Any]:
         return self._request("POST", "trade_book")
 
+
 class AsyncOpenAlgoClient:
     """Async client interacting OpenAlgo API."""
 
@@ -413,7 +427,9 @@ class AsyncOpenAlgoClient:
             )
         return self.client
 
-    async def _request(self, method: str, endpoint: str, **kwargs: Any) -> dict[str, Any]:
+    async def _request(
+        self, method: str, endpoint: str, **kwargs: Any
+    ) -> dict[str, Any]:
         client = await self._ensure_client()
         url = f"/api/v1/{endpoint.lstrip('/')}"
         try:
@@ -479,7 +495,9 @@ class AsyncOpenAlgoClient:
         }
         return await self._request("POST", "history", json=payload)
 
-    async def get_option_chain(self, symbol: str, expiry: str | None = None) -> dict[str, Any]:
+    async def get_option_chain(
+        self, symbol: str, expiry: str | None = None
+    ) -> dict[str, Any]:
         payload = {"symbol": symbol, "expiry": expiry}
         return await self._request("POST", "option_chain", json=payload)
 
@@ -633,5 +651,6 @@ class AsyncOpenAlgoClient:
 
     async def get_trade_book(self) -> dict[str, Any]:
         return await self._request("POST", "trade_book")
+
 
 async_client = AsyncOpenAlgoClient()

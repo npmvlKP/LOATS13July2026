@@ -4,6 +4,8 @@ Implements custom indicators: Supertrend, VWAP, CMF.
 Provides standalone indicator calculation functions.
 """
 
+from typing import Any
+
 import numpy as np
 import pandas as pd
 from pandas import Series
@@ -14,12 +16,14 @@ from .models import HistoricalData, TAIndicator
 # Optional Numba import for performance optimization
 try:
     from numba import njit
+
     NUMBA_AVAILABLE = True
     # Test if cache parameter is supported in this numba version
     try:
         # Test cache support by trying to compile a simple function
-        def _test_cache_support_func(x):
+        def _test_cache_support_func(x: Any) -> Any:
             return x
+
         njit(cache=True)(_test_cache_support_func)
         NJIT_SUPPORTS_CACHE = True
     except TypeError:
@@ -29,8 +33,9 @@ try:
     # Test if fastmath parameter is supported in this numba version
     try:
         # Test fastmath support by trying to compile a simple function
-        def _test_fastmath_support_func(x):
+        def _test_fastmath_support_func(x: Any) -> Any:
             return x
+
         njit(fastmath=True)(_test_fastmath_support_func)
         NJIT_SUPPORTS_FASTMATH = True
     except TypeError:
@@ -40,23 +45,33 @@ except ImportError:
     NUMBA_AVAILABLE = False
     NJIT_SUPPORTS_CACHE = False
     NJIT_SUPPORTS_FASTMATH = False
+
     # Define dummy decorator if Numba not available
-    def njit(func):
+    def njit(func: Any) -> Any:
         return func
+
 
 # Create the appropriate decorator based on cache and fastmath support
 if NJIT_SUPPORTS_CACHE and NJIT_SUPPORTS_FASTMATH:
-    def _supertrend_njit_decorator(func):
+
+    def _supertrend_njit_decorator(func: Any) -> Any:
         return njit(cache=True, fastmath=True)(func)
+
 elif NJIT_SUPPORTS_CACHE:
-    def _supertrend_njit_decorator(func):
+
+    def _supertrend_njit_decorator(func: Any) -> Any:
         return njit(cache=True)(func)
+
 elif NJIT_SUPPORTS_FASTMATH:
-    def _supertrend_njit_decorator(func):
+
+    def _supertrend_njit_decorator(func: Any) -> Any:
         return njit(fastmath=True)(func)
+
 else:
-    def _supertrend_njit_decorator(func):
+
+    def _supertrend_njit_decorator(func: Any) -> Any:
         return njit(func)
+
 
 logger = get_logger(__name__)
 
@@ -140,7 +155,7 @@ def _supertrend_core(
     close_arr: np.ndarray,
     upper_band_arr: np.ndarray,
     lower_band_arr: np.ndarray,
-    period: int
+    period: int,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Numba-optimized core Supertrend calculation.
 
@@ -215,6 +230,7 @@ def _supertrend_core(
 
     return supertrend_arr, direction_arr
 
+
 def calculate_supertrend(
     df: pd.DataFrame, period: int = 10, multiplier: float = 3.0
 ) -> tuple[pd.Series, pd.Series]:
@@ -252,6 +268,14 @@ def calculate_supertrend(
     upper_band_arr = hl2_arr + (multiplier * atr_arr)
     lower_band_arr = hl2_arr - (multiplier * atr_arr)
 
+    # Initialize arrays before the conditional
+    supertrend_arr: np.ndarray[tuple[int], np.dtype[np.float64]] = np.full(
+        n, np.nan, dtype=np.float64
+    )
+    direction_arr: np.ndarray[tuple[int], np.dtype[np.float64]] = np.full(
+        n, np.nan, dtype=np.float64
+    )
+
     # Use optimized core function
     if NUMBA_AVAILABLE:
         supertrend_arr, direction_arr = _supertrend_core(
@@ -260,12 +284,6 @@ def calculate_supertrend(
     else:
         # Optimized fallback implementation if Numba not available
         # Uses state tracking to minimize array lookups and improve performance
-        supertrend_arr: np.ndarray[tuple[int], np.dtype[np.float64]] = np.full(
-            n, np.nan, dtype=np.float64
-        )
-        direction_arr: np.ndarray[tuple[int], np.dtype[np.float64]] = np.full(
-            n, np.nan, dtype=np.float64
-        )
 
         # Initialize state variables for performance optimization
         curr_dir = 1
@@ -339,7 +357,10 @@ def calculate_vwap(df: pd.DataFrame) -> pd.Series:
     cumulative_tpv = (typical_price * volume).cumsum()
     cumulative_volume = volume.cumsum()
 
+    # Handle zero volume case to avoid NaN
     vwap = cumulative_tpv / cumulative_volume
+    # When volume is zero, return the typical price instead of NaN
+    vwap = vwap.fillna(typical_price)
     return vwap
 
 
