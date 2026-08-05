@@ -141,6 +141,7 @@ class CircuitBreaker:
     def _record_success(self) -> None:
         """Record a successful call."""
         now = time.monotonic()
+        self._stats.total_calls += 1
         self._stats.successful_calls += 1
         self._stats.consecutive_successes += 1
         self._stats.consecutive_failures = 0
@@ -158,6 +159,7 @@ class CircuitBreaker:
     def _record_failure(self) -> None:
         """Record a failed call."""
         now = time.monotonic()
+        self._stats.total_calls += 1
         self._stats.failed_calls += 1
         self._stats.consecutive_failures += 1
         self._stats.consecutive_successes = 0
@@ -175,6 +177,7 @@ class CircuitBreaker:
 
     def _record_rejection(self) -> None:
         """Record a rejected call (circuit was open)."""
+        self._stats.total_calls += 1
         self._stats.rejected_calls += 1
 
     def call(self, func: Callable[..., T], *args: Any, **kwargs: Any) -> T:
@@ -277,6 +280,7 @@ class CircuitBreaker:
         """Get circuit breaker status for monitoring/alerting."""
         with self._state_lock:
             return {
+                "circuit_name": self.name,
                 "name": self.name,
                 "state": self._state.value,
                 "failure_threshold": self.config.failure_threshold,

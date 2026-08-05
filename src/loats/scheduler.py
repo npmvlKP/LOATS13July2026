@@ -623,6 +623,10 @@ class TradingScheduler:
             ).total_seconds()
             logger.info("Data cleanup completed %.2fms", duration * 1000)
 
+    async def cleanup_old_data(self) -> None:
+        """Cleanup old data method for testing."""
+        await self._data_cleanup_task()
+
     async def run_once(self, job_id: str) -> None:
         """Run specific job once immediately."""
         try:
