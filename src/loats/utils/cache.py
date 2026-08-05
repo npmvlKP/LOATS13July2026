@@ -423,6 +423,10 @@ async def close_cache() -> None:
 
 def model_to_cache_key(model: BaseModel) -> str:
     """Convert BaseModel to cache key."""
+    model_data = model.model_dump()
+    # Include trade_id if available for better cache key uniqueness
+    if hasattr(model, 'trade_id') and model.trade_id:
+        return f"{model.__class__.__name__}:{model.trade_id}:{hash(model.model_dump_json())}"
     return f"{model.__class__.__name__}:{hash(model.model_dump_json())}"
 
 
