@@ -55,7 +55,7 @@ class CacheManager:
     def __init__(self, config: CacheConfig):
         self.config = config
         self._cache: TTLCache[str, Any] | None = None
-        self._redis: redis.Redis[str] | None = None
+        self._redis: redis.Redis | None = None
         self._cache_stats = {
             "hits": 0,
             "misses": 0,

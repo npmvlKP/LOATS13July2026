@@ -36,7 +36,6 @@ services:
       # Mount audit database
       - loats_data:/app/data
     ports:
-      - "8000:8000"  # If web server is added
       - "8001:8001"  # Prometheus metrics server
     healthcheck:
       test: ["CMD", "python", "quick_health_check.py"]
