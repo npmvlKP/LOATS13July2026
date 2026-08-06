@@ -134,6 +134,16 @@ async def main() -> None:
         await system.shutdown()
         sys.exit(1)
 
+def cli_main() -> None:
+    """CLI entry point that properly handles async main function."""
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        logger.info("Trading system stopped user")
+    except Exception as e:
+        logger.error(f"Unexpected error: {e}")
+        sys.exit(1)
+
 
 if __name__ == "__main__":
     try:
