@@ -1,20 +1,22 @@
 """Test resilience patterns for LOATS13July2026."""
 
-import asyncio
+import time
+from unittest.mock import patch
+
 import pytest
-from unittest.mock import Mock, patch
 
 from src.loats.utils.circuit_breaker import (
     CircuitBreaker,
     CircuitBreakerConfig,
     CircuitBreakerOpenError,
 )
-from src.loats.utils.retry import RetryConfig
 from src.loats.utils.resilience import (
     CircuitBreakerRetryCompositionError,
     circuit_breaker_retry_async,
     circuit_breaker_retry_sync,
 )
+from src.loats.utils.retry import RetryConfig
+
 
 class TestCircuitBreakerRetryComposition:
     """Test circuit breaker + retry composition patterns."""
@@ -66,7 +68,8 @@ class TestCircuitBreakerRetryComposition:
 
         # Manually open the circuit
         cb._state = cb._state.OPEN  # type: ignore
-        cb._opened_at = 1.0
+        # Set opened_at to a future time to prevent transition to HALF_OPEN
+        cb._opened_at = time.monotonic() + 3600  # 1 hour in the future
 
         call_count = 0
 

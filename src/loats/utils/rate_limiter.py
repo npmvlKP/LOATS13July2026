@@ -3,8 +3,6 @@
 import asyncio
 import time
 from collections import deque
-from collections.abc import Callable
-from typing import Any
 
 from ..config import get_settings
 from ..loats_logging import get_logger
@@ -320,33 +318,6 @@ class RateLimitExceededError(Exception):
         super().__init__(self.message)
 
 
-def rate_limited(
-    max_ops: int | None = None, window_size: float = 1.0
-) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
-    """Decorator for rate limiting synchronous functions.
-
-    Args:
-        max_ops: Maximum operations per window (default: from settings)
-        window_size: Time window in seconds (default: 1.0)
-
-    Returns:
-        A decorator that can be applied to synchronous functions
-    """
-
-    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
-        # Create a sync rate limiter for this function
-        limiter = SyncRateLimiter(max_ops=max_ops, window_size=window_size)
-
-        def wrapper(*args: Any, **kwargs: Any) -> Any:
-            if not limiter.acquire():
-                raise RateLimitExceededError(
-                    f"Rate limit exceeded for function {func.__name__}"
-                )
-            return func(*args, **kwargs)
-
-        return wrapper
-
-    return decorator
 
 
 # Internal global rate limiter instances for dependency injection
