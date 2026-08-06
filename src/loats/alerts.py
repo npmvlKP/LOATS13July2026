@@ -74,6 +74,18 @@ class AlertSystem:
 
         return module_db
 
+    async def _initialize_bot(self) -> Bot:
+        """Initialize and return Telegram bot instance."""
+        if not settings.telegram_bot_token:
+            logger.warning("Telegram bot token not configured.")
+            raise ValueError("Telegram bot token not configured")
+        if not settings.telegram_chat_id:
+            logger.warning("Telegram chat ID not configured.")
+            raise ValueError("Telegram chat ID not configured")
+
+        self.bot = Bot(token=settings.telegram_bot_token.get_secret_value())
+        return self.bot
+
     async def initialize(self) -> None:
         """Initialize Telegram bot."""
         try:
@@ -169,6 +181,20 @@ class AlertSystem:
             logger.error(f"Error shutting down Telegram bot: {e}")
             raise
 
+    async def _send_telegram_message(self, message: str) -> bool:
+        """Send Telegram message using the bot."""
+        if not self.bot or not settings.telegram_chat_id:
+            logger.debug("Telegram bot not configured, message not sent")
+            return False
+
+        # Call _safe_send_message directly without catching exceptions
+        # This allows the circuit breaker to handle failures properly
+        return await self._safe_send_message(
+            chat_id=settings.telegram_chat_id,
+            text=message,
+            parse_mode="HTML"
+        )
+
     async def _safe_send_message(
         self, chat_id: str, text: str, parse_mode: str = "HTML"
     ) -> bool:
@@ -189,7 +215,7 @@ class AlertSystem:
             return True
         except CircuitBreakerOpenError:
             logger.warning("Telegram circuit breaker open")
-            return False
+            raise  # Re-raise to allow test to catch it
         except Exception:
             logger.error("Failed send Telegram message after retries")
             return False

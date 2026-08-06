@@ -799,6 +799,28 @@ class Database:
         rows = cursor.fetchall()
         return [self._row_to_trade(row) for row in rows]
 
+    def get_trades(self, symbol: str | None = None) -> list[Trade]:
+        """
+        Get all trades, optionally filtered by symbol.
+        Args:
+            symbol: Optional symbol filter
+        Returns:
+            List of Trade models
+        """
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        if symbol:
+            cursor.execute(
+                "SELECT * FROM trades WHERE symbol = ? ORDER BY entry_time DESC",
+                (symbol,),
+            )
+        else:
+            cursor.execute(
+                "SELECT * FROM trades ORDER BY entry_time DESC"
+            )
+        rows = cursor.fetchall()
+        return [self._row_to_trade(row) for row in rows]
+
     def _row_to_trade(self, row: Any) -> Trade:
         """Convert database row Trade model."""
         from .models import ProductType, TransactionType
