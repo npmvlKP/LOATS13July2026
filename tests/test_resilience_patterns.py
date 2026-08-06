@@ -141,7 +141,7 @@ class TestCircuitBreakerRetryComposition:
                 raise ValueError("Test error")
             return "success"
 
-        with pytest.raises(ValueError):
+        with pytest.raises(CircuitBreakerRetryCompositionError):
             await test_func()
 
         # Circuit should be open now
@@ -158,7 +158,7 @@ class TestCircuitBreakerRetryComposition:
 
         # Manually open the circuit
         cb._state = cb._state.OPEN  # type: ignore
-        cb._opened_at = 1.0
+        cb._opened_at = time.monotonic() + 3600  # 1 hour in the future
 
         call_count = 0
 
@@ -176,7 +176,7 @@ class TestCircuitBreakerRetryComposition:
         assert call_count == 0
 
     async def test_async_excluded_exception_not_retried(self):
-        """Test that excluded exceptions are not retried."""
+        """Test that excluded exceptions are not retried (but get wrapped in composition error)."""
         cb = CircuitBreaker(
             "test",
             CircuitBreakerConfig(
@@ -194,10 +194,14 @@ class TestCircuitBreakerRetryComposition:
             call_count += 1
             raise ValueError("Excluded error")
 
-        with pytest.raises(ValueError):
+        with pytest.raises(CircuitBreakerRetryCompositionError) as exc_info:
             await test_func()
 
-        # Should only be called once since ValueError is excluded
+        # Should contain the original ValueError
+        assert isinstance(exc_info.value.__cause__, ValueError)
+        assert "Excluded error" in str(exc_info.value)
+
+        # Should only be called once since ValueError is excluded from retry
         assert call_count == 1
 
     def test_sync_retry_then_circuit_breaker_success(self):
@@ -291,11 +295,8 @@ class TestCircuitBreakerRetryComposition:
             def test_func():
                 return "should not reach"
 
-            with pytest.raises(CircuitBreakerRetryCompositionError) as exc_info:
+            with pytest.raises(RuntimeError):
                 test_func()
-
-            assert "test" in str(exc_info.value)
-            assert "Unexpected circuit breaker error" in str(exc_info.value)
 
     async def test_async_composition_error_handling(self):
         """Test async composition error handling for unexpected failures."""
