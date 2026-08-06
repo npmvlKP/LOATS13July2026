@@ -567,7 +567,7 @@ class Database:
 
         # Write JSONL file (append-only) using canonical serialization
         with Path(self.audit_log_path).open("a", encoding="utf-8") as f:
-            f.write(json.dumps(canonical_entry_data) + "\n")
+            f.write(self._canonical_serialize(entry_data) + "\n")
 
     def _cleanup_old_data(self) -> None:
         """
