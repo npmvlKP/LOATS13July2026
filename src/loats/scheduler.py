@@ -170,7 +170,7 @@ class TradingScheduler:
             self.scan_tasks.pop(task_id, None)
 
     async def _safe_get_history(
-        self, symbol: str, interval: str
+        self, symbol: str, interval: str, count: int | None = None
     ) -> dict[str, Any] | None:
         """Get history retry circuit breaker protection."""
         try:
@@ -198,10 +198,10 @@ class TradingScheduler:
             return cast("dict[str, Any] | None", result)
         except CircuitBreakerOpenError:
             logger.warning("OpenAlgo circuit breaker open get_quotes")
-            return None
+            raise  # Re-raise to allow test to catch it
         except Exception:
             logger.error("Failed get quotes after retries")
-            return None
+            raise  # Re-raise to allow test to catch it
 
     async def _ta_scan_task(self) -> None:
         """Technical analysis scan task."""
