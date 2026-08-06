@@ -9,7 +9,6 @@ from .alerts import alerts
 from .config import get_settings
 from .database import Database
 from .loats_logging import logger
-from .metrics import start_metrics_server
 from .scheduler import scheduler
 from .utils.cache import close_cache, initialize_cache
 
@@ -35,7 +34,6 @@ class TradingSystem:
         """Initialize all system components."""
         try:
             logger.info("Initializing LOATS13July2026 trading system")
-            start_metrics_server()
             await initialize_cache()
             await self.db.async_initialize()
             if not await self.db.async_verify_audit_log_integrity():

@@ -141,9 +141,12 @@ class TestCacheManager:
 
     @pytest.mark.asyncio
     async def test_set_no_cache(self, cache_manager: CacheManager) -> None:
-        """Test setting value with no cache initialized."""
+        """Test setting value with no cache initialized (auto-initializes now)."""
         result = await cache_manager.set("test_key", "test_value")
-        assert result is False
+        assert result is True  # Cache now auto-initializes
+        # Verify the value was actually cached
+        cached_value = await cache_manager.get("test_key")
+        assert cached_value == "test_value"
 
     @pytest.mark.asyncio
     async def test_get_or_set_cache_hit(self, cache_manager: CacheManager) -> None:
@@ -279,7 +282,7 @@ class TestCacheManager:
 
         assert stats["enabled"] is True
         assert stats["connected"] is True
-        assert stats["cache_type"] == "in_memory_ttl"
+        assert stats["cache_type"] == "lightweight_in_memory"
         assert stats["current_size"] == 2
         assert stats["max_size"] == 1000
         assert stats["hits"] == 10
