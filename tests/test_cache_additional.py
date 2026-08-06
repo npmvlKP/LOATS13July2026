@@ -91,79 +91,64 @@ class TestCacheManagerAdditional:
 
     @pytest.mark.asyncio
     async def test_get_redis_fallback(self, cache_manager: CacheManager) -> None:
-        """Test Redis get operation with fallback to in-memory."""
+        """Test in-memory get operation (Redis fallback removed in LITE edition)."""
         await cache_manager.initialize()
 
         # Add item to in-memory cache
         cache_key = cache_manager._get_cache_key("test_key")
         cache_manager._cache[cache_key] = "cached_value"
 
-        # Mock Redis to raise error
-        with patch.object(cache_manager, "_redis") as mock_redis:
-            mock_redis.get.side_effect = Exception("Redis error")
-            cache_manager._cache_type = "redis"
-
-            result = await cache_manager.get("test_key")
-            assert result == "cached_value"
+        # Test in-memory get operation
+        result = await cache_manager.get("test_key")
+        assert result == "cached_value"
+        assert cache_manager._cache_type == "in_memory_ttl"
 
     @pytest.mark.asyncio
     async def test_set_redis_fallback(self, cache_manager: CacheManager) -> None:
-        """Test Redis set operation with fallback to in-memory."""
+        """Test in-memory set operation (Redis fallback removed in LITE edition)."""
         await cache_manager.initialize()
 
-        # Mock Redis to raise error
-        with patch.object(cache_manager, "_redis") as mock_redis:
-            mock_redis.setex.side_effect = Exception("Redis error")
-            cache_manager._cache_type = "redis"
+        result = await cache_manager.set("test_key", "test_value")
+        assert result is True
 
-            result = await cache_manager.set("test_key", "test_value")
-            assert result is True
-
-            # Verify it was stored in in-memory cache
-            cache_key = cache_manager._get_cache_key("test_key")
-            assert cache_manager._cache[cache_key] == "test_value"
+        # Verify it was stored in in-memory cache
+        cache_key = cache_manager._get_cache_key("test_key")
+        assert cache_manager._cache[cache_key] == "test_value"
+        assert cache_manager._cache_type == "in_memory_ttl"
 
     @pytest.mark.asyncio
     async def test_delete_redis_fallback(self, cache_manager: CacheManager) -> None:
-        """Test Redis delete operation with fallback to in-memory."""
+        """Test in-memory delete operation (Redis fallback removed in LITE edition)."""
         await cache_manager.initialize()
 
         # Add item to in-memory cache
         cache_key = cache_manager._get_cache_key("test_key")
         cache_manager._cache[cache_key] = "test_value"
 
-        # Mock Redis to raise error
-        with patch.object(cache_manager, "_redis") as mock_redis:
-            mock_redis.delete.side_effect = Exception("Redis error")
-            cache_manager._cache_type = "redis"
-
-            result = await cache_manager.delete("test_key")
-            assert result is True
-            assert cache_key not in cache_manager._cache
+        result = await cache_manager.delete("test_key")
+        assert result is True
+        assert cache_key not in cache_manager._cache
+        assert cache_manager._cache_type == "in_memory_ttl"
 
     @pytest.mark.asyncio
     async def test_clear_redis_fallback(self, cache_manager: CacheManager) -> None:
-        """Test Redis clear operation with fallback to in-memory."""
+        """Test in-memory clear operation (Redis fallback removed in LITE edition)."""
         await cache_manager.initialize()
 
         # Add items to in-memory cache
         cache_manager._cache["loats:key1"] = "value1"
         cache_manager._cache["loats:key2"] = "value2"
 
-        # Mock Redis to raise error
-        with patch.object(cache_manager, "_redis") as mock_redis:
-            mock_redis.keys.side_effect = Exception("Redis error")
-            cache_manager._cache_type = "redis"
-
-            result = await cache_manager.clear()
-            assert result == 2
-            assert len(cache_manager._cache) == 0
+        result = await cache_manager.clear()
+        assert result == 2
+        assert len(cache_manager._cache) == 0
+        assert cache_manager._cache_type == "in_memory_ttl"
 
     @pytest.mark.asyncio
     async def test_get_cache_stats_redis_fallback(
         self, cache_manager: CacheManager
     ) -> None:
-        """Test Redis stats operation with fallback to basic stats."""
+        """Test in-memory stats operation (Redis fallback removed in LITE edition)."""
         await cache_manager.initialize()
 
         # Add some items to cache
@@ -174,18 +159,13 @@ class TestCacheManagerAdditional:
         cache_manager._cache_stats["hits"] = 10
         cache_manager._cache_stats["misses"] = 5
 
-        # Mock Redis to raise error
-        with patch.object(cache_manager, "_redis") as mock_redis:
-            mock_redis.info.side_effect = Exception("Redis error")
-            mock_redis.dbsize.side_effect = Exception("Redis error")
-            cache_manager._cache_type = "redis"
-
-            stats = await cache_manager.get_cache_stats()
-            assert stats["enabled"] is True
-            assert stats["cache_type"] == "redis"
-            assert stats["current_size"] == 2
-            assert stats["hits"] == 10
-            assert stats["misses"] == 5
+        stats = await cache_manager.get_cache_stats()
+        assert stats["enabled"] is True
+        assert stats["cache_type"] == "lightweight_in_memory"
+        assert stats["current_size"] == 2
+        assert stats["hits"] == 10
+        assert stats["misses"] == 5
+        assert cache_manager._cache_type == "in_memory_ttl"
 
     @pytest.mark.asyncio
     async def test_get_or_set_error_handling(self, cache_manager: CacheManager) -> None:

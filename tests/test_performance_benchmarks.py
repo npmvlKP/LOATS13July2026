@@ -31,8 +31,11 @@ def test_db() -> Generator[Database, None, None]:
     import tempfile
     from pathlib import Path
 
-    with tempfile.TemporaryDirectory() as temp_dir:
-        temp_path = Path(temp_dir)
+    # Use ignore_cleanup_errors=True to handle file permission issues on Windows
+    # when SQLite connections from other threads are still active during cleanup
+    temp_dir = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
+    try:
+        temp_path = Path(temp_dir.name)
         db = Database(
             db_path=temp_path / "test_perf.db",
             audit_log_path=temp_path / "test_audit.log",
@@ -40,11 +43,31 @@ def test_db() -> Generator[Database, None, None]:
         db.retention_days = 30
         db._initialize_database()
         yield db
-        # Ensure database connection is properly closed
+        # Ensure ALL database connections are properly closed to prevent file permission issues
+        # Use ignore_errors=True to handle SQLite thread affinity issues during cleanup
+        try:
+            db.close_all()
+        except Exception:
+            pass  # Ignore errors during cleanup
+
+        # Additional cleanup: try to close current thread connection and clear registry
         try:
             db.close()
         except Exception:
-            pass  # Ignore errors during cleanup
+            pass
+
+        # Clear thread registry to prevent potential issues
+        try:
+            with db._registry_lock:
+                db._thread_registry.clear()
+        except Exception:
+            pass
+    finally:
+        # Clean up the temporary directory
+        try:
+            temp_dir.cleanup()
+        except Exception:
+            pass  # Ignore cleanup errors
 
 class TestDatabasePerformance:
     """Benchmark database operations performance."""
