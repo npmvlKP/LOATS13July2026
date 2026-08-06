@@ -186,10 +186,14 @@ def reset_metrics_before_each_test() -> None:
     manager = MetricsManager()
     manager.reset_for_testing()
 
+
 @pytest.fixture(autouse=True, scope="function")
 def reset_circuit_breakers_before_each_test() -> None:
     """Reset circuit breakers state before each test to ensure isolation."""
-    from src.loats.utils.circuit_breaker import OPENALGO_CIRCUIT_BREAKER, TELEGRAM_CIRCUIT_BREAKER
+    from src.loats.utils.circuit_breaker import (
+        OPENALGO_CIRCUIT_BREAKER,
+        TELEGRAM_CIRCUIT_BREAKER,
+    )
 
     # Reset both global circuit breakers to ensure test isolation
     OPENALGO_CIRCUIT_BREAKER.reset()

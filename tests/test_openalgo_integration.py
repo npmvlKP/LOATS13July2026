@@ -5,23 +5,23 @@ including kill-switch and rate-limit paths.
 """
 
 from unittest.mock import AsyncMock, MagicMock, patch
-import pytest
+
 import httpx
+import pytest
 from httpx import Response
 
 from src.loats.config import get_settings
-from src.loats.models import OrderType, OrderVariety, TransactionType, ProductType
+from src.loats.models import OrderType, OrderVariety, ProductType, TransactionType
 from src.loats.openalgo import (
     AsyncOpenAlgoClient,
     KillSwitchError,
     OpenAlgoAPIError,
     OpenAlgoClient,
-    OpenAlgoError,
     RateLimitExceededError,
 )
-from src.loats.utils.rate_limiter import get_order_rate_limiter, get_smart_order_rate_limiter
 
 settings = get_settings()
+
 
 class TestOrderOperationsIntegration:
     """Integration tests for order operations."""
@@ -61,8 +61,8 @@ class TestOrderOperationsIntegration:
                 "quantity": 1,
                 "order_type": "MARKET",
                 "transaction_type": "BUY",
-                "product_type": "MIS"
-            }
+                "product_type": "MIS",
+            },
         }
         return response
 
@@ -74,7 +74,7 @@ class TestOrderOperationsIntegration:
         response.json.return_value = {
             "success": False,
             "message": "Rate limit exceeded",
-            "error": "too_many_requests"
+            "error": "too_many_requests",
         }
         return response
 
@@ -83,18 +83,20 @@ class TestOrderOperationsIntegration:
         self,
         async_client: AsyncOpenAlgoClient,
         mock_async_httpx_client: AsyncMock,
-        mock_success_response: MagicMock
+        mock_success_response: MagicMock,
     ) -> None:
         """Test async place_order success path."""
         mock_async_httpx_client.post.return_value = mock_success_response
 
-        with patch.object(
-            async_client, "_ensure_client", return_value=mock_async_httpx_client
-        ), patch(
-            "src.loats.openalgo._async_check_kill_switch", return_value=None
-        ), patch(
-            "src.loats.utils.rate_limiter.get_order_rate_limiter"
-        ) as mock_rate_limiter:
+        with (
+            patch.object(
+                async_client, "_ensure_client", return_value=mock_async_httpx_client
+            ),
+            patch("src.loats.openalgo._async_check_kill_switch", return_value=None),
+            patch(
+                "src.loats.utils.rate_limiter.get_order_rate_limiter"
+            ) as mock_rate_limiter,
+        ):
             mock_rate_limiter_instance = AsyncMock()
             mock_rate_limiter_instance.acquire.return_value = True
             mock_rate_limiter.return_value = mock_rate_limiter_instance
@@ -104,7 +106,7 @@ class TestOrderOperationsIntegration:
                 quantity=1,
                 order_type=OrderType.MARKET,
                 transaction_type=TransactionType.BUY,
-                product_type=ProductType.MIS
+                product_type=ProductType.MIS,
             )
 
             assert result["success"] is True
@@ -115,41 +117,36 @@ class TestOrderOperationsIntegration:
 
     @pytest.mark.asyncio
     async def test_async_place_order_kill_switch(
-        self,
-        async_client: AsyncOpenAlgoClient
+        self, async_client: AsyncOpenAlgoClient
     ) -> None:
         """Test async place_order with kill switch active."""
         with patch(
             "src.loats.openalgo._async_check_kill_switch",
-            side_effect=KillSwitchError("Kill switch active")
+            side_effect=KillSwitchError("Kill switch active"),
         ):
             with pytest.raises(KillSwitchError):
                 await async_client.place_order(
-                    symbol="NIFTY",
-                    quantity=1,
-                    order_type=OrderType.MARKET
+                    symbol="NIFTY", quantity=1, order_type=OrderType.MARKET
                 )
 
     @pytest.mark.asyncio
     async def test_async_place_order_rate_limit(
-        self,
-        async_client: AsyncOpenAlgoClient
+        self, async_client: AsyncOpenAlgoClient
     ) -> None:
         """Test async place_order with rate limit exceeded."""
-        with patch(
-            "src.loats.openalgo._async_check_kill_switch", return_value=None
-        ), patch(
-            "src.loats.utils.rate_limiter.get_order_rate_limiter"
-        ) as mock_rate_limiter:
+        with (
+            patch("src.loats.openalgo._async_check_kill_switch", return_value=None),
+            patch(
+                "src.loats.utils.rate_limiter.get_order_rate_limiter"
+            ) as mock_rate_limiter,
+        ):
             mock_rate_limiter_instance = AsyncMock()
             mock_rate_limiter_instance.acquire.return_value = False
             mock_rate_limiter.return_value = mock_rate_limiter_instance
 
             with pytest.raises(RateLimitExceededError):
                 await async_client.place_order(
-                    symbol="NIFTY",
-                    quantity=1,
-                    order_type=OrderType.MARKET
+                    symbol="NIFTY", quantity=1, order_type=OrderType.MARKET
                 )
 
     @pytest.mark.asyncio
@@ -157,19 +154,21 @@ class TestOrderOperationsIntegration:
         self,
         async_client: AsyncOpenAlgoClient,
         mock_async_httpx_client: AsyncMock,
-        mock_success_response: MagicMock
+        mock_success_response: MagicMock,
     ) -> None:
         """Test async place_smart_order success path."""
         mock_success_response.json.return_value["data"]["strategy"] = "simple"
         mock_async_httpx_client.post.return_value = mock_success_response
 
-        with patch.object(
-            async_client, "_ensure_client", return_value=mock_async_httpx_client
-        ), patch(
-            "src.loats.openalgo._async_check_kill_switch", return_value=None
-        ), patch(
-            "src.loats.utils.rate_limiter.get_smart_order_rate_limiter"
-        ) as mock_rate_limiter:
+        with (
+            patch.object(
+                async_client, "_ensure_client", return_value=mock_async_httpx_client
+            ),
+            patch("src.loats.openalgo._async_check_kill_switch", return_value=None),
+            patch(
+                "src.loats.utils.rate_limiter.get_smart_order_rate_limiter"
+            ) as mock_rate_limiter,
+        ):
             mock_rate_limiter_instance = AsyncMock()
             mock_rate_limiter_instance.acquire.return_value = True
             mock_rate_limiter.return_value = mock_rate_limiter_instance
@@ -181,7 +180,7 @@ class TestOrderOperationsIntegration:
                 price=18000.0,
                 strategy="simple",
                 stop_loss=17900.0,
-                take_profit=18100.0
+                take_profit=18100.0,
             )
 
             assert result["success"] is True
@@ -191,15 +190,15 @@ class TestOrderOperationsIntegration:
 
     @pytest.mark.asyncio
     async def test_async_place_smart_order_rate_limit(
-        self,
-        async_client: AsyncOpenAlgoClient
+        self, async_client: AsyncOpenAlgoClient
     ) -> None:
         """Test async place_smart_order with rate limit exceeded."""
-        with patch(
-            "src.loats.openalgo._async_check_kill_switch", return_value=None
-        ), patch(
-            "src.loats.utils.rate_limiter.get_smart_order_rate_limiter"
-        ) as mock_rate_limiter:
+        with (
+            patch("src.loats.openalgo._async_check_kill_switch", return_value=None),
+            patch(
+                "src.loats.utils.rate_limiter.get_smart_order_rate_limiter"
+            ) as mock_rate_limiter,
+        ):
             mock_rate_limiter_instance = AsyncMock()
             mock_rate_limiter_instance.acquire.return_value = False
             mock_rate_limiter.return_value = mock_rate_limiter_instance
@@ -209,7 +208,7 @@ class TestOrderOperationsIntegration:
                     symbol="NIFTY",
                     quantity=1,
                     order_type=OrderType.MARKET,
-                    strategy="simple"
+                    strategy="simple",
                 )
 
     @pytest.mark.asyncio
@@ -217,22 +216,21 @@ class TestOrderOperationsIntegration:
         self,
         async_client: AsyncOpenAlgoClient,
         mock_async_httpx_client: AsyncMock,
-        mock_success_response: MagicMock
+        mock_success_response: MagicMock,
     ) -> None:
         """Test async modify_order success path."""
         mock_success_response.json.return_value["data"]["order_id"] = "test_order_123"
         mock_success_response.json.return_value["data"]["status"] = "MODIFIED"
         mock_async_httpx_client.post.return_value = mock_success_response
 
-        with patch.object(
-            async_client, "_ensure_client", return_value=mock_async_httpx_client
-        ), patch(
-            "src.loats.openalgo._async_check_kill_switch", return_value=None
+        with (
+            patch.object(
+                async_client, "_ensure_client", return_value=mock_async_httpx_client
+            ),
+            patch("src.loats.openalgo._async_check_kill_switch", return_value=None),
         ):
             result = await async_client.modify_order(
-                order_id="test_order_123",
-                quantity=2,
-                price=18050.0
+                order_id="test_order_123", quantity=2, price=18050.0
             )
 
             assert result["success"] is True
@@ -241,36 +239,33 @@ class TestOrderOperationsIntegration:
 
     @pytest.mark.asyncio
     async def test_async_modify_order_kill_switch(
-        self,
-        async_client: AsyncOpenAlgoClient
+        self, async_client: AsyncOpenAlgoClient
     ) -> None:
         """Test async modify_order with kill switch active."""
         with patch(
             "src.loats.openalgo._async_check_kill_switch",
-            side_effect=KillSwitchError("Kill switch active")
+            side_effect=KillSwitchError("Kill switch active"),
         ):
             with pytest.raises(KillSwitchError):
-                await async_client.modify_order(
-                    order_id="test_order_123",
-                    quantity=2
-                )
+                await async_client.modify_order(order_id="test_order_123", quantity=2)
 
     @pytest.mark.asyncio
     async def test_async_cancel_order_success(
         self,
         async_client: AsyncOpenAlgoClient,
         mock_async_httpx_client: AsyncMock,
-        mock_success_response: MagicMock
+        mock_success_response: MagicMock,
     ) -> None:
         """Test async cancel_order success path."""
         mock_success_response.json.return_value["data"]["order_id"] = "test_order_123"
         mock_success_response.json.return_value["data"]["status"] = "CANCELLED"
         mock_async_httpx_client.post.return_value = mock_success_response
 
-        with patch.object(
-            async_client, "_ensure_client", return_value=mock_async_httpx_client
-        ), patch(
-            "src.loats.openalgo._async_check_kill_switch", return_value=None
+        with (
+            patch.object(
+                async_client, "_ensure_client", return_value=mock_async_httpx_client
+            ),
+            patch("src.loats.openalgo._async_check_kill_switch", return_value=None),
         ):
             result = await async_client.cancel_order("test_order_123")
 
@@ -280,13 +275,12 @@ class TestOrderOperationsIntegration:
 
     @pytest.mark.asyncio
     async def test_async_cancel_order_kill_switch(
-        self,
-        async_client: AsyncOpenAlgoClient
+        self, async_client: AsyncOpenAlgoClient
     ) -> None:
         """Test async cancel_order with kill switch active."""
         with patch(
             "src.loats.openalgo._async_check_kill_switch",
-            side_effect=KillSwitchError("Kill switch active")
+            side_effect=KillSwitchError("Kill switch active"),
         ):
             with pytest.raises(KillSwitchError):
                 await async_client.cancel_order("test_order_123")
@@ -295,58 +289,55 @@ class TestOrderOperationsIntegration:
         self,
         sync_client: OpenAlgoClient,
         mock_sync_httpx_client: MagicMock,
-        mock_success_response: MagicMock
+        mock_success_response: MagicMock,
     ) -> None:
         """Test sync place_order success path."""
         mock_sync_httpx_client.post.return_value = mock_success_response
 
-        with patch.object(
-            sync_client, "_ensure_client", return_value=mock_sync_httpx_client
-        ), patch(
-            "src.loats.openalgo._check_kill_switch", return_value=None
+        with (
+            patch.object(
+                sync_client, "_ensure_client", return_value=mock_sync_httpx_client
+            ),
+            patch("src.loats.openalgo._check_kill_switch", return_value=None),
         ):
             result = sync_client.place_order(
                 symbol="NIFTY",
                 quantity=1,
                 order_type=OrderType.MARKET,
                 transaction_type=TransactionType.BUY,
-                product_type=ProductType.MIS
+                product_type=ProductType.MIS,
             )
 
             assert result["success"] is True
             assert result["data"]["order_id"] == "test_order_123"
             mock_sync_httpx_client.post.assert_called_once()
 
-    def test_sync_place_order_kill_switch(
-        self,
-        sync_client: OpenAlgoClient
-    ) -> None:
+    def test_sync_place_order_kill_switch(self, sync_client: OpenAlgoClient) -> None:
         """Test sync place_order with kill switch active."""
         with patch(
             "src.loats.openalgo._check_kill_switch",
-            side_effect=KillSwitchError("Kill switch active")
+            side_effect=KillSwitchError("Kill switch active"),
         ):
             with pytest.raises(KillSwitchError):
                 sync_client.place_order(
-                    symbol="NIFTY",
-                    quantity=1,
-                    order_type=OrderType.MARKET
+                    symbol="NIFTY", quantity=1, order_type=OrderType.MARKET
                 )
 
     def test_sync_place_smart_order_success(
         self,
         sync_client: OpenAlgoClient,
         mock_sync_httpx_client: MagicMock,
-        mock_success_response: MagicMock
+        mock_success_response: MagicMock,
     ) -> None:
         """Test sync place_smart_order success path."""
         mock_success_response.json.return_value["data"]["strategy"] = "simple"
         mock_sync_httpx_client.post.return_value = mock_success_response
 
-        with patch.object(
-            sync_client, "_ensure_client", return_value=mock_sync_httpx_client
-        ), patch(
-            "src.loats.openalgo._check_kill_switch", return_value=None
+        with (
+            patch.object(
+                sync_client, "_ensure_client", return_value=mock_sync_httpx_client
+            ),
+            patch("src.loats.openalgo._check_kill_switch", return_value=None),
         ):
             result = sync_client.place_smart_order(
                 symbol="NIFTY",
@@ -355,7 +346,7 @@ class TestOrderOperationsIntegration:
                 price=18000.0,
                 strategy="simple",
                 stop_loss=17900.0,
-                take_profit=18100.0
+                take_profit=18100.0,
             )
 
             assert result["success"] is True
@@ -367,58 +358,52 @@ class TestOrderOperationsIntegration:
         self,
         sync_client: OpenAlgoClient,
         mock_sync_httpx_client: MagicMock,
-        mock_success_response: MagicMock
+        mock_success_response: MagicMock,
     ) -> None:
         """Test sync modify_order success path."""
         mock_success_response.json.return_value["data"]["order_id"] = "test_order_123"
         mock_success_response.json.return_value["data"]["status"] = "MODIFIED"
         mock_sync_httpx_client.post.return_value = mock_success_response
 
-        with patch.object(
-            sync_client, "_ensure_client", return_value=mock_sync_httpx_client
-        ), patch(
-            "src.loats.openalgo._check_kill_switch", return_value=None
+        with (
+            patch.object(
+                sync_client, "_ensure_client", return_value=mock_sync_httpx_client
+            ),
+            patch("src.loats.openalgo._check_kill_switch", return_value=None),
         ):
             result = sync_client.modify_order(
-                order_id="test_order_123",
-                quantity=2,
-                price=18050.0
+                order_id="test_order_123", quantity=2, price=18050.0
             )
 
             assert result["success"] is True
             assert result["data"]["order_id"] == "test_order_123"
             assert result["data"]["status"] == "MODIFIED"
 
-    def test_sync_modify_order_kill_switch(
-        self,
-        sync_client: OpenAlgoClient
-    ) -> None:
+    def test_sync_modify_order_kill_switch(self, sync_client: OpenAlgoClient) -> None:
         """Test sync modify_order with kill switch active."""
         with patch(
             "src.loats.openalgo._check_kill_switch",
-            side_effect=KillSwitchError("Kill switch active")
+            side_effect=KillSwitchError("Kill switch active"),
         ):
             with pytest.raises(KillSwitchError):
-                sync_client.modify_order(
-                    order_id="test_order_123",
-                    quantity=2
-                )
+                sync_client.modify_order(order_id="test_order_123", quantity=2)
 
     def test_sync_cancel_order_success(
         self,
         sync_client: OpenAlgoClient,
         mock_sync_httpx_client: MagicMock,
-        mock_success_response: MagicMock
+        mock_success_response: MagicMock,
     ) -> None:
         """Test sync cancel_order success path."""
         mock_success_response.json.return_value["data"]["order_id"] = "test_order_123"
         mock_success_response.json.return_value["data"]["status"] = "CANCELLED"
         mock_sync_httpx_client.post.return_value = mock_success_response
 
-        with patch.object(
-            sync_client, "_ensure_client", return_value=mock_sync_httpx_client
-        ), patch(
-            "src.loats.openalgo._check_kill_switch", return_value=None
+        with (
+            patch.object(
+                sync_client, "_ensure_client", return_value=mock_sync_httpx_client
+            ),
+            patch("src.loats.openalgo._check_kill_switch", return_value=None),
         ):
             result = sync_client.cancel_order("test_order_123")
 
@@ -426,23 +411,18 @@ class TestOrderOperationsIntegration:
             assert result["data"]["order_id"] == "test_order_123"
             assert result["data"]["status"] == "CANCELLED"
 
-    def test_sync_cancel_order_kill_switch(
-        self,
-        sync_client: OpenAlgoClient
-    ) -> None:
+    def test_sync_cancel_order_kill_switch(self, sync_client: OpenAlgoClient) -> None:
         """Test sync cancel_order with kill switch active."""
         with patch(
             "src.loats.openalgo._check_kill_switch",
-            side_effect=KillSwitchError("Kill switch active")
+            side_effect=KillSwitchError("Kill switch active"),
         ):
             with pytest.raises(KillSwitchError):
                 sync_client.cancel_order("test_order_123")
 
     @pytest.mark.asyncio
     async def test_async_order_operations_error_handling(
-        self,
-        async_client: AsyncOpenAlgoClient,
-        mock_async_httpx_client: AsyncMock
+        self, async_client: AsyncOpenAlgoClient, mock_async_httpx_client: AsyncMock
     ) -> None:
         """Test async order operations error handling."""
         # Test API error
@@ -457,28 +437,26 @@ class TestOrderOperationsIntegration:
 
         mock_async_httpx_client.post.return_value = error_response
 
-        with patch.object(
-            async_client, "_ensure_client", return_value=mock_async_httpx_client
-        ), patch(
-            "src.loats.openalgo._async_check_kill_switch", return_value=None
-        ), patch(
-            "src.loats.utils.rate_limiter.get_order_rate_limiter"
-        ) as mock_rate_limiter:
+        with (
+            patch.object(
+                async_client, "_ensure_client", return_value=mock_async_httpx_client
+            ),
+            patch("src.loats.openalgo._async_check_kill_switch", return_value=None),
+            patch(
+                "src.loats.utils.rate_limiter.get_order_rate_limiter"
+            ) as mock_rate_limiter,
+        ):
             mock_rate_limiter_instance = AsyncMock()
             mock_rate_limiter_instance.acquire.return_value = True
             mock_rate_limiter.return_value = mock_rate_limiter_instance
 
             with pytest.raises(OpenAlgoAPIError):
                 await async_client.place_order(
-                    symbol="NIFTY",
-                    quantity=1,
-                    order_type=OrderType.MARKET
+                    symbol="NIFTY", quantity=1, order_type=OrderType.MARKET
                 )
 
     def test_sync_order_operations_error_handling(
-        self,
-        sync_client: OpenAlgoClient,
-        mock_sync_httpx_client: MagicMock
+        self, sync_client: OpenAlgoClient, mock_sync_httpx_client: MagicMock
     ) -> None:
         """Test sync order operations error handling."""
         # Test API error
@@ -493,16 +471,15 @@ class TestOrderOperationsIntegration:
 
         mock_sync_httpx_client.post.return_value = error_response
 
-        with patch.object(
-            sync_client, "_ensure_client", return_value=mock_sync_httpx_client
-        ), patch(
-            "src.loats.openalgo._check_kill_switch", return_value=None
+        with (
+            patch.object(
+                sync_client, "_ensure_client", return_value=mock_sync_httpx_client
+            ),
+            patch("src.loats.openalgo._check_kill_switch", return_value=None),
         ):
             with pytest.raises(OpenAlgoAPIError):
                 sync_client.place_order(
-                    symbol="NIFTY",
-                    quantity=1,
-                    order_type=OrderType.MARKET
+                    symbol="NIFTY", quantity=1, order_type=OrderType.MARKET
                 )
 
     @pytest.mark.asyncio
@@ -510,18 +487,20 @@ class TestOrderOperationsIntegration:
         self,
         async_client: AsyncOpenAlgoClient,
         mock_async_httpx_client: AsyncMock,
-        mock_success_response: MagicMock
+        mock_success_response: MagicMock,
     ) -> None:
         """Test async order operations with all optional parameters."""
         mock_async_httpx_client.post.return_value = mock_success_response
 
-        with patch.object(
-            async_client, "_ensure_client", return_value=mock_async_httpx_client
-        ), patch(
-            "src.loats.openalgo._async_check_kill_switch", return_value=None
-        ), patch(
-            "src.loats.utils.rate_limiter.get_order_rate_limiter"
-        ) as mock_rate_limiter:
+        with (
+            patch.object(
+                async_client, "_ensure_client", return_value=mock_async_httpx_client
+            ),
+            patch("src.loats.openalgo._async_check_kill_switch", return_value=None),
+            patch(
+                "src.loats.utils.rate_limiter.get_order_rate_limiter"
+            ) as mock_rate_limiter,
+        ):
             mock_rate_limiter_instance = AsyncMock()
             mock_rate_limiter_instance.acquire.return_value = True
             mock_rate_limiter.return_value = mock_rate_limiter_instance
@@ -538,7 +517,7 @@ class TestOrderOperationsIntegration:
                 trigger_price=18050.0,
                 stop_loss=17900.0,
                 take_profit=18100.0,
-                trailing_stop_loss=17800.0
+                trailing_stop_loss=17800.0,
             )
 
             assert result["success"] is True
@@ -557,7 +536,7 @@ class TestOrderOperationsIntegration:
                 strategy="advanced",
                 transaction_type=TransactionType.BUY,
                 product_type=ProductType.MIS,
-                metadata={"source": "automated"}
+                metadata={"source": "automated"},
             )
 
             assert result["success"] is True
@@ -568,15 +547,16 @@ class TestOrderOperationsIntegration:
         self,
         sync_client: OpenAlgoClient,
         mock_sync_httpx_client: MagicMock,
-        mock_success_response: MagicMock
+        mock_success_response: MagicMock,
     ) -> None:
         """Test sync order operations with all optional parameters."""
         mock_sync_httpx_client.post.return_value = mock_success_response
 
-        with patch.object(
-            sync_client, "_ensure_client", return_value=mock_sync_httpx_client
-        ), patch(
-            "src.loats.openalgo._check_kill_switch", return_value=None
+        with (
+            patch.object(
+                sync_client, "_ensure_client", return_value=mock_sync_httpx_client
+            ),
+            patch("src.loats.openalgo._check_kill_switch", return_value=None),
         ):
             # Test place_order with all parameters
             result = sync_client.place_order(
@@ -590,7 +570,7 @@ class TestOrderOperationsIntegration:
                 trigger_price=18050.0,
                 stop_loss=17900.0,
                 take_profit=18100.0,
-                trailing_stop_loss=17800.0
+                trailing_stop_loss=17800.0,
             )
 
             assert result["success"] is True
@@ -609,7 +589,7 @@ class TestOrderOperationsIntegration:
                 strategy="advanced",
                 transaction_type=TransactionType.BUY,
                 product_type=ProductType.MIS,
-                metadata={"source": "automated"}
+                metadata={"source": "automated"},
             )
 
             assert result["success"] is True

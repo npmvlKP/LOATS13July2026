@@ -271,8 +271,6 @@ class TestSyncRateLimiterAdditional:
         assert wait_time <= 1.0  # At most 1 second
 
 
-
-
 class TestGlobalRateLimitersAdditional:
     """Additional tests for global rate limiter instances."""
 

@@ -26,7 +26,7 @@ class TestAlertSystemCoverage:
 
         # Test with None database
         alert_system_no_db = AlertSystem(None)
-        with patch.object(alert_system_no_db, '_safe_send_message', return_value=False):
+        with patch.object(alert_system_no_db, "_safe_send_message", return_value=False):
             result = await alert_system_no_db.send_alert("test message")
             assert result is False
 
@@ -37,7 +37,7 @@ class TestAlertSystemCoverage:
         db_mock.get_position_book.return_value = None
         alert_system = AlertSystem(db_mock)
 
-        with patch.object(alert_system, '_safe_get_position_book', return_value=None):
+        with patch.object(alert_system, "_safe_get_position_book", return_value=None):
             result = await alert_system.send_position_alert()
             assert result is False
 
@@ -48,7 +48,7 @@ class TestAlertSystemCoverage:
         db_mock.get_funds.return_value = None
         alert_system = AlertSystem(db_mock)
 
-        with patch.object(alert_system, '_safe_get_funds', return_value=None):
+        with patch.object(alert_system, "_safe_get_funds", return_value=None):
             result = await alert_system.send_funds_alert()
             assert result is False
 
@@ -61,6 +61,7 @@ class TestAlertSystemCoverage:
         status = alert_system.get_circuit_breaker_status()
         assert isinstance(status, dict)
 
+
 class TestOpenAlgoClientCoverage:
     """Test OpenAlgoClient methods with low coverage."""
 
@@ -69,7 +70,7 @@ class TestOpenAlgoClientCoverage:
         client = OpenAlgoClient(api_key="test_key")
         client.client = None
 
-        with patch('httpx.Client') as mock_client:
+        with patch("httpx.Client") as mock_client:
             mock_client_instance = MagicMock()
             mock_client.return_value = mock_client_instance
             result = client._ensure_client()
@@ -81,11 +82,12 @@ class TestOpenAlgoClientCoverage:
         client = AsyncOpenAlgoClient(api_key="test_key")
         client.client = None
 
-        with patch('httpx.AsyncClient') as mock_client:
+        with patch("httpx.AsyncClient") as mock_client:
             mock_client_instance = AsyncMock()
             mock_client.return_value = mock_client_instance
             result = await client._ensure_client()
             assert result == mock_client_instance
+
 
 class TestSchedulerCoverage:
     """Test TradingScheduler methods with low coverage."""
@@ -97,7 +99,7 @@ class TestSchedulerCoverage:
         scheduler.scheduler = MagicMock()
 
         # Test with market closed
-        with patch.object(scheduler, 'is_market_open', return_value=False):
+        with patch.object(scheduler, "is_market_open", return_value=False):
             await scheduler._market_status_check_task()
             # Should not raise exceptions
 
@@ -107,9 +109,10 @@ class TestSchedulerCoverage:
         scheduler = TradingScheduler()
         scheduler.scheduler = MagicMock()
 
-        with patch.object(scheduler, 'cleanup_old_data'):
+        with patch.object(scheduler, "cleanup_old_data"):
             await scheduler._data_cleanup_task()
             # Should not raise exceptions
+
 
 class TestCircuitBreakerCoverage:
     """Test CircuitBreaker methods with low coverage."""
@@ -117,7 +120,10 @@ class TestCircuitBreakerCoverage:
     def test_circuit_breaker_record_methods(self):
         """Test circuit breaker record methods."""
         from src.loats.utils.circuit_breaker import CircuitBreakerConfig
-        config = CircuitBreakerConfig(failure_threshold=3, success_threshold=2, timeout=10.0)
+
+        config = CircuitBreakerConfig(
+            failure_threshold=3, success_threshold=2, timeout=10.0
+        )
         cb = CircuitBreaker("test_circuit", config)
 
         # Test record methods
@@ -132,13 +138,17 @@ class TestCircuitBreakerCoverage:
     def test_circuit_breaker_get_status(self):
         """Test get_status method."""
         from src.loats.utils.circuit_breaker import CircuitBreakerConfig
-        config = CircuitBreakerConfig(failure_threshold=3, success_threshold=2, timeout=10.0)
+
+        config = CircuitBreakerConfig(
+            failure_threshold=3, success_threshold=2, timeout=10.0
+        )
         cb = CircuitBreaker("test_circuit", config)
 
         status = cb.get_status()
         assert isinstance(status, dict)
         assert "circuit_name" in status
         assert "state" in status
+
 
 class TestDatabaseCoverage:
     """Test Database methods with low coverage."""
@@ -157,7 +167,7 @@ class TestDatabaseCoverage:
             entry_time=datetime.now(UTC),
             exit_time=datetime.now(UTC),
             transaction_type=TransactionType.BUY,
-            pnl=Decimal("50.00")
+            pnl=Decimal("50.00"),
         )
 
         trade_dict = db._model_to_dict(trade)
@@ -180,6 +190,7 @@ class TestDatabaseCoverage:
         db._canonical_normalize("test_value")
         # Should not raise exceptions
 
+
 class TestModelsCoverage:
     """Test model methods with low coverage."""
 
@@ -193,7 +204,7 @@ class TestModelsCoverage:
             quantity=10,
             entry_time=datetime.now(UTC),
             exit_time=datetime.now(UTC),
-            transaction_type=TransactionType.BUY
+            transaction_type=TransactionType.BUY,
         )
 
         # Test calculate_pnl_method with float current_price
@@ -209,11 +220,12 @@ class TestModelsCoverage:
             quantity=10,
             entry_time=datetime.now(UTC),
             exit_time=datetime.now(UTC),
-            transaction_type=TransactionType.SELL
+            transaction_type=TransactionType.SELL,
         )
 
         pnl_sell = trade_sell.calculate_pnl_method(100.00)
         assert pnl_sell == 50.00
+
 
 class TestUtilsCoverage:
     """Test utility functions with low coverage."""
@@ -231,7 +243,7 @@ class TestUtilsCoverage:
             quantity=10,
             entry_time=datetime.now(UTC),
             exit_time=datetime.now(UTC),
-            transaction_type=TransactionType.BUY
+            transaction_type=TransactionType.BUY,
         )
         cache_key = model_to_cache_key(trade)
         assert isinstance(cache_key, str)
