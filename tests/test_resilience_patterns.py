@@ -91,9 +91,8 @@ class TestCircuitBreakerRetryComposition:
         cb = CircuitBreaker(
             "test",
             CircuitBreakerConfig(
-                failure_threshold=3,
-                excluded_exceptions=(ValueError,)
-            )
+                failure_threshold=3, excluded_exceptions=(ValueError,)
+            ),
         )
         retry_config = RetryConfig(max_attempts=3)
 
@@ -180,9 +179,8 @@ class TestCircuitBreakerRetryComposition:
         cb = CircuitBreaker(
             "test",
             CircuitBreakerConfig(
-                failure_threshold=3,
-                excluded_exceptions=(ValueError,)
-            )
+                failure_threshold=3, excluded_exceptions=(ValueError,)
+            ),
         )
         retry_config = RetryConfig(max_attempts=3)
 
@@ -288,7 +286,7 @@ class TestCircuitBreakerRetryComposition:
         retry_config = RetryConfig(max_attempts=2)
 
         # Mock the circuit breaker to raise an unexpected error
-        with patch.object(cb, 'call') as mock_call:
+        with patch.object(cb, "call") as mock_call:
             mock_call.side_effect = RuntimeError("Unexpected circuit breaker error")
 
             @circuit_breaker_retry_sync(cb, retry_config)
@@ -304,7 +302,7 @@ class TestCircuitBreakerRetryComposition:
         retry_config = RetryConfig(max_attempts=2)
 
         # Mock the circuit breaker to raise an unexpected error
-        with patch.object(cb, 'call_async') as mock_call:
+        with patch.object(cb, "call_async") as mock_call:
             mock_call.side_effect = RuntimeError("Unexpected circuit breaker error")
 
             @circuit_breaker_retry_async(cb, retry_config)

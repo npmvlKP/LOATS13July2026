@@ -3,8 +3,6 @@ Additional tests for cache.py to improve Redis coverage.
 Focuses on Redis-specific functionality and edge cases.
 """
 
-from unittest.mock import MagicMock, patch
-
 import pytest
 from cachetools import TTLCache
 

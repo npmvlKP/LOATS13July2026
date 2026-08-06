@@ -69,6 +69,7 @@ def test_db() -> Generator[Database, None, None]:
         except Exception:
             pass  # Ignore cleanup errors
 
+
 class TestDatabasePerformance:
     """Benchmark database operations performance."""
 
@@ -99,9 +100,9 @@ class TestDatabasePerformance:
         inserts_per_second = len(trades) / insert_time
 
         print(f"Database insert performance: {inserts_per_second:.2f} inserts/sec")
-        assert (
-            inserts_per_second > 50
-        ), f"Database insert performance too slow: {inserts_per_second:.2f} inserts/sec"
+        assert inserts_per_second > 50, (
+            f"Database insert performance too slow: {inserts_per_second:.2f} inserts/sec"
+        )
 
     def test_database_query_performance(self, test_db: Database) -> None:
         """Benchmark trade query performance."""
@@ -129,6 +130,7 @@ class TestDatabasePerformance:
         query_time = end_time - start_time
         print(f"Database query performance: {query_time:.4f} seconds")
         assert query_time < 0.1, f"Database query too slow: {query_time:.4f} seconds"
+
 
 class TestTechnicalAnalysisPerformance:
     """Benchmark technical analysis calculations performance."""
@@ -162,9 +164,9 @@ class TestTechnicalAnalysisPerformance:
             print(
                 f"Supertrend {size} points: {calc_time:.4f}s ({time_per_point:.2f} μs/point)"
             )
-            assert (
-                calc_time < 1.0
-            ), f"Supertrend calculation too slow for {size} points: {calc_time:.4f}s"
+            assert calc_time < 1.0, (
+                f"Supertrend calculation too slow for {size} points: {calc_time:.4f}s"
+            )
 
     def test_rsi_performance(self) -> None:
         """Benchmark RSI calculation performance."""
@@ -191,9 +193,10 @@ class TestTechnicalAnalysisPerformance:
             print(
                 f"RSI {size} points: {calc_time:.4f}s ({time_per_point:.2f} μs/point)"
             )
-            assert (
-                calc_time < 0.5
-            ), f"RSI calculation too slow for {size} points: {calc_time:.4f}s"
+            assert calc_time < 0.5, (
+                f"RSI calculation too slow for {size} points: {calc_time:.4f}s"
+            )
+
 
 class TestCachePerformance:
     """Benchmark cache operations performance."""
@@ -229,12 +232,13 @@ class TestCachePerformance:
         for i in range(1000):
             await cache_manager.delete(f"test_key_{i}")
 
-        assert (
-            writes_per_second > 1000
-        ), f"Cache write performance too slow: {writes_per_second:.2f} writes/sec"
-        assert (
-            reads_per_second > 1000
-        ), f"Cache read performance too slow: {reads_per_second:.2f} reads/sec"
+        assert writes_per_second > 1000, (
+            f"Cache write performance too slow: {writes_per_second:.2f} writes/sec"
+        )
+        assert reads_per_second > 1000, (
+            f"Cache read performance too slow: {reads_per_second:.2f} reads/sec"
+        )
+
 
 class TestConcurrentPerformance:
     """Benchmark concurrent operations performance."""
@@ -279,9 +283,9 @@ class TestConcurrentPerformance:
         inserts_per_second = total_inserts / concurrent_time
 
         print(f"Concurrent database operations: {inserts_per_second:.2f} inserts/sec")
-        assert (
-            inserts_per_second > 100
-        ), f"Concurrent performance too slow: {inserts_per_second:.2f} inserts/sec"
+        assert inserts_per_second > 100, (
+            f"Concurrent performance too slow: {inserts_per_second:.2f} inserts/sec"
+        )
 
     @pytest.mark.asyncio
     async def test_concurrent_cache_operations(self) -> None:
@@ -314,9 +318,10 @@ class TestConcurrentPerformance:
         for i in range(1000):
             await cache_manager.delete(f"concurrent_key_{i}")
 
-        assert (
-            operations_per_second > 5000
-        ), f"Concurrent cache performance too slow: {operations_per_second:.2f} ops/sec"
+        assert operations_per_second > 5000, (
+            f"Concurrent cache performance too slow: {operations_per_second:.2f} ops/sec"
+        )
+
 
 class TestAPILatency:
     """Benchmark API response times."""
@@ -343,9 +348,9 @@ class TestAPILatency:
             response_time = end_time - start_time
             print(f"API response time: {response_time:.4f} seconds")
 
-            assert (
-                response_time < 0.5
-            ), f"API response too slow: {response_time:.4f} seconds"
+            assert response_time < 0.5, (
+                f"API response too slow: {response_time:.4f} seconds"
+            )
             assert result["status"] == "success"
 
     @pytest.mark.asyncio
@@ -377,6 +382,6 @@ class TestAPILatency:
             )  # Avoid division by zero
 
             print(f"Batch API performance: {requests_per_second:.2f} requests/sec")
-            assert (
-                requests_per_second > 10
-            ), f"Batch API performance too slow: {requests_per_second:.2f} requests/sec"
+            assert requests_per_second > 10, (
+                f"Batch API performance too slow: {requests_per_second:.2f} requests/sec"
+            )

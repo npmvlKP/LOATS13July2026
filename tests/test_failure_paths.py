@@ -29,6 +29,7 @@ from src.loats.utils.retry import RetryConfig, retry_async, retry_sync
 
 logger = logging.getLogger(__name__)
 
+
 class TestCircuitBreakerOpenScenarios:
     """End-to-end tests for circuit breaker open scenarios."""
 
@@ -197,6 +198,7 @@ class TestCircuitBreakerOpenScenarios:
             assert "telegram" in str(exc_info.value)
             assert "open" in str(exc_info.value).lower()
 
+
 class TestRetryExhaustedScenarios:
     """End-to-end tests for retry exhausted scenarios."""
 
@@ -359,6 +361,7 @@ class TestRetryExhaustedScenarios:
 
         assert call_count == 1
 
+
 class TestFailureRecoveryScenarios:
     """Test system recovery after failure scenarios."""
 
@@ -485,6 +488,7 @@ class TestFailureRecoveryScenarios:
             assert result["status"] == "success"
             # call_count should be 6 (3 from first call + 3 from second call, but circuit breaker prevents some)
             assert call_count >= 4
+
 
 class TestErrorPropagation:
     """Test proper error propagation through the system."""
