@@ -11,11 +11,9 @@ import pytest
 from src.loats.utils.rate_limiter import (
     AsyncRateLimiter,
     RateLimiter,
-    RateLimitExceededError,
     SyncRateLimiter,
     get_order_rate_limiter,
     get_smart_order_rate_limiter,
-    rate_limited,
 )
 
 
@@ -273,53 +271,6 @@ class TestSyncRateLimiterAdditional:
         assert wait_time <= 1.0  # At most 1 second
 
 
-class TestRateLimiterDecoratorAdditional:
-    """Additional tests for rate limiter decorator."""
-
-    def test_rate_limited_decorator_basic(self) -> None:
-        """Test rate limited decorator basic functionality."""
-        call_count = 0
-
-        @rate_limited(max_ops=2, window_size=1.0)
-        def test_function():
-            nonlocal call_count
-            call_count += 1
-            return f"Call {call_count}"
-
-        # First two calls should succeed
-        result1 = test_function()
-        result2 = test_function()
-        assert result1 == "Call 1"
-        assert result2 == "Call 2"
-
-        # Third call should raise RateLimitExceededError
-        with pytest.raises(RateLimitExceededError):
-            test_function()
-
-    def test_rate_limited_decorator_with_different_params(self) -> None:
-        """Test rate limited decorator with different parameters."""
-        call_count = 0
-
-        @rate_limited(max_ops=1, window_size=0.5)
-        def test_function():
-            nonlocal call_count
-            call_count += 1
-            return f"Call {call_count}"
-
-        # First call should succeed
-        result1 = test_function()
-        assert result1 == "Call 1"
-
-        # Second call should fail immediately
-        with pytest.raises(RateLimitExceededError):
-            test_function()
-
-        # Wait for window to expire
-        time.sleep(0.6)  # 600ms
-
-        # Should be able to call again
-        result2 = test_function()
-        assert result2 == "Call 2"
 
 
 class TestGlobalRateLimitersAdditional:

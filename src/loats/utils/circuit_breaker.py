@@ -196,8 +196,6 @@ class CircuitBreaker:
             CircuitBreakerOpenError: If circuit is open
             Exception: Any exception from the function (after checking exclusions)
         """
-        self._stats.total_calls += 1
-
         if self.state == CircuitState.OPEN:
             self._record_rejection()
             remaining = self.config.timeout
@@ -240,8 +238,6 @@ class CircuitBreaker:
             CircuitBreakerOpenError: If circuit is open
             Exception: Any exception from the function (after checking exclusions)
         """
-        self._stats.total_calls += 1
-
         if self.state == CircuitState.OPEN:
             self._record_rejection()
             remaining = self.config.timeout

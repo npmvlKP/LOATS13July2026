@@ -12,7 +12,6 @@ from .rate_limiter import (
     RateLimitExceededError,
     get_order_rate_limiter,
     get_smart_order_rate_limiter,
-    rate_limited,
 )
 from .resilience import (
     CircuitBreakerRetryCompositionError,
@@ -38,7 +37,6 @@ __all__ = [
     "RateLimitExceededError",
     "AsyncRateLimiter",
     "RateLimiter",
-    "rate_limited",
     # Retry
     "OPENALGO_RETRY_CONFIG",
     "retry_async",

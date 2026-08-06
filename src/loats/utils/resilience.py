@@ -137,16 +137,9 @@ def circuit_breaker_retry_sync(
                 if last_exception:
                     raise last_exception
                 raise RuntimeError("Retry logic exhausted without result or exception")
-
             except CircuitBreakerOpenError:
                 # Circuit breaker is open, fail fast without retry
                 raise
-            except Exception as e:
-                # This should not happen if the composition is working correctly,
-                # but we handle it defensively
-                raise CircuitBreakerRetryCompositionError(
-                    circuit_breaker.name, e
-                ) from e
 
         return wrapper
 

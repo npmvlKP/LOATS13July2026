@@ -535,6 +535,10 @@ class Database:
         # Re-serialize fully populated model (including hash)
         entry_data = self._model_to_dict(entry)
 
+        # FIX-F-DATA-2: Use canonical serialization for JSONL storage to ensure hash consistency
+        # This ensures the stored data matches exactly what was hashed
+        canonical_entry_data = json.loads(self._canonical_serialize(entry_data))
+
         # Write database
         conn = self._get_connection()
         cursor = conn.cursor()
@@ -561,9 +565,9 @@ class Database:
         )
         conn.commit()
 
-        # Write JSONL file (append-only)
+        # Write JSONL file (append-only) using canonical serialization
         with Path(self.audit_log_path).open("a", encoding="utf-8") as f:
-            f.write(json.dumps(entry_data) + "\n")
+            f.write(json.dumps(canonical_entry_data) + "\n")
 
     def _cleanup_old_data(self) -> None:
         """

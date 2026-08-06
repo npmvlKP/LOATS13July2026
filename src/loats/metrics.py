@@ -70,7 +70,7 @@ class MetricsManager:
         """Set up mock Prometheus metrics to work with lightweight implementation."""
 
         # Configure job_execution_counter mock
-        def job_execution_labels(job_id: str = "", status: str = ""):
+        def job_execution_labels(job_id: str = "", status: str = "") -> MagicMock:
             mock_counter = MagicMock()
             mock_counter.inc = MagicMock(side_effect=lambda: self._track_job_via_mock(job_id, status))
             return mock_counter
@@ -78,7 +78,7 @@ class MetricsManager:
         self.job_execution_counter.labels = MagicMock(side_effect=job_execution_labels)
 
         # Configure job_latency_summary mock
-        def job_latency_labels(job_id: str = ""):
+        def job_latency_labels(job_id: str = "") -> MagicMock:
             mock_summary = MagicMock()
             mock_summary.observe = MagicMock(side_effect=lambda duration: self._track_latency_via_mock(job_id, duration))
             return mock_summary
@@ -86,7 +86,7 @@ class MetricsManager:
         self.job_latency_summary.labels = MagicMock(side_effect=job_latency_labels)
 
         # Configure signals_generated_counter mock
-        def signals_generated_labels(signal_type: str = "", scan_type: str = ""):
+        def signals_generated_labels(signal_type: str = "", scan_type: str = "") -> MagicMock:
             mock_counter = MagicMock()
             mock_counter.inc = MagicMock(side_effect=lambda: self._record_signal_via_mock(signal_type, scan_type))
             return mock_counter
@@ -97,7 +97,7 @@ class MetricsManager:
         self.kill_switch_status.set = MagicMock(side_effect=lambda value: self._set_kill_switch_via_mock(value))
 
         # Configure circuit_breaker_status mock
-        def circuit_breaker_labels(component: str = ""):
+        def circuit_breaker_labels(component: str = "") -> MagicMock:
             mock_gauge = MagicMock()
             mock_gauge.set = MagicMock(side_effect=lambda value: self._set_circuit_breaker_via_mock(component, value))
             return mock_gauge

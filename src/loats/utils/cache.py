@@ -24,6 +24,10 @@ class CacheConfig:
         ttl_seconds: int = 300,
         prefix: str = "loats",
         max_size: int = 1000,
+        cache_type: str = "memory",
+        redis_host: str | None = None,
+        redis_port: int | None = None,
+        redis_password: str | None = None,
     ):
         """Initialize cache configuration.
 
@@ -31,10 +35,18 @@ class CacheConfig:
             ttl_seconds: Time-to-live for cache entries in seconds
             prefix: Prefix for cache keys to avoid collisions
             max_size: Maximum number of entries in cache
+            cache_type: Type of cache backend ('memory' or 'redis')
+            redis_host: Redis host (required if cache_type='redis')
+            redis_port: Redis port (required if cache_type='redis')
+            redis_password: Redis password (optional for Redis)
         """
         self.ttl_seconds = ttl_seconds
         self.prefix = prefix
         self.max_size = max_size
+        self.cache_type = cache_type
+        self.redis_host = redis_host
+        self.redis_port = redis_port
+        self.redis_password = redis_password
 
 class CacheManager:
     """Lightweight cache manager for LOATS13July2026 LITE edition.
@@ -52,15 +64,19 @@ class CacheManager:
             "deletes": 0,
             "evictions": 0,
         }
+        self._cache_type: str = "uninitialized"
         self._initialized = False
 
     async def initialize(self) -> None:
-        """Initialize lightweight in-memory cache."""
+        """Initialize cache based on configuration."""
         try:
+            # For LITE edition, always use in-memory cache regardless of config
+            # This maintains compatibility while avoiding Redis dependency
             self._cache = TTLCache(
                 maxsize=self.config.max_size,
                 ttl=self.config.ttl_seconds,
             )
+            self._cache_type = "in_memory_ttl"
             self._initialized = True
             logger.info(
                 f"Lightweight in-memory cache initialized (max_size={self.config.max_size}, ttl={self.config.ttl_seconds}s)"

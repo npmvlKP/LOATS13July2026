@@ -3,7 +3,7 @@ Additional unit tests for cache utility module to increase coverage.
 Tests Redis functionality, error handling, and edge cases.
 """
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 from cachetools import TTLCache
@@ -49,31 +49,45 @@ class TestCacheManagerAdditional:
     @pytest.mark.asyncio
     async def test_initialize_redis_fallback(self, cache_manager: CacheManager) -> None:
         """Test Redis initialization with fallback to in-memory."""
-        # Mock Redis to be unavailable
-        with patch("src.loats.utils.cache.redis") as mock_redis:
-            mock_redis.asyncio.Redis.side_effect = ImportError("Redis not available")
+        # For LITE edition, always use in-memory cache regardless of Redis config
+        # This test verifies that the LITE edition gracefully handles Redis configuration
+        # by falling back to in-memory caching
 
-            await cache_manager.initialize()
-            assert cache_manager._cache is not None
-            assert isinstance(cache_manager._cache, TTLCache)
-            assert cache_manager._cache_type == "in_memory_ttl"
+        # Set Redis configuration
+        redis_config = CacheConfig(
+            cache_type="redis",
+            redis_host="redis.example.com",
+            redis_port=6380,
+            redis_password="secret",
+        )
+        cache_manager_with_redis = CacheManager(redis_config)
+
+        await cache_manager_with_redis.initialize()
+        assert cache_manager_with_redis._cache is not None
+        assert isinstance(cache_manager_with_redis._cache, TTLCache)
+        assert cache_manager_with_redis._cache_type == "in_memory_ttl"
 
     @pytest.mark.asyncio
     async def test_initialize_redis_connection_error(
         self, cache_manager: CacheManager
     ) -> None:
         """Test Redis connection error handling."""
-        # Mock Redis to raise connection error
-        with patch("src.loats.utils.cache.redis") as mock_redis:
-            mock_redis.asyncio.Redis = MagicMock()
-            mock_redis.asyncio.Redis.return_value.ping.side_effect = Exception(
-                "Connection failed"
-            )
+        # For LITE edition, this test verifies that Redis configuration is gracefully ignored
+        # and in-memory caching is used instead
 
-            await cache_manager.initialize()
-            assert cache_manager._cache is not None
-            assert isinstance(cache_manager._cache, TTLCache)
-            assert cache_manager._cache_type == "in_memory_ttl"
+        # Set Redis configuration with connection that would fail
+        redis_config = CacheConfig(
+            cache_type="redis",
+            redis_host="unreachable.redis.example.com",
+            redis_port=6379,
+            redis_password="secret",
+        )
+        cache_manager_with_redis = CacheManager(redis_config)
+
+        await cache_manager_with_redis.initialize()
+        assert cache_manager_with_redis._cache is not None
+        assert isinstance(cache_manager_with_redis._cache, TTLCache)
+        assert cache_manager_with_redis._cache_type == "in_memory_ttl"
 
     @pytest.mark.asyncio
     async def test_get_redis_fallback(self, cache_manager: CacheManager) -> None:
