@@ -1,21 +1,21 @@
 """Coverage booster tests to improve overall coverage to 80%+."""
 
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
-import sqlite3
+from unittest.mock import AsyncMock, MagicMock, patch
 
-from src.loats.models import (
-    Trade, Order, Signal, Position, FundsData, QuoteData,
-    HistoricalData, OrderType, TransactionType, SignalType
-)
-from src.loats.database import Database
+import pytest
+
 from src.loats.alerts import AlertSystem
-from src.loats.openalgo import OpenAlgoClient, AsyncOpenAlgoClient
+from src.loats.database import Database
+from src.loats.models import (
+    Trade,
+    TransactionType,
+)
+from src.loats.openalgo import AsyncOpenAlgoClient, OpenAlgoClient
 from src.loats.scheduler import TradingScheduler
 from src.loats.utils.circuit_breaker import CircuitBreaker
-from src.loats.config.settings import get_settings
+
 
 class TestAlertSystemCoverage:
     """Test AlertSystem methods with low coverage."""
@@ -23,8 +23,6 @@ class TestAlertSystemCoverage:
     @pytest.mark.asyncio
     async def test_alert_system_send_alert_error_handling(self):
         """Test send_alert with various error scenarios."""
-        db_mock = MagicMock()
-        alert_system = AlertSystem(db_mock)
 
         # Test with None database
         alert_system_no_db = AlertSystem(None)
@@ -156,8 +154,8 @@ class TestDatabaseCoverage:
             entry_price=Decimal("100.00"),
             exit_price=Decimal("105.00"),
             quantity=10,
-            entry_time=datetime.now(timezone.utc),
-            exit_time=datetime.now(timezone.utc),
+            entry_time=datetime.now(UTC),
+            exit_time=datetime.now(UTC),
             transaction_type=TransactionType.BUY,
             pnl=Decimal("50.00")
         )
@@ -178,7 +176,8 @@ class TestDatabaseCoverage:
         serialized = db._canonical_serialize(test_data)
         assert isinstance(serialized, str)
 
-        normalized = db._canonical_normalize("test_value")
+        # Test canonical normalization
+        db._canonical_normalize("test_value")
         # Should not raise exceptions
 
 class TestModelsCoverage:
@@ -192,8 +191,8 @@ class TestModelsCoverage:
             entry_price=Decimal("100.00"),
             exit_price=Decimal("105.00"),
             quantity=10,
-            entry_time=datetime.now(timezone.utc),
-            exit_time=datetime.now(timezone.utc),
+            entry_time=datetime.now(UTC),
+            exit_time=datetime.now(UTC),
             transaction_type=TransactionType.BUY
         )
 
@@ -208,8 +207,8 @@ class TestModelsCoverage:
             entry_price=Decimal("105.00"),
             exit_price=Decimal("100.00"),
             quantity=10,
-            entry_time=datetime.now(timezone.utc),
-            exit_time=datetime.now(timezone.utc),
+            entry_time=datetime.now(UTC),
+            exit_time=datetime.now(UTC),
             transaction_type=TransactionType.SELL
         )
 
@@ -221,7 +220,7 @@ class TestUtilsCoverage:
 
     def test_cache_key_functions(self):
         """Test cache key generation functions."""
-        from src.loats.utils.cache import model_to_cache_key, dict_to_cache_key
+        from src.loats.utils.cache import dict_to_cache_key, model_to_cache_key
 
         # Test model to cache key
         trade = Trade(
@@ -230,8 +229,8 @@ class TestUtilsCoverage:
             entry_price=Decimal("100.00"),
             exit_price=Decimal("105.00"),
             quantity=10,
-            entry_time=datetime.now(timezone.utc),
-            exit_time=datetime.now(timezone.utc),
+            entry_time=datetime.now(UTC),
+            exit_time=datetime.now(UTC),
             transaction_type=TransactionType.BUY
         )
         cache_key = model_to_cache_key(trade)

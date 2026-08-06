@@ -4,7 +4,9 @@ Final validation of scalability fix.
 """
 
 import asyncio
-from src.loats.utils.cache import cache_manager, initialize_cache, close_cache
+
+from src.loats.utils.cache import cache_manager, close_cache, initialize_cache
+
 
 async def final_validation():
     """Final validation of scalability implementation."""

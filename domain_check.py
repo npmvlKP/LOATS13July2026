@@ -1,5 +1,6 @@
 """Domain validation scan for LOATS13July2026."""
 import pathlib
+
 src = pathlib.Path('src/loats')
 files = list(src.rglob('*.py'))
 print('Total src files:', len(files))

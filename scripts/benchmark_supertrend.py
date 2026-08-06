@@ -1,16 +1,18 @@
 #!/usr/bin/env python3
 """Benchmark script for Supertrend indicator performance."""
+import sys
 import time
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
-import sys
-from pathlib import Path
 
 # Add project root to path for imports
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 from src.loats.ta import calculate_supertrend
+
 
 def generate_test_data(n_points: int = 10000) -> pd.DataFrame:
     """Generate synthetic market data for benchmarking."""

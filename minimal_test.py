@@ -4,7 +4,9 @@ Minimal test to isolate cache issue.
 """
 
 import asyncio
-from src.loats.utils.cache import CacheManager, CacheConfig
+
+from src.loats.utils.cache import CacheConfig, CacheManager
+
 
 async def minimal_test():
     """Minimal test of cache functionality."""

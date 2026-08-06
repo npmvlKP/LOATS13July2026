@@ -4,7 +4,9 @@ Final comprehensive test for cache functionality.
 """
 
 import asyncio
-from src.loats.utils.cache import CacheManager, CacheConfig
+
+from src.loats.utils.cache import CacheConfig, CacheManager
+
 
 async def test_final_cache():
     """Comprehensive test for cache functionality."""

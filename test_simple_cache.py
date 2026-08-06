@@ -4,7 +4,9 @@ Simple test script for cache functionality.
 """
 
 import asyncio
-from src.loats.utils.cache import cache_manager, initialize_cache, close_cache
+
+from src.loats.utils.cache import cache_manager, close_cache, initialize_cache
+
 
 async def test_simple_cache():
     """Test basic cache functionality."""

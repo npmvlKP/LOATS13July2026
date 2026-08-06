@@ -11,8 +11,8 @@ This module provides comprehensive performance benchmarks for:
 import asyncio
 import threading
 import time
+from collections.abc import Generator
 from datetime import datetime, timedelta
-from typing import Generator
 from unittest.mock import patch
 
 import numpy as np
@@ -20,9 +20,10 @@ import pandas as pd
 import pytest
 
 from src.loats.database import Database
-from src.loats.models import ProductType, TransactionType, Trade
+from src.loats.models import ProductType, Trade, TransactionType
 from src.loats.ta import calculate_rsi, calculate_supertrend
 from src.loats.utils.cache import cache_manager
+
 
 @pytest.fixture
 def test_db() -> Generator[Database, None, None]:

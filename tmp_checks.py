@@ -1,4 +1,5 @@
 import ast
+
 src = open('src/loats/database.py', encoding='utf-8').read()
 t = ast.parse(src)
 names = []
