@@ -5,6 +5,21 @@ description = "Lite OpenAlgo Trading System"
 authors = [{name = "npmvlKP", email = "npmvlKP@gmail.com"}]
 readme = "README.md"
 requires-python = ">=3.12"
+license = {text = "MIT"}
+keywords = ["trading", "algorithmic", "finance", "openalgo", "automation"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Financial and Insurance Industry",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3 :: Only",
+    "Topic :: Office/Business :: Financial :: Investment",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Operating System :: OS Independent",
+    "Typing :: Typed"
+]
 dependencies = [
     "openalgo>=0.1.0",
     "httpx>=0.28.0",
@@ -43,8 +58,18 @@ dev = [
     "pre-commit>=3.7.0"
 ]
 
+[project.urls]
+Homepage = "https://github.com/npmvlKP/LOATS13July2026"
+Documentation = "https://github.com/npmvlKP/LOATS13July2026/blob/main/README.md"
+Repository = "https://github.com/npmvlKP/LOATS13July2026.git"
+Issues = "https://github.com/npmvlKP/LOATS13July2026/issues"
+Changelog = "https://github.com/npmvlKP/LOATS13July2026/blob/main/CHANGELOG.md"
+
+[project.scripts]
+loats = "loats.main:main"
+
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling>=1.21.0"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]

@@ -14,6 +14,15 @@ from .rate_limiter import (
     get_smart_order_rate_limiter,
     rate_limited,
 )
+from .resilience import (
+    CircuitBreakerRetryCompositionError,
+    circuit_breaker_retry_async,
+    circuit_breaker_retry_sync,
+    openalgo_circuit_breaker_retry_async,
+    openalgo_circuit_breaker_retry_sync,
+    telegram_circuit_breaker_retry_async,
+    telegram_circuit_breaker_retry_sync,
+)
 from .retry import OPENALGO_RETRY_CONFIG, retry_async, retry_sync
 
 __all__ = [
@@ -34,4 +43,12 @@ __all__ = [
     "OPENALGO_RETRY_CONFIG",
     "retry_async",
     "retry_sync",
+    # Resilience patterns
+    "circuit_breaker_retry_sync",
+    "circuit_breaker_retry_async",
+    "CircuitBreakerRetryCompositionError",
+    "openalgo_circuit_breaker_retry_sync",
+    "openalgo_circuit_breaker_retry_async",
+    "telegram_circuit_breaker_retry_sync",
+    "telegram_circuit_breaker_retry_async",
 ]

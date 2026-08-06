@@ -141,6 +141,7 @@ class CircuitBreaker:
     def _record_success(self) -> None:
         """Record a successful call."""
         now = time.monotonic()
+        self._stats.total_calls += 1
         self._stats.successful_calls += 1
         self._stats.consecutive_successes += 1
         self._stats.consecutive_failures = 0
@@ -158,6 +159,7 @@ class CircuitBreaker:
     def _record_failure(self) -> None:
         """Record a failed call."""
         now = time.monotonic()
+        self._stats.total_calls += 1
         self._stats.failed_calls += 1
         self._stats.consecutive_failures += 1
         self._stats.consecutive_successes = 0

@@ -190,9 +190,7 @@ class AlertSystem:
         # Call _safe_send_message directly without catching exceptions
         # This allows the circuit breaker to handle failures properly
         return await self._safe_send_message(
-            chat_id=settings.telegram_chat_id,
-            text=message,
-            parse_mode="HTML"
+            chat_id=settings.telegram_chat_id, text=message, parse_mode="HTML"
         )
 
     async def _safe_send_message(
