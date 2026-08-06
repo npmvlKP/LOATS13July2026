@@ -7,26 +7,25 @@ Validates all scalability improvements mentioned in the task.
 import asyncio
 import json
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 # Ensure UTF-8 encoding for Windows
 if sys.platform == "win32":
     import io
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 
-from src.loats.sentiment import sentiment
+from src.loats.loats_logging import get_logger
 from src.loats.openalgo import async_client
-from src.loats.utils.cache import cache_manager, initialize_cache, close_cache
+from src.loats.sentiment import sentiment
+from src.loats.utils.cache import cache_manager, close_cache, initialize_cache
+from src.loats.utils.circuit_breaker import (
+    OPENALGO_CIRCUIT_BREAKER,
+    TELEGRAM_CIRCUIT_BREAKER,
+)
 from src.loats.utils.rate_limiter import (
     get_order_rate_limiter,
     get_smart_order_rate_limiter,
-    RateLimitExceededError
 )
-from src.loats.utils.circuit_breaker import (
-    OPENALGO_CIRCUIT_BREAKER,
-    TELEGRAM_CIRCUIT_BREAKER
-)
-from src.loats.loats_logging import get_logger
 
 logger = get_logger(__name__)
 
@@ -123,8 +122,8 @@ async def validate_async_io_patterns():
 
     # Verify async methods are properly defined
     import inspect
-    get_quotes_method = getattr(async_client, 'get_quotes')
-    place_order_method = getattr(async_client, 'place_order')
+    get_quotes_method = async_client.get_quotes
+    place_order_method = async_client.place_order
 
     assert inspect.iscoroutinefunction(get_quotes_method), "get_quotes should be async"
     assert inspect.iscoroutinefunction(place_order_method), "place_order should be async"
@@ -135,7 +134,7 @@ async def main():
     """Main validation entry point."""
     print("🚀 Starting LOATS13July2026 Scalability Validation")
     print("=" * 60)
-    print(f"📅 Validation Date: {datetime.now(timezone.utc).isoformat()}")
+    print(f"📅 Validation Date: {datetime.now(UTC).isoformat()}")
     print("=" * 60)
 
     try:

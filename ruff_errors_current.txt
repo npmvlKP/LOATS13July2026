@@ -532,18 +532,6 @@ W292 [*] No newline at end of file
     |
 help: Add trailing newline
 
-F841 Local variable `model_data` is assigned to but never used
-   --> src\loats\utils\cache.py:426:5
-    |
-424 | def model_to_cache_key(model: BaseModel) -> str:
-425 |     """Convert BaseModel to cache key."""
-426 |     model_data = model.model_dump()
-    |     ^^^^^^^^^^
-427 |     # Include trade_id if available for better cache key uniqueness
-428 |     if hasattr(model, 'trade_id') and model.trade_id:
-    |
-help: Remove assignment to unused variable `model_data`
-
 I001 [*] Import block is un-sorted or un-formatted
   --> test_comprehensive_fixes.py:20:1
    |
@@ -2890,5 +2878,5 @@ T201 `print` found
     |
 help: Remove `print`
 
-Found 247 errors.
-[*] 57 fixable with the `--fix` option (183 hidden fixes can be enabled with the `--unsafe-fixes` option).
+Found 246 errors.
+[*] 57 fixable with the `--fix` option (182 hidden fixes can be enabled with the `--unsafe-fixes` option).

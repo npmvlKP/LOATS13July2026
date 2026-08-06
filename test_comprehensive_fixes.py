@@ -18,10 +18,15 @@ if sys.platform == "win32":
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
 
 from loats.alerts import alerts
+from loats.config import settings
 from loats.openalgo import KillSwitchError
 from loats.scheduler import TradingScheduler
-from loats.utils import ORDER_RATE_LIMITER, SMART_ORDER_RATE_LIMITER, RateLimitExceededError
-from loats.config import settings
+from loats.utils import (
+    ORDER_RATE_LIMITER,
+    SMART_ORDER_RATE_LIMITER,
+    RateLimitExceededError,
+)
+
 
 async def test_kill_switch_enforcement():
     """Test F-REL-1: Kill switch enforcement."""
@@ -119,7 +124,7 @@ async def test_async_error_handling():
     try:
         # Test that RateLimitExceededError can be raised and caught properly
         raise RateLimitExceededError("Test rate limit")
-    except RateLimitExceededError as e:
+    except RateLimitExceededError:
         print("  ✅ RateLimitExceededError can be raised and caught")
     except Exception as e:
         return False, f"Unexpected exception type: {type(e)}"
@@ -127,7 +132,7 @@ async def test_async_error_handling():
     try:
         # Test that KillSwitchError can be raised and caught properly
         raise KillSwitchError("Test kill switch")
-    except KillSwitchError as e:
+    except KillSwitchError:
         print("  ✅ KillSwitchError can be raised and caught")
     except Exception as e:
         return False, f"Unexpected exception type: {type(e)}"

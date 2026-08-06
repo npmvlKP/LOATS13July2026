@@ -4,7 +4,9 @@ Test script for Redis cache functionality.
 """
 
 import asyncio
-from src.loats.utils.cache import CacheManager, CacheConfig
+
+from src.loats.utils.cache import CacheConfig, CacheManager
+
 
 async def test_redis_cache():
     """Test Redis cache with fallback to in-memory."""

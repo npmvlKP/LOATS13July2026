@@ -1,0 +1,25 @@
+F841 Local variable `alert_system` is assigned to but never used
+  --> tests\test_coverage_booster.py:27:9
+   |
+25 |         """Test send_alert with various error scenarios."""
+26 |         db_mock = MagicMock()
+27 |         alert_system = AlertSystem(db_mock)
+   |         ^^^^^^^^^^^^
+28 |
+29 |         # Test with None database
+   |
+help: Remove assignment to unused variable `alert_system`
+
+F841 Local variable `normalized` is assigned to but never used
+   --> tests\test_coverage_booster.py:181:9
+    |
+179 |         assert isinstance(serialized, str)
+180 |
+181 |         normalized = db._canonical_normalize("test_value")
+    |         ^^^^^^^^^^
+182 |         # Should not raise exceptions
+    |
+help: Remove assignment to unused variable `normalized`
+
+Found 2 errors.
+No fixes available (2 hidden fixes can be enabled with the `--unsafe-fixes` option).

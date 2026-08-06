@@ -18,8 +18,9 @@ if sys.platform == "win32":
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
 
-from loats.utils.rate_limiter import AsyncRateLimiter, RateLimitExceededError
 from loats.config import settings
+from loats.utils.rate_limiter import AsyncRateLimiter
+
 
 async def test_rate_limiter():
     """Test that rate limiter works correctly."""
