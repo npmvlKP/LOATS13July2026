@@ -815,9 +815,7 @@ class Database:
                 (symbol,),
             )
         else:
-            cursor.execute(
-                "SELECT * FROM trades ORDER BY entry_time DESC"
-            )
+            cursor.execute("SELECT * FROM trades ORDER BY entry_time DESC")
         rows = cursor.fetchall()
         return [self._row_to_trade(row) for row in rows]
 
