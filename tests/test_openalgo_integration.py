@@ -158,6 +158,8 @@ class TestOrderOperationsIntegration:
     ) -> None:
         """Test async place_smart_order success path."""
         mock_success_response.json.return_value["data"]["strategy"] = "simple"
+        mock_success_response.json.return_value["data"]["stop_loss"] = 17900.0
+        mock_success_response.json.return_value["data"]["take_profit"] = 18100.0
         mock_async_httpx_client.post.return_value = mock_success_response
 
         with (
@@ -331,6 +333,8 @@ class TestOrderOperationsIntegration:
     ) -> None:
         """Test sync place_smart_order success path."""
         mock_success_response.json.return_value["data"]["strategy"] = "simple"
+        mock_success_response.json.return_value["data"]["stop_loss"] = 17900.0
+        mock_success_response.json.return_value["data"]["take_profit"] = 18100.0
         mock_sync_httpx_client.post.return_value = mock_success_response
 
         with (
@@ -511,7 +515,7 @@ class TestOrderOperationsIntegration:
                 quantity=1,
                 order_type=OrderType.LIMIT,
                 price=18000.0,
-                variety=OrderVariety.STOPLOSS,
+                variety=OrderVariety.REGULAR,
                 transaction_type=TransactionType.BUY,
                 product_type=ProductType.MIS,
                 trigger_price=18050.0,
@@ -524,6 +528,7 @@ class TestOrderOperationsIntegration:
 
             # Test place_smart_order with all parameters
             mock_success_response.json.return_value["data"]["strategy"] = "advanced"
+            mock_success_response.json.return_value["data"]["metadata"] = {"source": "automated"}
             result = await async_client.place_smart_order(
                 symbol="NIFTY",
                 quantity=1,
@@ -564,7 +569,7 @@ class TestOrderOperationsIntegration:
                 quantity=1,
                 order_type=OrderType.LIMIT,
                 price=18000.0,
-                variety=OrderVariety.STOPLOSS,
+                variety=OrderVariety.REGULAR,
                 transaction_type=TransactionType.BUY,
                 product_type=ProductType.MIS,
                 trigger_price=18050.0,
@@ -577,6 +582,7 @@ class TestOrderOperationsIntegration:
 
             # Test place_smart_order with all parameters
             mock_success_response.json.return_value["data"]["strategy"] = "advanced"
+            mock_success_response.json.return_value["data"]["metadata"] = {"source": "automated"}
             result = sync_client.place_smart_order(
                 symbol="NIFTY",
                 quantity=1,
