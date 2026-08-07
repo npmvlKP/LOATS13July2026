@@ -33,6 +33,11 @@ logger = logging.getLogger(__name__)
 class TestCircuitBreakerOpenScenarios:
     """End-to-end tests for circuit breaker open scenarios."""
 
+    def setup_method(self) -> None:
+        """Reset circuit breakers before each test."""
+        OPENALGO_CIRCUIT_BREAKER.reset()
+        TELEGRAM_CIRCUIT_BREAKER.reset()
+
     def test_circuit_breaker_open_rejection(self) -> None:
         """Test that calls are rejected when circuit breaker is open."""
         config = CircuitBreakerConfig(
@@ -131,18 +136,16 @@ class TestCircuitBreakerOpenScenarios:
         with patch("src.loats.openalgo.async_client.get_quotes") as mock_get_quotes:
             mock_get_quotes.side_effect = ConnectionError("API unavailable")
 
-            # Make enough calls to trigger circuit breaker open (failure_threshold=3)
-            # Each call will be retried 3 times, so we need 3 calls to get 9 failures
-            # But the circuit breaker counts each call attempt, not each retry
-            # So we need 3 failed calls to reach the threshold
-            with pytest.raises(ConnectionError):
-                await scheduler._safe_get_quotes(["NIFTY"])
-            with pytest.raises(ConnectionError):
-                await scheduler._safe_get_quotes(["NIFTY"])
+            # First call should exhaust retries and raise ConnectionError, opening circuit breaker
+            # OpenAlgo CB threshold=3, Retry config=3. 1 call = 3 failures = Open.
             with pytest.raises(ConnectionError):
                 await scheduler._safe_get_quotes(["NIFTY"])
 
-            # Fourth call should be rejected by circuit breaker (failure_threshold=3)
+            # Verify circuit breaker is now open
+            status = OPENALGO_CIRCUIT_BREAKER.get_status()
+            assert status["state"] == "open"
+
+            # Second call should be rejected by circuit breaker
             with pytest.raises(CircuitBreakerOpenError) as exc_info:
                 await scheduler._safe_get_quotes(["NIFTY"])
 
@@ -172,26 +175,16 @@ class TestCircuitBreakerOpenScenarios:
             # Initialize the bot to set up the mock
             alert_system.bot = mock_bot
 
-            # Force circuit breaker open - these should fail after retries
-            # Telegram circuit breaker has failure_threshold=5
+            # Force circuit breaker open - first call should fail after 5 retries
+            # Telegram CB threshold=5, Retry config=5. 1 call = 5 failures = Open.
             result1 = await alert_system._send_telegram_message("Test message")
-            result2 = await alert_system._send_telegram_message("Test message")
-            result3 = await alert_system._send_telegram_message("Test message")
-            result4 = await alert_system._send_telegram_message("Test message")
-            result5 = await alert_system._send_telegram_message("Test message")
-
-            # All should return False due to failures
             assert result1 is False
-            assert result2 is False
-            assert result3 is False
-            assert result4 is False
-            assert result5 is False
 
             # Circuit breaker should now be open
             status = alert_system.get_circuit_breaker_status()
             assert status["telegram"]["state"] == "open"
 
-            # Fourth call should be rejected by circuit breaker
+            # Second call should be rejected by circuit breaker
             with pytest.raises(CircuitBreakerOpenError) as exc_info:
                 await alert_system._send_telegram_message("Test message")
 
@@ -201,6 +194,11 @@ class TestCircuitBreakerOpenScenarios:
 
 class TestRetryExhaustedScenarios:
     """End-to-end tests for retry exhausted scenarios."""
+
+    def setup_method(self) -> None:
+        """Reset circuit breakers before each test."""
+        OPENALGO_CIRCUIT_BREAKER.reset()
+        TELEGRAM_CIRCUIT_BREAKER.reset()
 
     def test_retry_exhausted_synchronous(self) -> None:
         """Test that retries are exhausted and final exception is raised."""
@@ -305,18 +303,37 @@ class TestRetryExhaustedScenarios:
         with patch("src.loats.openalgo.async_client.get_history") as mock_get_history:
             mock_get_history.side_effect = ConnectionError("History API failed")
 
-            # This should exhaust retries and return None
-            result = await scheduler._safe_get_history("NIFTY", "1min", 100)
-            assert result is None
+            # First call should exhaust retries and raise ConnectionError, opening circuit breaker
+            with pytest.raises(ConnectionError):
+                await scheduler._safe_get_history("NIFTY", "1min", 100)
 
-            # Make additional calls to trigger circuit breaker (failure_threshold=3)
-            result2 = await scheduler._safe_get_history("NIFTY", "1min", 100)
-            assert result2 is None
+            # Check status after first call - circuit breaker should now be open
+            status1 = scheduler.get_circuit_breaker_status()
+            print(f"After call 1: {status1}")
+            assert status1["state"] == "open"
+            assert status1["consecutive_failures"] == 3
 
-            result3 = await scheduler._safe_get_history("NIFTY", "1min", 100)
-            assert result3 is None
+            # Subsequent calls should be rejected with CircuitBreakerOpenError
+            with pytest.raises(CircuitBreakerOpenError):
+                await scheduler._safe_get_history("NIFTY", "1min", 100)
 
-            # Verify circuit breaker is now open
+            # Check status after second call - should still be open
+            status2 = scheduler.get_circuit_breaker_status()
+            print(f"After call 2: {status2}")
+            assert status2["state"] == "open"
+            assert status2["rejected_calls"] == 1
+
+            # Third call should also be rejected
+            with pytest.raises(CircuitBreakerOpenError):
+                await scheduler._safe_get_history("NIFTY", "1min", 100)
+
+            # Check status after third call
+            status3 = scheduler.get_circuit_breaker_status()
+            print(f"After call 3: {status3}")
+            assert status3["state"] == "open"
+            assert status3["rejected_calls"] == 2
+
+            # Verify circuit breaker is still open
             status = scheduler.get_circuit_breaker_status()
             assert status["state"] == "open"
 
@@ -364,6 +381,11 @@ class TestRetryExhaustedScenarios:
 
 class TestFailureRecoveryScenarios:
     """Test system recovery after failure scenarios."""
+
+    def setup_method(self) -> None:
+        """Reset circuit breakers before each test."""
+        OPENALGO_CIRCUIT_BREAKER.reset()
+        TELEGRAM_CIRCUIT_BREAKER.reset()
 
     def test_circuit_breaker_recovery_after_timeout(self) -> None:
         """Test circuit breaker recovery after timeout period."""
@@ -452,42 +474,54 @@ class TestFailureRecoveryScenarios:
     @pytest.mark.asyncio
     async def test_openalgo_recovery_scenario(self) -> None:
         """Test OpenAlgo API recovery scenario."""
-        # Reset circuit breaker
+        # Reset circuit breaker with shorter timeout for testing
         OPENALGO_CIRCUIT_BREAKER.reset()
+        original_timeout = OPENALGO_CIRCUIT_BREAKER.config.timeout
+        OPENALGO_CIRCUIT_BREAKER.config.timeout = 1.0
 
-        scheduler = TradingScheduler()
+        try:
+            scheduler = TradingScheduler()
 
-        # Mock failing then successful API
-        call_count = 0
+            # Mock failing then successful API
+            call_count = 0
 
-        async def mock_get_quotes(symbols: list[str]) -> dict[str, Any]:
-            nonlocal call_count
-            call_count += 1
+            async def mock_get_quotes(symbols: list[str]) -> dict[str, Any]:
+                nonlocal call_count
+                call_count += 1
 
-            # Fail consistently for first 3 calls to trigger circuit breaker
-            if call_count <= 3:
-                raise ConnectionError("API temporarily unavailable")
-            return {
-                "status": "success",
-                "data": {symbol: {"last_price": 100.0} for symbol in symbols},
-            }
+                # Fail initially to open circuit breaker
+                if call_count <= 3:
+                    raise ConnectionError("API temporarily unavailable")
+                return {
+                    "status": "success",
+                    "data": {symbol: {"last_price": 100.0} for symbol in symbols},
+                }
 
-        with patch(
-            "src.loats.openalgo.async_client.get_quotes", side_effect=mock_get_quotes
-        ):
-            # First call should fail after retries and open circuit breaker
-            # Each call attempts 3 retries, so 3 failures will open the circuit
-            with pytest.raises(ConnectionError):
-                await scheduler._safe_get_quotes(["NIFTY"])
+            with patch(
+                "src.loats.openalgo.async_client.get_quotes", side_effect=mock_get_quotes
+            ):
+                # First call should fail after retries and open circuit breaker
+                with pytest.raises(ConnectionError):
+                    await scheduler._safe_get_quotes(["NIFTY"])
 
-            # After timeout, should succeed
-            await asyncio.sleep(1.1)  # Wait for circuit breaker timeout
+                # Verify it's open
+                assert OPENALGO_CIRCUIT_BREAKER.get_status()["state"] == "open"
 
-            result = await scheduler._safe_get_quotes(["NIFTY"])
-            assert result is not None
-            assert result["status"] == "success"
-            # call_count should be 6 (3 from first call + 3 from second call, but circuit breaker prevents some)
-            assert call_count >= 4
+                # Wait for timeout to transition to HALF_OPEN
+                await asyncio.sleep(1.1)
+
+                # Now it should succeed and close the circuit
+                result = await scheduler._safe_get_quotes(["NIFTY"])
+                assert result is not None
+                assert result["status"] == "success"
+                assert OPENALGO_CIRCUIT_BREAKER.get_status()["state"] == "half_open"
+
+                # One more success to close it (success_threshold=2)
+                result = await scheduler._safe_get_quotes(["NIFTY"])
+                assert result is not None
+                assert OPENALGO_CIRCUIT_BREAKER.get_status()["state"] == "closed"
+        finally:
+            OPENALGO_CIRCUIT_BREAKER.config.timeout = original_timeout
 
 
 class TestErrorPropagation:

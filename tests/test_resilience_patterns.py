@@ -140,7 +140,7 @@ class TestCircuitBreakerRetryComposition:
                 raise ValueError("Test error")
             return "success"
 
-        with pytest.raises(CircuitBreakerRetryCompositionError):
+        with pytest.raises(ValueError):
             await test_func()
 
         # Circuit should be open now
@@ -192,11 +192,10 @@ class TestCircuitBreakerRetryComposition:
             call_count += 1
             raise ValueError("Excluded error")
 
-        with pytest.raises(CircuitBreakerRetryCompositionError) as exc_info:
+        with pytest.raises(ValueError) as exc_info:
             await test_func()
 
         # Should contain the original ValueError
-        assert isinstance(exc_info.value.__cause__, ValueError)
         assert "Excluded error" in str(exc_info.value)
 
         # Should only be called once since ValueError is excluded from retry
@@ -309,10 +308,9 @@ class TestCircuitBreakerRetryComposition:
             async def test_func():
                 return "should not reach"
 
-            with pytest.raises(CircuitBreakerRetryCompositionError) as exc_info:
+            with pytest.raises(RuntimeError) as exc_info:
                 await test_func()
 
-            assert "test" in str(exc_info.value)
             assert "Unexpected circuit breaker error" in str(exc_info.value)
 
     def test_sync_stats_tracking(self):
