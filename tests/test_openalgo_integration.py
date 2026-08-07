@@ -137,7 +137,7 @@ class TestOrderOperationsIntegration:
         with (
             patch("src.loats.openalgo._async_check_kill_switch", return_value=None),
             patch(
-                "src.loats.utils.rate_limiter.get_order_rate_limiter"
+                "src.loats.openalgo.get_order_rate_limiter"
             ) as mock_rate_limiter,
         ):
             mock_rate_limiter_instance = AsyncMock()
@@ -198,7 +198,7 @@ class TestOrderOperationsIntegration:
         with (
             patch("src.loats.openalgo._async_check_kill_switch", return_value=None),
             patch(
-                "src.loats.utils.rate_limiter.get_smart_order_rate_limiter"
+                "src.loats.openalgo.get_smart_order_rate_limiter"
             ) as mock_rate_limiter,
         ):
             mock_rate_limiter_instance = AsyncMock()
