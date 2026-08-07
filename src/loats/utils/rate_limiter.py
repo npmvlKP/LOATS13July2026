@@ -320,17 +320,14 @@ class RateLimitExceededError(Exception):
 
 
 
-# Internal global rate limiter instances for dependency injection
-# Note: These are created with default parameters but can be overridden by passing parameters to the getter functions
-# Order rate limiters use higher limits (50 ops per second) for order operations
-_ORDER_RATE_LIMITER = AsyncRateLimiter(max_ops=50)
-_SMART_ORDER_RATE_LIMITER = AsyncRateLimiter(max_ops=50)
+# F-CONC-3: Removed module-level singletons to implement per-call rate limiters
+# This ensures proper isolation between different callers and prevents shared state issues
 
 
 def get_order_rate_limiter(
     max_ops: int | None = None, window_size: float = 1.0
 ) -> AsyncRateLimiter:
-    """Get global order rate limiter instance.
+    """Get order rate limiter instance.
 
     Args:
         max_ops: Maximum operations per window. If None, uses default from settings.
@@ -338,18 +335,23 @@ def get_order_rate_limiter(
 
     Returns:
         Configured AsyncRateLimiter instance.
+
+    Note:
+        F-CONC-3: This function now creates a new instance per call instead of
+        using module-level singletons. This ensures proper isolation between
+        different callers and prevents shared state issues in production.
     """
-    # If parameters are provided, create a new instance with those parameters
-    # Only use global instance if no parameters are provided
-    if max_ops is None and window_size == 1.0:
-        return _ORDER_RATE_LIMITER
+    # F-CONC-3: Create new instance per call instead of using module-level singleton
+    # Order rate limiters use higher limits (50 ops per second) for order operations
+    if max_ops is None:
+        max_ops = 50
     return AsyncRateLimiter(max_ops=max_ops, window_size=window_size)
 
 
 def get_smart_order_rate_limiter(
     max_ops: int | None = None, window_size: float = 1.0
 ) -> AsyncRateLimiter:
-    """Get global smart order rate limiter instance.
+    """Get smart order rate limiter instance.
 
     Args:
         max_ops: Maximum operations per window. If None, uses default from settings.
@@ -357,9 +359,14 @@ def get_smart_order_rate_limiter(
 
     Returns:
         Configured AsyncRateLimiter instance.
+
+    Note:
+        F-CONC-3: This function now creates a new instance per call instead of
+        using module-level singletons. This ensures proper isolation between
+        different callers and prevents shared state issues in production.
     """
-    # If parameters are provided, create a new instance with those parameters
-    # Only use global instance if no parameters are provided
-    if max_ops is None and window_size == 1.0:
-        return _SMART_ORDER_RATE_LIMITER
+    # F-CONC-3: Create new instance per call instead of using module-level singleton
+    # Smart order rate limiters use higher limits (50 ops per second) for order operations
+    if max_ops is None:
+        max_ops = 50
     return AsyncRateLimiter(max_ops=max_ops, window_size=window_size)

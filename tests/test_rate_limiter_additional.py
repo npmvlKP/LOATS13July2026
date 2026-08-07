@@ -304,20 +304,26 @@ class TestGlobalRateLimitersAdditional:
         # Should be different instances
         assert default_limiter is not custom_limiter
 
-    def test_rate_limiter_singleton_behavior(self) -> None:
-        """Test that default rate limiters are singletons."""
+    def test_rate_limiter_per_call_behavior(self) -> None:
+        """Test that rate limiters are created per call (F-CONC-3)."""
         # Get default limiters multiple times
         order_limiter1 = get_order_rate_limiter()
         order_limiter2 = get_order_rate_limiter()
         smart_limiter1 = get_smart_order_rate_limiter()
         smart_limiter2 = get_smart_order_rate_limiter()
 
-        # Should be the same instances
-        assert order_limiter1 is order_limiter2
-        assert smart_limiter1 is smart_limiter2
+        # F-CONC-3: Should be different instances (per-call creation)
+        assert order_limiter1 is not order_limiter2
+        assert smart_limiter1 is not smart_limiter2
 
-        # Should be different instances
+        # Should still be different types of limiters
         assert order_limiter1 is not smart_limiter1
+
+        # Each should have default max_ops=50
+        assert order_limiter1.max_ops == 50
+        assert order_limiter2.max_ops == 50
+        assert smart_limiter1.max_ops == 50
+        assert smart_limiter2.max_ops == 50
 
 
 class TestRateLimiterEdgeCasesAdditional:
