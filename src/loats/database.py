@@ -537,7 +537,7 @@ class Database:
 
         # FIX-F-DATA-2: Use canonical serialization for JSONL storage to ensure hash consistency
         # This ensures the stored data matches exactly what was hashed
-        canonical_entry_data = json.loads(self._canonical_serialize(entry_data))
+        # canonical_entry_data = json.loads(self._canonical_serialize(entry_data))
 
         # Write database
         conn = self._get_connection()

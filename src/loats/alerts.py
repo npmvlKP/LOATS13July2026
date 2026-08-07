@@ -184,7 +184,7 @@ class AlertSystem:
     async def _send_telegram_message(self, message: str) -> bool:
         """Send Telegram message using the bot."""
         if not self.bot or not settings.telegram_chat_id:
-            logger.debug(f"Telegram bot not configured, message not sent")
+            logger.debug("Telegram bot not configured, message not sent")
             return False
 
         # Call _safe_send_message directly without catching exceptions
@@ -215,7 +215,7 @@ class AlertSystem:
             logger.warning("Telegram circuit breaker open")
             raise  # Re-raise to allow test to catch it
         except Exception:
-            logger.error(f"Failed send Telegram message after retries")
+            logger.error("Failed send Telegram message after retries")
             return False
 
     async def send_alert(self, message: str, alert_type: str = "info") -> bool:
