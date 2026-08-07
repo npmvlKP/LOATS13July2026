@@ -37,9 +37,7 @@ dependencies = [
     "python-telegram-bot>=20.7.0",
     "python-dotenv>=1.0.0",
     "newspaper4k>=0.9.3",
-    "cachetools>=5.3.0",
-    "prometheus-client>=0.21.0",
-    "redis>=5.0.0"
+    "cachetools>=5.3.0"
 ]
 
 [project.optional-dependencies]
