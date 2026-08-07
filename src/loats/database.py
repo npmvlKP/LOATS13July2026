@@ -1395,17 +1395,23 @@ class Database:
         """
         conn = self._get_connection()
         cursor = conn.cursor()
-        query = (
-            "SELECT order_id, symbol, quantity, order_type, price, trigger_price, "
-            "variety, transaction_type, product_type, status, timestamp, "
-            "filled_quantity, average_price, stop_loss, take_profit, trailing_stop_loss, "
-            "created_at, updated_at, created_at_ms, updated_at_ms, timestamp_ms "
-            "FROM orders WHERE status = 'OPEN'"
-        )
         if symbol:
-            cursor.execute(f"{query} AND symbol = ?", (symbol,))
+            cursor.execute(
+                "SELECT order_id, symbol, quantity, order_type, price, trigger_price, "
+                "variety, transaction_type, product_type, status, timestamp, "
+                "filled_quantity, average_price, stop_loss, take_profit, trailing_stop_loss, "
+                "created_at, updated_at, created_at_ms, updated_at_ms, timestamp_ms "
+                "FROM orders WHERE status = 'OPEN' AND symbol = ? ORDER BY timestamp DESC",
+                (symbol,)
+            )
         else:
-            cursor.execute(f"{query} ORDER BY timestamp DESC")
+            cursor.execute(
+                "SELECT order_id, symbol, quantity, order_type, price, trigger_price, "
+                "variety, transaction_type, product_type, status, timestamp, "
+                "filled_quantity, average_price, stop_loss, take_profit, trailing_stop_loss, "
+                "created_at, updated_at, created_at_ms, updated_at_ms, timestamp_ms "
+                "FROM orders WHERE status = 'OPEN' ORDER BY timestamp DESC"
+            )
         rows = cursor.fetchall()
         return [self._row_to_order(row) for row in rows]
 
