@@ -263,14 +263,15 @@ class CircuitBreaker:
             raise
 
     def reset(self) -> None:
-        """Manually reset the circuit breaker to closed state."""
+        """Manually reset the circuit breaker to closed state and reset statistics."""
         with self._state_lock:
             self._state = CircuitState.CLOSED
             self._opened_at = None
             self._half_open_at = None
-            self._stats.consecutive_failures = 0
-            self._stats.consecutive_successes = 0
-            logger.info(f"Circuit breaker '{self.name}' manually reset to CLOSED")
+            self._stats = CircuitBreakerStats()
+            logger.info(
+                f"Circuit breaker '{self.name}' manually reset to CLOSED and stats reset"
+            )
 
     def get_status(self) -> dict[str, Any]:
         """Get circuit breaker status for monitoring/alerting."""

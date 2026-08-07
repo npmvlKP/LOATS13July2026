@@ -180,10 +180,10 @@ class TradingScheduler:
             )
         except CircuitBreakerOpenError:
             logger.warning("OpenAlgo circuit breaker open get_history")
-            return None
+            raise  # Re-raise to allow test to catch it
         except Exception:
             logger.error("Failed get history after retries")
-            return None
+            raise  # Re-raise to allow circuit breaker to record failure
 
     @openalgo_circuit_breaker_retry_async
     async def _safe_get_quotes(self, symbols: list[str]) -> dict[str, Any] | None:
@@ -378,10 +378,10 @@ class TradingScheduler:
             return await async_client.get_position_book()
         except CircuitBreakerOpenError:
             logger.warning("OpenAlgo circuit breaker open get_position_book")
-            return None
+            raise
         except Exception:
             logger.error("Failed get position book after retries")
-            return None
+            raise
 
     @openalgo_circuit_breaker_retry_async
     async def _safe_get_funds(self) -> dict[str, Any] | None:
@@ -390,10 +390,10 @@ class TradingScheduler:
             return await async_client.get_funds()
         except CircuitBreakerOpenError:
             logger.warning("OpenAlgo circuit breaker open get_funds")
-            return None
+            raise
         except Exception:
             logger.error("Failed get funds after retries")
-            return None
+            raise
 
     async def _signal_generation_task(self) -> None:
         """Signal generation task."""

@@ -65,81 +65,65 @@ def circuit_breaker_retry_sync(
 
     Returns:
         Decorator function with composed circuit breaker and retry behavior
-
-    Example:
-        @circuit_breaker_retry_sync(OPENALGO_CIRCUIT_BREAKER, OPENALGO_RETRY_CONFIG)
-        def fetch_data():
-            return http_client.get("/api/data")
     """
 
     def decorator(func: Callable[..., T]) -> Callable[..., T]:
         def wrapper(*args: Any, **kwargs: Any) -> T:
-            # Apply circuit breaker first
-            try:
-                # Check circuit breaker state before attempting
-                if circuit_breaker.state == CircuitState.OPEN:
-                    remaining = circuit_breaker.config.timeout
-                    if circuit_breaker._opened_at is not None:
-                        remaining = max(
-                            0,
-                            circuit_breaker.config.timeout
-                            - (time.monotonic() - circuit_breaker._opened_at),
+            # Apply retry logic manually to ensure circuit breaker sees each attempt
+            cfg = retry_config or RetryConfig()
+            last_exception: Exception | None = None
+
+            for attempt in range(1, cfg.max_attempts + 1):
+                try:
+                    # Call through circuit breaker to track success/failure
+                    return circuit_breaker.call(func, *args, **kwargs)
+
+                except CircuitBreakerOpenError:
+                    # Circuit breaker is open, fail fast without retry
+                    # The circuit breaker has already recorded the rejection
+                    raise
+                except Exception as e:
+                    last_exception = e
+
+                    # Check if exception is excluded from retry
+                    if isinstance(e, circuit_breaker.config.excluded_exceptions):
+                        logger.debug(
+                            f"Circuit breaker '{circuit_breaker.name}': excluded exception {type(e).__name__}"
                         )
-                    raise CircuitBreakerOpenError(circuit_breaker.name, remaining)
+                        raise e
 
-                # Apply retry logic manually to ensure circuit breaker sees each attempt
-                cfg = retry_config or RetryConfig()
-                last_exception: Exception | None = None
+                    # Check if exception is retryable
+                    if not isinstance(e, cfg.retryable_exceptions):
+                        logger.debug(
+                            f"Non-retryable exception {type(e).__name__}: {e}"
+                        )
+                        raise e
 
-                for attempt in range(1, cfg.max_attempts + 1):
-                    try:
-                        return circuit_breaker.call(func, *args, **kwargs)
-                    except CircuitBreakerOpenError:
-                        # Circuit breaker opened during retry - fail fast
-                        raise
-                    except Exception as e:
-                        last_exception = e
-
-                        # Check if exception is excluded from retry
-                        if isinstance(e, circuit_breaker.config.excluded_exceptions):
-                            logger.debug(
-                                f"Circuit breaker '{circuit_breaker.name}': excluded exception {type(e).__name__}"
-                            )
-                            raise
-
-                        # Check if exception is retryable
-                        if not isinstance(e, cfg.retryable_exceptions):
-                            logger.debug(
-                                f"Non-retryable exception {type(e).__name__}: {e}"
-                            )
-                            raise
-
-                        # Check if we have more attempts
-                        if attempt >= cfg.max_attempts:
-                            logger.warning(
-                                f"Max retry attempts ({cfg.max_attempts}) reached for {func.__name__}"
-                            )
-                            raise
-
-                        # Calculate and apply delay
-                        delay = _calculate_delay(cfg, attempt)
+                    # Check if we have more attempts
+                    if attempt >= cfg.max_attempts:
                         logger.warning(
-                            f"Retry {attempt}/{cfg.max_attempts} for {func.__name__} "
-                            f"after {delay:.2f}s. Error: {e}"
+                            f"Max retry attempts ({cfg.max_attempts}) reached for {func.__name__}"
                         )
+                        raise e
 
-                        if on_retry:
-                            on_retry(e, attempt)
+                    # Calculate and apply delay
+                    delay = _calculate_delay(cfg, attempt)
+                    logger.warning(
+                        f"Retry {attempt}/{cfg.max_attempts} for {func.__name__} "
+                        f"after {delay:.2f}s. Error: {e}"
+                    )
 
-                        time.sleep(delay)
+                    if on_retry:
+                        on_retry(e, attempt)
 
-                # Should not reach here, but just in case
-                if last_exception:
-                    raise last_exception
-                raise RuntimeError("Retry logic exhausted without result or exception")
-            except CircuitBreakerOpenError:
-                # Circuit breaker is open, fail fast without retry
-                raise
+                    time.sleep(delay)
+
+            # Should not reach here
+            if last_exception:
+                raise CircuitBreakerRetryCompositionError(
+                    circuit_breaker.name, last_exception
+                )
+            raise RuntimeError("Retry logic exhausted without result or exception")
 
         return wrapper
 
@@ -170,92 +154,67 @@ def circuit_breaker_retry_async(
 
     Returns:
         Decorator function with composed circuit breaker and retry behavior
-
-    Example:
-        @circuit_breaker_retry_async(OPENALGO_CIRCUIT_BREAKER, OPENALGO_RETRY_CONFIG)
-        async def fetch_data():
-            return await http_client.get("/api/data")
     """
 
     def decorator(
         func: Callable[..., Coroutine[Any, Any, T]],
     ) -> Callable[..., Coroutine[Any, Any, T]]:
         async def wrapper(*args: Any, **kwargs: Any) -> T:
-            # Apply circuit breaker first
-            try:
-                # Check circuit breaker state before attempting
-                if circuit_breaker.state == CircuitState.OPEN:
-                    remaining = circuit_breaker.config.timeout
-                    if circuit_breaker._opened_at is not None:
-                        remaining = max(
-                            0,
-                            circuit_breaker.config.timeout
-                            - (time.monotonic() - circuit_breaker._opened_at),
-                        )
-                    raise CircuitBreakerOpenError(circuit_breaker.name, remaining)
+            # Apply retry logic manually to ensure circuit breaker sees each attempt
+            cfg = retry_config or RetryConfig()
+            last_exception: Exception | None = None
 
-                # Apply retry logic manually to ensure circuit breaker sees each attempt
-                cfg = retry_config or RetryConfig()
-                last_exception: Exception | None = None
+            for attempt in range(1, cfg.max_attempts + 1):
+                try:
+                    # Call through circuit breaker to track success/failure
+                    return cast(T, await circuit_breaker.call_async(func, *args, **kwargs))
 
-                for attempt in range(1, cfg.max_attempts + 1):
-                    try:
-                        return cast(
-                            T, await circuit_breaker.call_async(func, *args, **kwargs)
+                except CircuitBreakerOpenError:
+                    # Circuit breaker is open, fail fast without retry
+                    # The circuit breaker has already recorded the rejection
+                    raise
+                except Exception as e:
+                    last_exception = e
+
+                    # Check if exception is excluded from retry
+                    if isinstance(e, circuit_breaker.config.excluded_exceptions):
+                        logger.debug(
+                            f"Circuit breaker '{circuit_breaker.name}': excluded exception {type(e).__name__}"
                         )
-                    except CircuitBreakerOpenError:
-                        # Circuit breaker opened during retry - fail fast
                         raise
-                    except Exception as e:
-                        last_exception = e
 
-                        # Check if exception is excluded from retry
-                        if isinstance(e, circuit_breaker.config.excluded_exceptions):
-                            logger.debug(
-                                f"Circuit breaker '{circuit_breaker.name}': excluded exception {type(e).__name__}"
-                            )
-                            raise
-
-                        # Check if exception is retryable
-                        if not isinstance(e, cfg.retryable_exceptions):
-                            logger.debug(
-                                f"Non-retryable exception {type(e).__name__}: {e}"
-                            )
-                            raise
-
-                        # Check if we have more attempts
-                        if attempt >= cfg.max_attempts:
-                            logger.warning(
-                                f"Max retry attempts ({cfg.max_attempts}) reached for {func.__name__}"
-                            )
-                            raise
-
-                        # Calculate and apply delay
-                        delay = _calculate_delay(cfg, attempt)
-                        logger.warning(
-                            f"Retry {attempt}/{cfg.max_attempts} for {func.__name__} "
-                            f"after {delay:.2f}s. Error: {e}"
+                    # Check if exception is retryable
+                    if not isinstance(e, cfg.retryable_exceptions):
+                        logger.debug(
+                            f"Non-retryable exception {type(e).__name__}: {e}"
                         )
+                        raise
 
-                        if on_retry:
-                            on_retry(e, attempt)
+                    # Check if we have more attempts
+                    if attempt >= cfg.max_attempts:
+                        logger.warning(
+                            f"Max retry attempts ({cfg.max_attempts}) reached for {func.__name__}"
+                        )
+                        raise
 
-                        await asyncio.sleep(delay)
+                    # Calculate and apply delay
+                    delay = _calculate_delay(cfg, attempt)
+                    logger.warning(
+                        f"Retry {attempt}/{cfg.max_attempts} for {func.__name__} "
+                        f"after {delay:.2f}s. Error: {e}"
+                    )
 
-                # Should not reach here, but just in case
-                if last_exception:
-                    raise last_exception
-                raise RuntimeError("Retry logic exhausted without result or exception")
+                    if on_retry:
+                        on_retry(e, attempt)
 
-            except CircuitBreakerOpenError:
-                # Circuit breaker is open, fail fast without retry
-                raise
-            except Exception as e:
-                # This should not happen if the composition is working correctly,
-                # but we handle it defensively
+                    await asyncio.sleep(delay)
+
+            # Should not reach here
+            if last_exception:
                 raise CircuitBreakerRetryCompositionError(
-                    circuit_breaker.name, e
-                ) from e
+                    circuit_breaker.name, last_exception
+                )
+            raise RuntimeError("Retry logic exhausted without result or exception")
 
         return wrapper
 
