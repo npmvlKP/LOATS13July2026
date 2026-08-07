@@ -28,6 +28,7 @@ LABEL io.openshift.expose-services=""
 WORKDIR /app
 
 # Install system dependencies for Python packages
+# LITE: No Redis, no Prometheus, minimal system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
