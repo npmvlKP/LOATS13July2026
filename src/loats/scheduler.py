@@ -2,7 +2,7 @@
 
 import asyncio
 import datetime
-from typing import Any, cast
+from typing import Any
 from zoneinfo import ZoneInfo
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -29,7 +29,7 @@ from .utils.circuit_breaker import (
     OPENALGO_CIRCUIT_BREAKER,
     CircuitBreakerOpenError,
 )
-from .utils.retry import OPENALGO_RETRY_CONFIG, retry_async
+from .utils.resilience import openalgo_circuit_breaker_retry_async
 
 settings = get_settings()
 
@@ -169,18 +169,15 @@ class TradingScheduler:
         finally:
             self.scan_tasks.pop(task_id, None)
 
+    @openalgo_circuit_breaker_retry_async
     async def _safe_get_history(
         self, symbol: str, interval: str, count: int | None = None
     ) -> dict[str, Any] | None:
         """Get history retry circuit breaker protection."""
         try:
-            retried_get = retry_async(OPENALGO_RETRY_CONFIG)(
-                lambda: async_client.get_history(
-                    symbol=symbol, interval=interval, from_date=None, to_date=None
-                )
+            return await async_client.get_history(
+                symbol=symbol, interval=interval, from_date=None, to_date=None
             )
-            result = await OPENALGO_CIRCUIT_BREAKER.call_async(retried_get)
-            return cast("dict[str, Any] | None", result)
         except CircuitBreakerOpenError:
             logger.warning("OpenAlgo circuit breaker open get_history")
             return None
@@ -188,14 +185,11 @@ class TradingScheduler:
             logger.error("Failed get history after retries")
             return None
 
+    @openalgo_circuit_breaker_retry_async
     async def _safe_get_quotes(self, symbols: list[str]) -> dict[str, Any] | None:
         """Get quotes retry circuit breaker protection."""
         try:
-            retried_get = retry_async(OPENALGO_RETRY_CONFIG)(
-                lambda: async_client.get_quotes(symbols)
-            )
-            result = await OPENALGO_CIRCUIT_BREAKER.call_async(retried_get)
-            return cast("dict[str, Any] | None", result)
+            return await async_client.get_quotes(symbols)
         except CircuitBreakerOpenError:
             logger.warning("OpenAlgo circuit breaker open get_quotes")
             raise  # Re-raise to allow test to catch it
@@ -377,14 +371,11 @@ class TradingScheduler:
         finally:
             self.scan_tasks.pop(task_id, None)
 
+    @openalgo_circuit_breaker_retry_async
     async def _safe_get_position_book(self) -> dict[str, Any] | None:
         """Get position book retry circuit breaker protection."""
         try:
-            retried_get = retry_async(OPENALGO_RETRY_CONFIG)(
-                lambda: async_client.get_position_book()
-            )
-            result = await OPENALGO_CIRCUIT_BREAKER.call_async(retried_get)
-            return cast("dict[str, Any] | None", result)
+            return await async_client.get_position_book()
         except CircuitBreakerOpenError:
             logger.warning("OpenAlgo circuit breaker open get_position_book")
             return None
@@ -392,14 +383,11 @@ class TradingScheduler:
             logger.error("Failed get position book after retries")
             return None
 
+    @openalgo_circuit_breaker_retry_async
     async def _safe_get_funds(self) -> dict[str, Any] | None:
         """Get funds retry circuit breaker protection."""
         try:
-            retried_get = retry_async(OPENALGO_RETRY_CONFIG)(
-                lambda: async_client.get_funds()
-            )
-            result = await OPENALGO_CIRCUIT_BREAKER.call_async(retried_get)
-            return cast("dict[str, Any] | None", result)
+            return await async_client.get_funds()
         except CircuitBreakerOpenError:
             logger.warning("OpenAlgo circuit breaker open get_funds")
             return None

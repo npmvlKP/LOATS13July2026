@@ -27,7 +27,10 @@ from .utils.circuit_breaker import (
     TELEGRAM_CIRCUIT_BREAKER,
     CircuitBreakerOpenError,
 )
-from .utils.retry import OPENALGO_RETRY_CONFIG, retry_async
+from .utils.resilience import (
+    openalgo_circuit_breaker_retry_async,
+    telegram_circuit_breaker_retry_async,
+)
 
 logger = get_logger(__name__)
 
@@ -204,12 +207,14 @@ class AlertSystem:
         bot: Bot = self.bot
 
         try:
-            retried_send = retry_async(OPENALGO_RETRY_CONFIG)(
-                lambda: bot.send_message(
+            # Use the proper composition pattern
+            @telegram_circuit_breaker_retry_async
+            async def _send_message() -> Any:
+                return await bot.send_message(
                     chat_id=chat_id, text=text, parse_mode=parse_mode
                 )
-            )
-            await TELEGRAM_CIRCUIT_BREAKER.call_async(retried_send)
+
+            await _send_message()
             return True
         except CircuitBreakerOpenError:
             logger.warning("Telegram circuit breaker open")
@@ -411,16 +416,11 @@ class AlertSystem:
             logger.error(f"Failed format system alert: {e}")
             return False
 
+    @openalgo_circuit_breaker_retry_async
     async def _safe_get_position_book(self) -> dict[str, Any] | None:
         """Get position book circuit breaker retry protection."""
         try:
-            retried_get = retry_async(OPENALGO_RETRY_CONFIG)(
-                lambda: async_client.get_position_book()
-            )
-            result: dict[str, Any] = await OPENALGO_CIRCUIT_BREAKER.call_async(
-                retried_get
-            )
-            return result
+            return await async_client.get_position_book()
         except CircuitBreakerOpenError:
             logger.warning("Circuit breaker open, skipping position book fetch")
             return None
@@ -428,16 +428,11 @@ class AlertSystem:
             logger.error(f"Failed to get position book: {e}")
             return None
 
+    @openalgo_circuit_breaker_retry_async
     async def _safe_get_funds(self) -> dict[str, Any] | None:
         """Get funds circuit breaker retry protection."""
         try:
-            retried_get = retry_async(OPENALGO_RETRY_CONFIG)(
-                lambda: async_client.get_funds()
-            )
-            result: dict[str, Any] = await OPENALGO_CIRCUIT_BREAKER.call_async(
-                retried_get
-            )
-            return result
+            return await async_client.get_funds()
         except CircuitBreakerOpenError:
             logger.warning("Circuit breaker open, skipping funds fetch")
             return None
@@ -497,16 +492,11 @@ class AlertSystem:
             logger.error(f"Failed get funds alert: {e}")
             return False
 
+    @openalgo_circuit_breaker_retry_async
     async def _safe_get_all_orders(self) -> dict[str, Any] | None:
         """Get all orders circuit breaker retry protection."""
         try:
-            retried_get = retry_async(OPENALGO_RETRY_CONFIG)(
-                lambda: async_client.get_all_orders()
-            )
-            result: dict[str, Any] = await OPENALGO_CIRCUIT_BREAKER.call_async(
-                retried_get
-            )
-            return result
+            return await async_client.get_all_orders()
         except CircuitBreakerOpenError:
             logger.warning("Circuit breaker open, skipping orders fetch")
             return None
@@ -514,13 +504,11 @@ class AlertSystem:
             logger.error(f"Failed to get all orders: {e}")
             return None
 
+    @openalgo_circuit_breaker_retry_async
     async def _safe_cancel_order(self, order_id: str) -> bool:
         """Cancel order circuit breaker retry protection."""
         try:
-            retried_cancel = retry_async(OPENALGO_RETRY_CONFIG)(
-                lambda: async_client.cancel_order(order_id)
-            )
-            await OPENALGO_CIRCUIT_BREAKER.call_async(retried_cancel)
+            await async_client.cancel_order(order_id)
             return True
         except CircuitBreakerOpenError:
             logger.warning("OpenAlgo circuit breaker open cancel_order")
