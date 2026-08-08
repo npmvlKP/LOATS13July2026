@@ -39,6 +39,15 @@ repos:
   # in pre-commit's isolated virtualenv.
   - repo: local
     hooks:
+      - id: commit-message-check
+        name: commit message validation
+        entry: python scripts/commit_message_check.py
+        language: system
+        stages: [commit-msg]
+        pass_filenames: true
+
+  - repo: local
+    hooks:
       - id: bandit
         name: bandit (security scan)
         entry: python -m bandit
