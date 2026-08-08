@@ -1,5 +1,22 @@
 """
 OpenAlgo client implementation LOATS13July2026.
+
+Circuit Breaker Pattern for Order Operations:
+------------------------------------------
+Order placement methods (place_order, place_smart_order, modify_order, cancel_order)
+use circuit breaker protection WITHOUT retry to prevent duplicate orders.
+
+Rationale:
+- Retrying POST operations can create duplicate orders if the original request
+  succeeded but the response was lost
+- Circuit breaker provides fail-fast behavior when OpenAlgo is down
+- When circuit is open, methods fail immediately with CircuitBreakerOpenError
+- This conserves resources and provides faster operator alerting
+
+Contrast with GET operations:
+- Read-only operations use circuit_breaker_retry_async decorator
+- These can safely retry as they don't modify state
+- Example: scheduler's _safe_get_* methods, alerts' _safe_get_* methods
 """
 
 from __future__ import annotations
@@ -25,6 +42,7 @@ from .models import (
     TransactionType,
 )
 from .utils.cache import cache_manager
+from .utils.circuit_breaker import OPENALGO_CIRCUIT_BREAKER
 from .utils.rate_limiter import (
     RateLimitExceededError,
     get_order_rate_limiter,
@@ -525,40 +543,48 @@ class AsyncOpenAlgoClient:
         take_profit: float | None = None,
         trailing_stop_loss: float | None = None,
     ) -> dict[str, Any]:
+        """
+        Place an order with circuit breaker protection.
+
+        Note: Circuit breaker is applied without retry to avoid duplicate orders.
+        When the circuit is open, this method fails fast with CircuitBreakerOpenError.
+        """
         await _async_check_kill_switch()
         # Use higher rate limits for order operations (50 ops per second)
         if not await get_order_rate_limiter().acquire():
             logger.warning("Rate limit exceeded order placement")
             raise RateLimitExceededError("Rate limit exceeded")
-        if isinstance(order_type, OrderType):
-            order_type = order_type.value
-        if isinstance(variety, OrderVariety):
-            variety = variety.value
-        if isinstance(transaction_type, TransactionType):
-            transaction_type = transaction_type.value
-        if isinstance(product_type, ProductType):
-            product_type = product_type.value
 
-        payload: dict[str, Any] = {
-            "symbol": symbol,
-            "quantity": quantity,
-            "order_type": order_type,
-            "variety": variety,
-            "transaction_type": transaction_type,
-            "product_type": product_type,
-        }
-        if price is not None:
-            payload["price"] = price
-        if trigger_price is not None:
-            payload["trigger_price"] = trigger_price
-        if stop_loss is not None:
-            payload["stop_loss"] = stop_loss
-        if take_profit is not None:
-            payload["take_profit"] = take_profit
-        if trailing_stop_loss is not None:
-            payload["trailing_stop_loss"] = trailing_stop_loss
+        # Wrap order placement in circuit breaker without retry
+        async def _place_order_impl() -> dict[str, Any]:
+            # Convert enum parameters to values
+            order_type_val = order_type.value if isinstance(order_type, OrderType) else order_type
+            variety_val = variety.value if isinstance(variety, OrderVariety) else variety
+            transaction_type_val = transaction_type.value if isinstance(transaction_type, TransactionType) else transaction_type
+            product_type_val = product_type.value if isinstance(product_type, ProductType) else product_type
 
-        return await self._request("POST", "place_order", json=payload)
+            payload: dict[str, Any] = {
+                "symbol": symbol,
+                "quantity": quantity,
+                "order_type": order_type_val,
+                "variety": variety_val,
+                "transaction_type": transaction_type_val,
+                "product_type": product_type_val,
+            }
+            if price is not None:
+                payload["price"] = price
+            if trigger_price is not None:
+                payload["trigger_price"] = trigger_price
+            if stop_loss is not None:
+                payload["stop_loss"] = stop_loss
+            if take_profit is not None:
+                payload["take_profit"] = take_profit
+            if trailing_stop_loss is not None:
+                payload["trailing_stop_loss"] = trailing_stop_loss
+
+            return await self._request("POST", "place_order", json=payload)
+
+        return await OPENALGO_CIRCUIT_BREAKER.call_async(_place_order_impl)
 
     async def place_smart_order(
         self,
@@ -575,40 +601,49 @@ class AsyncOpenAlgoClient:
         product_type: str | ProductType = "MIS",
         metadata: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
+        """
+        Place a smart order with circuit breaker protection.
+
+        Note: Circuit breaker is applied without retry to avoid duplicate orders.
+        When the circuit is open, this method fails fast with CircuitBreakerOpenError.
+        """
         await _async_check_kill_switch()
         # Use higher rate limits for smart order operations (50 ops per second)
         if not await get_smart_order_rate_limiter().acquire():
             logger.warning("Rate limit exceeded smart order placement")
             raise RateLimitExceededError("Rate limit exceeded")
-        if isinstance(order_type, OrderType):
-            order_type = order_type.value
-        if isinstance(transaction_type, TransactionType):
-            transaction_type = transaction_type.value
-        if isinstance(product_type, ProductType):
-            product_type = product_type.value
 
-        payload: dict[str, Any] = {
-            "symbol": symbol,
-            "quantity": quantity,
-            "order_type": order_type,
-            "strategy": strategy,
-            "transaction_type": transaction_type,
-            "product_type": product_type,
-        }
-        if price is not None:
-            payload["price"] = price
-        if trigger_price is not None:
-            payload["trigger_price"] = trigger_price
-        if stop_loss is not None:
-            payload["stop_loss"] = stop_loss
-        if take_profit is not None:
-            payload["take_profit"] = take_profit
-        if trailing_stop_loss is not None:
-            payload["trailing_stop_loss"] = trailing_stop_loss
-        if metadata is not None:
-            payload["metadata"] = metadata
+        # Wrap smart order placement in circuit breaker without retry
+        async def _place_smart_order_impl() -> dict[str, Any]:
+            # Convert enum parameters to values
+            order_type_val = order_type.value if isinstance(order_type, OrderType) else order_type
+            transaction_type_val = transaction_type.value if isinstance(transaction_type, TransactionType) else transaction_type
+            product_type_val = product_type.value if isinstance(product_type, ProductType) else product_type
 
-        return await self._request("POST", "place_smart_order", json=payload)
+            payload: dict[str, Any] = {
+                "symbol": symbol,
+                "quantity": quantity,
+                "order_type": order_type_val,
+                "strategy": strategy,
+                "transaction_type": transaction_type_val,
+                "product_type": product_type_val,
+            }
+            if price is not None:
+                payload["price"] = price
+            if trigger_price is not None:
+                payload["trigger_price"] = trigger_price
+            if stop_loss is not None:
+                payload["stop_loss"] = stop_loss
+            if take_profit is not None:
+                payload["take_profit"] = take_profit
+            if trailing_stop_loss is not None:
+                payload["trailing_stop_loss"] = trailing_stop_loss
+            if metadata is not None:
+                payload["metadata"] = metadata
+
+            return await self._request("POST", "place_smart_order", json=payload)
+
+        return await OPENALGO_CIRCUIT_BREAKER.call_async(_place_smart_order_impl)
 
     async def modify_order(
         self,
@@ -621,32 +656,54 @@ class AsyncOpenAlgoClient:
         take_profit: float | None = None,
         trailing_stop_loss: float | None = None,
     ) -> dict[str, Any]:
+        """
+        Modify an order with circuit breaker protection.
+
+        Note: Circuit breaker is applied without retry to avoid duplicate modifications.
+        When the circuit is open, this method fails fast with CircuitBreakerOpenError.
+        """
         await _async_check_kill_switch()
-        if isinstance(order_type, OrderType):
-            order_type = order_type.value
 
-        payload: dict[str, Any] = {"order_id": order_id}
-        if quantity is not None:
-            payload["quantity"] = quantity
-        if order_type is not None:
-            payload["order_type"] = order_type
-        if price is not None:
-            payload["price"] = price
-        if trigger_price is not None:
-            payload["trigger_price"] = trigger_price
-        if stop_loss is not None:
-            payload["stop_loss"] = stop_loss
-        if take_profit is not None:
-            payload["take_profit"] = take_profit
-        if trailing_stop_loss is not None:
-            payload["trailing_stop_loss"] = trailing_stop_loss
+        # Wrap order modification in circuit breaker without retry
+        async def _modify_order_impl() -> dict[str, Any]:
+            # Convert enum parameter to value if needed
+            order_type_val = order_type.value if isinstance(order_type, OrderType) else order_type
 
-        return await self._request("POST", "modify_order", json=payload)
+            payload: dict[str, Any] = {"order_id": order_id}
+            if quantity is not None:
+                payload["quantity"] = quantity
+            if order_type is not None:
+                payload["order_type"] = order_type_val
+            if price is not None:
+                payload["price"] = price
+            if trigger_price is not None:
+                payload["trigger_price"] = trigger_price
+            if stop_loss is not None:
+                payload["stop_loss"] = stop_loss
+            if take_profit is not None:
+                payload["take_profit"] = take_profit
+            if trailing_stop_loss is not None:
+                payload["trailing_stop_loss"] = trailing_stop_loss
+
+            return await self._request("POST", "modify_order", json=payload)
+
+        return await OPENALGO_CIRCUIT_BREAKER.call_async(_modify_order_impl)
 
     async def cancel_order(self, order_id: str) -> dict[str, Any]:
+        """
+        Cancel an order with circuit breaker protection.
+
+        Note: Circuit breaker is applied without retry to avoid duplicate cancellations.
+        When the circuit is open, this method fails fast with CircuitBreakerOpenError.
+        """
         await _async_check_kill_switch()
-        payload = {"order_id": order_id}
-        return await self._request("POST", "cancel_order", json=payload)
+
+        # Wrap order cancellation in circuit breaker without retry
+        async def _cancel_order_impl() -> dict[str, Any]:
+            payload = {"order_id": order_id}
+            return await self._request("POST", "cancel_order", json=payload)
+
+        return await OPENALGO_CIRCUIT_BREAKER.call_async(_cancel_order_impl)
 
     async def get_order_status(self, order_id: str) -> dict[str, Any]:
         payload = {"order_id": order_id}
