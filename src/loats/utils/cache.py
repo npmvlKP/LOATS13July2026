@@ -5,6 +5,7 @@ Implements simple in-memory caching optimized for minimal resource usage.
 
 import hashlib
 import json
+import threading
 from collections.abc import Callable
 from typing import Any, TypeVar
 
@@ -60,6 +61,7 @@ class CacheManager:
         """Initialize cache manager with lightweight in-memory cache."""
         self.config = config
         self._cache: TTLCache[str, Any] | None = None
+        self._cache_lock = threading.Lock()
         self._cache_stats = {
             "hits": 0,
             "misses": 0,
@@ -107,13 +109,14 @@ class CacheManager:
         cache_key = self._get_cache_key(key)
 
         try:
-            result = self._cache.get(cache_key)
-            if result is not None:
-                self._cache_stats["hits"] += 1
-                return str(result) if result else None
-            else:
-                self._cache_stats["misses"] += 1
-                return None
+            with self._cache_lock:
+                result = self._cache.get(cache_key)
+                if result is not None:
+                    self._cache_stats["hits"] += 1
+                    return str(result) if result else None
+                else:
+                    self._cache_stats["misses"] += 1
+                    return None
         except Exception as e:
             logger.warning(f"Cache get failed for key {key}: {e}")
             return None
@@ -146,10 +149,12 @@ class CacheManager:
             cache_key = self._get_cache_key(key)
             logger.debug(f"Setting cache key: {cache_key}, value: {value_str}")
 
-            self._cache[cache_key] = value_str
-            self._cache_stats["sets"] += 1
+            with self._cache_lock:
+                self._cache[cache_key] = value_str
+                self._cache_stats["sets"] += 1
+                cache_size = len(self._cache)
             logger.debug(
-                f"Cache set successful. Current cache size: {len(self._cache)}"
+                f"Cache set successful. Current cache size: {cache_size}"
             )
             return True
 
@@ -215,11 +220,12 @@ class CacheManager:
         cache_key = self._get_cache_key(key)
 
         try:
-            if cache_key in self._cache:
-                del self._cache[cache_key]
-                self._cache_stats["deletes"] += 1
-                return True
-            return False
+            with self._cache_lock:
+                if cache_key in self._cache:
+                    del self._cache[cache_key]
+                    self._cache_stats["deletes"] += 1
+                    return True
+                return False
         except Exception as e:
             logger.warning(f"Cache delete failed for key {key}: {e}")
             return False
@@ -230,29 +236,30 @@ class CacheManager:
             return 0
 
         try:
-            if pattern == "*":
-                # Clear all cache
-                count = len(self._cache)
-                self._cache.clear()
-                self._cache_stats["evictions"] += count
-                return count
-            else:
-                # Pattern matching - clear keys that match the pattern
-                prefix_pattern = f"{self.config.prefix}:{pattern}"
-                keys_to_delete = [
-                    k
-                    for k in self._cache.keys()
-                    if pattern in k or k.startswith(prefix_pattern)
-                ]
+            with self._cache_lock:
+                if pattern == "*":
+                    # Clear all cache
+                    count = len(self._cache)
+                    self._cache.clear()
+                    self._cache_stats["evictions"] += count
+                    return count
+                else:
+                    # Pattern matching - clear keys that match the pattern
+                    prefix_pattern = f"{self.config.prefix}:{pattern}"
+                    keys_to_delete = [
+                        k
+                        for k in self._cache.keys()
+                        if pattern in k or k.startswith(prefix_pattern)
+                    ]
 
-                count = 0
-                for key in keys_to_delete:
-                    if key in self._cache:
-                        del self._cache[key]
-                        count += 1
+                    count = 0
+                    for key in keys_to_delete:
+                        if key in self._cache:
+                            del self._cache[key]
+                            count += 1
 
-                self._cache_stats["evictions"] += count
-                return count
+                    self._cache_stats["evictions"] += count
+                    return count
 
         except Exception as e:
             logger.warning(f"Cache clear failed: {e}")
