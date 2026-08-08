@@ -8,6 +8,13 @@ Run this script to confirm the forensic analysis findings.
 import re
 import sys
 
+# Set UTF-8 encoding for Windows
+if sys.platform == "win32":
+    import io
+
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
+
 def verify_no_sql_injection():
     """Verify that no SQL injection patterns exist in database.py"""
 

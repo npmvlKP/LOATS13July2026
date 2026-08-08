@@ -17,7 +17,6 @@ from .circuit_breaker import (
     TELEGRAM_CIRCUIT_BREAKER,
     CircuitBreaker,
     CircuitBreakerOpenError,
-    CircuitState,
 )
 from .retry import (
     HTTP_RETRY_CONFIG,

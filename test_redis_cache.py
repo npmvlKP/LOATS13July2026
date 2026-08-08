@@ -4,6 +4,14 @@ Test script for Redis cache functionality.
 """
 
 import asyncio
+import sys
+
+# Set UTF-8 encoding for Windows
+if sys.platform == "win32":
+    import io
+
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
 
 from src.loats.utils.cache import CacheConfig, CacheManager
 

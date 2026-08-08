@@ -13,7 +13,6 @@ feedparser>=6.0
 newspaper4k>=0.9.6
 lxml>=6.1.1
 lxml-html-clean>=0.4.5
-cryptography>=50.0.0
 structlog>=23.2
 python-telegram-bot>=20.7
 APScheduler>=3.10

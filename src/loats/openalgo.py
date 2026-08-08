@@ -654,10 +654,22 @@ class AsyncOpenAlgoClient:
         # Wrap order placement in circuit breaker without retry
         async def _place_order_impl() -> dict[str, Any]:
             # Convert enum parameters to values
-            order_type_val = order_type.value if isinstance(order_type, OrderType) else order_type
-            variety_val = variety.value if isinstance(variety, OrderVariety) else variety
-            transaction_type_val = transaction_type.value if isinstance(transaction_type, TransactionType) else transaction_type
-            product_type_val = product_type.value if isinstance(product_type, ProductType) else product_type
+            order_type_val = (
+                order_type.value if isinstance(order_type, OrderType) else order_type
+            )
+            variety_val = (
+                variety.value if isinstance(variety, OrderVariety) else variety
+            )
+            transaction_type_val = (
+                transaction_type.value
+                if isinstance(transaction_type, TransactionType)
+                else transaction_type
+            )
+            product_type_val = (
+                product_type.value
+                if isinstance(product_type, ProductType)
+                else product_type
+            )
 
             payload: dict[str, Any] = {
                 "symbol": symbol,
@@ -719,9 +731,19 @@ class AsyncOpenAlgoClient:
         # Wrap smart order placement in circuit breaker without retry
         async def _place_smart_order_impl() -> dict[str, Any]:
             # Convert enum parameters to values
-            order_type_val = order_type.value if isinstance(order_type, OrderType) else order_type
-            transaction_type_val = transaction_type.value if isinstance(transaction_type, TransactionType) else transaction_type
-            product_type_val = product_type.value if isinstance(product_type, ProductType) else product_type
+            order_type_val = (
+                order_type.value if isinstance(order_type, OrderType) else order_type
+            )
+            transaction_type_val = (
+                transaction_type.value
+                if isinstance(transaction_type, TransactionType)
+                else transaction_type
+            )
+            product_type_val = (
+                product_type.value
+                if isinstance(product_type, ProductType)
+                else product_type
+            )
 
             payload: dict[str, Any] = {
                 "symbol": symbol,
@@ -777,7 +799,9 @@ class AsyncOpenAlgoClient:
         # Wrap order modification in circuit breaker without retry
         async def _modify_order_impl() -> dict[str, Any]:
             # Convert enum parameter to value if needed
-            order_type_val = order_type.value if isinstance(order_type, OrderType) else order_type
+            order_type_val = (
+                order_type.value if isinstance(order_type, OrderType) else order_type
+            )
 
             payload: dict[str, Any] = {"order_id": order_id}
             if quantity is not None:

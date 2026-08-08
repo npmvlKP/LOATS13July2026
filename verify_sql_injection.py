@@ -7,6 +7,13 @@ Verifies that no SQL injection vulnerabilities exist in the database implementat
 import re
 import sys
 
+# Set UTF-8 encoding for Windows
+if sys.platform == "win32":
+    import io
+
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
+
 def check_for_sql_injection_patterns(file_path):
     """Check for various SQL injection patterns in a file."""
     with open(file_path, 'r', encoding='utf-8') as f:

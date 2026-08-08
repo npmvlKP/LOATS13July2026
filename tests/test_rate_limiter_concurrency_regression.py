@@ -6,11 +6,14 @@ when multiple calls are made concurrently, addressing the F-CONC-3 issue.
 
 import asyncio
 import time
-from typing import List
 
 import pytest
 
-from src.loats.utils.rate_limiter import get_order_rate_limiter, get_smart_order_rate_limiter
+from src.loats.utils.rate_limiter import (
+    get_order_rate_limiter,
+    get_smart_order_rate_limiter,
+)
+
 
 class TestRateLimiterConcurrencyRegression:
     """Regression tests for rate limiter concurrency behavior."""
@@ -33,7 +36,9 @@ class TestRateLimiterConcurrencyRegression:
 
         # Should have exactly 50 successful acquisitions (max_ops)
         successful = sum(results)
-        assert successful == 50, f"Expected 50 successful acquisitions, got {successful}"
+        assert successful == 50, (
+            f"Expected 50 successful acquisitions, got {successful}"
+        )
 
         # Verify that the singleton behavior works correctly
         limiter1 = get_order_rate_limiter()
@@ -43,7 +48,9 @@ class TestRateLimiterConcurrencyRegression:
     @pytest.mark.asyncio
     async def test_smart_order_rate_limiter_concurrency(self) -> None:
         """Test that smart order rate limiter enforces limits under concurrent access."""
-        limiter = get_smart_order_rate_limiter(max_ops=50)  # Use default 50 ops per second
+        limiter = get_smart_order_rate_limiter(
+            max_ops=50
+        )  # Use default 50 ops per second
 
         async def make_request(request_id: int) -> bool:
             """Simulate a smart order request."""
@@ -58,7 +65,9 @@ class TestRateLimiterConcurrencyRegression:
 
         # Should have exactly 50 successful acquisitions (max_ops)
         successful = sum(results)
-        assert successful == 50, f"Expected 50 successful acquisitions, got {successful}"
+        assert successful == 50, (
+            f"Expected 50 successful acquisitions, got {successful}"
+        )
 
         # Verify that the singleton behavior works correctly
         limiter1 = get_smart_order_rate_limiter()
@@ -69,7 +78,9 @@ class TestRateLimiterConcurrencyRegression:
     async def test_mixed_rate_limiter_concurrency(self) -> None:
         """Test concurrent access to both order and smart order rate limiters."""
         order_limiter = get_order_rate_limiter(max_ops=25)  # Lower limit for testing
-        smart_limiter = get_smart_order_rate_limiter(max_ops=25)  # Lower limit for testing
+        smart_limiter = get_smart_order_rate_limiter(
+            max_ops=25
+        )  # Lower limit for testing
 
         async def make_order_request(request_id: int) -> bool:
             """Simulate an order request."""
@@ -86,32 +97,42 @@ class TestRateLimiterConcurrencyRegression:
                 return False
 
         # Create mixed requests
-        all_tasks = [
-            make_order_request(i) for i in range(50)
-        ] + [make_smart_order_request(i) for i in range(50, 100)]
+        all_tasks = [make_order_request(i) for i in range(50)] + [
+            make_smart_order_request(i) for i in range(50, 100)
+        ]
         results = await asyncio.gather(*all_tasks)
 
         # Should have exactly 25 successful order acquisitions
         order_successful = sum(results[:50])
-        assert order_successful == 25, f"Expected 25 successful order acquisitions, got {order_successful}"
+        assert order_successful == 25, (
+            f"Expected 25 successful order acquisitions, got {order_successful}"
+        )
 
         # Should have exactly 25 successful smart order acquisitions
         smart_successful = sum(results[50:])
-        assert smart_successful == 25, f"Expected 25 successful smart order acquisitions, got {smart_successful}"
+        assert smart_successful == 25, (
+            f"Expected 25 successful smart order acquisitions, got {smart_successful}"
+        )
 
         # Verify that both limiters are singletons
         order_limiter1 = get_order_rate_limiter()
         order_limiter2 = get_order_rate_limiter()
-        assert order_limiter1 is order_limiter2, "Order rate limiter should be a singleton"
+        assert order_limiter1 is order_limiter2, (
+            "Order rate limiter should be a singleton"
+        )
 
         smart_limiter1 = get_smart_order_rate_limiter()
         smart_limiter2 = get_smart_order_rate_limiter()
-        assert smart_limiter1 is smart_limiter2, "Smart order rate limiter should be a singleton"
+        assert smart_limiter1 is smart_limiter2, (
+            "Smart order rate limiter should be a singleton"
+        )
 
     @pytest.mark.asyncio
     async def test_rate_limiter_time_window_enforcement(self) -> None:
         """Test that rate limiter properly enforces time window limits."""
-        limiter = get_order_rate_limiter(max_ops=10, window_size=1.0)  # 10 ops per second
+        limiter = get_order_rate_limiter(
+            max_ops=10, window_size=1.0
+        )  # 10 ops per second
 
         # First, fill the limiter
         for _ in range(10):
@@ -124,7 +145,9 @@ class TestRateLimiterConcurrencyRegression:
             results.append(result)
 
         # Should all fail
-        assert all(not result for result in results), "All requests after max_ops should fail"
+        assert all(not result for result in results), (
+            "All requests after max_ops should fail"
+        )
 
         # Wait for the window to expire
         await asyncio.sleep(1.1)  # Slightly more than window size
@@ -194,14 +217,15 @@ class TestRateLimiterConcurrencyRegression:
         # Allow for some small timing variations due to system scheduling
         for wait_time in wait_times:
             assert wait_time >= 0.0, "Wait time should be non-negative"
-            assert (
-                wait_time <= 1.2
-            ), f"Wait time {wait_time} should not exceed window size + buffer (allowing for small timing variations)"
+            assert wait_time <= 1.2, (
+                f"Wait time {wait_time} should not exceed window size + buffer (allowing for small timing variations)"
+            )
 
         # Verify singleton behavior
         limiter1 = get_order_rate_limiter()
         limiter2 = get_order_rate_limiter()
         assert limiter1 is limiter2, "Rate limiter should be a singleton"
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

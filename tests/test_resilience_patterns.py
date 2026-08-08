@@ -11,7 +11,6 @@ from src.loats.utils.circuit_breaker import (
     CircuitBreakerOpenError,
 )
 from src.loats.utils.resilience import (
-    CircuitBreakerRetryCompositionError,
     circuit_breaker_retry_async,
     circuit_breaker_retry_sync,
 )

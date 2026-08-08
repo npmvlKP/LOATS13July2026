@@ -283,9 +283,7 @@ class TestJobTracking:
             # Execute the job
             import asyncio
 
-            _start_time = time.time()
-            _result = asyncio.run(test_job())
-            _end_time = time.time()
+            assert asyncio.run(test_job()) == "success"
 
             # Should have recorded latency
             mock_latency_labels.assert_called_once_with(job_id="test_job")

@@ -21,7 +21,6 @@ async def test_run_ta_scan_success(scheduler):
         patch(
             "src.loats.scheduler.async_client", new_callable=AsyncMock
         ) as mock_client,
-        patch("src.loats.scheduler.Database") as mock_db,
         patch("src.loats.scheduler.technical_analysis") as mock_ta,
     ):
         mock_client.get_history.return_value = {
@@ -52,7 +51,7 @@ async def test_run_ta_scan_success(scheduler):
         mock_ta.calculate_indicators.return_value = []
         mock_ta.generate_signal.return_value = ("BUY", 0.8)
 
-        db_instance = mock_db.return_value
+        db_instance = MagicMock()
         db_instance.async_store_historical_data = AsyncMock(return_value=True)
         db_instance.async_create_signal = AsyncMock(return_value=True)
         db_instance.async_store_quote = AsyncMock(return_value=True)
@@ -66,12 +65,9 @@ async def test_run_ta_scan_success(scheduler):
 
 @pytest.mark.asyncio
 async def test_run_sentiment_scan_success(scheduler):
-    with (
-        patch(
-            "src.loats.scheduler.sentiment", new_callable=AsyncMock
-        ) as mock_sentiment,
-        patch("src.loats.scheduler.Database") as mock_db,
-    ):
+    with patch(
+        "src.loats.scheduler.sentiment", new_callable=AsyncMock
+    ) as mock_sentiment:
         mock_result = SentimentAnalysisResult(
             symbol="NSE:NIFTY50",
             timestamp=datetime.datetime.now(datetime.UTC),
@@ -86,7 +82,7 @@ async def test_run_sentiment_scan_success(scheduler):
 
         mock_sentiment.analyze_symbol_sentiment.return_value = mock_result
 
-        db_instance = mock_db.return_value
+        db_instance = MagicMock()
         db_instance.async_create_signal = AsyncMock(return_value=True)
         scheduler.db = db_instance
 
@@ -96,13 +92,10 @@ async def test_run_sentiment_scan_success(scheduler):
 
 @pytest.mark.asyncio
 async def test_run_signal_generation_success(scheduler):
-    with (
-        patch(
-            "src.loats.scheduler.async_client", new_callable=AsyncMock
-        ) as mock_client,
-        patch("src.loats.scheduler.Database") as mock_db,
-    ):
-        db_instance = mock_db.return_value
+    with patch(
+        "src.loats.scheduler.async_client", new_callable=AsyncMock
+    ) as mock_client:
+        db_instance = MagicMock()
         db_instance.async_get_latest_signals = AsyncMock(
             return_value=[MagicMock(strength=0.8, indicators={})]
         )
@@ -147,11 +140,10 @@ async def test_check_market_status_closed(scheduler):
 
 @pytest.mark.asyncio
 async def test_run_data_cleanup_success(scheduler):
-    with patch("src.loats.scheduler.Database") as mock_db:
-        db_instance = mock_db.return_value
-        db_instance.async_cleanup = AsyncMock(return_value=True)
-        db_instance.async_verify_audit_log_integrity = AsyncMock(return_value=True)
-        db_instance.async_vacuum = AsyncMock(return_value=True)
-        scheduler.db = db_instance
-        await scheduler.run_data_cleanup()
-        assert scheduler.db.async_cleanup.called
+    db_instance = MagicMock()
+    db_instance.async_cleanup = AsyncMock(return_value=True)
+    db_instance.async_verify_audit_log_integrity = AsyncMock(return_value=True)
+    db_instance.async_vacuum = AsyncMock(return_value=True)
+    scheduler.db = db_instance
+    await scheduler.run_data_cleanup()
+    assert scheduler.db.async_cleanup.called

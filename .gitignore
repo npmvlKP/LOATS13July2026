@@ -55,6 +55,14 @@ build/
 .gitmodules
 gitleaks-report.json
 
+# Security scan artifacts
+gitleaks_final.json
+gitleaks_out.txt
+gitleaks_results.json
+
+# Node.js modules
+node_modules/
+
 # Project specific
 LOATS13July2026/
 

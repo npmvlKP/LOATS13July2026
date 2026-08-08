@@ -30,18 +30,30 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install ".[dev]"
+      - name: Check dependency manifest sync
+        run: python scripts/check_deps_sync.py
       - name: Run Ruff linter
-        run: ruff check src/ tests/ --config pyproject.toml --output-format=github
+        run: ruff check src/ tests/ scripts/ --config pyproject.toml --output-format=github
       - name: Run Ruff formatter
-        run: ruff format --check src/ tests/ --config pyproject.toml
+        run: ruff format --check src/ tests/ scripts/ --config pyproject.toml
       - name: Run isort
-        run: isort --check-only src/ tests/ --settings-path pyproject.toml
+        run: isort --check-only src/ tests/ scripts/ --settings-path pyproject.toml
+      - name: Run Flake8
+        run: flake8 src/ tests/ scripts/
       - name: Run MyPy
         run: mypy src/ --strict --config-file pyproject.toml --output-format=github
       - name: Run Bandit
         run: bandit -r src/ -f json -o bandit-report.json
       - name: Run pip-audit
         run: pip-audit --format=json --output-file pip-audit-report.json
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        with:
+          config: .gitleaks.toml
+          fail-on: secrets
+          exit-code: 1
+          verbose: true
+
       - name: Upload security reports
         if: always()
         uses: actions/upload-artifact@v4

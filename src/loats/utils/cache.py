@@ -153,9 +153,7 @@ class CacheManager:
                 self._cache[cache_key] = value_str
                 self._cache_stats["sets"] += 1
                 cache_size = len(self._cache)
-            logger.debug(
-                f"Cache set successful. Current cache size: {cache_size}"
-            )
+            logger.debug(f"Cache set successful. Current cache size: {cache_size}")
             return True
 
         except Exception as e:
