@@ -17,12 +17,29 @@ Contrast with GET operations:
 - Read-only operations use circuit_breaker_retry_async decorator
 - These can safely retry as they don't modify state
 - Example: scheduler's _safe_get_* methods, alerts' _safe_get_* methods
+
+Idempotency Keys for Order Operations:
+-------------------------------------
+Every order placement sends an Idempotency-Key header (UUID v4) so a broker
+can deduplicate retried submissions. Keys are persisted in a TTL-bounded
+local store keyed by a stable request identity so retries reuse the same key:
+- modify_order / cancel_order: keyed by order_id (stable across retries)
+- place_order / place_smart_order: keyed by canonical payload digest
+
+This covers the kill-switch cancel path in alerts.py, which retries
+cancel_order up to 3 attempts via openalgo_circuit_breaker_retry_async.
+NOTE: OpenAlgo server-side honoring of Idempotency-Key is unconfirmed; the
+header is inert if ignored. The no-retry circuit breaker on order placement
+remains the primary duplicate-order control.
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
+import threading
+import time
+import uuid
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
@@ -53,6 +70,43 @@ if TYPE_CHECKING:
     from .alerts import AlertSystem
 
 logger = get_logger(__name__)
+
+
+_IDEMPOTENCY_TTL_SECONDS = 300.0
+_IDEMPOTENCY_KEY_MAX_ENTRIES = 1024
+_idempotency_keys: dict[str, tuple[str, float]] = {}
+_idempotency_lock = threading.Lock()
+
+
+def _get_idempotency_key(identity: str) -> str:
+    """Get-or-create idempotency key for a stable request identity.
+
+    Retries of the same logical order reuse the same key within the TTL
+    window, letting the broker deduplicate repeated submissions.
+    """
+    now = time.monotonic()
+    with _idempotency_lock:
+        entry = _idempotency_keys.get(identity)
+        if entry is not None and now < entry[1]:
+            return entry[0]
+        key = str(uuid.uuid4())
+        _idempotency_keys[identity] = (key, now + _IDEMPOTENCY_TTL_SECONDS)
+        if len(_idempotency_keys) > _IDEMPOTENCY_KEY_MAX_ENTRIES:
+            expired = [
+                ident
+                for ident, (_, expiry) in _idempotency_keys.items()
+                if expiry < now
+            ]
+            for ident in expired:
+                del _idempotency_keys[ident]
+        return key
+
+
+def _order_payload_digest(payload: dict[str, Any]) -> str:
+    """Canonical digest identifying a logical order placement."""
+    return hashlib.sha256(
+        json.dumps(payload, sort_keys=True).encode("utf-8")
+    ).hexdigest()
 
 
 class OpenAlgoError(Exception):
@@ -139,9 +193,19 @@ class OpenAlgoClient:
             )
         return self.client
 
-    def _request(self, method: str, endpoint: str, **kwargs: Any) -> dict[str, Any]:
+    def _request(
+        self,
+        method: str,
+        endpoint: str,
+        idempotency_key: str | None = None,
+        **kwargs: Any,
+    ) -> dict[str, Any]:
         client = self._ensure_client()
         url = f"/api/v1/{endpoint.lstrip('/')}"
+        if idempotency_key is not None:
+            headers = dict(kwargs.pop("headers", None) or {})
+            headers["Idempotency-Key"] = idempotency_key
+            kwargs["headers"] = headers
         try:
             if method.upper() == "POST":
                 response = client.post(url, **kwargs)
@@ -317,7 +381,14 @@ class OpenAlgoClient:
         if trailing_stop_loss is not None:
             payload["trailing_stop_loss"] = trailing_stop_loss
 
-        return self._request("POST", "place_order", json=payload)
+        return self._request(
+            "POST",
+            "place_order",
+            json=payload,
+            idempotency_key=_get_idempotency_key(
+                f"place:{_order_payload_digest(payload)}"
+            ),
+        )
 
     def place_smart_order(
         self,
@@ -363,7 +434,14 @@ class OpenAlgoClient:
         if metadata is not None:
             payload["metadata"] = metadata
 
-        return self._request("POST", "place_smart_order", json=payload)
+        return self._request(
+            "POST",
+            "place_smart_order",
+            json=payload,
+            idempotency_key=_get_idempotency_key(
+                f"place_smart_order:{_order_payload_digest(payload)}"
+            ),
+        )
 
     def modify_order(
         self,
@@ -396,12 +474,22 @@ class OpenAlgoClient:
         if trailing_stop_loss is not None:
             payload["trailing_stop_loss"] = trailing_stop_loss
 
-        return self._request("POST", "modify_order", json=payload)
+        return self._request(
+            "POST",
+            "modify_order",
+            json=payload,
+            idempotency_key=_get_idempotency_key(f"modify:{order_id}"),
+        )
 
     def cancel_order(self, order_id: str) -> dict[str, Any]:
         _check_kill_switch()
         payload = {"order_id": order_id}
-        return self._request("POST", "cancel_order", json=payload)
+        return self._request(
+            "POST",
+            "cancel_order",
+            json=payload,
+            idempotency_key=_get_idempotency_key(f"cancel:{order_id}"),
+        )
 
     def get_order_status(self, order_id: str) -> dict[str, Any]:
         payload = {"order_id": order_id}
@@ -447,10 +535,18 @@ class AsyncOpenAlgoClient:
         return self.client
 
     async def _request(
-        self, method: str, endpoint: str, **kwargs: Any
+        self,
+        method: str,
+        endpoint: str,
+        idempotency_key: str | None = None,
+        **kwargs: Any,
     ) -> dict[str, Any]:
         client = await self._ensure_client()
         url = f"/api/v1/{endpoint.lstrip('/')}"
+        if idempotency_key is not None:
+            headers = dict(kwargs.pop("headers", None) or {})
+            headers["Idempotency-Key"] = idempotency_key
+            kwargs["headers"] = headers
         try:
             if method.upper() == "POST":
                 response = await client.post(url, **kwargs)
@@ -582,7 +678,14 @@ class AsyncOpenAlgoClient:
             if trailing_stop_loss is not None:
                 payload["trailing_stop_loss"] = trailing_stop_loss
 
-            return await self._request("POST", "place_order", json=payload)
+            return await self._request(
+                "POST",
+                "place_order",
+                json=payload,
+                idempotency_key=_get_idempotency_key(
+                    f"place:{_order_payload_digest(payload)}"
+                ),
+            )
 
         return await OPENALGO_CIRCUIT_BREAKER.call_async(_place_order_impl)
 
@@ -641,7 +744,14 @@ class AsyncOpenAlgoClient:
             if metadata is not None:
                 payload["metadata"] = metadata
 
-            return await self._request("POST", "place_smart_order", json=payload)
+            return await self._request(
+                "POST",
+                "place_smart_order",
+                json=payload,
+                idempotency_key=_get_idempotency_key(
+                    f"place_smart_order:{_order_payload_digest(payload)}"
+                ),
+            )
 
         return await OPENALGO_CIRCUIT_BREAKER.call_async(_place_smart_order_impl)
 
@@ -685,7 +795,12 @@ class AsyncOpenAlgoClient:
             if trailing_stop_loss is not None:
                 payload["trailing_stop_loss"] = trailing_stop_loss
 
-            return await self._request("POST", "modify_order", json=payload)
+            return await self._request(
+                "POST",
+                "modify_order",
+                json=payload,
+                idempotency_key=_get_idempotency_key(f"modify:{order_id}"),
+            )
 
         return await OPENALGO_CIRCUIT_BREAKER.call_async(_modify_order_impl)
 
@@ -701,7 +816,12 @@ class AsyncOpenAlgoClient:
         # Wrap order cancellation in circuit breaker without retry
         async def _cancel_order_impl() -> dict[str, Any]:
             payload = {"order_id": order_id}
-            return await self._request("POST", "cancel_order", json=payload)
+            return await self._request(
+                "POST",
+                "cancel_order",
+                json=payload,
+                idempotency_key=_get_idempotency_key(f"cancel:{order_id}"),
+            )
 
         return await OPENALGO_CIRCUIT_BREAKER.call_async(_cancel_order_impl)
 
