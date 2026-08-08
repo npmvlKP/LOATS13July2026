@@ -27,6 +27,33 @@ async def test_is_market_open_logic(scheduler):
 
 
 @pytest.mark.asyncio
+async def test_is_market_open_holiday_republic_day(scheduler):
+    # 2026-01-26 is Republic Day (Monday) — market must be closed.
+    republic_day = datetime.datetime(2026, 1, 26, 10, 0)
+    with patch("src.loats.scheduler.datetime.datetime") as mock_dt:
+        mock_dt.now.return_value = republic_day
+        assert scheduler.is_market_open() is False
+
+
+@pytest.mark.asyncio
+async def test_is_market_open_weekday_during_hours(scheduler):
+    # 2026-01-27 is Tuesday, not a holiday, within 9:15-15:30 IST.
+    trading_day = datetime.datetime(2026, 1, 27, 10, 0)
+    with patch("src.loats.scheduler.datetime.datetime") as mock_dt:
+        mock_dt.now.return_value = trading_day
+        assert scheduler.is_market_open() is True
+
+
+@pytest.mark.asyncio
+async def test_is_market_open_before_hours(scheduler):
+    # Weekday, not a holiday, before market open (9:15).
+    pre_open = datetime.datetime(2026, 1, 27, 8, 0)
+    with patch("src.loats.scheduler.datetime.datetime") as mock_dt:
+        mock_dt.now.return_value = pre_open
+        assert scheduler.is_market_open() is False
+
+
+@pytest.mark.asyncio
 async def test_run_once_all_jobs(scheduler):
     scheduler.run_ta_scan = AsyncMock()
     scheduler.run_sentiment_scan = AsyncMock()
