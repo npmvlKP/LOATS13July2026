@@ -11,7 +11,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 
 from .alerts import alerts
 from .config import get_settings
-from .database import Database
+from .database import Database, db
 from .loats_logging import get_logger
 from .metrics import record_signal, track_job
 from .models import (
@@ -35,7 +35,6 @@ settings = get_settings()
 
 logger = get_logger(__name__)
 
-
 class TradingScheduler:
     """Scheduler trading scans operations."""
 
@@ -58,7 +57,8 @@ class TradingScheduler:
         self.scheduler = AsyncIOScheduler()
         self.running = False
         self.scan_tasks: dict[str, asyncio.Task[dict[str, Any] | None]] = {}
-        self.db = Database()
+        # Use shared module-level db singleton to avoid resource leaks on shutdown
+        self.db = db
 
     async def initialize(self) -> None:
         """Initialize scheduler set jobs."""
@@ -662,7 +662,6 @@ class TradingScheduler:
     def is_running(self) -> bool:
         """Check scheduler running."""
         return self.running
-
 
 # Export default instance
 scheduler = TradingScheduler()
