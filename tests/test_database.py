@@ -189,6 +189,46 @@ class TestDatabase:
         signals = db.get_latest_signals("NONEXISTENT", limit=3)
         assert len(signals) == 0
 
+    def test_get_latest_signals_scan_type_filter(
+        self, db: Database, sample_signal: Signal
+    ) -> None:
+        """Test get_latest_signals filters by metadata scan_type."""
+        for i in range(3):
+            signal = Signal(
+                **sample_signal.model_dump(
+                    exclude={"signal_id", "timestamp"}
+                ),
+                signal_id=f"filter_signal_{i}",
+                timestamp=datetime.now() - timedelta(minutes=i),
+            )
+            db.create_signal(signal)
+
+        sentiment_signal = Signal(
+            **sample_signal.model_dump(
+                exclude={"signal_id", "timestamp", "metadata"}
+            ),
+            signal_id="filter_sentiment_0",
+            timestamp=datetime.now(),
+            metadata={"scan_type": "sentiment", "news_count": 5},
+        )
+        db.create_signal(sentiment_signal)
+
+        ta_signals = db.get_latest_signals("TEST", limit=5, scan_type="ta")
+        assert len(ta_signals) == 3
+        assert all(s.metadata.get("scan_type") == "ta" for s in ta_signals)
+
+        sentiment_signals = db.get_latest_signals(
+            "TEST", limit=5, scan_type="sentiment"
+        )
+        assert len(sentiment_signals) == 1
+        assert sentiment_signals[0].signal_id == "filter_sentiment_0"
+
+        no_filter = db.get_latest_signals("TEST", limit=5)
+        assert len(no_filter) == 4
+
+        unknown = db.get_latest_signals("TEST", limit=5, scan_type="combined")
+        assert len(unknown) == 0
+
     def test_store_and_get_historical_data(
         self,
         db: Database,

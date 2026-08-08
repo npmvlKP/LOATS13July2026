@@ -403,8 +403,12 @@ class TradingScheduler:
         try:
             self._check_kill_switch()
             symbol = settings.default_symbol
-            ta_signals = await self.db.async_get_latest_signals(symbol, limit=1)
-            sentiment_signals = await self.db.async_get_latest_signals(symbol, limit=1)
+            ta_signals = await self.db.async_get_latest_signals(
+                symbol, limit=1, scan_type="ta"
+            )
+            sentiment_signals = await self.db.async_get_latest_signals(
+                symbol, limit=1, scan_type="sentiment"
+            )
 
             quotes = await self._safe_get_quotes([symbol])
             if quotes is None:

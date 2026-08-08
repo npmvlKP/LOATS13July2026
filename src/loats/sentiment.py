@@ -4,6 +4,7 @@ Implements RSS news sentiment analysis using Vader Sentiment.
 """
 
 import asyncio
+import hashlib
 import json
 from datetime import UTC, datetime
 from typing import cast
@@ -104,7 +105,10 @@ class SentimentAnalyzer:
     ) -> SentimentAnalysisResult:
         """Analyze sentiment specific symbol across multiple RSS feeds asynchronously."""
         # Create cache key based on symbol and RSS URLs
-        cache_key = f"sentiment:{symbol}:{hash(frozenset(rss_urls))}:{max_items}"
+        urls_digest = hashlib.sha256(
+            "\n".join(sorted(rss_urls)).encode("utf-8")
+        ).hexdigest()
+        cache_key = f"sentiment:{symbol}:{urls_digest}:{max_items}"
 
         # Try to get cached result first
         cached_result = await cache_manager.get(cache_key)
