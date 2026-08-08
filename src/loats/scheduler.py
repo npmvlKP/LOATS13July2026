@@ -35,6 +35,73 @@ settings = get_settings()
 
 logger = get_logger(__name__)
 
+# NSE / BSE trading-holidays calendar (3-year rolling window).
+# 2026 = official NSE Indices calendar (niftyindices.com).
+# 2027-2028 = projected per calendarlabs.com; re-verify against the
+# official NSE circular (published ~Dec) before each trading year.
+_NSE_HOLIDAY_TUPLES: tuple[tuple[int, int, int], ...] = (
+    # 2026 — official NSE / NSE Indices calendar
+    (2026, 1, 15),
+    (2026, 1, 26),
+    (2026, 3, 3),
+    (2026, 3, 26),
+    (2026, 3, 31),
+    (2026, 4, 3),
+    (2026, 4, 14),
+    (2026, 5, 1),
+    (2026, 5, 28),
+    (2026, 6, 26),
+    (2026, 9, 14),
+    (2026, 10, 2),
+    (2026, 10, 20),
+    (2026, 11, 10),
+    (2026, 11, 24),
+    (2026, 12, 25),
+    # 2027 — projected (verify vs official NSE circular)
+    (2027, 1, 26),
+    (2027, 3, 6),
+    (2027, 3, 10),
+    (2027, 3, 22),
+    (2027, 3, 26),
+    (2027, 4, 14),
+    (2027, 4, 15),
+    (2027, 4, 19),
+    (2027, 5, 1),
+    (2027, 5, 17),
+    (2027, 6, 15),
+    (2027, 8, 15),
+    (2027, 9, 4),
+    (2027, 10, 2),
+    (2027, 10, 10),
+    (2027, 10, 29),
+    (2027, 11, 14),
+    (2027, 12, 25),
+    # 2028 — projected (verify vs official NSE circular; Good Friday corrected)
+    (2028, 1, 26),
+    (2028, 2, 23),
+    (2028, 2, 27),
+    (2028, 3, 11),
+    (2028, 4, 4),
+    (2028, 4, 7),
+    (2028, 4, 13),
+    (2028, 4, 14),
+    (2028, 5, 1),
+    (2028, 5, 5),
+    (2028, 6, 3),
+    (2028, 8, 15),
+    (2028, 8, 23),
+    (2028, 9, 27),
+    (2028, 10, 2),
+    (2028, 10, 17),
+    (2028, 10, 18),
+    (2028, 11, 2),
+    (2028, 12, 25),
+)
+NSE_HOLIDAYS: frozenset[datetime.date] = frozenset(
+    datetime.date(y, m, d) for y, m, d in _NSE_HOLIDAY_TUPLES
+)
+
+
 class TradingScheduler:
     """Scheduler trading scans operations."""
 
@@ -45,6 +112,10 @@ class TradingScheduler:
         # Check weekday (Monday=0, Sunday=6)
         # Indian markets open Monday-Friday
         if now.weekday() >= 5:  # Saturday (5) Sunday (6)
+            return False
+
+        # Indian markets closed on NSE/BSE trading holidays
+        if now.date() in NSE_HOLIDAYS:
             return False
 
         # Indian market hours: 9:15 - 15:30 IST
