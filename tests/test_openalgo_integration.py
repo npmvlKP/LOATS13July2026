@@ -136,9 +136,7 @@ class TestOrderOperationsIntegration:
         """Test async place_order with rate limit exceeded."""
         with (
             patch("src.loats.openalgo._async_check_kill_switch", return_value=None),
-            patch(
-                "src.loats.openalgo.get_order_rate_limiter"
-            ) as mock_rate_limiter,
+            patch("src.loats.openalgo.get_order_rate_limiter") as mock_rate_limiter,
         ):
             mock_rate_limiter_instance = AsyncMock()
             mock_rate_limiter_instance.acquire.return_value = False
@@ -528,7 +526,9 @@ class TestOrderOperationsIntegration:
 
             # Test place_smart_order with all parameters
             mock_success_response.json.return_value["data"]["strategy"] = "advanced"
-            mock_success_response.json.return_value["data"]["metadata"] = {"source": "automated"}
+            mock_success_response.json.return_value["data"]["metadata"] = {
+                "source": "automated"
+            }
             result = await async_client.place_smart_order(
                 symbol="NIFTY",
                 quantity=1,
@@ -582,7 +582,9 @@ class TestOrderOperationsIntegration:
 
             # Test place_smart_order with all parameters
             mock_success_response.json.return_value["data"]["strategy"] = "advanced"
-            mock_success_response.json.return_value["data"]["metadata"] = {"source": "automated"}
+            mock_success_response.json.return_value["data"]["metadata"] = {
+                "source": "automated"
+            }
             result = sync_client.place_smart_order(
                 symbol="NIFTY",
                 quantity=1,

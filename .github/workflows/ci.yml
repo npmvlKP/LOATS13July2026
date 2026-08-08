@@ -34,8 +34,6 @@ jobs:
         run: ruff check src/ tests/ --config pyproject.toml --output-format=github
       - name: Run Ruff formatter
         run: ruff format --check src/ tests/ --config pyproject.toml
-      - name: Run Black
-        run: black --check src/ tests/ --config pyproject.toml
       - name: Run isort
         run: isort --check-only src/ tests/ --settings-path pyproject.toml
       - name: Run MyPy

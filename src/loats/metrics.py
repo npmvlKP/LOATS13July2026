@@ -4,12 +4,63 @@ Implements simple in-memory metrics tracking without external dependencies.
 """
 
 import time
-from typing import Any, Optional
-from unittest.mock import MagicMock
+from collections.abc import Callable, Coroutine
+from typing import Any, Optional, TypeVar, cast
 
 from .loats_logging import get_logger
 
+
+# Lightweight replacements for the MagicMock based test stubs.
+class _Metric:
+    """Simple metric object exposing ``inc``, ``observe`` and ``set`` methods.
+    Invokes the bound ``callback`` when a metric method is called.
+    """
+
+    def __init__(self, callback: Callable[..., Any]) -> None:
+        self._callback = callback
+
+    def inc(self) -> None:
+        self._callback()
+
+    def observe(self, value: Any) -> None:
+        self._callback(value)
+
+    def set(self, value: Any) -> None:
+        self._callback(value)
+
+
+class _MetricFactory:
+    """Factory returning a metric object bound to ``labels`` and a callback.
+
+    Mimics Prometheus' ``Counter.labels(...)`` API. Label values are bound at
+    ``labels()`` time and forwarded positionally (in keyword-call order) to the
+    tracker callback; the value passed to ``inc``/``observe``/``set`` is
+    appended after them. This matches each tracker's
+    ``(label..., value)`` signature, e.g. ``_track_latency_via_mock(job_id, duration)``.
+    """
+
+    def __init__(self, callback: Callable[..., Any]) -> None:
+        self._callback = callback
+
+    def labels(self, **label_kwargs: Any) -> _Metric:
+        bound = tuple(label_kwargs.values())
+        return _Metric(lambda *args: self._callback(*bound, *args))
+
+
+class _SimpleSetter:
+    """Wrapper exposing a ``set`` method that forwards to ``callback``.
+    Used for boolean style metrics.
+    """
+
+    def __init__(self, callback: Callable[[Any], Any]) -> None:
+        self._callback = callback
+
+    def set(self, value: Any) -> None:
+        self._callback(value)
+
+
 logger = get_logger(__name__)
+
 
 class MetricsManager:
     """Lightweight metrics manager for LOATS13July2026 LITE edition.
@@ -38,7 +89,7 @@ class MetricsManager:
         self.job_latency_stats: dict[str, float | int] = {
             "total_seconds": 0.0,
             "count": 0,
-            "min_seconds": float('inf'),
+            "min_seconds": float("inf"),
             "max_seconds": 0.0,
         }
         self.signals_generated_stats: dict[str, Any] = {
@@ -51,58 +102,17 @@ class MetricsManager:
             "circuit_breaker_status": {},
         }
 
-        # Create mock Prometheus-style objects for test compatibility
-        # These are lightweight mocks that don't require Prometheus dependency
-        self.job_execution_counter = MagicMock()
-        self.job_latency_summary = MagicMock()
-        self.signals_generated_counter = MagicMock()
-        self.kill_switch_status = MagicMock()
-        self.circuit_breaker_status = MagicMock()
-
-        # Set up mock behavior to work with our lightweight stats
-        self._setup_mock_metrics()
+        # Lightweight stub objects mimicking Prometheus metrics API used in tests.
+        # Avoid importing unittest.mock in production code.
+        self.job_execution_counter = _MetricFactory(self._track_job_via_mock)
+        self.job_latency_summary = _MetricFactory(self._track_latency_via_mock)
+        self.signals_generated_counter = _MetricFactory(self._record_signal_via_mock)
+        self.kill_switch_status = _SimpleSetter(self._set_kill_switch_via_mock)
+        self.circuit_breaker_status = _MetricFactory(self._set_circuit_breaker_via_mock)
 
         self._initialized = True
         self._server_started = False
         logger.info("Lightweight metrics manager initialized")
-
-    def _setup_mock_metrics(self) -> None:
-        """Set up mock Prometheus metrics to work with lightweight implementation."""
-
-        # Configure job_execution_counter mock
-        def job_execution_labels(job_id: str = "", status: str = "") -> MagicMock:
-            mock_counter = MagicMock()
-            mock_counter.inc = MagicMock(side_effect=lambda: self._track_job_via_mock(job_id, status))
-            return mock_counter
-
-        self.job_execution_counter.labels = MagicMock(side_effect=job_execution_labels)
-
-        # Configure job_latency_summary mock
-        def job_latency_labels(job_id: str = "") -> MagicMock:
-            mock_summary = MagicMock()
-            mock_summary.observe = MagicMock(side_effect=lambda duration: self._track_latency_via_mock(job_id, duration))
-            return mock_summary
-
-        self.job_latency_summary.labels = MagicMock(side_effect=job_latency_labels)
-
-        # Configure signals_generated_counter mock
-        def signals_generated_labels(signal_type: str = "", scan_type: str = "") -> MagicMock:
-            mock_counter = MagicMock()
-            mock_counter.inc = MagicMock(side_effect=lambda: self._record_signal_via_mock(signal_type, scan_type))
-            return mock_counter
-
-        self.signals_generated_counter.labels = MagicMock(side_effect=signals_generated_labels)
-
-        # Configure kill_switch_status mock
-        self.kill_switch_status.set = MagicMock(side_effect=lambda value: self._set_kill_switch_via_mock(value))
-
-        # Configure circuit_breaker_status mock
-        def circuit_breaker_labels(component: str = "") -> MagicMock:
-            mock_gauge = MagicMock()
-            mock_gauge.set = MagicMock(side_effect=lambda value: self._set_circuit_breaker_via_mock(component, value))
-            return mock_gauge
-
-        self.circuit_breaker_status.labels = MagicMock(side_effect=circuit_breaker_labels)
 
     def _track_job_via_mock(self, job_id: str, status: str) -> None:
         """Track job execution via mock interface."""
@@ -169,7 +179,7 @@ class MetricsManager:
             self.job_latency_stats = {
                 "total_seconds": 0.0,
                 "count": 0,
-                "min_seconds": float('inf'),
+                "min_seconds": float("inf"),
                 "max_seconds": 0.0,
             }
             self.signals_generated_stats = {
@@ -181,8 +191,6 @@ class MetricsManager:
                 "kill_switch_active": False,
                 "circuit_breaker_status": {},
             }
-            # Re-setup mocks
-            self._setup_mock_metrics()
 
     def track_job_execution(self, job_id: str, status: str, duration: float) -> None:
         """Track job execution metrics."""
@@ -242,7 +250,8 @@ class MetricsManager:
         """Get summary of all metrics."""
         try:
             avg_latency = (
-                self.job_latency_stats["total_seconds"] / self.job_latency_stats["count"]
+                self.job_latency_stats["total_seconds"]
+                / self.job_latency_stats["count"]
                 if self.job_latency_stats["count"] > 0
                 else 0.0
             )
@@ -253,7 +262,8 @@ class MetricsManager:
                     "failure": self.job_execution_stats["failure"],
                     "total": self.job_execution_stats["total"],
                     "success_rate": (
-                        self.job_execution_stats["success"] / self.job_execution_stats["total"]
+                        self.job_execution_stats["success"]
+                        / self.job_execution_stats["total"]
                         if self.job_execution_stats["total"] > 0
                         else 0.0
                     ),
@@ -293,13 +303,17 @@ class MetricsManager:
             logger.error(f"Failed to start metrics server: {e}")
             self._server_started = False
 
+
 # Initialize the singleton
 metrics = MetricsManager()
 
-def track_job(job_id: str) -> Any:
+F = TypeVar("F", bound=Callable[..., Coroutine[Any, Any, Any]])
+
+
+def track_job(job_id: str) -> Callable[[F], F]:
     """Decorator to track job execution time and status."""
 
-    def decorator(func: Any) -> Any:
+    def decorator(func: F) -> F:
         async def wrapper(*args: Any, **kwargs: Any) -> Any:
             start_time = time.time()
             status = "success"
@@ -313,48 +327,60 @@ def track_job(job_id: str) -> Any:
                 duration = time.time() - start_time
                 try:
                     # Use the global metrics instance to track job execution
-                    metrics.job_execution_counter.labels(job_id=job_id, status=status).inc()
+                    metrics.job_execution_counter.labels(
+                        job_id=job_id, status=status
+                    ).inc()
                     metrics.job_latency_summary.labels(job_id=job_id).observe(duration)
-                except Exception:
+                except Exception:  # nosec B110
                     # Silently handle metrics errors to not interfere with job execution
                     pass
 
-        return wrapper
+        return cast(F, wrapper)
 
     return decorator
+
 
 def record_signal(signal_type: str, scan_type: str) -> None:
     """Record signal generation event."""
     try:
-        metrics.signals_generated_counter.labels(signal_type=signal_type, scan_type=scan_type).inc()
-    except Exception:
+        metrics.signals_generated_counter.labels(
+            signal_type=signal_type, scan_type=scan_type
+        ).inc()
+    except Exception:  # nosec B110
         # Silently handle metrics errors to not interfere with application flow
         pass
+
 
 def set_kill_switch_status(active: bool) -> None:
     """Set kill switch status metric."""
     try:
         metrics.kill_switch_status.set(1 if active else 0)
-    except Exception:
+    except Exception:  # nosec B110
         # Silently handle metrics errors to not interfere with application flow
         pass
+
 
 def set_circuit_breaker_status(component: str, open_status: bool) -> None:
     """Set circuit breaker status metric."""
     try:
-        metrics.circuit_breaker_status.labels(component=component).set(1 if open_status else 0)
-    except Exception:
+        metrics.circuit_breaker_status.labels(component=component).set(
+            1 if open_status else 0
+        )
+    except Exception:  # nosec B110
         # Silently handle metrics errors to not interfere with application flow
         pass
+
 
 def get_metrics_summary() -> dict[str, Any]:
     """Get summary of all metrics."""
     return metrics.get_metrics_summary()
 
+
 def start_metrics_server(port: int = 8001) -> None:
     """Start the metrics server (standalone function for compatibility)."""
     manager = MetricsManager()
     manager.start_server(port)
+
 
 # Mock start_http_server function for test compatibility
 def start_http_server(port: int) -> None:

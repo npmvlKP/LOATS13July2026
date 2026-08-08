@@ -1402,7 +1402,7 @@ class Database:
                 "filled_quantity, average_price, stop_loss, take_profit, trailing_stop_loss, "
                 "created_at, updated_at, created_at_ms, updated_at_ms, timestamp_ms "
                 "FROM orders WHERE status = 'OPEN' AND symbol = ? ORDER BY timestamp DESC",
-                (symbol,)
+                (symbol,),
             )
         else:
             cursor.execute(

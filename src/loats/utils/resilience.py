@@ -94,9 +94,7 @@ def circuit_breaker_retry_sync(
 
                     # Check if exception is retryable
                     if not isinstance(e, cfg.retryable_exceptions):
-                        logger.debug(
-                            f"Non-retryable exception {type(e).__name__}: {e}"
-                        )
+                        logger.debug(f"Non-retryable exception {type(e).__name__}: {e}")
                         raise e
 
                     # Check if we have more attempts
@@ -167,7 +165,9 @@ def circuit_breaker_retry_async(
             for attempt in range(1, cfg.max_attempts + 1):
                 try:
                     # Call through circuit breaker to track success/failure
-                    return cast(T, await circuit_breaker.call_async(func, *args, **kwargs))
+                    return cast(
+                        T, await circuit_breaker.call_async(func, *args, **kwargs)
+                    )
 
                 except CircuitBreakerOpenError:
                     # Circuit breaker is open, fail fast without retry
@@ -185,9 +185,7 @@ def circuit_breaker_retry_async(
 
                     # Check if exception is retryable
                     if not isinstance(e, cfg.retryable_exceptions):
-                        logger.debug(
-                            f"Non-retryable exception {type(e).__name__}: {e}"
-                        )
+                        logger.debug(f"Non-retryable exception {type(e).__name__}: {e}")
                         raise
 
                     # Check if we have more attempts

@@ -498,7 +498,8 @@ class TestFailureRecoveryScenarios:
                 }
 
             with patch(
-                "src.loats.openalgo.async_client.get_quotes", side_effect=mock_get_quotes
+                "src.loats.openalgo.async_client.get_quotes",
+                side_effect=mock_get_quotes,
             ):
                 # First call should fail after retries and open circuit breaker
                 with pytest.raises(ConnectionError):

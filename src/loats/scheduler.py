@@ -197,9 +197,9 @@ class TradingScheduler:
             logger.error("Failed get quotes after retries")
             raise  # Re-raise to allow test to catch it
 
+    @track_job("ta_scan")
     async def _ta_scan_task(self) -> None:
         """Technical analysis scan task."""
-        track_job("ta_scan")
         start_time = datetime.datetime.now(datetime.UTC)
         logger.info("Starting technical analysis scan")
         try:
@@ -298,9 +298,9 @@ class TradingScheduler:
         finally:
             self.scan_tasks.pop(task_id, None)
 
+    @track_job("sentiment_scan")
     async def _sentiment_scan_task(self) -> None:
         """Sentiment analysis scan task."""
-        track_job("sentiment_scan")
         start_time = datetime.datetime.now(datetime.UTC)
         logger.info("Starting sentiment analysis scan")
         try:
@@ -395,9 +395,9 @@ class TradingScheduler:
             logger.error("Failed get funds after retries")
             raise
 
+    @track_job("signal_generation")
     async def _signal_generation_task(self) -> None:
         """Signal generation task."""
-        track_job("signal_generation")
         start_time = datetime.datetime.now(datetime.UTC)
         logger.info("Starting signal generation scan")
         try:
