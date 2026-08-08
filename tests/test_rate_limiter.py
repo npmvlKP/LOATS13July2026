@@ -264,19 +264,19 @@ class TestGlobalRateLimiters:
         assert limiter.max_ops == 50
         assert limiter.window_size == 1.0
 
-    def test_rate_limiter_per_call(self) -> None:
-        """Test that rate limiters are created per call (F-CONC-3)."""
+    def test_rate_limiter_singleton_behavior(self) -> None:
+        """Test that rate limiters are now singletons (fixed F-CONC-3)."""
         limiter1 = get_order_rate_limiter()
         limiter2 = get_order_rate_limiter()
-        # F-CONC-3: Should be different instances (per-call creation)
-        assert limiter1 is not limiter2
+        # Should be the same instance (singleton behavior)
+        assert limiter1 is limiter2
 
         smart_limiter1 = get_smart_order_rate_limiter()
         smart_limiter2 = get_smart_order_rate_limiter()
-        # F-CONC-3: Should be different instances (per-call creation)
-        assert smart_limiter1 is not smart_limiter2
+        # Should be the same instance (singleton behavior)
+        assert smart_limiter1 is smart_limiter2
 
-        # Order and smart order limiters should be different instances
+        # Order and smart order limiters should be different instances (different singletons)
         assert limiter1 is not smart_limiter1
 
         # All should have default max_ops=50
