@@ -1,8 +1,16 @@
 """
-Fixed test to verify kill switch functionality.
+Tests to verify kill switch functionality.
 """
 
 from unittest.mock import patch
+
+import pytest
+
+from src.loats.openalgo import (
+    KillSwitchError,
+    _async_check_kill_switch,
+    _check_kill_switch,
+)
 
 
 def test_kill_switch_check():
@@ -10,46 +18,22 @@ def test_kill_switch_check():
     with patch("src.loats.alerts.alerts") as mock_alerts:
         mock_alerts.is_kill_switch_active.return_value = True
 
-        from src.loats.openalgo import KillSwitchError, _check_kill_switch
-
-        try:
+        with pytest.raises(KillSwitchError):
             _check_kill_switch()
-            print("FAILED: Should have raised KillSwitchError")
-            return False
-        except KillSwitchError:
-            print("SUCCESS: KillSwitchError raised as expected")
-            return True
-        except Exception as e:
-            print(f"ERROR: Unexpected exception: {e}")
-            return False
 
 
 def test_async_kill_switch_check():
     """Test _async_check_kill_switch function raises KillSwitchError when active."""
+    import asyncio
+
     with patch("src.loats.alerts.alerts") as mock_alerts:
         mock_alerts.is_kill_switch_active.return_value = True
 
-        import asyncio
-
-        from src.loats.openalgo import KillSwitchError, _async_check_kill_switch
-
-        try:
+        with pytest.raises(KillSwitchError):
             asyncio.run(_async_check_kill_switch())
-            print("FAILED: Should have raised KillSwitchError")
-            return False
-        except KillSwitchError:
-            print("SUCCESS: KillSwitchError raised as expected")
-            return True
-        except Exception as e:
-            print(f"ERROR: Unexpected exception: {e}")
-            return False
 
 
 if __name__ == "__main__":
-    success1 = test_kill_switch_check()
-    success2 = test_async_kill_switch_check()
-
-    if success1 and success2:
-        print("All kill switch tests passed!")
-    else:
-        print("Some kill switch tests failed!")
+    test_kill_switch_check()
+    test_async_kill_switch_check()
+    print("All kill switch tests passed!")

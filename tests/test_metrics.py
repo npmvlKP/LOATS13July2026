@@ -62,6 +62,69 @@ class TestMetricsManager:
         assert manager2 is manager1
         assert manager2._initialized is True
 
+    def test_labels_counter_records_job_execution(self) -> None:
+        """Real path: labels().inc() must record job execution stats."""
+        manager = MetricsManager()
+        manager.reset_for_testing()
+
+        manager.job_execution_counter.labels(job_id="j1", status="success").inc()
+        manager.job_execution_counter.labels(job_id="j2", status="failure").inc()
+
+        assert manager.job_execution_stats == {
+            "success": 1,
+            "failure": 1,
+            "total": 2,
+        }
+
+    def test_labels_summary_observe_records_latency(self) -> None:
+        """Real path: labels().observe(value) must record the observed value."""
+        manager = MetricsManager()
+        manager.reset_for_testing()
+
+        manager.job_latency_summary.labels(job_id="j1").observe(1.25)
+        manager.job_latency_summary.labels(job_id="j1").observe(0.5)
+
+        assert manager.job_latency_stats["count"] == 2
+        assert manager.job_latency_stats["total_seconds"] == 1.75
+        assert manager.job_latency_stats["min_seconds"] == 0.5
+        assert manager.job_latency_stats["max_seconds"] == 1.25
+
+    def test_labels_gauge_set_records_circuit_breaker(self) -> None:
+        """Real path: labels().set(value) must record circuit breaker status."""
+        manager = MetricsManager()
+        manager.reset_for_testing()
+
+        manager.circuit_breaker_status.labels(component="openalgo").set(1)
+        manager.circuit_breaker_status.labels(component="telegram").set(0)
+
+        assert manager.system_status["circuit_breaker_status"] == {
+            "openalgo": True,
+            "telegram": False,
+        }
+
+    def test_kill_switch_setter_records_status(self) -> None:
+        """Real path: kill_switch_status.set(value) must record status."""
+        manager = MetricsManager()
+        manager.reset_for_testing()
+
+        manager.kill_switch_status.set(1)
+        manager.kill_switch_status.set(0)
+
+        assert manager.system_status["kill_switch_active"] is False
+
+    def test_signals_counter_records_signal(self) -> None:
+        """Real path: labels().inc() must record signal stats."""
+        manager = MetricsManager()
+        manager.reset_for_testing()
+
+        manager.signals_generated_counter.labels(
+            signal_type="BUY", scan_type="ta"
+        ).inc()
+
+        assert manager.signals_generated_stats["total"] == 1
+        assert manager.signals_generated_stats["by_type"] == {"BUY": 1}
+        assert manager.signals_generated_stats["by_scan_type"] == {"ta": 1}
+
 
 class TestMetricsServer:
     """Tests for metrics server functionality."""

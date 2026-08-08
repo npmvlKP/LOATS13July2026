@@ -16,6 +16,7 @@ logger = get_logger(__name__)
 
 T = TypeVar("T")
 
+
 class CacheConfig:
     """Configuration for lightweight in-memory cache operations."""
 
@@ -47,6 +48,7 @@ class CacheConfig:
         self.redis_host = redis_host
         self.redis_port = redis_port
         self.redis_password = redis_password
+
 
 class CacheManager:
     """Lightweight cache manager for LOATS13July2026 LITE edition.
@@ -145,7 +147,9 @@ class CacheManager:
 
             self._cache[cache_key] = value_str
             self._cache_stats["sets"] += 1
-            logger.debug(f"Cache set successful. Current cache size: {len(self._cache)}")
+            logger.debug(
+                f"Cache set successful. Current cache size: {len(self._cache)}"
+            )
             return True
 
         except Exception as e:
@@ -278,6 +282,7 @@ class CacheManager:
             logger.error(f"Cache stats failed: {e}")
             return {"enabled": False, "error": str(e)}
 
+
 # Global cache manager instance with lightweight configuration
 cache_config = CacheConfig(
     ttl_seconds=300,  # 5 minutes default TTL
@@ -287,13 +292,16 @@ cache_config = CacheConfig(
 
 cache_manager = CacheManager(cache_config)
 
+
 async def initialize_cache() -> None:
     """Initialize the lightweight global cache manager."""
     await cache_manager.initialize()
 
+
 async def close_cache() -> None:
     """Close the lightweight global cache manager."""
     await cache_manager.close()
+
 
 def model_to_cache_key(model: BaseModel) -> str:
     """Convert BaseModel to cache key."""
@@ -301,6 +309,7 @@ def model_to_cache_key(model: BaseModel) -> str:
     if hasattr(model, "trade_id") and model.trade_id:
         return f"{model.__class__.__name__}:{model.trade_id}:{hash(model.model_dump_json())}"
     return f"{model.__class__.__name__}:{hash(model.model_dump_json())}"
+
 
 def dict_to_cache_key(data: dict[str, Any]) -> str:
     """Convert dict to cache key."""

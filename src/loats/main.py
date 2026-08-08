@@ -3,6 +3,7 @@
 import asyncio
 import signal
 import sys
+from collections.abc import Callable
 from typing import Any
 
 from .alerts import alerts
@@ -68,11 +69,8 @@ class TradingSystem:
         """Wait shutdown signal."""
         loop = asyncio.get_running_loop()
 
-        def signal_handler(sig: int, frame: Any) -> None:
-            logger.info(f"Received signal: {sig}")
-            loop.call_soon_threadsafe(self.shutdown_event.set)
-
         if sys.platform == "win32":
+            signal_handler = self._make_signal_handler(loop)
             signal.signal(signal.SIGINT, signal_handler)
             signal.signal(signal.SIGTERM, signal_handler)
         else:
@@ -83,6 +81,27 @@ class TradingSystem:
                 )
 
         await self.shutdown_event.wait()
+
+    def _make_signal_handler(
+        self, loop: asyncio.AbstractEventLoop
+    ) -> Callable[[int, Any], None]:
+        """Build a signal handler that triggers graceful shutdown.
+
+        Windows cannot use ``loop.add_signal_handler``, so the handler must be
+        registered via ``signal.signal``. It schedules ``_handle_shutdown_signal``
+        on the event loop so cleanup (scheduler, alerts, cache, database) runs
+        inside the async context, matching the POSIX path.
+        """
+
+        def signal_handler(sig: int, frame: Any) -> None:
+            logger.info(f"Received signal: {sig}")
+            loop.call_soon_threadsafe(
+                lambda: asyncio.create_task(
+                    self._handle_shutdown_signal(signal.Signals(sig))
+                )
+            )
+
+        return signal_handler
 
     async def _handle_shutdown_signal(self, sig: signal.Signals) -> None:
         """Handle shutdown signal."""
@@ -133,6 +152,7 @@ async def main() -> None:
         logger.error(f"Trading system failed: {e}")
         await system.shutdown()
         sys.exit(1)
+
 
 def cli_main() -> None:
     """CLI entry point that properly handles async main function."""

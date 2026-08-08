@@ -1,3 +1,5 @@
+import asyncio
+import signal
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -90,3 +92,44 @@ async def test_trading_system_run_once(trading_system):
         mock_ta.assert_called_once()
         mock_sentiment.assert_called_once()
         mock_signal.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_signal_handler_triggers_graceful_shutdown(trading_system):
+    """Signal handler must trigger full graceful shutdown (Windows path)."""
+    with (
+        patch(
+            "src.loats.main.alerts.send_system_alert", new_callable=AsyncMock
+        ) as mock_send_alert,
+        patch(
+            "src.loats.main.scheduler.shutdown", new_callable=AsyncMock
+        ) as mock_scheduler_shutdown,
+        patch(
+            "src.loats.main.alerts.shutdown", new_callable=AsyncMock
+        ) as mock_alerts_shutdown,
+        patch("src.loats.main.close_cache") as mock_close_cache,
+        patch(
+            "src.loats.main.db.async_close_all", new_callable=AsyncMock
+        ) as mock_db_close_all,
+    ):
+        trading_system.running = True
+        loop = asyncio.get_running_loop()
+        handler = trading_system._make_signal_handler(loop)
+
+        handler(signal.SIGINT, None)
+
+        async def wait_shutdown():
+            for _ in range(100):
+                if not trading_system.running:
+                    return
+                await asyncio.sleep(0.01)
+            raise AssertionError("graceful shutdown was not triggered")
+
+        await wait_shutdown()
+
+        assert not trading_system.running
+        mock_send_alert.assert_called_once()
+        mock_scheduler_shutdown.assert_called_once()
+        mock_alerts_shutdown.assert_called_once()
+        mock_close_cache.assert_called_once()
+        mock_db_close_all.assert_called_once()

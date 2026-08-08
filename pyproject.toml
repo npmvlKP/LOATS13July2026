@@ -36,7 +36,7 @@ dependencies = [
     "structlog>=23.2.0",
     "python-telegram-bot>=20.7.0",
     "python-dotenv>=1.0.0",
-    "newspaper4k>=0.9.3",
+    "newspaper4k>=0.9.6",
     "cachetools>=5.3.0",
     "redis>=5.0.0",
     "prometheus-client>=0.21.0"
@@ -50,7 +50,6 @@ dev = [
     "pytest-cov>=5.0.0",
     "ruff>=0.5.0",
     "mypy>=1.10.0",
-    "black>=24.0.0",
     "isort>=5.13.0",
     "flake8>=7.0.0",
     "bandit>=1.7.0",
@@ -152,7 +151,6 @@ disallow_subclassing_any = true
 disallow_untyped_calls = false
 explicit_package_bases = true
 exclude = ["tests/", "scripts/"]
-ignore_errors = true
 namespace_packages = true
 
 [[tool.mypy.overrides]]
