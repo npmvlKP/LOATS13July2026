@@ -30,6 +30,11 @@ repos:
         args: [--strict, --show-error-codes, --namespace-packages, --explicit-package-bases]
         exclude: "^tests/"
 
+  - repo: https://github.com/PyCQA/flake8
+    rev: 7.3.0
+    hooks:
+      - id: flake8
+
   # bandit: Use system language to avoid Windows cp1252 encoding bug
   # in pre-commit's isolated virtualenv.
   - repo: local
@@ -57,3 +62,10 @@ repos:
         language: system
         pass_filenames: false
         stages: [pre-push]
+
+      - id: deps-sync
+        name: dependency manifest sync
+        entry: python scripts/check_deps_sync.py
+        language: system
+        pass_filenames: false
+        files: ^(pyproject\.toml|requirements-core\.txt)$

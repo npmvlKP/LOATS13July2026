@@ -2,14 +2,14 @@
 Concurrency stress test for cache thread-safety.
 Tests that the cache can handle concurrent access from multiple threads.
 """
+
 import asyncio
-import threading
-import time
 from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
 from src.loats.utils.cache import CacheConfig, CacheManager
+
 
 class TestCacheConcurrency:
     """Tests for cache thread-safety under concurrent access."""
@@ -21,7 +21,9 @@ class TestCacheConcurrency:
         return CacheManager(config)
 
     @pytest.mark.asyncio
-    async def test_concurrent_get_set_operations(self, cache_manager: CacheManager) -> None:
+    async def test_concurrent_get_set_operations(
+        self, cache_manager: CacheManager
+    ) -> None:
         """Test concurrent get and set operations from multiple threads."""
         await cache_manager.initialize()
 
@@ -66,7 +68,9 @@ class TestCacheConcurrency:
         assert stats["current_size"] == num_workers * 100  # 100 operations per worker
 
     @pytest.mark.asyncio
-    async def test_concurrent_delete_operations(self, cache_manager: CacheManager) -> None:
+    async def test_concurrent_delete_operations(
+        self, cache_manager: CacheManager
+    ) -> None:
         """Test concurrent delete operations from multiple threads."""
         await cache_manager.initialize()
 
@@ -98,7 +102,9 @@ class TestCacheConcurrency:
         assert len(all_results) == num_workers * 25
 
     @pytest.mark.asyncio
-    async def test_concurrent_clear_operations(self, cache_manager: CacheManager) -> None:
+    async def test_concurrent_clear_operations(
+        self, cache_manager: CacheManager
+    ) -> None:
         """Test concurrent clear operations from multiple threads."""
         await cache_manager.initialize()
 
@@ -122,7 +128,9 @@ class TestCacheConcurrency:
         assert all(isinstance(result, int) for result in results)
 
     @pytest.mark.asyncio
-    async def test_concurrent_get_or_set_operations(self, cache_manager: CacheManager) -> None:
+    async def test_concurrent_get_or_set_operations(
+        self, cache_manager: CacheManager
+    ) -> None:
         """Test concurrent get_or_set operations from multiple threads."""
         await cache_manager.initialize()
 
@@ -138,11 +146,15 @@ class TestCacheConcurrency:
                 key = f"get_or_set_key_{worker_id}_{i}"
 
                 # First call should fetch and cache
-                value1 = await cache_manager.get_or_set(key, lambda: fetch_function(key))
+                value1 = await cache_manager.get_or_set(
+                    key, lambda bound_key=key: fetch_function(bound_key)
+                )
                 results.append(f"first_{key}_{value1}")
 
                 # Second call should return cached value
-                value2 = await cache_manager.get_or_set(key, lambda: fetch_function(key))
+                value2 = await cache_manager.get_or_set(
+                    key, lambda bound_key=key: fetch_function(bound_key)
+                )
                 results.append(f"second_{key}_{value2}")
 
                 # Both should be the same
@@ -163,7 +175,9 @@ class TestCacheConcurrency:
         assert len(all_results) == num_workers * 100  # 100 operations per worker
 
     @pytest.mark.asyncio
-    async def test_stress_test_high_concurrency(self, cache_manager: CacheManager) -> None:
+    async def test_stress_test_high_concurrency(
+        self, cache_manager: CacheManager
+    ) -> None:
         """Stress test with high concurrency to detect race conditions."""
         await cache_manager.initialize()
 
@@ -222,7 +236,6 @@ class TestCacheConcurrency:
             asyncio.set_event_loop(loop)
 
             async def async_work():
-                nonlocal results
                 for i in range(num_ops):
                     key = f"thread_pool_{worker_id}_{i}"
                     value = f"thread_pool_value_{worker_id}_{i}"

@@ -11,7 +11,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 
 from .alerts import alerts
 from .config import get_settings
-from .database import Database, db
+from .database import db
 from .loats_logging import get_logger
 from .metrics import record_signal, track_job
 from .models import (
@@ -733,6 +733,7 @@ class TradingScheduler:
     def is_running(self) -> bool:
         """Check scheduler running."""
         return self.running
+
 
 # Export default instance
 scheduler = TradingScheduler()

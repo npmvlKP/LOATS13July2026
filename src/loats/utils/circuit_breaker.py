@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import threading
 import time
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any, TypeVar
@@ -221,8 +221,8 @@ class CircuitBreaker:
             raise
 
     async def call_async(
-        self, func: Callable[..., Any], *args: Any, **kwargs: Any
-    ) -> Any:
+        self, func: Callable[..., Awaitable[T]], *args: Any, **kwargs: Any
+    ) -> T:
         """
         Execute an async function with circuit breaker protection.
 

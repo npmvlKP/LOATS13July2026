@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Benchmark script for Supertrend indicator performance."""
+
 import sys
 import time
 from pathlib import Path
@@ -38,6 +39,7 @@ def generate_test_data(n_points: int = 10000) -> pd.DataFrame:
 
     return pd.DataFrame(data)
 
+
 def benchmark_supertrend(df: pd.DataFrame, n_runs: int = 5) -> dict:
     """Benchmark supertrend calculation performance."""
     times = []
@@ -61,6 +63,7 @@ def benchmark_supertrend(df: pd.DataFrame, n_runs: int = 5) -> dict:
         "max_time": max_time,
         "times": times,
     }
+
 
 def main() -> None:
     """Run benchmark tests with different data sizes."""
@@ -93,11 +96,12 @@ def main() -> None:
     print("-" * 50)
 
     for result in results:
-        n_points = result['n_points']
-        avg_time = result['avg_time']
+        n_points = result["n_points"]
+        avg_time = result["avg_time"]
         time_per_point = (avg_time / n_points) * 1_000_000  # Convert to microseconds
 
         print(f"{n_points:<12} {avg_time:<15.4f} {time_per_point:<18.2f}")
+
 
 if __name__ == "__main__":
     main()
