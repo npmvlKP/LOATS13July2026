@@ -3,6 +3,7 @@ Lightweight metrics collection for LOATS13July2026 LITE edition.
 Implements simple in-memory metrics tracking without external dependencies.
 """
 
+import threading
 import time
 from collections.abc import Callable, Coroutine
 from typing import Any, Optional, TypeVar, cast
@@ -293,9 +294,7 @@ class MetricsManager:
             return
 
         try:
-            # For LITE edition, we use a simple flag instead of actual HTTP server
-            # This maintains compatibility with tests while avoiding Prometheus dependency
-            # Call the mock start_http_server function for test compatibility
+            # LITE edition: start lightweight HTTP server (stdlib only).
             start_http_server(port)
             self._server_started = True
             logger.info(f"Lightweight metrics server started on port {port}")
@@ -382,7 +381,31 @@ def start_metrics_server(port: int = 8001) -> None:
     manager.start_server(port)
 
 
-# Mock start_http_server function for test compatibility
 def start_http_server(port: int) -> None:
-    """Mock start_http_server function to maintain test compatibility."""
-    pass
+    """Start a lightweight HTTP server exposing metrics as JSON.
+
+    LITE edition: serves :func:`get_metrics_summary` over HTTP from a
+    background daemon thread. No external Prometheus dependency required.
+    """
+    import json as _json
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+    class _MetricsHandler(BaseHTTPRequestHandler):
+        def do_GET(self) -> None:
+            body = _json.dumps(get_metrics_summary()).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, msg: str, *args: Any) -> None:
+            logger.debug("Metrics HTTP: %s", msg % args)
+
+    server = ThreadingHTTPServer(("127.0.0.1", port), _MetricsHandler)
+    thread = threading.Thread(
+        target=server.serve_forever,
+        daemon=True,
+        name=f"metrics-http-server-{port}",
+    )
+    thread.start()

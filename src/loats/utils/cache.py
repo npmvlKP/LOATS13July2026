@@ -3,6 +3,7 @@ Lightweight caching utilities for LOATS13July2026 LITE edition.
 Implements simple in-memory caching optimized for minimal resource usage.
 """
 
+import hashlib
 import json
 from collections.abc import Callable
 from typing import Any, TypeVar
@@ -303,14 +304,26 @@ async def close_cache() -> None:
     await cache_manager.close()
 
 
+def _hash_text(text: str) -> str:
+    """Return deterministic SHA-256 digest for cache keys.
+
+    ``hash()`` is randomized per process (PYTHONHASHSEED) which produces
+    different cache keys across processes, defeating shared caches.
+    """
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
 def model_to_cache_key(model: BaseModel) -> str:
     """Convert BaseModel to cache key."""
     # Include trade_id if available for better cache key uniqueness
     if hasattr(model, "trade_id") and model.trade_id:
-        return f"{model.__class__.__name__}:{model.trade_id}:{hash(model.model_dump_json())}"
-    return f"{model.__class__.__name__}:{hash(model.model_dump_json())}"
+        return (
+            f"{model.__class__.__name__}:{model.trade_id}:"
+            f"{_hash_text(model.model_dump_json())}"
+        )
+    return f"{model.__class__.__name__}:{_hash_text(model.model_dump_json())}"
 
 
 def dict_to_cache_key(data: dict[str, Any]) -> str:
     """Convert dict to cache key."""
-    return f"dict:{hash(json.dumps(data, sort_keys=True))}"
+    return f"dict:{_hash_text(json.dumps(data, sort_keys=True))}"

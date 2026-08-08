@@ -4,6 +4,7 @@ OpenAlgo client implementation LOATS13July2026.
 
 from __future__ import annotations
 
+import hashlib
 import json
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
@@ -463,7 +464,10 @@ class AsyncOpenAlgoClient:
 
     async def get_quotes(self, symbols: list[str]) -> dict[str, Any]:
         symbols_sorted = sorted(symbols)
-        cache_key = f"quotes:{hash(frozenset(symbols_sorted))}"
+        symbols_digest = hashlib.sha256(
+            ",".join(symbols_sorted).encode("utf-8")
+        ).hexdigest()
+        cache_key = f"quotes:{symbols_digest}"
         cached_result = await cache_manager.get(cache_key)
         if cached_result:
             try:

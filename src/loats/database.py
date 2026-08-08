@@ -912,24 +912,38 @@ class Database:
         )
         return True
 
-    def get_latest_signals(self, symbol: str, limit: int = 10) -> list[Signal]:
+    def get_latest_signals(
+        self, symbol: str, limit: int = 10, scan_type: str | None = None
+    ) -> list[Signal]:
         """
         Get latest signals symbol.
         Args:
             symbol: Symbol filter
             limit: Maximum number signals return
+            scan_type: Optional scan type filter (``ta``, ``sentiment``, ``combined``)
+                matched against ``metadata.scan_type`` stored JSON
         Returns:
             List Signal models ordered timestamp descending
         """
         conn = self._get_connection()
         cursor = conn.cursor()
-        cursor.execute(
-            """
-            SELECT * FROM signals WHERE symbol = ?
-            ORDER BY timestamp DESC LIMIT ?
-            """,
-            (symbol, limit),
-        )
+        if scan_type is not None:
+            cursor.execute(
+                """
+                SELECT * FROM signals
+                WHERE symbol = ? AND json_extract(metadata, '$.scan_type') = ?
+                ORDER BY timestamp DESC LIMIT ?
+                """,
+                (symbol, scan_type, limit),
+            )
+        else:
+            cursor.execute(
+                """
+                SELECT * FROM signals WHERE symbol = ?
+                ORDER BY timestamp DESC LIMIT ?
+                """,
+                (symbol, limit),
+            )
         rows = cursor.fetchall()
         return [self._row_to_signal(row) for row in rows]
 
@@ -1612,10 +1626,12 @@ class Database:
         return await asyncio.to_thread(self.store_funds, funds)
 
     async def async_get_latest_signals(
-        self, symbol: str, limit: int = 10
+        self, symbol: str, limit: int = 10, scan_type: str | None = None
     ) -> list[Signal]:
         """Async wrapper get_latest_signals() avoid blocking event loop."""
-        return await asyncio.to_thread(self.get_latest_signals, symbol, limit)
+        return await asyncio.to_thread(
+            self.get_latest_signals, symbol, limit, scan_type
+        )
 
     async def async_verify_audit_log_integrity(self) -> bool:
         """Async wrapper verify_audit_log_integrity() avoid blocking event loop."""
