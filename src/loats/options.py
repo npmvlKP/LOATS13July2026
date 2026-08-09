@@ -134,8 +134,9 @@ class OptionsEngine:
                 rho=rho_val,
                 implied_volatility=sigma,
             )
-        except Exception:
-            # Fallback for values at edge cases
+        except (ValueError, TypeError, ZeroDivisionError) as e:
+            # Fallback for specific numerical errors
+            logger.warning(f"Numerical error in Greeks calculation: {e}")
             if option_type == OptionType.CALL:
                 return Greeks(
                     delta=1.0 if S > K else 0.0,
@@ -154,6 +155,10 @@ class OptionsEngine:
                     rho=0.0,
                     implied_volatility=sigma,
                 )
+        except Exception as e:
+            # Catch any other unexpected exceptions
+            logger.error(f"Unexpected error in Greeks calculation: {e}")
+            raise
 
     def calculate_implied_volatility(
         self,
@@ -305,8 +310,11 @@ class OptionsEngine:
                 contract.rho = greeks.rho
 
                 analyzed_chain.append(contract)
+            except (ValueError, TypeError, ZeroDivisionError) as e:
+                logger.warning(f"Numerical error analyzing option {contract.symbol}: {e}")
+                analyzed_chain.append(contract)
             except Exception as e:
-                logger.error(f"Failed to analyze option {contract.symbol}: {e}")
+                logger.error(f"Unexpected error analyzing option {contract.symbol}: {e}")
                 analyzed_chain.append(contract)
 
         return analyzed_chain
@@ -380,7 +388,8 @@ def calculate_greeks(
             rho=rho_val,
             implied_volatility=sigma,
         )
-    except Exception:
+    except (ValueError, TypeError, ZeroDivisionError) as e:
+        logger.warning(f"Numerical error in standalone Greeks calculation: {e}")
         if option_type == OptionType.CALL:
             return Greeks(
                 delta=1.0 if S > K else 0.0,
@@ -398,6 +407,9 @@ def calculate_greeks(
             rho=0.0,
             implied_volatility=sigma,
         )
+    except Exception as e:
+        logger.error(f"Unexpected error in standalone Greeks calculation: {e}")
+        raise
 
 
 def calculate_implied_volatility(
@@ -423,9 +435,13 @@ def calculate_implied_volatility(
 
     try:
         return float(implied_volatility(price, S, K, t, r, flag))
-    except Exception:
+    except (ValueError, TypeError, ZeroDivisionError) as e:
+        logger.warning(f"Numerical error in standalone implied volatility calculation: {e}")
         # Fallback to a reasonable value
         return 0.2
+    except Exception as e:
+        logger.error(f"Unexpected error in standalone implied volatility calculation: {e}")
+        raise
 
 
 def calculate_var(returns: list[float], confidence_level: float = 0.95) -> float:

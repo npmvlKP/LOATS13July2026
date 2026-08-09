@@ -150,6 +150,20 @@ def _check_kill_switch() -> None:
     alerts = _get_alerts()
     if alerts.is_kill_switch_active():
         logger.error("Kill switch active, order placement blocked")
+        # Log audit entry for kill switch activation
+        try:
+            from .database import db
+            db._log_audit(
+                action="BLOCK",
+                entity_type="order",
+                entity_id="kill_switch_blocked",
+                user="system",
+                metadata={"reason": "Kill switch active"},
+                previous_state=None,
+                new_state={"status": "blocked", "reason": "kill_switch_active"}
+            )
+        except Exception as e:
+            logger.error(f"Failed to write audit log for kill switch block: {e}")
         raise KillSwitchError("Kill switch active, order placement blocked")
 
 
@@ -158,6 +172,20 @@ async def _async_check_kill_switch() -> None:
     alerts = _get_alerts()
     if alerts.is_kill_switch_active():
         logger.error("Kill switch active, order placement blocked")
+        # Log audit entry for kill switch activation
+        try:
+            from .database import db
+            db._log_audit(
+                action="BLOCK",
+                entity_type="order",
+                entity_id="kill_switch_blocked",
+                user="system",
+                metadata={"reason": "Kill switch active"},
+                previous_state=None,
+                new_state={"status": "blocked", "reason": "kill_switch_active"}
+            )
+        except Exception as e:
+            logger.error(f"Failed to write audit log for kill switch block: {e}")
         raise KillSwitchError("Kill switch active, order placement blocked")
 
 
