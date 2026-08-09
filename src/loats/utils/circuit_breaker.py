@@ -140,45 +140,48 @@ class CircuitBreaker:
 
     def _record_success(self) -> None:
         """Record a successful call."""
-        now = time.monotonic()
-        self._stats.total_calls += 1
-        self._stats.successful_calls += 1
-        self._stats.consecutive_successes += 1
-        self._stats.consecutive_failures = 0
-        self._stats.last_success_time = now
+        with self._state_lock:
+            now = time.monotonic()
+            self._stats.total_calls += 1
+            self._stats.successful_calls += 1
+            self._stats.consecutive_successes += 1
+            self._stats.consecutive_failures = 0
+            self._stats.last_success_time = now
 
-        # In HALF_OPEN state, check if we should close the circuit
-        if self._state == CircuitState.HALF_OPEN:
-            if self._stats.consecutive_successes >= self.config.success_threshold:
-                self._state = CircuitState.CLOSED
-                self._opened_at = None
-                self._half_open_at = None
-                self._stats.consecutive_successes = 0
-                logger.info(f"Circuit breaker '{self.name}' CLOSED after recovery")
+            # In HALF_OPEN state, check if we should close the circuit
+            if self._state == CircuitState.HALF_OPEN:
+                if self._stats.consecutive_successes >= self.config.success_threshold:
+                    self._state = CircuitState.CLOSED
+                    self._opened_at = None
+                    self._half_open_at = None
+                    self._stats.consecutive_successes = 0
+                    logger.info(f"Circuit breaker '{self.name}' CLOSED after recovery")
 
     def _record_failure(self) -> None:
         """Record a failed call."""
-        now = time.monotonic()
-        self._stats.total_calls += 1
-        self._stats.failed_calls += 1
-        self._stats.consecutive_failures += 1
-        self._stats.consecutive_successes = 0
-        self._stats.last_failure_time = now
+        with self._state_lock:
+            now = time.monotonic()
+            self._stats.total_calls += 1
+            self._stats.failed_calls += 1
+            self._stats.consecutive_failures += 1
+            self._stats.consecutive_successes = 0
+            self._stats.last_failure_time = now
 
-        # Check if we should open the circuit
-        if self._stats.consecutive_failures >= self.config.failure_threshold:
-            if self._state != CircuitState.OPEN:
-                self._state = CircuitState.OPEN
-                self._opened_at = time.monotonic()
-                logger.warning(
-                    f"Circuit breaker '{self.name}' OPENED after "
-                    f"{self._stats.consecutive_failures} consecutive failures"
-                )
+            # Check if we should open the circuit
+            if self._stats.consecutive_failures >= self.config.failure_threshold:
+                if self._state != CircuitState.OPEN:
+                    self._state = CircuitState.OPEN
+                    self._opened_at = time.monotonic()
+                    logger.warning(
+                        f"Circuit breaker '{self.name}' OPENED after "
+                        f"{self._stats.consecutive_failures} consecutive failures"
+                    )
 
     def _record_rejection(self) -> None:
         """Record a rejected call (circuit was open)."""
-        self._stats.total_calls += 1
-        self._stats.rejected_calls += 1
+        with self._state_lock:
+            self._stats.total_calls += 1
+            self._stats.rejected_calls += 1
 
     def call(self, func: Callable[..., T], *args: Any, **kwargs: Any) -> T:
         """
