@@ -11,7 +11,9 @@ from .config import get_settings
 from .database import Database
 from .loats_logging import logger
 from .metrics import metrics
+from .orchestrator import start_orchestrator, stop_orchestrator
 from .scheduler import scheduler
+from .strike_selection import strike_selector
 from .utils.cache import close_cache, initialize_cache
 
 # Module-level exports for testing (F-CONC-3)
@@ -21,7 +23,6 @@ db = Database(
     audit_log_path=settings.audit_log_path,
     retention_days=settings.retention_days,
 )
-
 
 class TradingSystem:
     """Main trading system class."""
@@ -44,6 +45,8 @@ class TradingSystem:
             await scheduler.initialize()
             # Start metrics server after cache initialization (R5-2 fix)
             metrics.start_server(settings.metrics_port)
+            # Start high-performance orchestrator
+            await start_orchestrator()
             logger.info("All system components initialized successfully")
         except Exception as e:
             logger.error(f"Failed initialize trading system: {e}")
@@ -121,6 +124,7 @@ class TradingSystem:
             await alerts.send_system_alert(
                 "LOATS13July2026 trading system shutting down", "warning"
             )
+            await stop_orchestrator()
             await scheduler.shutdown()
             await alerts.shutdown()
             await close_cache()
@@ -144,7 +148,6 @@ class TradingSystem:
             logger.error(f"Error running scans: {e}")
             raise
 
-
 async def main() -> None:
     """Standalone main entry point trading system."""
     system = TradingSystem()
@@ -156,7 +159,6 @@ async def main() -> None:
         await system.shutdown()
         sys.exit(1)
 
-
 def cli_main() -> None:
     """CLI entry point that properly handles async main function."""
     try:
@@ -166,7 +168,6 @@ def cli_main() -> None:
     except Exception as e:
         logger.error(f"Unexpected error: {e}")
         sys.exit(1)
-
 
 if __name__ == "__main__":
     try:
