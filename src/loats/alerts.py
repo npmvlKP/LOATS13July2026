@@ -37,13 +37,12 @@ logger = get_logger(__name__)
 # Settings must be accessed after all imports to avoid circular imports
 settings = get_settings()
 
-
 class AlertSystem:
     """Alert system using Telegram bot notifications kill switch.
     `AlertSystem` accepts an optional ``Database` instance constructor.
     When omitted, shared module-level `db` singleton (so original ``AlertSystem()` call-site continues work unchanged).
     active database reference exposed :attr:`db` property, which **looked dynamically** access time test-time
-    patches `src.loats.alerts.db` continue honored when explicit instance not injected.
+    patches `src.loats.alerts.db` continue honored when explicit instance not injected. The
     eliminates per-command `Database()` instantiation previously caused connection / file-handle churn Windows (NEW-M5).
     """
 
@@ -421,9 +420,6 @@ class AlertSystem:
         """Get position book circuit breaker retry protection."""
         try:
             return await async_client.get_position_book()
-        except CircuitBreakerOpenError:
-            logger.warning("Circuit breaker open, skipping position book fetch")
-            return None
         except Exception as e:
             logger.error(f"Failed to get position book: {e}")
             return None
@@ -433,9 +429,6 @@ class AlertSystem:
         """Get funds circuit breaker retry protection."""
         try:
             return await async_client.get_funds()
-        except CircuitBreakerOpenError:
-            logger.warning("Circuit breaker open, skipping funds fetch")
-            return None
         except Exception as e:
             logger.error(f"Failed to get funds: {e}")
             return None
@@ -497,9 +490,6 @@ class AlertSystem:
         """Get all orders circuit breaker retry protection."""
         try:
             return await async_client.get_all_orders()
-        except CircuitBreakerOpenError:
-            logger.warning("Circuit breaker open, skipping orders fetch")
-            return None
         except Exception as e:
             logger.error(f"Failed to get all orders: {e}")
             return None
@@ -510,9 +500,6 @@ class AlertSystem:
         try:
             await async_client.cancel_order(order_id)
             return True
-        except CircuitBreakerOpenError:
-            logger.warning("OpenAlgo circuit breaker open cancel_order")
-            return False
         except Exception as e:
             logger.error(f"Failed cancel order after retries: {order_id}", exc_info=e)
             return False
@@ -856,7 +843,6 @@ class AlertSystem:
             logger.error(f"Error handling message: {e}")
             if update.message:
                 await update.message.reply_text(f"❌ Error: {e!s}")
-
 
 # Export a default instance
 alerts = AlertSystem()

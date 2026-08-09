@@ -101,7 +101,6 @@ NSE_HOLIDAYS: frozenset[datetime.date] = frozenset(
     datetime.date(y, m, d) for y, m, d in _NSE_HOLIDAY_TUPLES
 )
 
-
 class TradingScheduler:
     """Scheduler trading scans operations."""
 
@@ -249,9 +248,6 @@ class TradingScheduler:
             return await async_client.get_history(
                 symbol=symbol, interval=interval, from_date=None, to_date=None
             )
-        except CircuitBreakerOpenError:
-            logger.warning("OpenAlgo circuit breaker open get_history")
-            raise  # Re-raise to allow test to catch it
         except Exception:
             logger.error("Failed get history after retries")
             raise  # Re-raise to allow circuit breaker to record failure
@@ -261,9 +257,6 @@ class TradingScheduler:
         """Get quotes retry circuit breaker protection."""
         try:
             return await async_client.get_quotes(symbols)
-        except CircuitBreakerOpenError:
-            logger.warning("OpenAlgo circuit breaker open get_quotes")
-            raise  # Re-raise to allow test to catch it
         except Exception:
             logger.error("Failed get quotes after retries")
             raise  # Re-raise to allow test to catch it
@@ -447,9 +440,6 @@ class TradingScheduler:
         """Get position book retry circuit breaker protection."""
         try:
             return await async_client.get_position_book()
-        except CircuitBreakerOpenError:
-            logger.warning("OpenAlgo circuit breaker open get_position_book")
-            raise
         except Exception:
             logger.error("Failed get position book after retries")
             raise
@@ -459,9 +449,6 @@ class TradingScheduler:
         """Get funds retry circuit breaker protection."""
         try:
             return await async_client.get_funds()
-        except CircuitBreakerOpenError:
-            logger.warning("OpenAlgo circuit breaker open get_funds")
-            raise
         except Exception:
             logger.error("Failed get funds after retries")
             raise
@@ -733,7 +720,6 @@ class TradingScheduler:
     def is_running(self) -> bool:
         """Check scheduler running."""
         return self.running
-
 
 # Export default instance
 scheduler = TradingScheduler()
