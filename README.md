@@ -77,6 +77,32 @@ OPENALGO_BASE_URL=http://127.0.0.1:5000
 OPENALGO_MODE=ANALYZE
 ```
 
+### Docker Deployment
+
+**Two Docker Compose configurations are available:**
+
+1. **CI/CD Testing**: `docker-compose.yml`
+   - Runs quick health check on startup
+   - Includes development volume mounts for hot-reload
+   - For testing and validation only
+
+2. **Production Runtime**: `docker-compose.runtime.yml`
+   - Starts the actual trading system (`loats.main:cli_main`)
+   - No development mounts (production-ready)
+   - For actual deployment
+
+**Usage:**
+
+```powershell
+# For CI/CD testing
+docker compose -f docker-compose.yml up
+
+# For production runtime
+docker compose -f docker-compose.runtime.yml up
+```
+
+**Important:** The default `Dockerfile` uses `quick_health_check.py` as CMD for CI/CD purposes. For runtime deployment, use the `command` override in `docker-compose.runtime.yml` or build with a custom CMD.
+
 ### Quality Gates
 
 Run all quality gates:

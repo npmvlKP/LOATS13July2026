@@ -61,5 +61,6 @@ COPY quick_health_check.py verify_project_health.py ./
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD python quick_health_check.py >/dev/null 2>&1; exit $?
 
-# Default command runs quick health check on container start
+# Default command runs quick health check on container start (for CI/CD)
+# For runtime, use: CMD ["python", "-m", "loats.main"]
 CMD ["python", "quick_health_check.py"]
