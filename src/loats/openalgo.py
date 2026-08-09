@@ -60,6 +60,12 @@ from .models import (
 )
 from .utils.cache import cache_manager
 from .utils.circuit_breaker import OPENALGO_CIRCUIT_BREAKER
+from .utils.payload_builder import (
+    build_cancel_order_payload,
+    build_modify_order_payload,
+    build_place_order_payload,
+    build_place_smart_order_payload,
+)
 from .utils.rate_limiter import (
     RateLimitExceededError,
     get_order_rate_limiter,
@@ -381,33 +387,19 @@ class OpenAlgoClient:
         trailing_stop_loss: float | None = None,
     ) -> dict[str, Any]:
         _check_kill_switch()
-        if isinstance(order_type, OrderType):
-            order_type = order_type.value
-        if isinstance(variety, OrderVariety):
-            variety = variety.value
-        if isinstance(transaction_type, TransactionType):
-            transaction_type = transaction_type.value
-        if isinstance(product_type, ProductType):
-            product_type = product_type.value
-
-        payload: dict[str, Any] = {
-            "symbol": symbol,
-            "quantity": quantity,
-            "order_type": order_type,
-            "variety": variety,
-            "transaction_type": transaction_type,
-            "product_type": product_type,
-        }
-        if price is not None:
-            payload["price"] = price
-        if trigger_price is not None:
-            payload["trigger_price"] = trigger_price
-        if stop_loss is not None:
-            payload["stop_loss"] = stop_loss
-        if take_profit is not None:
-            payload["take_profit"] = take_profit
-        if trailing_stop_loss is not None:
-            payload["trailing_stop_loss"] = trailing_stop_loss
+        payload = build_place_order_payload(
+            symbol=symbol,
+            quantity=quantity,
+            order_type=order_type,
+            price=price,
+            variety=variety,
+            transaction_type=transaction_type,
+            product_type=product_type,
+            trigger_price=trigger_price,
+            stop_loss=stop_loss,
+            take_profit=take_profit,
+            trailing_stop_loss=trailing_stop_loss,
+        )
 
         return self._request(
             "POST",
@@ -434,33 +426,20 @@ class OpenAlgoClient:
         metadata: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         _check_kill_switch()
-        if isinstance(order_type, OrderType):
-            order_type = order_type.value
-        if isinstance(transaction_type, TransactionType):
-            transaction_type = transaction_type.value
-        if isinstance(product_type, ProductType):
-            product_type = product_type.value
-
-        payload: dict[str, Any] = {
-            "symbol": symbol,
-            "quantity": quantity,
-            "order_type": order_type,
-            "strategy": strategy,
-            "transaction_type": transaction_type,
-            "product_type": product_type,
-        }
-        if price is not None:
-            payload["price"] = price
-        if trigger_price is not None:
-            payload["trigger_price"] = trigger_price
-        if stop_loss is not None:
-            payload["stop_loss"] = stop_loss
-        if take_profit is not None:
-            payload["take_profit"] = take_profit
-        if trailing_stop_loss is not None:
-            payload["trailing_stop_loss"] = trailing_stop_loss
-        if metadata is not None:
-            payload["metadata"] = metadata
+        payload = build_place_smart_order_payload(
+            symbol=symbol,
+            quantity=quantity,
+            order_type=order_type,
+            price=price,
+            trigger_price=trigger_price,
+            stop_loss=stop_loss,
+            take_profit=take_profit,
+            trailing_stop_loss=trailing_stop_loss,
+            strategy=strategy,
+            transaction_type=transaction_type,
+            product_type=product_type,
+            metadata=metadata,
+        )
 
         return self._request(
             "POST",
@@ -483,24 +462,16 @@ class OpenAlgoClient:
         trailing_stop_loss: float | None = None,
     ) -> dict[str, Any]:
         _check_kill_switch()
-        if isinstance(order_type, OrderType):
-            order_type = order_type.value
-
-        payload: dict[str, Any] = {"order_id": order_id}
-        if quantity is not None:
-            payload["quantity"] = quantity
-        if order_type is not None:
-            payload["order_type"] = order_type
-        if price is not None:
-            payload["price"] = price
-        if trigger_price is not None:
-            payload["trigger_price"] = trigger_price
-        if stop_loss is not None:
-            payload["stop_loss"] = stop_loss
-        if take_profit is not None:
-            payload["take_profit"] = take_profit
-        if trailing_stop_loss is not None:
-            payload["trailing_stop_loss"] = trailing_stop_loss
+        payload = build_modify_order_payload(
+            order_id=order_id,
+            quantity=quantity,
+            order_type=order_type,
+            price=price,
+            trigger_price=trigger_price,
+            stop_loss=stop_loss,
+            take_profit=take_profit,
+            trailing_stop_loss=trailing_stop_loss,
+        )
 
         return self._request(
             "POST",
