@@ -91,13 +91,13 @@ volumes:
     driver_opts:
       type: none
       o: bind
-      device: ./logs
+      device: ${PWD}/logs
   loats_data:
     driver: local
     driver_opts:
       type: none
       o: bind
-      device: ./data
+      device: ${PWD}/data
 
 # Development profile - includes development tools
 # Note: Profiles section removed due to Docker Compose validation issues

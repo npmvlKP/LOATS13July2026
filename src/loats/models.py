@@ -78,6 +78,7 @@ class QuoteData(BaseModel):
         if not isinstance(data, dict):
             return data
         close_raw = data.get("close")
+        # Only compute change_percent if it's not explicitly provided (including explicit 0)
         if (
             "change_percent" not in data
             and isinstance(close_raw, (int, float))
@@ -86,6 +87,7 @@ class QuoteData(BaseModel):
             last_price = data.get("last_price")
             if isinstance(last_price, (int, float)):
                 data["change_percent"] = (last_price - close_raw) / close_raw * 100
+        # Only compute change if it's not explicitly provided (including explicit 0)
         if (
             "change" not in data
             and "last_price" in data
