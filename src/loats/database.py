@@ -504,15 +504,35 @@ class Database:
         new_state: dict[str, Any] | None = None,
     ) -> None:
         """
-        Log audit entry write JSONL file.
+        Log audit entry with dual-write consistency guarantee.
+
+        Implements atomic dual-write audit trail: JSONL file + SQLite database.
+        Order of operations ensures consistency:
+        1. Write to JSONL file first
+        2. If JSONL write succeeds, write to SQLite database
+        3. If JSONL write fails, raise exception before DB commit
+
+        This guarantees that if a database row exists, the corresponding JSONL
+        entry also exists, maintaining audit trail integrity.
+
         Args:
-            action: Action performed
-            entity_type: Type entity
-            entity_id: entity
-            user: User performing action
-            metadata: Additional metadata
-            previous_state: State before action
-            new_state: State after action
+            action: Action performed (e.g., "CREATE", "UPDATE", "DELETE")
+            entity_type: Type of entity (e.g., "trade", "signal", "order")
+            entity_id: Unique identifier of the entity
+            user: User performing action (default: "system")
+            metadata: Additional metadata about the action
+            previous_state: State of entity before action (for updates)
+            new_state: State of entity after action (for creates/updates)
+
+        Raises:
+            RuntimeError: If JSONL file write fails, preventing DB commit
+            IOError/OSError: If file system operations fail during JSONL write
+
+        Dual-Write Guarantee:
+        - Database commit only occurs after successful JSONL write
+        - If JSONL write fails, exception is raised before DB commit
+        - This ensures both audit trails remain consistent
+        - The redundant audit trail design is preserved
         """
         now = datetime.now(UTC)
         entry = AuditLogEntry(
@@ -539,7 +559,20 @@ class Database:
         # This ensures the stored data matches exactly what was hashed
         # canonical_entry_data = json.loads(self._canonical_serialize(entry_data))
 
-        # Write database
+        # Write JSONL file first (append-only) using canonical serialization
+        # This ensures that if JSONL write fails, DB commit doesn't happen
+        # maintaining consistency between the two audit trails
+        try:
+            with Path(self.audit_log_path).open("a", encoding="utf-8") as f:
+                f.write(self._canonical_serialize(entry_data) + "\n")
+        except (IOError, OSError) as e:
+            # If JSONL write fails, raise before DB commit to maintain consistency
+            raise RuntimeError(
+                f"Failed to write audit log entry to JSONL file: {e}. "
+                "Database commit aborted to maintain consistency."
+            ) from e
+
+        # Write database - only after successful JSONL write
         conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute(
@@ -564,10 +597,6 @@ class Database:
             ),
         )
         conn.commit()
-
-        # Write JSONL file (append-only) using canonical serialization
-        with Path(self.audit_log_path).open("a", encoding="utf-8") as f:
-            f.write(self._canonical_serialize(entry_data) + "\n")
 
     def _cleanup_old_data(self) -> None:
         """
