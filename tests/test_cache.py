@@ -38,6 +38,14 @@ class TestCacheConfig:
         assert config.prefix == "test"
         assert config.max_size == 2000
 
+    def test_no_redis_config(self) -> None:
+        """Test that Redis config parameters are removed from CacheConfig."""
+        config = CacheConfig()
+        # Verify Redis parameters are not present
+        assert not hasattr(config, 'redis_host')
+        assert not hasattr(config, 'redis_port')
+        assert not hasattr(config, 'redis_password')
+
 
 class TestCacheManager:
     """Tests for CacheManager class."""
@@ -92,6 +100,66 @@ class TestCacheManager:
         """Test cache get with no cache initialized."""
         result = await cache_manager.get("test_key")
         assert result is None
+
+    @pytest.mark.asyncio
+    async def test_get_falsy_values_regression(self, cache_manager: CacheManager) -> None:
+        """Regression test: cache should return falsy values like 0, 0.0, '', False, [].
+
+        This test verifies that the bug where falsy values were treated as cache misses
+        has been fixed. The cache should properly store and retrieve all falsy values.
+        """
+        await cache_manager.initialize()
+
+        # Test various falsy values that should be cached and retrieved
+        falsy_values = [
+            ("zero_int", "0"),
+            ("zero_float", "0.0"),
+            ("empty_string", ""),
+            ("false_bool", "False"),
+            ("empty_list", "[]"),
+            ("empty_dict", "{}"),
+        ]
+
+        for key, value in falsy_values:
+            # Set the falsy value in cache
+            cache_key = cache_manager._get_cache_key(key)
+            cache_manager._cache[cache_key] = value
+
+            # Retrieve the value - it should be returned, not treated as a cache miss
+            result = await cache_manager.get(key)
+            assert result == value, f"Expected {value!r} for key {key}, got {result!r}"
+
+        # Verify cache stats show hits, not misses
+        assert cache_manager._cache_stats["hits"] == len(falsy_values)
+        assert cache_manager._cache_stats["misses"] == 0
+
+    @pytest.mark.asyncio
+    async def test_get_financial_zero_pnl(self, cache_manager: CacheManager) -> None:
+        """Regression test: cache should properly handle financial zero PnL values.
+
+        This is critical for trading systems where pnl: 0.0 is a valid financial result
+        representing zero profit/loss, not a missing value.
+        """
+        await cache_manager.initialize()
+
+        # Simulate caching a financial result with zero PnL
+        financial_data = '{"pnl": 0.0, "trades": 5, "profit_factor": 1.0}'
+        cache_key = cache_manager._get_cache_key("financial_result")
+        cache_manager._cache[cache_key] = financial_data
+
+        # Retrieve the financial data - should return the cached value
+        result = await cache_manager.get("financial_result")
+        assert result == financial_data
+
+        # Verify it was a cache hit, not a miss
+        assert cache_manager._cache_stats["hits"] == 1
+        assert cache_manager._cache_stats["misses"] == 0
+
+        # Parse the result to verify the zero PnL is preserved
+        parsed_result = json.loads(result)
+        assert parsed_result["pnl"] == 0.0
+        assert parsed_result["trades"] == 5
+        assert parsed_result["profit_factor"] == 1.0
 
     @pytest.mark.asyncio
     async def test_set_string(self, cache_manager: CacheManager) -> None:
