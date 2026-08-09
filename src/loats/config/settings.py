@@ -94,6 +94,11 @@ class Settings(BaseSettings):
         "Asia/Kolkata", description="Timezone for all datetime operations"
     )
 
+    # Metrics Configuration
+    metrics_port: int = Field(
+        8001, description="Port for Prometheus metrics server"
+    )
+
     @field_validator("max_order_value", "max_total_exposure", "circuit_limit_pct")
     @classmethod
     def validate_decimals(cls, v: Decimal) -> Decimal:

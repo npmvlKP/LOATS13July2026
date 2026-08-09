@@ -10,6 +10,7 @@ from .alerts import alerts
 from .config import get_settings
 from .database import Database
 from .loats_logging import logger
+from .metrics import metrics
 from .scheduler import scheduler
 from .utils.cache import close_cache, initialize_cache
 
@@ -41,6 +42,8 @@ class TradingSystem:
                 logger.warning("Audit log integrity check failed during initialization")
             await alerts.initialize()
             await scheduler.initialize()
+            # Start metrics server after cache initialization (R5-2 fix)
+            metrics.start_server(settings.metrics_port)
             logger.info("All system components initialized successfully")
         except Exception as e:
             logger.error(f"Failed initialize trading system: {e}")
