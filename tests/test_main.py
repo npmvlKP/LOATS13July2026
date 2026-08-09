@@ -26,12 +26,14 @@ async def test_trading_system_initialization(trading_system):
         patch(
             "src.loats.main.scheduler.initialize", new_callable=AsyncMock
         ) as mock_scheduler_init,
+        patch("src.loats.main.metrics.start_server") as mock_metrics_start,
     ):
         await trading_system.initialize()
         mock_db_init.assert_called_once()
         mock_db_verify.assert_called_once()
         mock_alerts_init.assert_called_once()
         mock_scheduler_init.assert_called_once()
+        mock_metrics_start.assert_called_once()
         assert trading_system.running is False
 
 
