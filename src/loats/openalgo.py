@@ -605,25 +605,113 @@ class AsyncOpenAlgoClient:
         from_date: str | None = None,
         to_date: str | None = None,
     ) -> dict[str, Any]:
+        # Create cache key based on parameters
+        cache_key_data = f"{symbol}:{interval}:{from_date}:{to_date}"
+        cache_key = f"history:{hashlib.sha256(cache_key_data.encode('utf-8')).hexdigest()}"
+
+        # Try to get cached result first
+        cached_result = await cache_manager.get(cache_key)
+        if cached_result:
+            try:
+                logger.debug(f"History cache hit for {symbol} {interval}")
+                return json.loads(cached_result)  # type: ignore[no-any-return]
+            except Exception as e:
+                logger.warning(f"Failed to parse cached history result: {e}")
+
+        # Cache miss - fetch from API
         payload = {
             "symbol": symbol,
             "interval": interval,
             "from_date": from_date,
             "to_date": to_date,
         }
-        return await self._request("POST", "history", json=payload)
+        result = await self._request("POST", "history", json=payload)
+
+        # Cache the result for 5 minutes (300 seconds)
+        try:
+            await cache_manager.set(cache_key, json.dumps(result), ttl=300)
+            logger.debug(f"Cached history for {symbol} {interval}")
+        except Exception as e:
+            logger.warning(f"Failed to cache history result: {e}")
+
+        return result
 
     async def get_option_chain(
         self, symbol: str, expiry: str | None = None
     ) -> dict[str, Any]:
+        # Create cache key based on parameters
+        cache_key_data = f"{symbol}:{expiry}"
+        cache_key = f"option_chain:{hashlib.sha256(cache_key_data.encode('utf-8')).hexdigest()}"
+
+        # Try to get cached result first
+        cached_result = await cache_manager.get(cache_key)
+        if cached_result:
+            try:
+                logger.debug(f"Option chain cache hit for {symbol}")
+                return json.loads(cached_result)  # type: ignore[no-any-return]
+            except Exception as e:
+                logger.warning(f"Failed to parse cached option chain result: {e}")
+
+        # Cache miss - fetch from API
         payload = {"symbol": symbol, "expiry": expiry}
-        return await self._request("POST", "option_chain", json=payload)
+        result = await self._request("POST", "option_chain", json=payload)
+
+        # Cache the result for 2 minutes (120 seconds)
+        try:
+            await cache_manager.set(cache_key, json.dumps(result), ttl=120)
+            logger.debug(f"Cached option chain for {symbol}")
+        except Exception as e:
+            logger.warning(f"Failed to cache option chain result: {e}")
+
+        return result
 
     async def get_position_book(self) -> dict[str, Any]:
-        return await self._request("POST", "position_book")
+        cache_key = "position_book:global"
+
+        # Try to get cached result first
+        cached_result = await cache_manager.get(cache_key)
+        if cached_result:
+            try:
+                logger.debug("Position book cache hit")
+                return json.loads(cached_result)  # type: ignore[no-any-return]
+            except Exception as e:
+                logger.warning(f"Failed to parse cached position book result: {e}")
+
+        # Cache miss - fetch from API
+        result = await self._request("POST", "position_book")
+
+        # Cache the result for 30 seconds
+        try:
+            await cache_manager.set(cache_key, json.dumps(result), ttl=30)
+            logger.debug("Cached position book")
+        except Exception as e:
+            logger.warning(f"Failed to cache position book result: {e}")
+
+        return result
 
     async def get_funds(self) -> dict[str, Any]:
-        return await self._request("POST", "funds")
+        cache_key = "funds:global"
+
+        # Try to get cached result first
+        cached_result = await cache_manager.get(cache_key)
+        if cached_result:
+            try:
+                logger.debug("Funds cache hit")
+                return json.loads(cached_result)  # type: ignore[no-any-return]
+            except Exception as e:
+                logger.warning(f"Failed to parse cached funds result: {e}")
+
+        # Cache miss - fetch from API
+        result = await self._request("POST", "funds")
+
+        # Cache the result for 60 seconds
+        try:
+            await cache_manager.set(cache_key, json.dumps(result), ttl=60)
+            logger.debug("Cached funds")
+        except Exception as e:
+            logger.warning(f"Failed to cache funds result: {e}")
+
+        return result
 
     async def place_order(
         self,
