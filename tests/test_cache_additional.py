@@ -24,17 +24,16 @@ class TestCacheConfigAdditional:
     """Additional tests for CacheConfig class."""
 
     def test_config_with_redis_settings(self) -> None:
-        """Test cache configuration with Redis settings."""
-        config = CacheConfig(
-            cache_type="redis",
-            redis_host="redis.example.com",
-            redis_port=6380,
-            redis_password="secret",
-        )
-        assert config.cache_type == "redis"
-        assert config.redis_host == "redis.example.com"
-        assert config.redis_port == 6380
-        assert config.redis_password == "secret"
+        """Test cache configuration with Redis settings (now removed for LITE edition)."""
+        # For LITE edition, Redis settings are no longer supported
+        # This test verifies that Redis parameters are properly removed
+        config = CacheConfig(cache_type="memory")
+        assert config.cache_type == "memory"
+
+        # Verify Redis parameters are not present
+        assert not hasattr(config, 'redis_host')
+        assert not hasattr(config, 'redis_port')
+        assert not hasattr(config, 'redis_password')
 
 
 class TestCacheManagerAdditional:
@@ -48,46 +47,35 @@ class TestCacheManagerAdditional:
 
     @pytest.mark.asyncio
     async def test_initialize_redis_fallback(self, cache_manager: CacheManager) -> None:
-        """Test Redis initialization with fallback to in-memory."""
-        # For LITE edition, always use in-memory cache regardless of Redis config
-        # This test verifies that the LITE edition gracefully handles Redis configuration
-        # by falling back to in-memory caching
+        """Test in-memory initialization (Redis removed in LITE edition)."""
+        # For LITE edition, always use in-memory cache
+        # This test verifies that the LITE edition uses in-memory caching
 
-        # Set Redis configuration
-        redis_config = CacheConfig(
-            cache_type="redis",
-            redis_host="redis.example.com",
-            redis_port=6380,
-            redis_password="secret",
-        )
-        cache_manager_with_redis = CacheManager(redis_config)
+        # Create cache manager with memory configuration
+        memory_config = CacheConfig(cache_type="memory")
+        cache_manager_with_memory = CacheManager(memory_config)
 
-        await cache_manager_with_redis.initialize()
-        assert cache_manager_with_redis._cache is not None
-        assert isinstance(cache_manager_with_redis._cache, TTLCache)
-        assert cache_manager_with_redis._cache_type == "in_memory_ttl"
+        await cache_manager_with_memory.initialize()
+        assert cache_manager_with_memory._cache is not None
+        assert isinstance(cache_manager_with_memory._cache, TTLCache)
+        assert cache_manager_with_memory._cache_type == "in_memory_ttl"
 
     @pytest.mark.asyncio
     async def test_initialize_redis_connection_error(
         self, cache_manager: CacheManager
     ) -> None:
-        """Test Redis connection error handling."""
-        # For LITE edition, this test verifies that Redis configuration is gracefully ignored
-        # and in-memory caching is used instead
+        """Test in-memory initialization (Redis removed in LITE edition)."""
+        # For LITE edition, always use in-memory cache
+        # This test verifies that the LITE edition uses in-memory caching
 
-        # Set Redis configuration with connection that would fail
-        redis_config = CacheConfig(
-            cache_type="redis",
-            redis_host="unreachable.redis.example.com",
-            redis_port=6379,
-            redis_password="secret",
-        )
-        cache_manager_with_redis = CacheManager(redis_config)
+        # Create cache manager with memory configuration
+        memory_config = CacheConfig(cache_type="memory")
+        cache_manager_with_memory = CacheManager(memory_config)
 
-        await cache_manager_with_redis.initialize()
-        assert cache_manager_with_redis._cache is not None
-        assert isinstance(cache_manager_with_redis._cache, TTLCache)
-        assert cache_manager_with_redis._cache_type == "in_memory_ttl"
+        await cache_manager_with_memory.initialize()
+        assert cache_manager_with_memory._cache is not None
+        assert isinstance(cache_manager_with_memory._cache, TTLCache)
+        assert cache_manager_with_memory._cache_type == "in_memory_ttl"
 
     @pytest.mark.asyncio
     async def test_get_redis_fallback(self, cache_manager: CacheManager) -> None:
