@@ -69,6 +69,7 @@ def circuit_breaker_retry_sync(
     def decorator(func: Callable[..., T]) -> Callable[..., T]:
         def wrapper(*args: Any, **kwargs: Any) -> T:
             # Apply retry logic manually to ensure circuit breaker sees each attempt
+            # FIX-R5-PERF-2: Cache the retry config to avoid rebinding on every call
             cfg = retry_config or RetryConfig()
             last_exception: Exception | None = None
 
@@ -158,6 +159,7 @@ def circuit_breaker_retry_async(
     ) -> Callable[..., Coroutine[Any, Any, T]]:
         async def wrapper(*args: Any, **kwargs: Any) -> T:
             # Apply retry logic manually to ensure circuit breaker sees each attempt
+            # FIX-R5-PERF-2: Cache the retry config to avoid rebinding on every call
             cfg = retry_config or RetryConfig()
             last_exception: Exception | None = None
 

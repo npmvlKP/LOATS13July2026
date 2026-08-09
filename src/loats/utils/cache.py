@@ -178,8 +178,18 @@ class CacheManager:
                 logger.error(f"Fetch function failed: {e}")
                 raise
 
-        # Try to get from cache
-        cached_value = await self.get(key)
+        # Try to get from cache - use sync dict lookup to avoid async overhead
+        cache_key = self._get_cache_key(key)
+        cached_value = None
+        if self._cache is not None:
+            with self._cache_lock:
+                result = self._cache.get(cache_key)
+                if result is not None:
+                    self._cache_stats["hits"] += 1
+                    cached_value = str(result)
+                else:
+                    self._cache_stats["misses"] += 1
+
         if cached_value is not None and not force_refresh:
             logger.debug(f"Cache hit for key: {key}")
             try:
