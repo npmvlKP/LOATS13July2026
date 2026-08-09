@@ -89,7 +89,10 @@ jobs:
             --cov-fail-under=80 \
             --cov-report=xml \
             --cov-report=term-missing \
+            --cov-report=json:coverage.json \
             --junitxml=pytest-report.xml
+      - name: Check per-module coverage
+        run: python scripts/check_per_module_coverage.py
       - name: Upload coverage
         uses: actions/upload-artifact@v4
         with:
