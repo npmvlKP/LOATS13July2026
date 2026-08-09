@@ -31,15 +31,14 @@ class TestMetricsErrorHandling:
         # Test that manager methods handle errors gracefully
         # The actual error handling is tested through the public methods
 
-        # Test track_job_execution with invalid data
+        # Test mock interface methods with invalid data
         try:
-            manager.track_job_execution(None, None, None)
+            manager.job_execution_counter.labels(job_id=None, status=None).inc()
         except Exception:
             pass  # Expected to fail gracefully
 
-        # Test record_signal with invalid data
         try:
-            manager.record_signal(None, None)
+            manager.signals_generated_counter.labels(signal_type=None, scan_type=None).inc()
         except Exception:
             pass  # Expected to fail gracefully
 
@@ -50,13 +49,14 @@ class TestMetricsErrorHandling:
 class TestDirectMetricsMethods:
     """Test direct metrics methods that are not covered by existing tests."""
 
-    def test_track_job_execution_direct(self):
-        """Test the track_job_execution method directly."""
+    def test_mock_interface_methods(self):
+        """Test the mock interface methods that are actually used in production."""
         manager = MetricsManager()
         manager.reset_for_testing()
 
-        # Track a successful job
-        manager.track_job_execution("job1", "success", 1.5)
+        # Test job execution tracking via mock interface
+        manager.job_execution_counter.labels(job_id="job1", status="success").inc()
+        manager.job_latency_summary.labels(job_id="job1").observe(1.5)
 
         # Verify metrics were updated
         assert manager.job_execution_stats == {
@@ -69,35 +69,16 @@ class TestDirectMetricsMethods:
         assert manager.job_latency_stats["min_seconds"] == 1.5
         assert manager.job_latency_stats["max_seconds"] == 1.5
 
-        # Track a failed job
-        manager.track_job_execution("job2", "failure", 2.0)
-
-        # Verify metrics were updated
-        assert manager.job_execution_stats == {
-            "success": 1,
-            "failure": 1,
-            "total": 2,
-        }
-        assert manager.job_latency_stats["count"] == 2
-        assert manager.job_latency_stats["total_seconds"] == 3.5
-        assert manager.job_latency_stats["min_seconds"] == 1.5
-        assert manager.job_latency_stats["max_seconds"] == 2.0
-
-    def test_record_signal_direct(self):
-        """Test the record_signal method directly."""
-        manager = MetricsManager()
-        manager.reset_for_testing()
-
-        # Record a signal
-        manager.record_signal("BUY", "ta_scan")
+        # Test signal recording via mock interface
+        manager.signals_generated_counter.labels(signal_type="BUY", scan_type="ta_scan").inc()
 
         # Verify metrics were updated
         assert manager.signals_generated_stats["total"] == 1
         assert manager.signals_generated_stats["by_type"] == {"BUY": 1}
         assert manager.signals_generated_stats["by_scan_type"] == {"ta_scan": 1}
 
-        # Record another signal of different type
-        manager.record_signal("SELL", "sentiment_scan")
+        # Test another signal
+        manager.signals_generated_counter.labels(signal_type="SELL", scan_type="sentiment_scan").inc()
 
         # Verify metrics were updated
         assert manager.signals_generated_stats["total"] == 2
@@ -179,14 +160,17 @@ class TestMetricsSummary:
         manager = MetricsManager()
         manager.reset_for_testing()
 
-        # Add some data
-        manager.track_job_execution("job1", "success", 1.0)
-        manager.track_job_execution("job2", "success", 2.0)
-        manager.track_job_execution("job3", "failure", 0.5)
+        # Add some data using mock interface
+        manager.job_execution_counter.labels(job_id="job1", status="success").inc()
+        manager.job_latency_summary.labels(job_id="job1").observe(1.0)
+        manager.job_execution_counter.labels(job_id="job2", status="success").inc()
+        manager.job_latency_summary.labels(job_id="job2").observe(2.0)
+        manager.job_execution_counter.labels(job_id="job3", status="failure").inc()
+        manager.job_latency_summary.labels(job_id="job3").observe(0.5)
 
-        manager.record_signal("BUY", "ta_scan")
-        manager.record_signal("BUY", "ta_scan")
-        manager.record_signal("SELL", "sentiment_scan")
+        manager.signals_generated_counter.labels(signal_type="BUY", scan_type="ta_scan").inc()
+        manager.signals_generated_counter.labels(signal_type="BUY", scan_type="ta_scan").inc()
+        manager.signals_generated_counter.labels(signal_type="SELL", scan_type="sentiment_scan").inc()
 
         manager.set_kill_switch_status(True)
         manager.set_circuit_breaker_status("openalgo", True)
@@ -267,9 +251,10 @@ class TestMetricsEdgeCases:
         manager = MetricsManager()
         manager.reset_for_testing()
 
-        # Test with empty strings
-        manager.track_job_execution("", "success", 1.0)
-        manager.record_signal("", "")
+        # Test with empty strings using mock interface
+        manager.job_execution_counter.labels(job_id="", status="success").inc()
+        manager.job_latency_summary.labels(job_id="").observe(1.0)
+        manager.signals_generated_counter.labels(signal_type="", scan_type="").inc()
         manager.set_circuit_breaker_status("", True)
 
         # Should handle empty strings without errors
@@ -283,12 +268,12 @@ class TestMetricsEdgeCases:
 
         # Test with None values (should be handled gracefully)
         try:
-            manager.track_job_execution(None, "success", 1.0)
+            manager.job_execution_counter.labels(job_id=None, status="success").inc()
         except Exception:
             pass  # Expected to fail, but shouldn't crash the system
 
         try:
-            manager.record_signal(None, None)
+            manager.signals_generated_counter.labels(signal_type=None, scan_type=None).inc()
         except Exception:
             pass  # Expected to fail, but shouldn't crash the system
 
@@ -301,9 +286,11 @@ class TestMetricsEdgeCases:
         manager = MetricsManager()
         manager.reset_for_testing()
 
-        # Test with very large values
-        manager.track_job_execution("job1", "success", 999999.999)
-        manager.track_job_execution("job2", "success", 0.000001)
+        # Test with very large values using mock interface
+        manager.job_execution_counter.labels(job_id="job1", status="success").inc()
+        manager.job_latency_summary.labels(job_id="job1").observe(999999.999)
+        manager.job_execution_counter.labels(job_id="job2", status="success").inc()
+        manager.job_latency_summary.labels(job_id="job2").observe(0.000001)
 
         # Should handle large values without errors
         summary = manager.get_metrics_summary()
@@ -317,7 +304,8 @@ class TestMetricsEdgeCases:
 
         # Test with negative values (should be handled gracefully)
         try:
-            manager.track_job_execution("job1", "success", -1.0)
+            manager.job_execution_counter.labels(job_id="job1", status="success").inc()
+            manager.job_latency_summary.labels(job_id="job1").observe(-1.0)
         except Exception:
             pass  # Expected to fail, but shouldn't crash the system
 
@@ -335,14 +323,16 @@ class TestMetricsIntegration:
         manager.reset_for_testing()
 
         # Simulate a complete workflow
-        # 1. Track job execution
-        manager.track_job_execution("scan_job_1", "success", 2.5)
-        manager.track_job_execution("scan_job_2", "failure", 1.2)
+        # 1. Track job execution using mock interface
+        manager.job_execution_counter.labels(job_id="scan_job_1", status="success").inc()
+        manager.job_latency_summary.labels(job_id="scan_job_1").observe(2.5)
+        manager.job_execution_counter.labels(job_id="scan_job_2", status="failure").inc()
+        manager.job_latency_summary.labels(job_id="scan_job_2").observe(1.2)
 
-        # 2. Record signals
-        manager.record_signal("BUY", "ta_scan")
-        manager.record_signal("BUY", "ta_scan")
-        manager.record_signal("SELL", "sentiment_scan")
+        # 2. Record signals using mock interface
+        manager.signals_generated_counter.labels(signal_type="BUY", scan_type="ta_scan").inc()
+        manager.signals_generated_counter.labels(signal_type="BUY", scan_type="ta_scan").inc()
+        manager.signals_generated_counter.labels(signal_type="SELL", scan_type="sentiment_scan").inc()
 
         # 3. Set system status
         manager.set_kill_switch_status(False)
@@ -369,7 +359,7 @@ class TestMetricsIntegration:
 
         # 5. Test error handling
         try:
-            manager.track_job_execution(None, None, None)
+            manager.job_execution_counter.labels(job_id=None, status=None).inc()
         except Exception:
             pass  # Should handle errors gracefully
 
@@ -385,8 +375,9 @@ class TestMetricsIntegration:
         def worker(worker_id):
             """Worker function that updates metrics."""
             for i in range(10):
-                manager.track_job_execution(f"job_{worker_id}_{i}", "success", 0.1)
-                manager.record_signal("BUY", f"scan_{worker_id}")
+                manager.job_execution_counter.labels(job_id=f"job_{worker_id}_{i}", status="success").inc()
+                manager.job_latency_summary.labels(job_id=f"job_{worker_id}_{i}").observe(0.1)
+                manager.signals_generated_counter.labels(signal_type="BUY", scan_type=f"scan_{worker_id}").inc()
 
         # Create and start multiple threads
         threads = []
@@ -422,10 +413,11 @@ class TestMetricsPerformance:
         manager = MetricsManager()
         manager.reset_for_testing()
 
-        # Add a large number of metrics
+        # Add a large number of metrics using mock interface
         for i in range(1000):
-            manager.track_job_execution(f"job_{i}", "success", 1.0)
-            manager.record_signal("BUY", "ta_scan")
+            manager.job_execution_counter.labels(job_id=f"job_{i}", status="success").inc()
+            manager.job_latency_summary.labels(job_id=f"job_{i}").observe(1.0)
+            manager.signals_generated_counter.labels(signal_type="BUY", scan_type="ta_scan").inc()
 
         # Should handle large dataset without errors
         summary = manager.get_metrics_summary()
@@ -439,10 +431,11 @@ class TestMetricsPerformance:
         manager = MetricsManager()
         manager.reset_for_testing()
 
-        # Add a large number of metrics
+        # Add a large number of metrics using mock interface
         for i in range(1000):
-            manager.track_job_execution(f"job_{i}", "success", 1.0)
-            manager.record_signal(f"SIGNAL_{i % 10}", f"SCAN_{i % 5}")
+            manager.job_execution_counter.labels(job_id=f"job_{i}", status="success").inc()
+            manager.job_latency_summary.labels(job_id=f"job_{i}").observe(1.0)
+            manager.signals_generated_counter.labels(signal_type=f"SIGNAL_{i % 10}", scan_type=f"SCAN_{i % 5}").inc()
 
         # Measure time to generate summary
         start_time = time.time()

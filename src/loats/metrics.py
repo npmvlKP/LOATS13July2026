@@ -195,45 +195,6 @@ class MetricsManager:
                 "circuit_breaker_status": {},
             }
 
-    def track_job_execution(self, job_id: str, status: str, duration: float) -> None:
-        """Track job execution metrics."""
-        try:
-            self.job_execution_stats["total"] += 1
-            if status == "success":
-                self.job_execution_stats["success"] += 1
-            else:
-                self.job_execution_stats["failure"] += 1
-
-            # Update latency stats
-            self.job_latency_stats["total_seconds"] += duration
-            self.job_latency_stats["count"] += 1
-            self.job_latency_stats["min_seconds"] = min(
-                self.job_latency_stats["min_seconds"], duration
-            )
-            self.job_latency_stats["max_seconds"] = max(
-                self.job_latency_stats["max_seconds"], duration
-            )
-
-        except Exception as e:
-            logger.warning(f"Failed to track job execution metrics: {e}")
-
-    def record_signal(self, signal_type: str, scan_type: str) -> None:
-        """Record signal generation event."""
-        try:
-            self.signals_generated_stats["total"] += 1
-
-            # Update by type
-            if signal_type not in self.signals_generated_stats["by_type"]:
-                self.signals_generated_stats["by_type"][signal_type] = 0
-            self.signals_generated_stats["by_type"][signal_type] += 1
-
-            # Update by scan type
-            if scan_type not in self.signals_generated_stats["by_scan_type"]:
-                self.signals_generated_stats["by_scan_type"][scan_type] = 0
-            self.signals_generated_stats["by_scan_type"][scan_type] += 1
-
-        except Exception as e:
-            logger.warning(f"Failed to record signal metrics: {e}")
 
     def set_kill_switch_status(self, active: bool) -> None:
         """Set kill switch status metric."""
