@@ -325,10 +325,10 @@ class AlertSystem:
 
             message = (
                 f"{emoji} <b>ORDER {action.upper()}</b> {emoji}\n\n"
-                f"<b>Order ID:</b> {order.order_id}\n"
-                f"<b>Symbol:</b> {order.symbol}\n"
-                f"<b>Type:</b> {order.order_type.value}\n"
-                f"<b>Transaction:</b> {order.transaction_type.value}\n"
+                f"<b>Order ID:</b> {html.escape(order.order_id)}\n"
+                f"<b>Symbol:</b> {html.escape(order.symbol)}\n"
+                f"<b>Type:</b> {html.escape(order.order_type.value)}\n"
+                f"<b>Transaction:</b> {html.escape(order.transaction_type.value)}\n"
                 f"<b>Quantity:</b> {order.quantity}\n"
                 f"<b>Price:</b> {price_str}\n"
                 f"<b>Status:</b> {order.status.value}\n"
@@ -370,10 +370,10 @@ class AlertSystem:
 
             message = (
                 f"{emoji} <b>TRADE {action.upper()}</b> {emoji}\n\n"
-                f"<b>Trade ID:</b> {trade.trade_id}\n"
-                f"<b>Symbol:</b> {trade.symbol}\n"
-                f"<b>Strategy:</b> {trade.strategy}\n"
-                f"<b>Type:</b> {trade.transaction_type.value if trade.transaction_type else 'N/A'}\n"
+                f"<b>Trade ID:</b> {html.escape(trade.trade_id)}\n"
+                f"<b>Symbol:</b> {html.escape(trade.symbol)}\n"
+                f"<b>Strategy:</b> {html.escape(trade.strategy)}\n"
+                f"<b>Type:</b> {html.escape(trade.transaction_type.value if trade.transaction_type else 'N/A')}\n"
                 f"<b>Quantity:</b> {trade.quantity}\n"
                 f"<b>Entry Price:</b> {trade.entry_price:.2f}\n"
                 f"<b>Status:</b> {trade.status}\n"
