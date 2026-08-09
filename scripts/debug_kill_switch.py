@@ -8,6 +8,10 @@ from unittest.mock import patch
 def test_kill_switch_directly():
     """Test kill switch function directly."""
     # Import the function after patching
+    import sys
+    import os
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
     with patch("src.loats.alerts.alerts") as mock_alerts:
         mock_alerts.is_kill_switch_active.return_value = True
 

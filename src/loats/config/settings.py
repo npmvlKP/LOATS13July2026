@@ -44,7 +44,7 @@ class Settings(BaseSettings):
 
     # Default Trading Parameters
     default_symbol: str = Field("NIFTY", description="Default trading symbol")
-    default_timeframe: str = Field("1min", description="Default timeframe for analysis")
+    default_timeframe: str = Field("1min", description="Default candlestick timeframe for technical analysis (e.g., '1min', '5min', '15min')")
     sentiment_threshold: float = Field(
         0.05, description="Sentiment threshold for signal generation"
     )
