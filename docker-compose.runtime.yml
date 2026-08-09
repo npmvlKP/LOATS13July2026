@@ -1,19 +1,15 @@
-# LOATS13July2026 - LITE Docker Compose Configuration for CI/CD
+# LOATS13July2026 - LITE Docker Compose Configuration for RUNTIME
 # LITE Philosophy: No Docker services, no heavy ML, pure Python
-# This compose file is for CI/CD testing and optional local development
+# This compose file is for PRODUCTION RUNTIME deployment
 #
-# NOTE: This is NOT a production deployment. For production runtime:
-# - Use docker-compose.runtime.yml instead
-# - Or use your cloud provider's managed services (AWS, GCP, Azure)
-# - Deploy as a Python application with proper process management
-# - Use environment-specific configuration
+# For CI/CD testing, use docker-compose.yml instead
 #
 # LITE: No Redis, no Prometheus, no external service dependencies
 
 version: "3.9"
 
 services:
-  # LOATS Application - Lightweight options analysis
+  # LOATS Application - Lightweight options analysis (RUNTIME mode)
   loats:
     build:
       context: .
@@ -32,8 +28,6 @@ services:
     env_file:
       - .env
     volumes:
-      # Mount for development hot-reload (comment out for production)
-      - ./src:/app/src:ro
       # Mount logs directory
       - loats_logs:/app/logs
       # Mount audit database
@@ -64,20 +58,8 @@ services:
       - no-new-privileges:true
     # Stop signal for graceful shutdown
     stop_grace_period: 10s
-
-  # Optional: OpenAlgo API server for local testing
-  # Uncomment if you need to run OpenAlgo locally
-  # openalgo:
-  #   image: openalgo/openalgo:latest
-  #   container_name: openalgo_api
-  #   restart: unless-stopped
-  #   environment:
-  #     - API_KEY=${OPENALGO_API_KEY}
-  #     - DATA_MODE=SIMULATED
-  #   ports:
-  #     - "5000:5000"
-  #   networks:
-  #     - loats_network
+    # RUNTIME MODE: Start the actual trading system
+    command: ["python", "-m", "loats.main"]
 
 networks:
   loats_network:
@@ -98,10 +80,3 @@ volumes:
       type: none
       o: bind
       device: ./data
-
-# Development profile - includes development tools
-# Note: Profiles section removed due to Docker Compose validation issues
-# The application can be run in different modes using environment variables
-# dev: Development environment with hot-reload
-# test: Testing environment
-# prod: Production environment (use cloud deployment instead)
