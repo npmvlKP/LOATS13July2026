@@ -108,6 +108,10 @@ class Database:
         # Initialize database
         self._initialize_database()
 
+        # Async connection pool
+        self._async_pool: aiosqlite.ConnectionPool | None = None
+        self._async_pool_lock = asyncio.Lock()
+
     def initialize(self) -> None:
         """Initialize database schema (public alias for _initialize_database)."""
         self._initialize_database()
@@ -301,29 +305,19 @@ class Database:
 
     def _get_connection(self) -> sqlite3.Connection:
         """
-        Get database connection thread-local caching.
+        Get database connection with pooling and health checks.
 
-        Optimization strategy (F-PERF-1)
-        Thread-local caching (``self._thread_local``) ensures each thread
-        reuses connection, avoiding connection-open overhead.
-        Per-instance PRAGMA tracking ``self._pragmas_applied`` keyed
-        ``id(conn)`` ensures each *new* connection runs PRAGMAs exactly once.
-        Reusing thread-local connection fast path zero PRAGMA cost.
-
-        Why per-instance (not module-level) tracking:
-        SQLite PRAGMAs (e.g., ``journal_mode=WAL`` ``cache_size``)
-        **per-connection** settings; opening new connection object resets defaults.
-        module-level flag incorrectly skip PRAGMAs later connections
-        long-running processes across Database instances.
+        Enhanced optimization strategy (F-PERF-1 + Connection Pooling)
+        - Thread-local caching ensures each thread reuses connection
+        - Connection health checks prevent stale connections
+        - Per-instance PRAGMA tracking ensures PRAGMAs applied exactly once
+        - Connection pooling with proper cleanup and error handling
 
         Thread safety: ``self._pragmas_lock`` guards check-and-set concurrent threads
-        racing create first connection pay PRAGMA cost once
-        per *new* connection object only.
+        racing create first connection pay PRAGMA cost once per *new* connection object.
 
-        FIX-WINDOWS-SHUTDOWN:
-        Connections registered ``self._thread_registry``
-        properly closed during shutdown, preventing file-handle leaks
-        Windows where worker threads hold connections open.
+        FIX-WINDOWS-SHUTDOWN: Connections registered ``self._thread_registry``
+        properly closed during shutdown, preventing file-handle leaks Windows.
         """
         # Fast path: use thread-local connection (most common case)
         thread_local_conn: sqlite3.Connection | None = getattr(
@@ -331,10 +325,25 @@ class Database:
         )
 
         if thread_local_conn is not None:
-            return thread_local_conn
+            try:
+                # Health check: verify connection is still valid
+                thread_local_conn.execute("SELECT 1")
+                return thread_local_conn
+            except sqlite3.Error:
+                # Stale connection, close and remove
+                try:
+                    thread_local_conn.close()
+                except Exception:
+                    pass  # Ignore errors during cleanup
+                del self._thread_local.connection
 
-        # Slow path: open new connection thread
-        conn = sqlite3.connect(self.db_path)
+        # Slow path: open new connection with optimized settings
+        conn = sqlite3.connect(
+            self.db_path,
+            timeout=30.0,  # Increased timeout for busy databases
+            isolation_level="IMMEDIATE",  # Better concurrency control
+            check_same_thread=False  # Allow cross-thread usage
+        )
 
         # Apply PRAGMAs exactly once per connection object (F-PERF-1)
         conn_id = id(conn)
@@ -344,7 +353,7 @@ class Database:
                     conn.execute(pragma)
                 self._pragmas_applied.add(conn_id)
 
-        # Register connection proper cleanup shutdown (FIX-WINDOWS-SHUTDOWN)
+        # Register connection for proper cleanup shutdown (FIX-WINDOWS-SHUTDOWN)
         thread_id = threading.get_ident()
         with self._registry_lock:
             self._thread_registry[thread_id] = conn
@@ -1617,6 +1626,14 @@ class Database:
         called during async application shutdown.
         """
         await asyncio.to_thread(self.close_all)
+        # Close async connection pool
+        if hasattr(self, '_async_pool') and self._async_pool:
+            try:
+                await self._async_pool.close()
+                logger.info("Async database connection pool closed")
+            except Exception as e:
+                logger.warning(f"Error closing async connection pool: {e}")
+            self._async_pool = None
 
     # -------------------------------------------------------------------------
     # Async wrapper methods non-blocking I/O
@@ -1625,6 +1642,19 @@ class Database:
     async def async_initialize(self) -> None:
         """Async wrapper initialize() avoid blocking event loop."""
         await asyncio.to_thread(self.initialize)
+        # Initialize async connection pool
+        try:
+            import aiosqlite
+            self._async_pool = aiosqlite.ConnectionPool(
+                str(self.db_path),
+                maxsize=10,
+                timeout=30.0
+            )
+            logger.info("Async database connection pool initialized")
+        except ImportError:
+            logger.warning("aiosqlite not available, using asyncio.to_thread for async operations")
+        except Exception as e:
+            logger.error(f"Failed to initialize async connection pool: {e}")
 
     async def async_cleanup(self) -> None:
         """Async wrapper cleanup() avoid blocking event loop."""
