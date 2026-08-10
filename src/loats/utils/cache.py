@@ -3,6 +3,7 @@ Lightweight caching utilities for LOATS13July2026 LITE edition.
 Implements simple in-memory caching optimized for minimal resource usage.
 """
 
+import asyncio
 import hashlib
 import json
 import threading
@@ -74,6 +75,7 @@ class CacheManager:
         self._cache: TTLCache[str, Any] | None = None
         self._redis: redis.Redis | None = None
         self._cache_lock = threading.Lock()
+        self._init_lock = threading.Lock()  # Threading lock for initialization
         self._cache_stats = {
             "hits": 0,
             "misses": 0,
@@ -118,6 +120,16 @@ class CacheManager:
                     ttl=self.config.ttl_seconds,
                 )
                 self._cache_type = "in_memory_ttl"
+
+            # Ensure cache backend is properly set before marking as initialized
+            if self._cache is None and self._redis is None:
+                # Fallback: create in-memory cache if both are None
+                self._cache = TTLCache(
+                    maxsize=self.config.max_size,
+                    ttl=self.config.ttl_seconds,
+                )
+                self._cache_type = "in_memory_ttl"
+                logger.warning("Created fallback in-memory cache")
 
             self._initialized = True
             logger.info(
@@ -176,12 +188,17 @@ class CacheManager:
     ) -> bool:
         """Set value in cache (Redis or in-memory)."""
         if not self._initialized:
-            await self.initialize()
+            # Use initialization lock to prevent race conditions
+            with self._init_lock:
+                if not self._initialized:
+                    await self.initialize()
 
         # Debug: Check cache state after initialization
         if self._cache is None and self._redis is None:
             logger.error(f"Cache not properly initialized: _cache={self._cache}, _redis={self._redis}, _initialized={self._initialized}")
-            await self.initialize()
+            with self._init_lock:
+                if self._cache is None and self._redis is None:
+                    await self.initialize()
             # Check again after re-initialization
             if self._cache is None and self._redis is None:
                 logger.error("Failed to initialize cache after retry")
