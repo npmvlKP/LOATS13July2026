@@ -167,22 +167,25 @@ class TestCacheRedisCoverage:
     async def test_redis_connection_parameters(
         self, cache_manager: CacheManager
     ) -> None:
-        """Test in-memory cache with Redis config (Redis removed in LITE edition)."""
-        # Test with Redis parameters - should use in-memory cache
-        config = CacheConfig(
-            cache_type="redis",
-            redis_host="custom.example.com",
-            redis_port=6380,
-            redis_password="secret",
-        )
+        """Test that Redis parameters are not supported in LITE edition."""
+        # Test that Redis parameters are not accepted in LITE edition
+        with pytest.raises(TypeError, match="unexpected keyword argument"):
+            CacheConfig(
+                cache_type="redis",
+                redis_host="custom.example.com",
+                redis_port=6380,
+                redis_password="secret",
+            )
+
+        # Test that only in-memory cache is supported
+        config = CacheConfig(cache_type="memory")
         cache_manager = CacheManager(config)
 
         await cache_manager.initialize()
 
-        # Should use in-memory cache regardless of Redis config
+        # Should use in-memory cache only
         assert cache_manager._cache_type == "in_memory_ttl"
-        assert cache_manager.config.redis_host == "custom.example.com"
-        assert cache_manager.config.redis_port == 6380
+        assert config.cache_type == "memory"
 
     @pytest.mark.asyncio
     async def test_cache_key_generation_with_redis_prefix(
