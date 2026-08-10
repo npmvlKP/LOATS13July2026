@@ -6,6 +6,7 @@ This module extends the Database class with true async I/O capabilities.
 import asyncio
 import json
 from datetime import UTC, datetime
+from typing import Any
 
 # Import aiosqlite for async database operations
 try:
@@ -391,7 +392,7 @@ async def _async_log_audit(
     try:
         with self.audit_log_path.open("a", encoding="utf-8") as f:
             f.write(self._canonical_serialize(entry_data) + "\n")
-    except (IOError, OSError) as e:
+    except OSError as e:
         raise RuntimeError(
             f"Failed to write audit log entry to JSONL file: {e}. "
             "Database commit aborted to maintain consistency."

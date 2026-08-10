@@ -28,6 +28,12 @@ from .models import (
     Trade,
 )
 
+# Import aiosqlite for async operations
+try:
+    import aiosqlite
+except ImportError:
+    aiosqlite = None  # Type checker hint
+
 logger = get_logger(__name__)
 
 T = TypeVar("T", bound=BaseModel)
@@ -574,7 +580,7 @@ class Database:
         try:
             with Path(self.audit_log_path).open("a", encoding="utf-8") as f:
                 f.write(self._canonical_serialize(entry_data) + "\n")
-        except (IOError, OSError) as e:
+        except OSError as e:
             # If JSONL write fails, raise before DB commit to maintain consistency
             raise RuntimeError(
                 f"Failed to write audit log entry to JSONL file: {e}. "
