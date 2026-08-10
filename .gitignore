@@ -60,6 +60,34 @@ gitleaks_final.json
 gitleaks_out.txt
 gitleaks_results.json
 
+# Quality gate output files
+audit_results.json
+bandit_alerts.txt
+cb_test_output.txt
+cov_output.txt
+coverage.json
+mypy_alerts.txt
+mypy_all_errors.txt
+mypy_errors.txt
+mypy_final_errors.txt
+mypy_new_output.txt
+mypy_output.txt
+mypy_src_errors.txt
+mypy_tests_errors.txt
+pip_audit_out.txt
+pip_audit_results.json
+pytest_output.txt
+ruff_alerts.txt
+ruff_all_errors.txt
+ruff_errors_after_fix.txt
+ruff_errors_current.txt
+ruff_final_errors.txt
+ruff_output.txt
+ruff_src_errors.txt
+ruff_src_only.txt
+ruff_tests_errors.txt
+ruff_tests_only.txt
+
 # Session artifacts - forensic audit reports
 *Forensic*Audit*.md
 bandit_output*.json
