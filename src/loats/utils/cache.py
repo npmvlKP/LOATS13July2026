@@ -29,7 +29,7 @@ except ImportError:
 
 
 class CacheConfig:
-    """Configuration for cache operations with Redis support."""
+    """Configuration for cache operations (LITE edition - in-memory only)."""
 
     def __init__(
         self,
@@ -37,10 +37,6 @@ class CacheConfig:
         prefix: str = "loats",
         max_size: int = 1000,
         cache_type: str = "memory",
-        redis_host: str = "localhost",
-        redis_port: int = 6379,
-        redis_password: str | None = None,
-        redis_db: int = 0,
     ):
         """Initialize cache configuration.
 
@@ -48,32 +44,23 @@ class CacheConfig:
             ttl_seconds: Time-to-live for cache entries in seconds
             prefix: Prefix for cache keys to avoid collisions
             max_size: Maximum number of entries in cache
-            cache_type: Type of cache backend ('memory' or 'redis')
-            redis_host: Redis host for distributed caching
-            redis_port: Redis port
-            redis_password: Redis password if required
-            redis_db: Redis database number
+            cache_type: Type of cache backend ('memory' only for LITE edition)
         """
         self.ttl_seconds = ttl_seconds
         self.prefix = prefix
         self.max_size = max_size
         self.cache_type = cache_type
-        self.redis_host = redis_host
-        self.redis_port = redis_port
-        self.redis_password = redis_password
-        self.redis_db = redis_db
 
 
 class CacheManager:
-    """Cache manager for LOATS13July2026 with Redis support.
-    Uses Redis for distributed caching with in-memory fallback.
+    """Cache manager for LOATS13July2026 LITE edition.
+    Uses in-memory caching only.
     """
 
     def __init__(self, config: CacheConfig):
-        """Initialize cache manager with Redis or in-memory cache."""
+        """Initialize cache manager with in-memory cache."""
         self.config = config
         self._cache: TTLCache[str, Any] | None = None
-        self._redis: redis.Redis | None = None
         self._cache_lock = threading.Lock()
         self._init_lock = threading.Lock()  # Threading lock for initialization
         self._cache_stats = {
@@ -87,49 +74,17 @@ class CacheManager:
         self._initialized = False
 
     async def initialize(self) -> None:
-        """Initialize cache based on configuration with Redis support."""
+        """Initialize in-memory cache (LITE edition)."""
         try:
-            if self.config.cache_type == "redis" and REDIS_AVAILABLE:
-                try:
-                    # Initialize Redis connection
-                    self._redis = redis.Redis(
-                        host=self.config.redis_host,
-                        port=self.config.redis_port,
-                        password=self.config.redis_password,
-                        db=self.config.redis_db,
-                        decode_responses=True,
-                    )
-                    # Test connection
-                    await self._redis.ping()
-                    self._cache_type = "redis"
-                    logger.info(
-                        f"Redis cache initialized (host={self.config.redis_host}:{self.config.redis_port}, db={self.config.redis_db})"
-                    )
-                except Exception as redis_error:
-                    logger.warning(f"Redis connection failed, falling back to in-memory cache: {redis_error}")
-                    # Fall back to in-memory cache
-                    self._cache = TTLCache(
-                        maxsize=self.config.max_size,
-                        ttl=self.config.ttl_seconds,
-                    )
-                    self._cache_type = "in_memory_ttl"
-            else:
-                # Use in-memory cache
-                self._cache = TTLCache(
-                    maxsize=self.config.max_size,
-                    ttl=self.config.ttl_seconds,
-                )
-                self._cache_type = "in_memory_ttl"
-
-            # Ensure cache backend is properly set before marking as initialized
-            if self._cache is None and self._redis is None:
-                # Fallback: create in-memory cache if both are None
-                self._cache = TTLCache(
-                    maxsize=self.config.max_size,
-                    ttl=self.config.ttl_seconds,
-                )
-                self._cache_type = "in_memory_ttl"
-                logger.warning("Created fallback in-memory cache")
+            logger.debug("DEBUG INIT: Starting initialization")
+            # Use in-memory cache only for LITE edition
+            logger.debug("DEBUG INIT: Creating in-memory cache")
+            self._cache = TTLCache(
+                maxsize=self.config.max_size,
+                ttl=self.config.ttl_seconds,
+            )
+            self._cache_type = "in_memory_ttl"
+            logger.debug(f"DEBUG INIT: Created cache - _cache={self._cache is not None}")
 
             self._initialized = True
             logger.info(
@@ -151,24 +106,15 @@ class CacheManager:
         return f"{self.config.prefix}:{key}"
 
     async def get(self, key: str) -> str | None:
-        """Get value from cache (Redis or in-memory)."""
+        """Get value from in-memory cache."""
         if not self._initialized:
             return None
 
         cache_key = self._get_cache_key(key)
 
         try:
-            if self._redis:
-                # Try Redis first
-                result = await self._redis.get(cache_key)
-                if result is not None:
-                    self._cache_stats["hits"] += 1
-                    return str(result)
-                else:
-                    self._cache_stats["misses"] += 1
-                    return None
-            elif self._cache:
-                # Fall back to in-memory cache
+            if self._cache:
+                # Get from in-memory cache
                 with self._cache_lock:
                     result = self._cache.get(cache_key)
                     if result is not None:
@@ -186,21 +132,27 @@ class CacheManager:
     async def set(
         self, key: str, value: str | BaseModel | dict[str, Any], ttl: int | None = None
     ) -> bool:
-        """Set value in cache (Redis or in-memory)."""
+        """Set value in in-memory cache."""
+        # Ensure cache is initialized
+        logger.debug(f"DEBUG SET: Initial check - _initialized={self._initialized}")
         if not self._initialized:
-            # Use initialization lock to prevent race conditions
+            logger.debug("DEBUG SET: Cache not initialized, initializing...")
             with self._init_lock:
                 if not self._initialized:
                     await self.initialize()
+            logger.debug(f"DEBUG SET: After init - _initialized={self._initialized}, _cache={self._cache is not None}")
 
-        # Debug: Check cache state after initialization
-        if self._cache is None and self._redis is None:
-            logger.error(f"Cache not properly initialized: _cache={self._cache}, _redis={self._redis}, _initialized={self._initialized}")
+        # After initialization, check if we have a valid cache backend
+        logger.debug(f"DEBUG SET: Backend check - _cache={self._cache is not None}")
+        if self._cache is None:
+            # This should not happen, but if it does, try to initialize again
+            logger.error(f"Cache not properly initialized: _cache={self._cache}, _initialized={self._initialized}")
             with self._init_lock:
-                if self._cache is None and self._redis is None:
+                if self._cache is None:
                     await self.initialize()
-            # Check again after re-initialization
-            if self._cache is None and self._redis is None:
+
+            # Final check - if still no backend, fail
+            if self._cache is None:
                 logger.error("Failed to initialize cache after retry")
                 return False
 
@@ -216,24 +168,14 @@ class CacheManager:
             cache_key = self._get_cache_key(key)
             logger.debug(f"Setting cache key: {cache_key}, value: {value_str}")
 
-            if self._redis:
-                # Use Redis cache
-                effective_ttl = ttl if ttl is not None else self.config.ttl_seconds
-                await self._redis.setex(cache_key, effective_ttl, value_str)
+            # Use in-memory cache
+            logger.debug("DEBUG: Taking in-memory cache branch")
+            with self._cache_lock:
+                self._cache[cache_key] = value_str
                 self._cache_stats["sets"] += 1
-                logger.debug(f"Redis cache set successful. Key: {cache_key}")
-                return True
-            elif self._cache:
-                # Fall back to in-memory cache
-                with self._cache_lock:
-                    self._cache[cache_key] = value_str
-                    self._cache_stats["sets"] += 1
-                    cache_size = len(self._cache)
-                logger.debug(f"In-memory cache set successful. Current cache size: {cache_size}")
-                return True
-            else:
-                logger.error("No cache backend available")
-                return False
+                cache_size = len(self._cache)
+            logger.debug(f"In-memory cache set successful. Current cache size: {cache_size}")
+            return True
 
         except Exception as e:
             logger.warning(f"Cache set failed for key {key}: {e}")
@@ -258,8 +200,12 @@ class CacheManager:
         Returns:
             Cached or freshly fetched value
         """
-        if not self._initialized or force_refresh:
-            # Cache disabled or forced refresh - call fetch function directly
+        # Ensure cache is initialized
+        if not self._initialized:
+            await self.initialize()
+
+        if force_refresh:
+            # Forced refresh - call fetch function directly
             try:
                 return await fetch_func()
             except Exception as e:
@@ -270,15 +216,8 @@ class CacheManager:
         cache_key = self._get_cache_key(key)
         cached_value = None
 
-        if self._redis:
-            # Try Redis first
-            cached_value = await self._redis.get(cache_key)
-            if cached_value is not None:
-                self._cache_stats["hits"] += 1
-            else:
-                self._cache_stats["misses"] += 1
-        elif self._cache is not None:
-            # Fall back to in-memory cache
+        if self._cache is not None:
+            # Get from in-memory cache
             with self._cache_lock:
                 result = self._cache.get(cache_key)
                 if result is not None:
@@ -309,21 +248,14 @@ class CacheManager:
             raise
 
     async def delete(self, key: str) -> bool:
-        """Delete key from cache (Redis or in-memory)."""
+        """Delete key from in-memory cache."""
         if not self._initialized:
             return False
 
         cache_key = self._get_cache_key(key)
 
         try:
-            if self._redis:
-                # Delete from Redis
-                result = await self._redis.delete(cache_key)
-                if result > 0:
-                    self._cache_stats["deletes"] += 1
-                    return True
-                return False
-            elif self._cache:
+            if self._cache:
                 # Delete from in-memory cache
                 with self._cache_lock:
                     if cache_key in self._cache:
@@ -338,31 +270,12 @@ class CacheManager:
             return False
 
     async def clear(self, pattern: str = "*") -> int:
-        """Clear cache by pattern (Redis or in-memory)."""
+        """Clear in-memory cache by pattern."""
         if not self._initialized:
             return 0
 
         try:
-            if self._redis:
-                # Clear Redis cache
-                if pattern == "*":
-                    # Clear all keys with our prefix
-                    keys = await self._redis.keys(f"{self.config.prefix}:*")
-                    if keys:
-                        await self._redis.delete(*keys)
-                        count = len(keys)
-                        self._cache_stats["evictions"] += count
-                        return count
-                else:
-                    # Pattern matching
-                    keys = await self._redis.keys(f"{self.config.prefix}:{pattern}*")
-                    if keys:
-                        await self._redis.delete(*keys)
-                        count = len(keys)
-                        self._cache_stats["evictions"] += count
-                        return count
-                return 0
-            elif self._cache:
+            if self._cache:
                 # Clear in-memory cache
                 with self._cache_lock:
                     if pattern == "*":
@@ -402,17 +315,13 @@ class CacheManager:
 
         try:
             current_size = 0
-            if self._redis:
-                # For Redis, we can't easily get current size without scanning all keys
-                # So we'll just report the cache type and stats
-                current_size = "N/A (Redis)"
-            elif self._cache:
+            if self._cache:
                 current_size = len(self._cache)
 
             return {
                 "enabled": True,
-                "connected": self._redis is not None or self._cache is not None,
-                "cache_type": self._cache_type,
+                "connected": self._cache is not None,
+                "cache_type": "lightweight_in_memory",
                 "current_size": current_size,
                 "max_size": self.config.max_size,
                 "hits": self._cache_stats["hits"],
@@ -428,16 +337,12 @@ class CacheManager:
             return {"enabled": False, "error": str(e)}
 
 
-# Global cache manager instance with Redis support
+# Global cache manager instance (LITE edition - in-memory only)
 cache_config = CacheConfig(
     ttl_seconds=300,  # 5 minutes default TTL
     prefix="loats",
     max_size=500,  # Reduced max size for LITE edition
-    cache_type="memory",  # Default to memory, can be overridden
-    redis_host="localhost",
-    redis_port=6379,
-    redis_password=None,
-    redis_db=0,
+    cache_type="memory",  # Default to memory
 )
 
 cache_manager = CacheManager(cache_config)
