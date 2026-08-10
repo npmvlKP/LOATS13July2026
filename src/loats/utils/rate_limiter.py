@@ -1,6 +1,7 @@
 """Rate limiter implementation LOATS13July2026."""
 
 import asyncio
+import threading
 import time
 from collections import deque
 
@@ -318,74 +319,82 @@ class RateLimitExceededError(Exception):
         super().__init__(self.message)
 
 
-# Module-level singletons for rate limiters with custom parameters support
-# This ensures proper shared state across all callers while maintaining
-# the intended rate limiting behavior
+# Module-level singletons for rate limiters with proper singleton behavior
+# Thread-safe singleton pattern to ensure shared state across all callers
+# while maintaining the intended rate limiting behavior
 
-# Dictionary to store rate limiter instances with custom parameters as keys
-_RateLimiterKey = tuple[int | None, float]
+# Thread-safe locks for singleton access
+_rate_limiter_lock = threading.Lock()
+_smart_rate_limiter_lock = threading.Lock()
 
-_order_rate_limiter_instances: dict[_RateLimiterKey, AsyncRateLimiter] = {}
-_smart_order_rate_limiter_instances: dict[_RateLimiterKey, AsyncRateLimiter] = {}
+# Singleton instances with default parameters
+_order_rate_limiter_instance: AsyncRateLimiter | None = None
+_smart_order_rate_limiter_instance: AsyncRateLimiter | None = None
 
 
 def get_order_rate_limiter(
     max_ops: int | None = None, window_size: float = 1.0
 ) -> AsyncRateLimiter:
-    """Get order rate limiter instance.
+    """Get order rate limiter instance with proper singleton behavior.
 
     Args:
         max_ops: Maximum operations per window. If None, uses default from settings.
         window_size: Time window in seconds.
 
     Returns:
-        Configured AsyncRateLimiter instance.
+        Shared AsyncRateLimiter instance with default parameters.
 
     Note:
-        This function now returns a module-level singleton that respects custom
-        parameters. Different parameter combinations return different instances.
+        This function now implements a proper singleton pattern to ensure
+        all callers share the same rate limiter instance, preventing the
+        broken rate limiting issue (R5-F-01).
+
+        Custom parameters are ignored to maintain shared state. Use the
+        default settings for proper rate limiting.
     """
-    # Create a key for the parameter combination
-    key = (max_ops, window_size)
+    global _order_rate_limiter_instance
 
-    # If we don't have an instance for these parameters, create one
-    if key not in _order_rate_limiter_instances:
-        # Order rate limiters use higher limits (50 ops per second) for order operations
-        if max_ops is None:
-            max_ops = 50
-        _order_rate_limiter_instances[key] = AsyncRateLimiter(
-            max_ops=max_ops, window_size=window_size
-        )
-
-    return _order_rate_limiter_instances[key]
+    # Thread-safe singleton access
+    with _rate_limiter_lock:
+        if _order_rate_limiter_instance is None:
+            # Order rate limiters use higher limits (50 ops per second) for order operations
+            if max_ops is None:
+                max_ops = 50
+            _order_rate_limiter_instance = AsyncRateLimiter(
+                max_ops=max_ops, window_size=window_size
+            )
+        return _order_rate_limiter_instance
 
 
 def get_smart_order_rate_limiter(
     max_ops: int | None = None, window_size: float = 1.0
 ) -> AsyncRateLimiter:
-    """Get smart order rate limiter instance.
+    """Get smart order rate limiter instance with proper singleton behavior.
 
     Args:
         max_ops: Maximum operations per window. If None, uses default from settings.
         window_size: Time window in seconds.
 
     Returns:
-        Configured AsyncRateLimiter instance.
+        Shared AsyncRateLimiter instance with default parameters.
 
     Note:
-        This function now returns a module-level singleton that respects custom
-        parameters. Different parameter combinations return different instances.
+        This function now implements a proper singleton pattern to ensure
+        all callers share the same rate limiter instance, preventing the
+        broken rate limiting issue (R5-F-01).
+
+        Custom parameters are ignored to maintain shared state. Use the
+        default settings for proper rate limiting.
     """
-    # Create a key for the parameter combination
-    key = (max_ops, window_size)
+    global _smart_order_rate_limiter_instance
 
-    # If we don't have an instance for these parameters, create one
-    if key not in _smart_order_rate_limiter_instances:
-        # Smart order rate limiters use higher limits (50 ops per second) for order operations
-        if max_ops is None:
-            max_ops = 50
-        _smart_order_rate_limiter_instances[key] = AsyncRateLimiter(
-            max_ops=max_ops, window_size=window_size
-        )
-
-    return _smart_order_rate_limiter_instances[key]
+    # Thread-safe singleton access
+    with _smart_rate_limiter_lock:
+        if _smart_order_rate_limiter_instance is None:
+            # Smart order rate limiters use higher limits (50 ops per second) for order operations
+            if max_ops is None:
+                max_ops = 50
+            _smart_order_rate_limiter_instance = AsyncRateLimiter(
+                max_ops=max_ops, window_size=window_size
+            )
+        return _smart_order_rate_limiter_instance
