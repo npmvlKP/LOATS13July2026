@@ -221,6 +221,16 @@ class TradingScheduler:
                 self.scheduler.shutdown(wait=False)
                 self.running = False
                 logger.info("Trading scheduler shutdown complete")
+
+                # FIX-R5-F-02: Close scheduler's database connection pool to prevent leaks
+                # The scheduler uses the shared module-level db singleton, but we need to ensure
+                # proper cleanup of any async resources during shutdown
+                if hasattr(self, 'db') and self.db:
+                    try:
+                        await self.db.async_close_all()
+                        logger.info("Scheduler database connections closed")
+                    except Exception as e:
+                        logger.warning(f"Error closing scheduler database connections: {e}")
             except Exception:
                 logger.exception("Error shutting down scheduler")
                 raise
