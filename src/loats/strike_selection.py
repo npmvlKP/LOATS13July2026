@@ -6,7 +6,7 @@ Implements optimized strike selection algorithms for options trading.
 
 import asyncio
 import datetime
-from typing import Any, List, Optional, Tuple
+from typing import Any
 
 import numpy as np
 from scipy.stats import norm
@@ -27,11 +27,11 @@ class StrikeSelectionEngine:
     async def select_strikes(
         self,
         underlying_price: float,
-        option_chain: List[OptionContract],
+        option_chain: list[OptionContract],
         strategy: str = "atm_straddle",
         width: int = 1,
         max_strikes: int = 5
-    ) -> List[float]:
+    ) -> list[float]:
         """Select optimal strikes based on strategy with <5ms latency.
 
         Args:
@@ -95,10 +95,10 @@ class StrikeSelectionEngine:
     async def _select_atm_straddle_strikes(
         self,
         underlying_price: float,
-        strikes: List[float],
+        strikes: list[float],
         width: int,
         max_strikes: int
-    ) -> List[float]:
+    ) -> list[float]:
         """Select ATM straddle strikes using binary search for O(log n) performance."""
         if not strikes:
             return []
@@ -140,10 +140,10 @@ class StrikeSelectionEngine:
     async def _select_delta_neutral_strikes(
         self,
         underlying_price: float,
-        option_chain: List[OptionContract],
+        option_chain: list[OptionContract],
         width: int,
         max_strikes: int
-    ) -> List[float]:
+    ) -> list[float]:
         """Select delta-neutral strikes using pre-calculated Greeks."""
         if not option_chain:
             return []
@@ -179,10 +179,10 @@ class StrikeSelectionEngine:
     async def _select_oi_based_strikes(
         self,
         underlying_price: float,
-        option_chain: List[OptionContract],
+        option_chain: list[OptionContract],
         width: int,
         max_strikes: int
-    ) -> List[float]:
+    ) -> list[float]:
         """Select strikes based on open interest analysis."""
         if not option_chain:
             return []
@@ -236,8 +236,8 @@ class StrikeSelectionEngine:
 
     async def analyze_strike_efficiency(
         self,
-        selected_strikes: List[float],
-        option_chain: List[OptionContract],
+        selected_strikes: list[float],
+        option_chain: list[OptionContract],
         underlying_price: float
     ) -> dict[str, Any]:
         """Analyze efficiency of selected strikes.
@@ -294,11 +294,11 @@ strike_selector = StrikeSelectionEngine()
 # Async wrapper for module-level access
 async def select_strikes(
     underlying_price: float,
-    option_chain: List[OptionContract],
+    option_chain: list[OptionContract],
     strategy: str = "atm_straddle",
     width: int = 1,
     max_strikes: int = 5
-) -> List[float]:
+) -> list[float]:
     """Async wrapper for strike selection."""
     return await strike_selector.select_strikes(
         underlying_price, option_chain, strategy, width, max_strikes

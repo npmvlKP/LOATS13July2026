@@ -6,7 +6,7 @@ Coordinates all trading operations with strict latency guarantees.
 
 import asyncio
 import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from .alerts import alerts
 from .config import get_settings
@@ -102,7 +102,7 @@ class TradingOrchestrator:
                     asyncio.gather(ta_task, sentiment_task, market_data_task),
                     timeout=0.08  # 80ms timeout to leave room for other operations
                 )
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 logger.warning("Trading cycle tasks timed out - continuing with partial results")
                 # Cancel remaining tasks
                 for task in [ta_task, sentiment_task, market_data_task]:
@@ -314,7 +314,7 @@ class TradingOrchestrator:
                 signal_type = "NEUTRAL"
 
             # Create combined signal
-            indicators: Dict[str, float] = {}
+            indicators: dict[str, float] = {}
             if ta_signals:
                 indicators.update(ta_signals[0].indicators)
             if sentiment_signals:
@@ -386,7 +386,7 @@ class TradingOrchestrator:
             if duration > 0.01:  # 10ms budget for risk management
                 logger.warning(f"Risk management exceeded budget: {duration*1000:.2f}ms")
 
-    async def _execute_strike_selection(self, option_chain: List[OptionContract]) -> List[float]:
+    async def _execute_strike_selection(self, option_chain: list[OptionContract]) -> list[float]:
         """Execute high-performance strike selection with <5ms guarantee."""
         start_time = datetime.datetime.now(datetime.UTC)
 
@@ -414,7 +414,7 @@ class TradingOrchestrator:
                     timeout=0.004  # 4ms timeout for strike selection
                 )
                 return selected_strikes
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 logger.warning("Strike selection timed out - using fallback")
                 # Simple fallback: return middle strikes
                 strikes = sorted({opt.strike_price for opt in option_chain})
@@ -465,7 +465,7 @@ class TradingOrchestrator:
         # Wait for current cycle to complete
         try:
             await asyncio.wait_for(self._shutdown_event.wait(), timeout=5.0)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.warning("Orchestrator shutdown timed out")
 
         logger.info("TradingOrchestrator shutdown complete")
@@ -477,7 +477,7 @@ class TradingOrchestrator:
             raise KillSwitchError()
 
     @openalgo_circuit_breaker_retry_async
-    async def _safe_get_history(self, symbol: str, interval: str) -> Optional[Dict[str, Any]]:
+    async def _safe_get_history(self, symbol: str, interval: str) -> dict[str, Any] | None:
         """Get history with circuit breaker protection."""
         try:
             return await async_client.get_history(symbol=symbol, interval=interval)
@@ -486,7 +486,7 @@ class TradingOrchestrator:
             return None
 
     @openalgo_circuit_breaker_retry_async
-    async def _safe_get_quotes(self, symbols: List[str]) -> Optional[Dict[str, Any]]:
+    async def _safe_get_quotes(self, symbols: list[str]) -> dict[str, Any] | None:
         """Get quotes with circuit breaker protection."""
         try:
             return await async_client.get_quotes(symbols)
@@ -495,7 +495,7 @@ class TradingOrchestrator:
             return None
 
     @openalgo_circuit_breaker_retry_async
-    async def _safe_get_position_book(self) -> Optional[Dict[str, Any]]:
+    async def _safe_get_position_book(self) -> dict[str, Any] | None:
         """Get position book with circuit breaker protection."""
         try:
             return await async_client.get_position_book()
@@ -504,7 +504,7 @@ class TradingOrchestrator:
             return None
 
     @openalgo_circuit_breaker_retry_async
-    async def _safe_get_funds(self) -> Optional[Dict[str, Any]]:
+    async def _safe_get_funds(self) -> dict[str, Any] | None:
         """Get funds with circuit breaker protection."""
         try:
             return await async_client.get_funds()
@@ -512,7 +512,7 @@ class TradingOrchestrator:
             logger.error("Failed to get funds after retries")
             return None
 
-    def _create_position_model(self, position_data: Dict[str, Any]) -> Any:
+    def _create_position_model(self, position_data: dict[str, Any]) -> Any:
         """Create position model from raw data."""
         from .models import Position, ProductType
 
@@ -527,7 +527,7 @@ class TradingOrchestrator:
             sell_quantity=position_data.get("sell_quantity", 0),
         )
 
-    def _create_funds_model(self, funds_data: Dict[str, Any]) -> Any:
+    def _create_funds_model(self, funds_data: dict[str, Any]) -> Any:
         """Create funds model from raw data."""
         from .models import FundsData
 
@@ -539,7 +539,7 @@ class TradingOrchestrator:
             timestamp=datetime.datetime.now(datetime.UTC),
         )
 
-    def get_cycle_stats(self) -> Dict[str, Any]:
+    def get_cycle_stats(self) -> dict[str, Any]:
         """Get current cycle statistics."""
         return {
             "cycle_count": self.cycle_count,
@@ -560,6 +560,6 @@ async def stop_orchestrator() -> None:
     """Stop the trading orchestrator."""
     await orchestrator.shutdown()
 
-async def get_cycle_stats() -> Dict[str, Any]:
+async def get_cycle_stats() -> dict[str, Any]:
     """Get orchestrator cycle statistics."""
     return orchestrator.get_cycle_stats()
