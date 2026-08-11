@@ -20,6 +20,7 @@ from src.loats.utils.rate_limiter import (
     get_smart_order_rate_limiter,
 )
 
+
 class TestRateLimiterFactoryRegression:
     """Regression tests for rate limiter factory pattern behavior."""
 
@@ -43,7 +44,9 @@ class TestRateLimiterFactoryRegression:
             current_limiter = get_order_rate_limiter()
 
             # Verify it's the same singleton instance
-            assert current_limiter is limiter, f"Call {i}: Factory should return singleton"
+            assert current_limiter is limiter, (
+                f"Call {i}: Factory should return singleton"
+            )
 
             # Try to acquire
             result = await current_limiter.acquire()
@@ -65,7 +68,9 @@ class TestRateLimiterFactoryRegression:
         # If we get 0, it means the rate limiter was already full, which is acceptable
         if successful_burst == 0:
             # All calls were rate limited - this means rate limiting is working
-            assert all(not result for result in burst_results), "All burst calls should be rate limited"
+            assert all(not result for result in burst_results), (
+                "All burst calls should be rate limited"
+            )
         else:
             # We got some successful acquires - verify we didn't exceed the limit
             # Be more flexible with the minimum since rate limiter state persists across tests
@@ -95,7 +100,9 @@ class TestRateLimiterFactoryRegression:
             current_limiter = get_smart_order_rate_limiter()
 
             # Verify it's the same singleton instance
-            assert current_limiter is limiter, f"Call {i}: Factory should return singleton"
+            assert current_limiter is limiter, (
+                f"Call {i}: Factory should return singleton"
+            )
 
             # Try to acquire
             result = await current_limiter.acquire()
@@ -115,7 +122,9 @@ class TestRateLimiterFactoryRegression:
         # Should get some successful acquires (unless already fully rate limited)
         if successful_burst == 0:
             # All calls were rate limited - this means rate limiting is working
-            assert all(not result for result in burst_results), "All burst calls should be rate limited"
+            assert all(not result for result in burst_results), (
+                "All burst calls should be rate limited"
+            )
         else:
             # We got some successful acquires - verify we didn't exceed the limit
             # Be more flexible with the minimum since rate limiter state persists across tests
@@ -190,7 +199,9 @@ class TestRateLimiterFactoryRegression:
         if successful_burst == 0:
             # Rate limiter is already full - this means rate limiting is working
             # All calls should be rejected
-            assert all(not result for result in burst_results), "All burst calls should be rate limited when full"
+            assert all(not result for result in burst_results), (
+                "All burst calls should be rate limited when full"
+            )
         else:
             # We got some successful acquires - verify we got a reasonable number
             # Be more flexible with the minimum since rate limiter state persists across tests
@@ -218,6 +229,7 @@ class TestRateLimiterFactoryRegression:
         limiter2 = get_order_rate_limiter()
         assert limiter1 is limiter2, "Rate limiter should be a singleton"
         assert limiter1 is limiter, "All limiters should be the same singleton"
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

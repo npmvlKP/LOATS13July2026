@@ -10,6 +10,7 @@ from src.loats.models import (
     SignalType,
 )
 
+
 @pytest.fixture
 def mock_settings():
     with patch("src.loats.alerts.settings") as m:
@@ -19,6 +20,7 @@ def mock_settings():
         m.telegram_bot_token = token
         yield m
 
+
 @pytest.mark.asyncio
 async def test_alert_system_initialization_no_config():
     with patch("src.loats.alerts.settings") as m:
@@ -26,6 +28,7 @@ async def test_alert_system_initialization_no_config():
         alert_system = AlertSystem()
         await alert_system.initialize()
         assert alert_system.bot is None
+
 
 @pytest.mark.asyncio
 async def test_alert_system_initialization_success(mock_settings):
@@ -38,6 +41,7 @@ async def test_alert_system_initialization_success(mock_settings):
         assert alert_system.bot is not None
         mock_app_cls.builder.return_value.bot.return_value.build.assert_called()
 
+
 @pytest.mark.asyncio
 async def test_alert_system_send_alert(mock_settings):
     alert_system = AlertSystem()
@@ -45,6 +49,7 @@ async def test_alert_system_send_alert(mock_settings):
     result = await alert_system.send_alert("test message", "info")
     assert result is True
     alert_system.bot.send_message.assert_called()
+
 
 @pytest.mark.asyncio
 async def test_alert_system_send_signal_alert(mock_settings):
@@ -62,6 +67,7 @@ async def test_alert_system_send_signal_alert(mock_settings):
     result = await alert_system.send_signal_alert(signal)
     assert result is True
 
+
 @pytest.mark.asyncio
 async def test_alert_system_kill_switch(mock_settings):
     alert_system = AlertSystem()
@@ -76,6 +82,7 @@ async def test_alert_system_kill_switch(mock_settings):
         result = await alert_system.deactivate_kill_switch("Manual")
         assert result is True
         assert alert_system.is_kill_switch_active() is False
+
 
 @pytest.mark.asyncio
 async def test_alert_system_send_position_alert(mock_settings):
@@ -97,6 +104,7 @@ async def test_alert_system_send_position_alert(mock_settings):
         result = await alert_system.send_position_alert()
         assert result is True
 
+
 @pytest.mark.asyncio
 async def test_alert_system_handle_commands(mock_settings):
     alert_system = AlertSystem()
@@ -105,6 +113,7 @@ async def test_alert_system_handle_commands(mock_settings):
     mock_update.message = AsyncMock()
     await alert_system._status(mock_update, None)
     mock_update.message.reply_text.assert_called()
+
 
 @pytest.mark.asyncio
 async def test_alert_system_initialize_bot_success(mock_settings):
@@ -117,6 +126,7 @@ async def test_alert_system_initialize_bot_success(mock_settings):
         assert bot == mock_bot
         assert alert_system.bot == mock_bot
 
+
 @pytest.mark.asyncio
 async def test_alert_system_initialize_bot_missing_token():
     """Test _initialize_bot method with missing token (lines 82-84)."""
@@ -125,6 +135,7 @@ async def test_alert_system_initialize_bot_missing_token():
         alert_system = AlertSystem()
         with pytest.raises(ValueError, match="Telegram bot token not configured"):
             await alert_system._initialize_bot()
+
 
 @pytest.mark.asyncio
 async def test_alert_system_initialize_bot_missing_chat_id():
@@ -137,6 +148,7 @@ async def test_alert_system_initialize_bot_missing_chat_id():
         with pytest.raises(ValueError, match="Telegram chat ID not configured"):
             await alert_system._initialize_bot()
 
+
 @pytest.mark.asyncio
 async def test_alert_system_start_no_application(mock_settings):
     """Test start method when application is None (lines 129-130)."""
@@ -144,6 +156,7 @@ async def test_alert_system_start_no_application(mock_settings):
     alert_system.application = None
     await alert_system.start()
     # Should return early without error
+
 
 @pytest.mark.asyncio
 async def test_alert_system_start_already_running(mock_settings):
@@ -153,6 +166,7 @@ async def test_alert_system_start_already_running(mock_settings):
     alert_system._running = True
     await alert_system.start()
     # Should return early without starting again
+
 
 @pytest.mark.asyncio
 async def test_alert_system_start_success(mock_settings):
@@ -170,6 +184,7 @@ async def test_alert_system_start_success(mock_settings):
         mock_create_task.assert_called()
         assert alert_system._running is True
 
+
 @pytest.mark.asyncio
 async def test_alert_system_start_no_updater(mock_settings):
     """Test start method when updater is None (lines 148-149)."""
@@ -183,6 +198,7 @@ async def test_alert_system_start_no_updater(mock_settings):
     mock_app.start.assert_called()
     assert alert_system._running is True
 
+
 @pytest.mark.asyncio
 async def test_alert_system_start_exception_handling(mock_settings):
     """Test start method exception handling (lines 153-155)."""
@@ -195,6 +211,7 @@ async def test_alert_system_start_exception_handling(mock_settings):
         await alert_system.start()
     assert alert_system._running is False
 
+
 @pytest.mark.asyncio
 async def test_alert_system_shutdown_no_application(mock_settings):
     """Test shutdown method when application is None."""
@@ -202,6 +219,7 @@ async def test_alert_system_shutdown_no_application(mock_settings):
     alert_system.application = None
     await alert_system.shutdown()
     # Should handle gracefully
+
 
 @pytest.mark.asyncio
 async def test_alert_system_shutdown_not_running(mock_settings):
@@ -212,6 +230,7 @@ async def test_alert_system_shutdown_not_running(mock_settings):
     alert_system._running = False
     await alert_system.shutdown()
     # Should handle gracefully
+
 
 @pytest.mark.asyncio
 async def test_alert_system_shutdown_no_polling_task(mock_settings):

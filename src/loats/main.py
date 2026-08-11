@@ -24,6 +24,7 @@ db = Database(
     retention_days=settings.retention_days,
 )
 
+
 class TradingSystem:
     """Main trading system class."""
 
@@ -44,7 +45,12 @@ class TradingSystem:
             await alerts.initialize()
             await scheduler.initialize()
             # Start metrics server after cache initialization (R5-2 fix)
-            metrics.start_server(settings.metrics_port)
+            try:
+                metrics.start_server(settings.metrics_port)
+                logger.info(f"Metrics server started on port {settings.metrics_port}")
+            except Exception as e:
+                logger.error(f"Failed to start metrics server: {e}")
+                # Continue without metrics server in LITE mode
             # Start high-performance orchestrator
             await start_orchestrator()
             logger.info("All system components initialized successfully")
@@ -148,6 +154,7 @@ class TradingSystem:
             logger.error(f"Error running scans: {e}")
             raise
 
+
 async def main() -> None:
     """Standalone main entry point trading system."""
     system = TradingSystem()
@@ -159,6 +166,7 @@ async def main() -> None:
         await system.shutdown()
         sys.exit(1)
 
+
 def cli_main() -> None:
     """CLI entry point that properly handles async main function."""
     try:
@@ -168,6 +176,7 @@ def cli_main() -> None:
     except Exception as e:
         logger.error(f"Unexpected error: {e}")
         sys.exit(1)
+
 
 if __name__ == "__main__":
     try:

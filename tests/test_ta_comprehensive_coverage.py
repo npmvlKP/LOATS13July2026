@@ -3,6 +3,7 @@ Comprehensive test suite for ta.py to achieve 80%+ coverage.
 Focuses on missing coverage areas including Numba logic, supertrend core functions,
 and edge cases.
 """
+
 from datetime import UTC, datetime, timedelta
 from unittest.mock import patch, MagicMock
 
@@ -24,6 +25,7 @@ from src.loats.ta import (
     NJIT_SUPPORTS_FASTMATH,
     _supertrend_njit_decorator,
 )
+
 
 class TestTANumbaCoverage:
     """Test Numba-related functionality and initialization."""
@@ -82,6 +84,7 @@ class TestTANumbaCoverage:
         cmf = calculate_cmf(df)
         assert len(cmf) == 1
 
+
 class TestSupertrendCoreCoverage:
     """Test the supertrend core function and fallback implementation."""
 
@@ -110,13 +113,19 @@ class TestSupertrendCoreCoverage:
 
         # Create test data
         n = 10
-        close_arr = np.array([100.0, 101.0, 102.0, 103.0, 104.0, 105.0, 106.0, 107.0, 108.0, 109.0])
-        upper_band_arr = np.array([102.0, 103.0, 104.0, 105.0, 106.0, 107.0, 108.0, 109.0, 110.0, 111.0])
-        lower_band_arr = np.array([98.0, 99.0, 100.0, 101.0, 102.0, 103.0, 104.0, 105.0, 106.0, 107.0])
+        close_arr = np.array(
+            [100.0, 101.0, 102.0, 103.0, 104.0, 105.0, 106.0, 107.0, 108.0, 109.0]
+        )
+        upper_band_arr = np.array(
+            [102.0, 103.0, 104.0, 105.0, 106.0, 107.0, 108.0, 109.0, 110.0, 111.0]
+        )
+        lower_band_arr = np.array(
+            [98.0, 99.0, 100.0, 101.0, 102.0, 103.0, 104.0, 105.0, 106.0, 107.0]
+        )
         period = 3
 
         # Call the core function directly (it's already decorated)
-        if hasattr(_supertrend_core, 'py_func'):
+        if hasattr(_supertrend_core, "py_func"):
             # If it's a Numba-compiled function, use the Python version
             supertrend_arr, direction_arr = _supertrend_core.py_func(
                 close_arr, upper_band_arr, lower_band_arr, period
@@ -151,7 +160,7 @@ class TestSupertrendCoreCoverage:
         )
 
         # Test with Numba disabled by mocking
-        with patch('src.loats.ta.NUMBA_AVAILABLE', False):
+        with patch("src.loats.ta.NUMBA_AVAILABLE", False):
             supertrend, direction = calculate_supertrend(df, period=5, multiplier=2.0)
 
             # Should still work with fallback implementation
@@ -182,7 +191,9 @@ class TestSupertrendCoreCoverage:
 
         # Test with different periods
         for period in [3, 5, 10]:
-            supertrend, direction = calculate_supertrend(df, period=period, multiplier=2.0)
+            supertrend, direction = calculate_supertrend(
+                df, period=period, multiplier=2.0
+            )
 
             assert len(supertrend) == len(df)
             assert len(direction) == len(df)
@@ -209,7 +220,9 @@ class TestSupertrendCoreCoverage:
 
         # Test with different multipliers
         for multiplier in [1.0, 2.0, 3.0, 5.0]:
-            supertrend, direction = calculate_supertrend(df, period=5, multiplier=multiplier)
+            supertrend, direction = calculate_supertrend(
+                df, period=5, multiplier=multiplier
+            )
 
             assert len(supertrend) == len(df)
             assert len(direction) == len(df)
@@ -217,6 +230,7 @@ class TestSupertrendCoreCoverage:
             # Should have some valid values
             assert not all(pd.isna(supertrend))
             assert not all(pd.isna(direction))
+
 
 class TestEdgeCasesAndBoundaryConditions:
     """Test edge cases and boundary conditions for all TA functions."""
@@ -290,7 +304,9 @@ class TestEdgeCasesAndBoundaryConditions:
         }
 
         df = pd.DataFrame(data)
-        macd_line, signal_line, histogram = calculate_macd(df, fast_period=5, slow_period=10, signal_period=3)
+        macd_line, signal_line, histogram = calculate_macd(
+            df, fast_period=5, slow_period=10, signal_period=3
+        )
 
         # Should handle constant prices without errors
         assert len(macd_line) == 30
@@ -311,7 +327,7 @@ class TestEdgeCasesAndBoundaryConditions:
             ],
             "open": [100.0] * 20,
             "high": [100.01] * 20,  # Very small range
-            "low": [99.99] * 20,   # Very small range
+            "low": [99.99] * 20,  # Very small range
             "close": [100.0] * 20,
             "volume": [1000] * 20,
         }
@@ -371,6 +387,7 @@ class TestEdgeCasesAndBoundaryConditions:
         # Should be NaN due to division by zero in CMF calculation
         assert all(pd.isna(cmf))
 
+
 class TestTechnicalAnalysisClassEdgeCases:
     """Test edge cases for the TechnicalAnalysis class methods."""
 
@@ -406,15 +423,21 @@ class TestTechnicalAnalysisClassEdgeCases:
         ]
 
         # Test with current price exactly at last close
-        strength = ta.calculate_price_action_strength(historical_data, current_price=101.0)
+        strength = ta.calculate_price_action_strength(
+            historical_data, current_price=101.0
+        )
         assert strength == 0.5  # Should be neutral
 
         # Test with current price slightly above last close
-        strength = ta.calculate_price_action_strength(historical_data, current_price=101.1)
+        strength = ta.calculate_price_action_strength(
+            historical_data, current_price=101.1
+        )
         assert strength == 0.7  # Should be bullish
 
         # Test with current price slightly below last close
-        strength = ta.calculate_price_action_strength(historical_data, current_price=100.9)
+        strength = ta.calculate_price_action_strength(
+            historical_data, current_price=100.9
+        )
         assert strength == 0.3  # Should be bearish
 
     def test_calculate_volatility_strength_edge_cases(self, ta: TechnicalAnalysis):
@@ -492,7 +515,8 @@ class TestTechnicalAnalysisClassEdgeCases:
         boundary_data = [
             HistoricalData(
                 symbol="TEST",
-                timestamp=datetime(2023, 1, 1, 9, 30, tzinfo=UTC) + timedelta(minutes=i),
+                timestamp=datetime(2023, 1, 1, 9, 30, tzinfo=UTC)
+                + timedelta(minutes=i),
                 open=100.0 + i,
                 high=101.0 + i,
                 low=99.5 + i,
@@ -514,7 +538,8 @@ class TestTechnicalAnalysisClassEdgeCases:
         above_boundary_data = boundary_data + [
             HistoricalData(
                 symbol="TEST",
-                timestamp=datetime(2023, 1, 1, 9, 30, tzinfo=UTC) + timedelta(minutes=15),
+                timestamp=datetime(2023, 1, 1, 9, 30, tzinfo=UTC)
+                + timedelta(minutes=15),
                 open=115.5,
                 high=116.5,
                 low=114.5,
@@ -589,6 +614,7 @@ class TestTechnicalAnalysisClassEdgeCases:
         assert signal is not None
         assert signal[0] == "NEUTRAL"  # MACD not > signal, so no BUY signal
 
+
 class TestPerformanceAndStressTests:
     """Test performance and stress scenarios."""
 
@@ -637,7 +663,8 @@ class TestPerformanceAndStressTests:
         large_historical_data = [
             HistoricalData(
                 symbol="TEST",
-                timestamp=datetime(2023, 1, 1, 9, 30, tzinfo=UTC) + timedelta(minutes=i),
+                timestamp=datetime(2023, 1, 1, 9, 30, tzinfo=UTC)
+                + timedelta(minutes=i),
                 open=100.0 + i * 0.1,
                 high=101.0 + i * 0.1,
                 low=99.0 + i * 0.1,

@@ -10,11 +10,13 @@ from ..models import (
     ProductType,
 )
 
+
 def _enum_to_value(value: Any | Enum) -> Any:
     """Convert enum to its value if it's an enum, otherwise return as-is."""
     if isinstance(value, Enum):
         return value.value
     return value
+
 
 def build_place_order_payload(
     symbol: str,
@@ -49,6 +51,7 @@ def build_place_order_payload(
     if trailing_stop_loss is not None:
         payload["trailing_stop_loss"] = trailing_stop_loss
     return payload
+
 
 def build_place_smart_order_payload(
     symbol: str,
@@ -87,6 +90,7 @@ def build_place_smart_order_payload(
         payload["metadata"] = metadata
     return payload
 
+
 def build_modify_order_payload(
     order_id: str,
     quantity: int | None = None,
@@ -114,6 +118,7 @@ def build_modify_order_payload(
     if trailing_stop_loss is not None:
         payload["trailing_stop_loss"] = trailing_stop_loss
     return payload
+
 
 def build_cancel_order_payload(order_id: str) -> dict[str, Any]:
     """Build payload for cancel_order API call."""

@@ -348,7 +348,7 @@ class Database:
             self.db_path,
             timeout=30.0,  # Increased timeout for busy databases
             isolation_level="IMMEDIATE",  # Better concurrency control
-            check_same_thread=False  # Allow cross-thread usage
+            check_same_thread=False,  # Allow cross-thread usage
         )
 
         # Apply PRAGMAs exactly once per connection object (F-PERF-1)
@@ -584,7 +584,8 @@ class Database:
             # FIX-F-PERM-3: Skip audit logging if running in test environment
             # This prevents permission issues in pytest temp directories
             import os
-            if os.environ.get('PYTEST_CURRENT_TEST'):
+
+            if os.environ.get("PYTEST_CURRENT_TEST"):
                 # Skip JSONL audit logging in test environment to avoid permission issues
                 logger.warning("Skipping JSONL audit log write in test environment")
             else:
@@ -607,6 +608,7 @@ class Database:
                             ) from e
                         # Wait and retry
                         import time
+
                         time.sleep(retry_delay)
                         retry_delay *= 2  # Exponential backoff
         except OSError as e:
@@ -1662,7 +1664,7 @@ class Database:
         """
         await asyncio.to_thread(self.close_all)
         # Close async connection pool
-        if hasattr(self, '_async_pool') and self._async_pool:
+        if hasattr(self, "_async_pool") and self._async_pool:
             try:
                 await self._async_pool.close()
                 logger.info("Async database connection pool closed")
@@ -1680,14 +1682,15 @@ class Database:
         # Initialize async connection pool
         try:
             import aiosqlite
+
             self._async_pool = aiosqlite.ConnectionPool(
-                str(self.db_path),
-                maxsize=10,
-                timeout=30.0
+                str(self.db_path), maxsize=10, timeout=30.0
             )
             logger.info("Async database connection pool initialized")
         except ImportError:
-            logger.warning("aiosqlite not available, using asyncio.to_thread for async operations")
+            logger.warning(
+                "aiosqlite not available, using asyncio.to_thread for async operations"
+            )
         except Exception as e:
             logger.error(f"Failed to initialize async connection pool: {e}")
 

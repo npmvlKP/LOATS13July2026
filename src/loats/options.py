@@ -328,10 +328,14 @@ class OptionsEngine:
 
                 analyzed_chain.append(contract)
             except (ValueError, TypeError, ZeroDivisionError) as e:
-                logger.warning(f"Numerical error analyzing option {contract.symbol}: {e}")
+                logger.warning(
+                    f"Numerical error analyzing option {contract.symbol}: {e}"
+                )
                 analyzed_chain.append(contract)
             except Exception as e:
-                logger.error(f"Unexpected error analyzing option {contract.symbol}: {e}")
+                logger.error(
+                    f"Unexpected error analyzing option {contract.symbol}: {e}"
+                )
                 analyzed_chain.append(contract)
 
         return analyzed_chain
@@ -453,11 +457,15 @@ def calculate_implied_volatility(
     try:
         return float(implied_volatility(price, S, K, t, r, flag))
     except (ValueError, TypeError, ZeroDivisionError) as e:
-        logger.warning(f"Numerical error in standalone implied volatility calculation: {e}")
+        logger.warning(
+            f"Numerical error in standalone implied volatility calculation: {e}"
+        )
         # Fallback to a reasonable value
         return 0.2
     except Exception as e:
-        logger.error(f"Unexpected error in standalone implied volatility calculation: {e}")
+        logger.error(
+            f"Unexpected error in standalone implied volatility calculation: {e}"
+        )
         raise
 
 

@@ -3,6 +3,7 @@ Comprehensive test suite for metrics.py to achieve 80%+ coverage.
 Focuses on missing coverage areas including error handling, direct methods,
 and HTTP server functionality.
 """
+
 import json
 import threading
 import time
@@ -19,6 +20,7 @@ from src.loats.metrics import (
     track_job,
     get_metrics_summary,
 )
+
 
 class TestMetricsErrorHandling:
     """Test error handling in metrics methods."""
@@ -38,13 +40,16 @@ class TestMetricsErrorHandling:
             pass  # Expected to fail gracefully
 
         try:
-            manager.signals_generated_counter.labels(signal_type=None, scan_type=None).inc()
+            manager.signals_generated_counter.labels(
+                signal_type=None, scan_type=None
+            ).inc()
         except Exception:
             pass  # Expected to fail gracefully
 
         # Should still be able to get summary after errors
         summary = manager.get_metrics_summary()
         assert summary is not None
+
 
 class TestDirectMetricsMethods:
     """Test direct metrics methods that are not covered by existing tests."""
@@ -70,7 +75,9 @@ class TestDirectMetricsMethods:
         assert manager.job_latency_stats["max_seconds"] == 1.5
 
         # Test signal recording via mock interface
-        manager.signals_generated_counter.labels(signal_type="BUY", scan_type="ta_scan").inc()
+        manager.signals_generated_counter.labels(
+            signal_type="BUY", scan_type="ta_scan"
+        ).inc()
 
         # Verify metrics were updated
         assert manager.signals_generated_stats["total"] == 1
@@ -78,12 +85,17 @@ class TestDirectMetricsMethods:
         assert manager.signals_generated_stats["by_scan_type"] == {"ta_scan": 1}
 
         # Test another signal
-        manager.signals_generated_counter.labels(signal_type="SELL", scan_type="sentiment_scan").inc()
+        manager.signals_generated_counter.labels(
+            signal_type="SELL", scan_type="sentiment_scan"
+        ).inc()
 
         # Verify metrics were updated
         assert manager.signals_generated_stats["total"] == 2
         assert manager.signals_generated_stats["by_type"] == {"BUY": 1, "SELL": 1}
-        assert manager.signals_generated_stats["by_scan_type"] == {"ta_scan": 1, "sentiment_scan": 1}
+        assert manager.signals_generated_stats["by_scan_type"] == {
+            "ta_scan": 1,
+            "sentiment_scan": 1,
+        }
 
     def test_set_kill_switch_status_direct(self):
         """Test the set_kill_switch_status method directly."""
@@ -114,6 +126,7 @@ class TestDirectMetricsMethods:
             "database": False,
             "telegram": True,
         }
+
 
 class TestMetricsSummary:
     """Test the get_metrics_summary method."""
@@ -168,9 +181,15 @@ class TestMetricsSummary:
         manager.job_execution_counter.labels(job_id="job3", status="failure").inc()
         manager.job_latency_summary.labels(job_id="job3").observe(0.5)
 
-        manager.signals_generated_counter.labels(signal_type="BUY", scan_type="ta_scan").inc()
-        manager.signals_generated_counter.labels(signal_type="BUY", scan_type="ta_scan").inc()
-        manager.signals_generated_counter.labels(signal_type="SELL", scan_type="sentiment_scan").inc()
+        manager.signals_generated_counter.labels(
+            signal_type="BUY", scan_type="ta_scan"
+        ).inc()
+        manager.signals_generated_counter.labels(
+            signal_type="BUY", scan_type="ta_scan"
+        ).inc()
+        manager.signals_generated_counter.labels(
+            signal_type="SELL", scan_type="sentiment_scan"
+        ).inc()
 
         manager.set_kill_switch_status(True)
         manager.set_circuit_breaker_status("openalgo", True)
@@ -182,12 +201,12 @@ class TestMetricsSummary:
             "success": 2,
             "failure": 1,
             "total": 3,
-            "success_rate": 2/3,
+            "success_rate": 2 / 3,
         }
 
         # Verify job latency
         assert summary["job_latency"] == {
-            "average_seconds": 3.5/3,
+            "average_seconds": 3.5 / 3,
             "min_seconds": 0.5,
             "max_seconds": 2.0,
             "total_seconds": 3.5,
@@ -230,6 +249,7 @@ class TestMetricsSummary:
         # Should handle division by zero gracefully
         assert summary["job_latency"]["average_seconds"] == 0.0
 
+
 class TestHTTPServerFunctionality:
     """Test the HTTP server functionality."""
 
@@ -242,6 +262,7 @@ class TestHTTPServerFunctionality:
             start_metrics_server(port=8080)
         except Exception:
             pass  # Expected to fail in test environment, but shouldn't crash
+
 
 class TestMetricsEdgeCases:
     """Test edge cases for metrics functionality."""
@@ -273,7 +294,9 @@ class TestMetricsEdgeCases:
             pass  # Expected to fail, but shouldn't crash the system
 
         try:
-            manager.signals_generated_counter.labels(signal_type=None, scan_type=None).inc()
+            manager.signals_generated_counter.labels(
+                signal_type=None, scan_type=None
+            ).inc()
         except Exception:
             pass  # Expected to fail, but shouldn't crash the system
 
@@ -313,6 +336,7 @@ class TestMetricsEdgeCases:
         summary = manager.get_metrics_summary()
         assert summary is not None
 
+
 class TestMetricsIntegration:
     """Integration tests for metrics functionality."""
 
@@ -324,15 +348,25 @@ class TestMetricsIntegration:
 
         # Simulate a complete workflow
         # 1. Track job execution using mock interface
-        manager.job_execution_counter.labels(job_id="scan_job_1", status="success").inc()
+        manager.job_execution_counter.labels(
+            job_id="scan_job_1", status="success"
+        ).inc()
         manager.job_latency_summary.labels(job_id="scan_job_1").observe(2.5)
-        manager.job_execution_counter.labels(job_id="scan_job_2", status="failure").inc()
+        manager.job_execution_counter.labels(
+            job_id="scan_job_2", status="failure"
+        ).inc()
         manager.job_latency_summary.labels(job_id="scan_job_2").observe(1.2)
 
         # 2. Record signals using mock interface
-        manager.signals_generated_counter.labels(signal_type="BUY", scan_type="ta_scan").inc()
-        manager.signals_generated_counter.labels(signal_type="BUY", scan_type="ta_scan").inc()
-        manager.signals_generated_counter.labels(signal_type="SELL", scan_type="sentiment_scan").inc()
+        manager.signals_generated_counter.labels(
+            signal_type="BUY", scan_type="ta_scan"
+        ).inc()
+        manager.signals_generated_counter.labels(
+            signal_type="BUY", scan_type="ta_scan"
+        ).inc()
+        manager.signals_generated_counter.labels(
+            signal_type="SELL", scan_type="sentiment_scan"
+        ).inc()
 
         # 3. Set system status
         manager.set_kill_switch_status(False)
@@ -375,9 +409,15 @@ class TestMetricsIntegration:
         def worker(worker_id):
             """Worker function that updates metrics."""
             for i in range(10):
-                manager.job_execution_counter.labels(job_id=f"job_{worker_id}_{i}", status="success").inc()
-                manager.job_latency_summary.labels(job_id=f"job_{worker_id}_{i}").observe(0.1)
-                manager.signals_generated_counter.labels(signal_type="BUY", scan_type=f"scan_{worker_id}").inc()
+                manager.job_execution_counter.labels(
+                    job_id=f"job_{worker_id}_{i}", status="success"
+                ).inc()
+                manager.job_latency_summary.labels(
+                    job_id=f"job_{worker_id}_{i}"
+                ).observe(0.1)
+                manager.signals_generated_counter.labels(
+                    signal_type="BUY", scan_type=f"scan_{worker_id}"
+                ).inc()
 
         # Create and start multiple threads
         threads = []
@@ -405,6 +445,7 @@ class TestMetricsIntegration:
         # Use approximate comparison for floating point
         assert abs(summary["job_latency"]["total_seconds"] - 5.0) < 1e-10  # 50 * 0.1
 
+
 class TestMetricsPerformance:
     """Performance tests for metrics functionality."""
 
@@ -415,9 +456,13 @@ class TestMetricsPerformance:
 
         # Add a large number of metrics using mock interface
         for i in range(1000):
-            manager.job_execution_counter.labels(job_id=f"job_{i}", status="success").inc()
+            manager.job_execution_counter.labels(
+                job_id=f"job_{i}", status="success"
+            ).inc()
             manager.job_latency_summary.labels(job_id=f"job_{i}").observe(1.0)
-            manager.signals_generated_counter.labels(signal_type="BUY", scan_type="ta_scan").inc()
+            manager.signals_generated_counter.labels(
+                signal_type="BUY", scan_type="ta_scan"
+            ).inc()
 
         # Should handle large dataset without errors
         summary = manager.get_metrics_summary()
@@ -433,9 +478,13 @@ class TestMetricsPerformance:
 
         # Add a large number of metrics using mock interface
         for i in range(1000):
-            manager.job_execution_counter.labels(job_id=f"job_{i}", status="success").inc()
+            manager.job_execution_counter.labels(
+                job_id=f"job_{i}", status="success"
+            ).inc()
             manager.job_latency_summary.labels(job_id=f"job_{i}").observe(1.0)
-            manager.signals_generated_counter.labels(signal_type=f"SIGNAL_{i % 10}", scan_type=f"SCAN_{i % 5}").inc()
+            manager.signals_generated_counter.labels(
+                signal_type=f"SIGNAL_{i % 10}", scan_type=f"SCAN_{i % 5}"
+            ).inc()
 
         # Measure time to generate summary
         start_time = time.time()

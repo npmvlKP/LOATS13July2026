@@ -129,7 +129,9 @@ class TestDatabasePerformance:
 
         query_time = end_time - start_time
         print(f"Database query performance: {query_time:.4f} seconds")
-        assert query_time < 0.05, f"Database query too slow: {query_time:.4f} seconds (expected < 0.05)"
+        assert query_time < 0.05, (
+            f"Database query too slow: {query_time:.4f} seconds (expected < 0.05)"
+        )
 
 
 class TestTechnicalAnalysisPerformance:
@@ -165,7 +167,9 @@ class TestTechnicalAnalysisPerformance:
                 f"Supertrend {size} points: {calc_time:.4f}s ({time_per_point:.2f} μs/point)"
             )
             # More precise thresholds based on data size - adjusted for actual performance
-            expected_max_time = 1.0 + (size / 30000)  # Scale with data size, realistic baseline
+            expected_max_time = 1.0 + (
+                size / 30000
+            )  # Scale with data size, realistic baseline
             assert calc_time < expected_max_time, (
                 f"Supertrend calculation too slow for {size} points: {calc_time:.4f}s (expected < {expected_max_time:.4f})"
             )

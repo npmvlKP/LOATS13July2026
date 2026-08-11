@@ -2,6 +2,7 @@
 Comprehensive test suite for options module coverage improvement.
 This test suite targets specific lines that are missing coverage in options.py.
 """
+
 import pytest
 from datetime import datetime, UTC
 from unittest.mock import patch, MagicMock
@@ -21,6 +22,7 @@ from src.loats.options import (
     options,
     analysis,
 )
+
 
 class TestOptionsCoverage:
     """Comprehensive test suite for options module coverage."""
@@ -87,7 +89,9 @@ class TestOptionsCoverage:
         )
         assert isinstance(greeks, Greeks)
 
-    def test_calculate_greeks_with_allow_expired_true(self, options_engine: OptionsEngine) -> None:
+    def test_calculate_greeks_with_allow_expired_true(
+        self, options_engine: OptionsEngine
+    ) -> None:
         """Test calculate_greeks with allow_expired=True (lines 107, 125)."""
         # Test expired call option with allow_expired=True
         greeks = options_engine.calculate_greeks(
@@ -155,15 +159,18 @@ class TestOptionsCoverage:
         assert greeks_itm_put.vega == 0.0
         assert greeks_itm_put.rho == 0.0
 
-    def test_calculate_greeks_exception_fallback(self, options_engine: OptionsEngine) -> None:
+    def test_calculate_greeks_exception_fallback(
+        self, options_engine: OptionsEngine
+    ) -> None:
         """Test calculate_greeks exception fallback (lines 137-149)."""
         # Mock the vollib functions to raise exceptions and test fallback
-        with patch('src.loats.options.delta') as mock_delta, \
-             patch('src.loats.options.gamma') as mock_gamma, \
-             patch('src.loats.options.theta') as mock_theta, \
-             patch('src.loats.options.vega') as mock_vega, \
-             patch('src.loats.options.rho') as mock_rho:
-
+        with (
+            patch("src.loats.options.delta") as mock_delta,
+            patch("src.loats.options.gamma") as mock_gamma,
+            patch("src.loats.options.theta") as mock_theta,
+            patch("src.loats.options.vega") as mock_vega,
+            patch("src.loats.options.rho") as mock_rho,
+        ):
             # Set up mocks to raise exceptions
             mock_delta.side_effect = Exception("Test exception")
             mock_gamma.side_effect = Exception("Test exception")
@@ -203,7 +210,9 @@ class TestOptionsCoverage:
             assert greeks_put.vega == 0.0
             assert greeks_put.rho == 0.0
 
-    def test_calculate_implied_volatility_arbitrage_bounds(self, options_engine: OptionsEngine) -> None:
+    def test_calculate_implied_volatility_arbitrage_bounds(
+        self, options_engine: OptionsEngine
+    ) -> None:
         """Test calculate_implied_volatility arbitrage bounds checking (lines 191-196)."""
         # Test call option with price out of bounds (should return default 0.2)
         iv = options_engine.calculate_implied_volatility(
@@ -227,10 +236,12 @@ class TestOptionsCoverage:
         )
         assert iv_put == 0.2  # Should return default when price is out of bounds
 
-    def test_calculate_implied_volatility_fallback_methods(self, options_engine: OptionsEngine) -> None:
+    def test_calculate_implied_volatility_fallback_methods(
+        self, options_engine: OptionsEngine
+    ) -> None:
         """Test calculate_implied_volatility fallback methods (lines 200-234)."""
         # Test with price that might cause vollib to fail, triggering fallback
-        with patch('src.loats.options.implied_volatility') as mock_iv:
+        with patch("src.loats.options.implied_volatility") as mock_iv:
             mock_iv.side_effect = Exception("vollib failed")
 
             iv = options_engine.calculate_implied_volatility(
@@ -246,14 +257,18 @@ class TestOptionsCoverage:
             assert isinstance(iv, float)
             assert iv > 0
 
-    def test_calculate_implied_volatility_brentq_fallback(self, options_engine: OptionsEngine) -> None:
+    def test_calculate_implied_volatility_brentq_fallback(
+        self, options_engine: OptionsEngine
+    ) -> None:
         """Test calculate_implied_volatility brentq fallback (lines 210-214)."""
         # Test scenario where brentq might be used as fallback
-        with patch('src.loats.options.implied_volatility') as mock_iv, \
-             patch('src.loats.options.black_scholes') as mock_bs, \
-             patch('src.loats.options.brentq') as mock_brentq:
-
+        with (
+            patch("src.loats.options.implied_volatility") as mock_iv,
+            patch("src.loats.options.black_scholes") as mock_bs,
+            patch("src.loats.options.brentq") as mock_brentq,
+        ):
             mock_iv.side_effect = Exception("vollib failed")
+
             # Mock black_scholes to return values that create a proper bracket
             def black_scholes_side_effect(flag, S, K, t, r, sigma):
                 if sigma <= 0.1:
@@ -277,16 +292,20 @@ class TestOptionsCoverage:
 
             assert iv == 0.25
 
-    def test_calculate_implied_volatility_newton_fallback(self, options_engine: OptionsEngine) -> None:
+    def test_calculate_implied_volatility_newton_fallback(
+        self, options_engine: OptionsEngine
+    ) -> None:
         """Test calculate_implied_volatility Newton method fallback (lines 216-234)."""
         # Test scenario where Newton method might be used as fallback
-        with patch('src.loats.options.implied_volatility') as mock_iv, \
-             patch('src.loats.options.black_scholes') as mock_bs, \
-             patch('src.loats.options.brentq') as mock_brentq, \
-             patch('src.loats.options.newton') as mock_newton, \
-             patch('src.loats.options.vega') as mock_vega:
-
+        with (
+            patch("src.loats.options.implied_volatility") as mock_iv,
+            patch("src.loats.options.black_scholes") as mock_bs,
+            patch("src.loats.options.brentq") as mock_brentq,
+            patch("src.loats.options.newton") as mock_newton,
+            patch("src.loats.options.vega") as mock_vega,
+        ):
             mock_iv.side_effect = Exception("vollib failed")
+
             # Mock black_scholes to return values that create a proper bracket
             def black_scholes_side_effect(flag, S, K, t, r, sigma):
                 if sigma <= 0.1:
@@ -310,7 +329,9 @@ class TestOptionsCoverage:
 
             assert iv == 0.30
 
-    def test_calculate_black_scholes_expired_contract(self, options_engine: OptionsEngine) -> None:
+    def test_calculate_black_scholes_expired_contract(
+        self, options_engine: OptionsEngine
+    ) -> None:
         """Test calculate_black_scholes with expired contract (line 256)."""
         # Test that ExpiredContractError is raised for expired contract
         with pytest.raises(ExpiredContractError) as exc_info:
@@ -340,7 +361,11 @@ class TestOptionsCoverage:
         assert isinstance(t_past, float)
         assert t_past < 0
 
-    def test_analyze_option_chain_comprehensive(self, options_engine: OptionsEngine, sample_option_contracts: list[OptionContract]) -> None:
+    def test_analyze_option_chain_comprehensive(
+        self,
+        options_engine: OptionsEngine,
+        sample_option_contracts: list[OptionContract],
+    ) -> None:
         """Test analyze_option_chain method comprehensively (lines 280-312)."""
         # Test with contracts that have None implied volatility (use future date)
         contracts_with_none_iv = [
@@ -363,8 +388,7 @@ class TestOptionsCoverage:
 
         # Test analyze_option_chain
         analyzed = options_engine.analyze_option_chain(
-            option_chain=contracts_with_none_iv,
-            underlying_price=18000.0
+            option_chain=contracts_with_none_iv, underlying_price=18000.0
         )
 
         assert len(analyzed) == 1
@@ -374,8 +398,7 @@ class TestOptionsCoverage:
 
         # Test with multiple contracts
         analyzed_multi = options_engine.analyze_option_chain(
-            option_chain=sample_option_contracts,
-            underlying_price=18000.0
+            option_chain=sample_option_contracts, underlying_price=18000.0
         )
 
         assert len(analyzed_multi) == 2
@@ -386,12 +409,15 @@ class TestOptionsCoverage:
             assert contract.vega is not None
             assert contract.rho is not None
 
-    def test_calculate_volatility_smile(self, options_engine: OptionsEngine, sample_option_contracts: list[OptionContract]) -> None:
+    def test_calculate_volatility_smile(
+        self,
+        options_engine: OptionsEngine,
+        sample_option_contracts: list[OptionContract],
+    ) -> None:
         """Test calculate_volatility_smile method (lines 320-326)."""
         # Test with contracts that have implied volatility
         smile = options_engine.calculate_volatility_smile(
-            option_chain=sample_option_contracts,
-            underlying_price=18000.0
+            option_chain=sample_option_contracts, underlying_price=18000.0
         )
 
         assert isinstance(smile, list)
@@ -419,8 +445,7 @@ class TestOptionsCoverage:
         ]
 
         smile_no_iv = options_engine.calculate_volatility_smile(
-            option_chain=contracts_no_iv,
-            underlying_price=18000.0
+            option_chain=contracts_no_iv, underlying_price=18000.0
         )
 
         assert isinstance(smile_no_iv, list)
@@ -468,12 +493,13 @@ class TestOptionsCoverage:
     def test_standalone_calculate_greeks_exception_fallback(self) -> None:
         """Test standalone calculate_greeks exception fallback (lines 383-393)."""
         # Mock the vollib functions to raise specific exceptions that trigger fallback
-        with patch('src.loats.options.delta') as mock_delta, \
-             patch('src.loats.options.gamma') as mock_gamma, \
-             patch('src.loats.options.theta') as mock_theta, \
-             patch('src.loats.options.vega') as mock_vega, \
-             patch('src.loats.options.rho') as mock_rho:
-
+        with (
+            patch("src.loats.options.delta") as mock_delta,
+            patch("src.loats.options.gamma") as mock_gamma,
+            patch("src.loats.options.theta") as mock_theta,
+            patch("src.loats.options.vega") as mock_vega,
+            patch("src.loats.options.rho") as mock_rho,
+        ):
             # Set up mocks to raise ValueError (which triggers fallback)
             mock_delta.side_effect = ValueError("Test exception")
             mock_gamma.side_effect = ValueError("Test exception")
@@ -514,7 +540,7 @@ class TestOptionsCoverage:
     def test_standalone_calculate_implied_volatility_fallback(self) -> None:
         """Test standalone calculate_implied_volatility fallback (lines 426-428)."""
         # Test with price that might cause vollib to fail, triggering fallback
-        with patch('src.loats.options.implied_volatility') as mock_iv:
+        with patch("src.loats.options.implied_volatility") as mock_iv:
             # Mock to raise specific exceptions that trigger fallback
             mock_iv.side_effect = ValueError("vollib failed")
 
@@ -557,7 +583,11 @@ class TestOptionsCoverage:
         var_two = calculate_historical_var([18000.0, 18050.0], confidence_level=0.95)
         assert var_two == 0.002777777777777778  # (50/18000)
 
-    def test_options_analysis_portfolio_greeks_with_r_parameter(self, options_analysis: OptionsAnalysis, sample_option_contracts: list[OptionContract]) -> None:
+    def test_options_analysis_portfolio_greeks_with_r_parameter(
+        self,
+        options_analysis: OptionsAnalysis,
+        sample_option_contracts: list[OptionContract],
+    ) -> None:
         """Test OptionsAnalysis portfolio greeks with 'r' parameter (line 608)."""
         # Test portfolio greeks calculation using the 'r' parameter (backward compatibility)
         # Use future-dated contracts to avoid expired contract errors
@@ -638,13 +668,14 @@ class TestOptionsCoverage:
                     }
                 ]
             },
-            18000.0
+            18000.0,
         )
 
         assert atm_strike == 18000.0
 
-
-    def test_options_engine_comprehensive_edge_cases(self, options_engine: OptionsEngine) -> None:
+    def test_options_engine_comprehensive_edge_cases(
+        self, options_engine: OptionsEngine
+    ) -> None:
         """Test comprehensive edge cases for OptionsEngine."""
         # Test with very small time to expiry (should clamp to 0.0001)
         greeks = options_engine.calculate_greeks(
@@ -690,7 +721,9 @@ class TestOptionsCoverage:
 
         assert iv > 1.0  # Should be very high
 
-    def test_analyze_option_chain_with_exception_handling(self, options_engine: OptionsEngine) -> None:
+    def test_analyze_option_chain_with_exception_handling(
+        self, options_engine: OptionsEngine
+    ) -> None:
         """Test analyze_option_chain with exception handling."""
         # Create a contract that might cause an exception during analysis
         problematic_contract = OptionContract(
@@ -711,14 +744,15 @@ class TestOptionsCoverage:
 
         # Test that the method handles exceptions gracefully
         analyzed = options_engine.analyze_option_chain(
-            option_chain=[problematic_contract],
-            underlying_price=18000.0
+            option_chain=[problematic_contract], underlying_price=18000.0
         )
 
         assert len(analyzed) == 1
         assert analyzed[0].symbol == "PROBLEMATIC"
 
-    def test_portfolio_greeks_with_various_contract_quantities(self, options_analysis: OptionsAnalysis) -> None:
+    def test_portfolio_greeks_with_various_contract_quantities(
+        self, options_analysis: OptionsAnalysis
+    ) -> None:
         """Test portfolio greeks with various contract quantities."""
         contracts = [
             OptionContract(
@@ -768,7 +802,9 @@ class TestOptionsCoverage:
         assert portfolio_greeks.vega > 0  # Vega should be positive
         assert portfolio_greeks.theta < 0  # Theta should be negative for long options
 
-    def test_options_engine_with_custom_risk_free_rate(self, options_engine: OptionsEngine) -> None:
+    def test_options_engine_with_custom_risk_free_rate(
+        self, options_engine: OptionsEngine
+    ) -> None:
         """Test OptionsEngine with custom risk-free rate."""
         # Set custom risk-free rate
         options_engine.set_risk_free_rate(0.08)
@@ -796,7 +832,9 @@ class TestOptionsCoverage:
 
         assert isinstance(greeks_with_none_r, Greeks)
 
-    def test_comprehensive_implied_volatility_scenarios(self, options_engine: OptionsEngine) -> None:
+    def test_comprehensive_implied_volatility_scenarios(
+        self, options_engine: OptionsEngine
+    ) -> None:
         """Test comprehensive implied volatility calculation scenarios."""
         # Test with very short time to expiry
         iv_short = options_engine.calculate_implied_volatility(

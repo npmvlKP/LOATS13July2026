@@ -44,7 +44,10 @@ class Settings(BaseSettings):
 
     # Default Trading Parameters
     default_symbol: str = Field("NIFTY", description="Default trading symbol")
-    default_timeframe: str = Field("1min", description="Default candlestick timeframe for technical analysis (e.g., '1min', '5min', '15min')")
+    default_timeframe: str = Field(
+        "1min",
+        description="Default candlestick timeframe for technical analysis (e.g., '1min', '5min', '15min')",
+    )
     sentiment_threshold: float = Field(
         0.05, description="Sentiment threshold for signal generation"
     )
@@ -95,9 +98,7 @@ class Settings(BaseSettings):
     )
 
     # Metrics Configuration
-    metrics_port: int = Field(
-        8001, description="Port for Prometheus metrics server"
-    )
+    metrics_port: int = Field(8001, description="Port for Prometheus metrics server")
 
     @field_validator("max_order_value", "max_total_exposure", "circuit_limit_pct")
     @classmethod

@@ -10,6 +10,7 @@ import sys
 import os
 import codecs
 
+
 def main():
     # Get the commit message file path from command line arguments
     if len(sys.argv) < 2:
@@ -20,7 +21,7 @@ def main():
 
     # Read the commit message
     try:
-        with open(commit_msg_file, 'r', encoding='utf-8') as f:
+        with open(commit_msg_file, "r", encoding="utf-8") as f:
             commit_message = f.read()
     except FileNotFoundError:
         print(f"ERROR: Commit message file not found: {commit_msg_file}")
@@ -36,7 +37,7 @@ def main():
         "ready for production",
         "deployment ready",
         "production-ready",
-        "deployment-ready"
+        "deployment-ready",
     ]
 
     # Check for prohibited phrases
@@ -51,9 +52,9 @@ def main():
         for phrase in found_violations:
             print(f"  - '{phrase}'")
 
-        print("\n" + "="*60)
+        print("\n" + "=" * 60)
         print("COMMIT MESSAGE POLICY VIOLATION")
-        print("="*60)
+        print("=" * 60)
         print("According to CONTRIBUTING.md guidelines, commit messages")
         print("must not claim deployment readiness. Only the QA gate may")
         print("declare production readiness after comprehensive testing.")
@@ -63,7 +64,7 @@ def main():
         print("deployment readiness.")
         print()
         print("See CONTRIBUTING.md for examples of acceptable formats.")
-        print("="*60)
+        print("=" * 60)
 
         sys.exit(1)
 
@@ -71,6 +72,7 @@ def main():
     # Use ASCII-compatible checkmark for Windows compatibility
     print("OK Commit message validation passed")
     sys.exit(0)
+
 
 if __name__ == "__main__":
     main()

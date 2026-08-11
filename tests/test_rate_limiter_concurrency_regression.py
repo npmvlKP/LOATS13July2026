@@ -51,7 +51,9 @@ class TestRateLimiterConcurrencyRegression:
     async def test_smart_order_rate_limiter_concurrency(self) -> None:
         """Test that smart order rate limiter enforces limits under concurrent access."""
         # The singleton pattern uses 50 ops/sec as default, ignoring custom parameters
-        limiter = get_smart_order_rate_limiter()  # Uses singleton with 50 ops/sec default
+        limiter = (
+            get_smart_order_rate_limiter()
+        )  # Uses singleton with 50 ops/sec default
 
         async def make_request(request_id: int) -> bool:
             """Simulate a smart order request."""
@@ -80,8 +82,12 @@ class TestRateLimiterConcurrencyRegression:
     async def test_mixed_rate_limiter_concurrency(self) -> None:
         """Test concurrent access to both order and smart order rate limiters."""
         # The singleton pattern uses 50 ops/sec as default, ignoring custom parameters
-        order_limiter = get_order_rate_limiter()  # Uses singleton with 50 ops/sec default
-        smart_limiter = get_smart_order_rate_limiter()  # Uses singleton with 50 ops/sec default
+        order_limiter = (
+            get_order_rate_limiter()
+        )  # Uses singleton with 50 ops/sec default
+        smart_limiter = (
+            get_smart_order_rate_limiter()
+        )  # Uses singleton with 50 ops/sec default
 
         async def make_order_request(request_id: int) -> bool:
             """Simulate an order request."""
