@@ -25,6 +25,11 @@ from src.loats.utils.circuit_breaker import (
     CircuitBreakerConfig,
     CircuitBreakerOpenError,
 )
+from src.loats.utils.rate_limiter import (
+    RateLimitExceededError,
+    get_order_rate_limiter,
+    get_smart_order_rate_limiter,
+)
 from src.loats.utils.retry import RetryConfig, retry_async, retry_sync
 
 logger = logging.getLogger(__name__)
@@ -523,6 +528,75 @@ class TestFailureRecoveryScenarios:
                 assert OPENALGO_CIRCUIT_BREAKER.get_status()["state"] == "closed"
         finally:
             OPENALGO_CIRCUIT_BREAKER.config.timeout = original_timeout
+
+
+class TestRateLimiterFailurePaths:
+    """Test rate limiter exceeded scenarios (R5-F-01)."""
+
+    def setup_method(self) -> None:
+        """Reset rate limiters before each test."""
+        from src.loats.utils.rate_limiter import (
+            _order_rate_limiter_instance,
+            _smart_order_rate_limiter_instance,
+            _rate_limiter_lock,
+            _smart_rate_limiter_lock,
+        )
+
+        # Reset both global rate limiter singletons to ensure test isolation
+        global _order_rate_limiter_instance, _smart_order_rate_limiter_instance
+
+        with _rate_limiter_lock:
+            _order_rate_limiter_instance = None
+
+        with _smart_rate_limiter_lock:
+            _smart_order_rate_limiter_instance = None
+
+    @pytest.mark.asyncio
+    async def test_order_rate_limiter_exceeded(self) -> None:
+        """Test that order placement fails when rate limiter is exceeded."""
+        limiter = get_order_rate_limiter()
+
+        # Consume all available tokens
+        for _ in range(50):  # max_ops=50 for order rate limiter
+            result = await limiter.acquire()
+            assert result is True
+
+        # Next attempt should fail
+        result = await limiter.acquire()
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_smart_order_rate_limiter_exceeded(self) -> None:
+        """Test that smart order placement fails when rate limiter is exceeded."""
+        limiter = get_smart_order_rate_limiter()
+
+        # Consume all available tokens
+        for _ in range(50):  # max_ops=50 for smart order rate limiter
+            result = await limiter.acquire()
+            assert result is True
+
+        # Next attempt should fail
+        result = await limiter.acquire()
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_rate_limiter_exceeded_with_retry(self) -> None:
+        """Test rate limiter exceeded scenario with retry logic."""
+        limiter = get_order_rate_limiter()
+
+        # Consume all tokens
+        for _ in range(50):
+            await limiter.acquire()
+
+        # Test that wait_for_token eventually succeeds
+        start_time = time.monotonic()
+        await limiter.wait_for_token()
+        end_time = time.monotonic()
+
+        # Should take approximately the time needed for oldest timestamp to expire
+        wait_time = end_time - start_time
+        assert wait_time >= 0.1  # At least 100ms
+        assert wait_time <= 1.1  # Should not take more than window size + small buffer
 
 
 class TestErrorPropagation:
