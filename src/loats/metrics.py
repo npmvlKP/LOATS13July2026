@@ -104,6 +104,14 @@ class MetricsManager:
             "kill_switch_active": False,
             "circuit_breaker_status": {},
         }
+        # Add cycle time stats for performance monitoring
+        self.cycle_time_stats: dict[str, Any] = {
+            "total_seconds": 0.0,
+            "count": 0,
+            "min_seconds": float("inf"),
+            "max_seconds": 0.0,
+            "target_compliance_count": 0,
+        }
 
         # Lightweight stub objects mimicking Prometheus metrics API used in tests.
         # Avoid importing unittest.mock in production code.
@@ -238,13 +246,25 @@ class MetricsManager:
                     "total_seconds": self.job_latency_stats["total_seconds"],
                     "count": self.job_latency_stats["count"],
                 },
-                "signals_generated": {
-                    "total": self.signals_generated_stats["total"],
-                    "by_type": self.signals_generated_stats["by_type"],
-                    "by_scan_type": self.signals_generated_stats["by_scan_type"],
-                },
-                "system_status": self.system_status,
-            }
+            "signals_generated": {
+                "total": self.signals_generated_stats["total"],
+                "by_type": self.signals_generated_stats["by_type"],
+                "by_scan_type": self.signals_generated_stats["by_scan_type"],
+            },
+            "system_status": self.system_status,
+            "cycle_time_stats": {
+                "total_seconds": self.cycle_time_stats["total_seconds"],
+                "count": self.cycle_time_stats["count"],
+                "min_seconds": self.cycle_time_stats["min_seconds"],
+                "max_seconds": self.cycle_time_stats["max_seconds"],
+                "target_compliance_count": self.cycle_time_stats["target_compliance_count"],
+                "average_seconds": (
+                    self.cycle_time_stats["total_seconds"] / self.cycle_time_stats["count"]
+                    if self.cycle_time_stats["count"] > 0
+                    else 0.0
+                ),
+            },
+        }
         except Exception as e:
             logger.error(f"Failed to get metrics summary: {e}")
             return {"error": str(e)}
@@ -315,15 +335,8 @@ def record_signal(signal_type: str, scan_type: str) -> None:
 def record_cycle_time(duration: float) -> None:
     """Record trading cycle execution time."""
     try:
-        # Add cycle time tracking to metrics
-        if not hasattr(metrics, "cycle_time_stats"):
-            metrics.cycle_time_stats = {
-                "total_seconds": 0.0,
-                "count": 0,
-                "min_seconds": float("inf"),
-                "max_seconds": 0.0,
-                "target_compliance_count": 0,
-            }
+        # Use existing cycle_time_stats attribute
+        # (already initialized in MetricsManager.__init__)
 
         metrics.cycle_time_stats["total_seconds"] += duration
         metrics.cycle_time_stats["count"] += 1
