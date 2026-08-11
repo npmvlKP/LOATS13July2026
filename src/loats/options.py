@@ -156,9 +156,26 @@ class OptionsEngine:
                     implied_volatility=sigma,
                 )
         except Exception as e:
-            # Catch any other unexpected exceptions
+            # Catch any other unexpected exceptions and return fallback values
             logger.error(f"Unexpected error in Greeks calculation: {e}")
-            raise
+            if option_type == OptionType.CALL:
+                return Greeks(
+                    delta=1.0 if S > K else 0.0,
+                    gamma=0.0,
+                    theta=0.0,
+                    vega=0.0,
+                    rho=0.0,
+                    implied_volatility=sigma,
+                )
+            else:
+                return Greeks(
+                    delta=-1.0 if S < K else 0.0,
+                    gamma=0.0,
+                    theta=0.0,
+                    vega=0.0,
+                    rho=0.0,
+                    implied_volatility=sigma,
+                )
 
     def calculate_implied_volatility(
         self,

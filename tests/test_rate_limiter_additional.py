@@ -281,13 +281,14 @@ class TestGlobalRateLimitersAdditional:
         assert default_limiter.max_ops == 50
         assert default_limiter.window_size == 1.0
 
-        # Get custom limiter
+        # Get custom limiter - should return the same singleton instance
         custom_limiter = get_order_rate_limiter(max_ops=100, window_size=2.0)
-        assert custom_limiter.max_ops == 100
-        assert custom_limiter.window_size == 2.0
+        # Since it's a singleton, custom parameters are ignored after first creation
+        assert custom_limiter.max_ops == 50  # Should be the original default
+        assert custom_limiter.window_size == 1.0  # Should be the original default
 
-        # Should be different instances
-        assert default_limiter is not custom_limiter
+        # Should be the same instance (singleton behavior)
+        assert default_limiter is custom_limiter
 
     def test_get_smart_order_rate_limiter_with_custom_params(self) -> None:
         """Test getting smart order rate limiter with custom parameters."""
@@ -296,13 +297,14 @@ class TestGlobalRateLimitersAdditional:
         assert default_limiter.max_ops == 50
         assert default_limiter.window_size == 1.0
 
-        # Get custom limiter
+        # Get custom limiter - should return the same singleton instance
         custom_limiter = get_smart_order_rate_limiter(max_ops=75, window_size=1.5)
-        assert custom_limiter.max_ops == 75
-        assert custom_limiter.window_size == 1.5
+        # Since it's a singleton, custom parameters are ignored after first creation
+        assert custom_limiter.max_ops == 50  # Should be the original default
+        assert custom_limiter.window_size == 1.0  # Should be the original default
 
-        # Should be different instances
-        assert default_limiter is not custom_limiter
+        # Should be the same instance (singleton behavior)
+        assert default_limiter is custom_limiter
 
     def test_rate_limiter_singleton_behavior(self) -> None:
         """Test that rate limiters are now singletons (fixed F-CONC-3)."""
