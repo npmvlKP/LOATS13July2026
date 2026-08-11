@@ -1,6 +1,3 @@
-"""
-Final test to verify HTML escaping is working correctly.
-"""
 import pytest
 from unittest.mock import AsyncMock, patch
 from src.loats.alerts import AlertSystem
@@ -34,7 +31,7 @@ async def test_html_escaping_final():
         message = call_args[0][0]
 
         # Verify HTML escaping is working correctly
-        assert "<script>test</script>" in message
+        assert "&lt;script&gt;test&lt;/script&gt;" in message
         assert "<script>test</script>" not in message
 
         print("✅ HTML escaping is working correctly!")

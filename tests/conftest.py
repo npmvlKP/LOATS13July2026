@@ -198,3 +198,22 @@ def reset_circuit_breakers_before_each_test() -> None:
     # Reset both global circuit breakers to ensure test isolation
     OPENALGO_CIRCUIT_BREAKER.reset()
     TELEGRAM_CIRCUIT_BREAKER.reset()
+
+@pytest.fixture(autouse=True, scope="function")
+def reset_rate_limiters_before_each_test() -> None:
+    """Reset rate limiter singletons before each test to ensure isolation."""
+    from src.loats.utils.rate_limiter import (
+        _order_rate_limiter_instance,
+        _smart_order_rate_limiter_instance,
+        _rate_limiter_lock,
+        _smart_rate_limiter_lock,
+    )
+
+    # Reset both global rate limiter singletons to ensure test isolation
+    global _order_rate_limiter_instance, _smart_order_rate_limiter_instance
+
+    with _rate_limiter_lock:
+        _order_rate_limiter_instance = None
+
+    with _smart_rate_limiter_lock:
+        _smart_order_rate_limiter_instance = None
