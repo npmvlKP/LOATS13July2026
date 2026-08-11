@@ -31,12 +31,10 @@ if TYPE_CHECKING:
 
 from src.loats.loats_logging import configure_logging
 
-
 @pytest.fixture(autouse=True)
 def configure_test_logging() -> None:
     """Configure logging test environment."""
     configure_logging(test_mode=True)
-
 
 @pytest.fixture
 def test_settings() -> Settings:
@@ -58,7 +56,6 @@ def test_settings() -> Settings:
         )
         yield test_settings
 
-
 @pytest.fixture
 def db(test_settings) -> collections.abc.Generator[Database, None, None]:
     """Create test database instance."""
@@ -71,7 +68,6 @@ def db(test_settings) -> collections.abc.Generator[Database, None, None]:
     yield db_instance
     db_instance.close()
     gc.collect()
-
 
 @pytest.fixture
 def sample_trade() -> Trade:
@@ -88,7 +84,6 @@ def sample_trade() -> Trade:
         take_profit=110.0,
         trailing_stop_loss=5.0,
     )
-
 
 @pytest.fixture
 def sample_order() -> Order:
@@ -107,7 +102,6 @@ def sample_order() -> Order:
         filled_quantity=0,
     )
 
-
 @pytest.fixture
 def sample_signal() -> Signal:
     """Create sample signal testing."""
@@ -120,7 +114,6 @@ def sample_signal() -> Signal:
         confidence=0.85,
         metadata={"scan_type": "ta", "timeframe": "1min"},
     )
-
 
 @pytest.fixture
 def sample_historical_data() -> list[HistoricalData]:
@@ -158,7 +151,6 @@ def sample_historical_data() -> list[HistoricalData]:
         ),
     ]
 
-
 def pytest_configure(config: pytest.Config) -> None:
     """Pytest configuration hook."""
     os.environ["ENVIRONMENT"] = "test"
@@ -168,7 +160,6 @@ def pytest_configure(config: pytest.Config) -> None:
     os.environ["TELEGRAM_BOT_TOKEN"] = "test_bot_token"
     os.environ["TELEGRAM_CHAT_ID"] = "123456789"
 
-
 @pytest.fixture(autouse=True, scope="function")
 async def clear_cache_before_each_test() -> None:
     """Clear cache before each test to prevent stale data."""
@@ -177,7 +168,6 @@ async def clear_cache_before_each_test() -> None:
     if cache_manager._cache:
         await cache_manager.clear()
 
-
 @pytest.fixture(autouse=True, scope="function")
 def reset_metrics_before_each_test() -> None:
     """Reset metrics manager state before each test to ensure isolation."""
@@ -185,7 +175,6 @@ def reset_metrics_before_each_test() -> None:
 
     manager = MetricsManager()
     manager.reset_for_testing()
-
 
 @pytest.fixture(autouse=True, scope="function")
 def reset_circuit_breakers_before_each_test() -> None:
@@ -199,7 +188,6 @@ def reset_circuit_breakers_before_each_test() -> None:
     OPENALGO_CIRCUIT_BREAKER.reset()
     TELEGRAM_CIRCUIT_BREAKER.reset()
 
-
 @pytest.fixture(autouse=True, scope="function")
 def reset_rate_limiters_before_each_test() -> None:
     """Reset rate limiter singletons before each test to ensure isolation."""
@@ -212,7 +200,6 @@ def reset_rate_limiters_before_each_test() -> None:
 
     # Reset both global rate limiter singletons to ensure test isolation
     with _rate_limiter_lock:
-        global _order_rate_limiter_instance
         _order_rate_limiter_instance = None
 
     with _smart_rate_limiter_lock:
