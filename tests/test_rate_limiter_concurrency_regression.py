@@ -10,6 +10,7 @@ import time
 import pytest
 
 from src.loats.utils.rate_limiter import (
+    AsyncRateLimiter,
     get_order_rate_limiter,
     get_smart_order_rate_limiter,
 )
@@ -168,7 +169,9 @@ class TestRateLimiterConcurrencyRegression:
     @pytest.mark.asyncio
     async def test_rate_limiter_sustained_concurrent_load(self) -> None:
         """Test rate limiter with sustained concurrent load over time."""
-        limiter = get_order_rate_limiter(max_ops=5, window_size=1.0)  # 5 ops per second
+        # Create a direct instance to test specific rate limits
+        # (avoid singleton pattern which uses fixed 50 ops/sec)
+        limiter = AsyncRateLimiter(max_ops=5, window_size=1.0)  # 5 ops per second
 
         start_time = time.monotonic()
         successful_ops = 0
