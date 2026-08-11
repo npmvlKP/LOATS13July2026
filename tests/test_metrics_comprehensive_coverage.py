@@ -13,7 +13,6 @@ import pytest
 
 from src.loats.metrics import (
     MetricsManager,
-    record_signal,
     set_circuit_breaker_status,
     set_kill_switch_status,
     start_metrics_server,

@@ -218,7 +218,7 @@ class TestJobTracking:
                 mock_summary = MagicMock()
                 mock_latency_labels.return_value = mock_summary
 
-                @track_job("test_job")
+                @track_job("test_job", manager=manager)
                 async def test_job():
                     return "success"
 
@@ -251,7 +251,7 @@ class TestJobTracking:
                 mock_summary = MagicMock()
                 mock_latency_labels.return_value = mock_summary
 
-                @track_job("test_job")
+                @track_job("test_job", manager=manager)
                 async def test_job():
                     raise Exception("Job failed")
 
@@ -275,7 +275,7 @@ class TestJobTracking:
             mock_summary = MagicMock()
             mock_latency_labels.return_value = mock_summary
 
-            @track_job("test_job")
+            @track_job("test_job", manager=manager)
             async def test_job():
                 time.sleep(0.1)  # Simulate work
                 return "success"
@@ -305,8 +305,8 @@ class TestSignalRecording:
             mock_counter = MagicMock()
             mock_labels.return_value = mock_counter
 
-            # Record a signal
-            record_signal(signal_type="BUY", scan_type="ta_scan")
+            # Record a signal with the test manager
+            record_signal(signal_type="BUY", scan_type="ta_scan", manager=manager)
 
             # Should have called the counter
             mock_labels.assert_called_once_with(signal_type="BUY", scan_type="ta_scan")
@@ -320,10 +320,10 @@ class TestSignalRecording:
             mock_counter = MagicMock()
             mock_labels.return_value = mock_counter
 
-            # Record different signal types
-            record_signal(signal_type="BUY", scan_type="ta_scan")
-            record_signal(signal_type="SELL", scan_type="ta_scan")
-            record_signal(signal_type="NEUTRAL", scan_type="sentiment_scan")
+            # Record different signal types with the test manager
+            record_signal(signal_type="BUY", scan_type="ta_scan", manager=manager)
+            record_signal(signal_type="SELL", scan_type="ta_scan", manager=manager)
+            record_signal(signal_type="NEUTRAL", scan_type="sentiment_scan", manager=manager)
 
             # Should have called the counter three times
             assert mock_labels.call_count == 3
@@ -338,12 +338,12 @@ class TestStatusMetrics:
         manager = MetricsManager()
 
         with patch.object(manager.kill_switch_status, "set") as mock_set:
-            # Set kill switch active
-            set_kill_switch_status(active=True)
+            # Set kill switch active with the test manager
+            set_kill_switch_status(active=True, manager=manager)
             mock_set.assert_called_once_with(1)
 
-            # Set kill switch inactive
-            set_kill_switch_status(active=False)
+            # Set kill switch inactive with the test manager
+            set_kill_switch_status(active=False, manager=manager)
             assert mock_set.call_count == 2
             mock_set.assert_called_with(0)
 
@@ -355,10 +355,10 @@ class TestStatusMetrics:
             mock_gauge = MagicMock()
             mock_labels.return_value = mock_gauge
 
-            # Set circuit breaker status for different components
-            set_circuit_breaker_status(component="openalgo", open_status=True)
-            set_circuit_breaker_status(component="database", open_status=False)
-            set_circuit_breaker_status(component="openalgo", open_status=True)
+            # Set circuit breaker status for different components with the test manager
+            set_circuit_breaker_status(component="openalgo", open_status=True, manager=manager)
+            set_circuit_breaker_status(component="database", open_status=False, manager=manager)
+            set_circuit_breaker_status(component="openalgo", open_status=True, manager=manager)
 
             # Should have called the gauge appropriately
             assert mock_labels.call_count == 3
@@ -381,22 +381,22 @@ class TestMetricsIntegration:
         with patch("src.loats.metrics.start_http_server"):
             manager.start_server(port=8001)
 
-        # Record some signals
+        # Record some signals with the test manager
         with patch.object(manager.signals_generated_counter, "labels") as mock_labels:
             mock_counter = MagicMock()
             mock_labels.return_value = mock_counter
 
-            record_signal(signal_type="BUY", scan_type="ta_scan")
-            record_signal(signal_type="SELL", scan_type="sentiment_scan")
+            record_signal(signal_type="BUY", scan_type="ta_scan", manager=manager)
+            record_signal(signal_type="SELL", scan_type="sentiment_scan", manager=manager)
 
             assert mock_counter.inc.call_count == 2
 
-        # Set status metrics
+        # Set status metrics with the test manager
         with patch.object(manager.kill_switch_status, "set") as mock_set:
-            set_kill_switch_status(active=True)
+            set_kill_switch_status(active=True, manager=manager)
             mock_set.assert_called_once_with(1)
 
-        # Test job tracking
+        # Test job tracking with the test manager
         with patch.object(manager.job_execution_counter, "labels") as mock_job_labels:
             mock_job_counter = MagicMock()
             mock_job_labels.return_value = mock_job_counter
@@ -407,7 +407,7 @@ class TestMetricsIntegration:
                 mock_summary = MagicMock()
                 mock_latency_labels.return_value = mock_summary
 
-                @track_job("integration_test")
+                @track_job("integration_test", manager=manager)
                 async def test_job():
                     return "success"
 
@@ -434,7 +434,7 @@ class TestMetricsIntegration:
             side_effect=Exception("Metrics error"),
         ):
 
-            @track_job("error_test")
+            @track_job("error_test", manager=manager)
             async def test_job():
                 return "success"
 
@@ -451,14 +451,14 @@ class TestMetricsIntegration:
             side_effect=Exception("Metrics error"),
         ):
             # Should not raise exception
-            record_signal(signal_type="BUY", scan_type="ta_scan")
+            record_signal(signal_type="BUY", scan_type="ta_scan", manager=manager)
 
         # Test status setting with error
         with patch.object(
             manager.kill_switch_status, "set", side_effect=Exception("Metrics error")
         ):
             # Should not raise exception
-            set_kill_switch_status(active=True)
+            set_kill_switch_status(active=True, manager=manager)
 
 
 class TestMetricsEdgeCases:
@@ -478,7 +478,7 @@ class TestMetricsEdgeCases:
                 mock_summary = MagicMock()
                 mock_latency_labels.return_value = mock_summary
 
-                @track_job("error_job")
+                @track_job("error_job", manager=manager)
                 async def test_job():
                     raise ValueError("Test error")
 
@@ -503,8 +503,8 @@ class TestMetricsEdgeCases:
             mock_counter = MagicMock()
             mock_labels.return_value = mock_counter
 
-            # Test with special characters
-            record_signal(signal_type="BUY_SIGNAL_🚀", scan_type="ta-scan_v1.0")
+            # Test with special characters using the test manager
+            record_signal(signal_type="BUY_SIGNAL_🚀", scan_type="ta-scan_v1.0", manager=manager)
 
             mock_labels.assert_called_once_with(
                 signal_type="BUY_SIGNAL_🚀", scan_type="ta-scan_v1.0"
@@ -515,7 +515,7 @@ class TestMetricsEdgeCases:
             mock_gauge = MagicMock()
             mock_labels.return_value = mock_gauge
 
-            set_circuit_breaker_status(component="openalgo-api_v2", open_status=True)
+            set_circuit_breaker_status(component="openalgo-api_v2", open_status=True, manager=manager)
             mock_labels.assert_called_once_with(component="openalgo-api_v2")
 
     def test_multiple_metrics_managers(self) -> None:
@@ -565,7 +565,7 @@ class TestMetricsEdgeCases:
                 mock_summary = MagicMock()
                 mock_latency_labels.return_value = mock_summary
 
-                @track_job("async_error_job")
+                @track_job("async_error_job", manager=manager)
                 async def test_job():
                     await asyncio.sleep(0.01)  # Small async delay
                     raise RuntimeError("Async error")

@@ -29,7 +29,7 @@ class TestSchedulerCoverage:
         # Mock datetime to be during market hours on a weekday
         with patch("src.loats.scheduler.datetime") as mock_datetime:
             # Set up mock for weekday during market hours
-            mock_now = datetime.datetime(2023, 1, 16, 10, 0, 0)  # Monday 10 AM
+            mock_now = datetime(2023, 1, 16, 10, 0, 0)  # Monday 10 AM
             mock_datetime.datetime.now.return_value = mock_now
             mock_datetime.date = datetime.date
 
@@ -47,7 +47,7 @@ class TestSchedulerCoverage:
         # Mock datetime to be on a weekend
         with patch("src.loats.scheduler.datetime") as mock_datetime:
             # Set up mock for weekend
-            mock_now = datetime.datetime(2023, 1, 14, 10, 0, 0)  # Saturday 10 AM
+            mock_now = datetime(2023, 1, 14, 10, 0, 0)  # Saturday 10 AM
             mock_datetime.datetime.now.return_value = mock_now
             mock_datetime.date = datetime.date
 
@@ -60,7 +60,7 @@ class TestSchedulerCoverage:
         # Mock datetime to be on a holiday
         with patch("src.loats.scheduler.datetime") as mock_datetime:
             # Set up mock for holiday (Republic Day 2026-01-26)
-            mock_now = datetime.datetime(2026, 1, 26, 10, 0, 0)
+            mock_now = datetime(2026, 1, 26, 10, 0, 0)
             mock_datetime.datetime.now.return_value = mock_now
             mock_datetime.date = datetime.date
 
@@ -73,7 +73,7 @@ class TestSchedulerCoverage:
         # Mock datetime to be before market hours
         with patch("src.loats.scheduler.datetime") as mock_datetime:
             # Set up mock for before market hours
-            mock_now = datetime.datetime(2023, 1, 16, 8, 0, 0)  # Monday 8 AM
+            mock_now = datetime(2023, 1, 16, 8, 0, 0)  # Monday 8 AM
             mock_datetime.datetime.now.return_value = mock_now
             mock_datetime.date = datetime.date
 
@@ -460,13 +460,13 @@ class TestSchedulerCoverage:
         mock_job1.id = "job1"
         mock_job1.name = "Test Job 1"
         mock_job1.trigger = "interval"
-        mock_job1.next_run_time = datetime.datetime.now(datetime.UTC)
+        mock_job1.next_run_time = datetime.now(timezone.utc)
 
         mock_job2 = MagicMock()
         mock_job2.id = "job2"
         mock_job2.name = "Test Job 2"
         mock_job2.trigger = "cron"
-        mock_job2.next_run_time = datetime.datetime.now(datetime.UTC)
+        mock_job2.next_run_time = datetime.now(timezone.utc)
 
         scheduler_instance.scheduler.get_jobs.return_value = [mock_job1, mock_job2]
 
