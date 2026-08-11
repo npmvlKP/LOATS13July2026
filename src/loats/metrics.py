@@ -3,6 +3,7 @@ Lightweight metrics collection for LOATS13July2026 LITE edition.
 Implements simple in-memory metrics tracking without external dependencies.
 """
 
+import functools
 import threading
 import time
 from collections.abc import Callable, Coroutine
@@ -63,26 +64,13 @@ class _SimpleSetter:
 logger = get_logger(__name__)
 
 
+@functools.lru_cache(maxsize=1)
 class MetricsManager:
     """Lightweight metrics manager for LOATS13July2026 LITE edition.
     Uses in-memory tracking to avoid external dependencies like Prometheus.
     """
 
-    _instance: Optional["MetricsManager"] = None
-    _lock = threading.Lock()
-    _initialized: bool = False
-
-    def __new__(cls) -> "MetricsManager":
-        if cls._instance is None:
-            with cls._lock:
-                if cls._instance is None:
-                    cls._instance = super().__new__(cls)
-        return cls._instance
-
     def __init__(self) -> None:
-        if getattr(self, "_initialized", False):
-            return
-
         # Lightweight in-memory metrics with proper type annotations
         self.job_execution_stats: dict[str, int] = {
             "success": 0,
@@ -121,8 +109,8 @@ class MetricsManager:
         self.kill_switch_status = _SimpleSetter(self._set_kill_switch_via_mock)
         self.circuit_breaker_status = _MetricFactory(self._set_circuit_breaker_via_mock)
 
-        self._initialized = True
         self._server_started = False
+        self._initialized = True
         logger.info("Lightweight metrics manager initialized")
 
     def _track_job_via_mock(self, job_id: str, status: str) -> None:
@@ -183,25 +171,25 @@ class MetricsManager:
 
     def reset_for_testing(self) -> None:
         """Reset the metrics manager state for testing purposes."""
-        if hasattr(self, "_initialized"):
-            self._initialized = False
-            # Clear all metrics
-            self.job_execution_stats = {"success": 0, "failure": 0, "total": 0}
-            self.job_latency_stats = {
-                "total_seconds": 0.0,
-                "count": 0,
-                "min_seconds": float("inf"),
-                "max_seconds": 0.0,
-            }
-            self.signals_generated_stats = {
-                "total": 0,
-                "by_type": {},
-                "by_scan_type": {},
-            }
-            self.system_status = {
-                "kill_switch_active": False,
-                "circuit_breaker_status": {},
-            }
+        # Clear the lru_cache to get a fresh instance
+        MetricsManager.cache_clear()  # type: ignore[attr-defined]
+        # Clear all metrics
+        self.job_execution_stats = {"success": 0, "failure": 0, "total": 0}
+        self.job_latency_stats = {
+            "total_seconds": 0.0,
+            "count": 0,
+            "min_seconds": float("inf"),
+            "max_seconds": 0.0,
+        }
+        self.signals_generated_stats = {
+            "total": 0,
+            "by_type": {},
+            "by_scan_type": {},
+        }
+        self.system_status = {
+            "kill_switch_active": False,
+            "circuit_breaker_status": {},
+        }
 
     def set_kill_switch_status(self, active: bool) -> None:
         """Set kill switch status metric."""
@@ -246,25 +234,28 @@ class MetricsManager:
                     "total_seconds": self.job_latency_stats["total_seconds"],
                     "count": self.job_latency_stats["count"],
                 },
-            "signals_generated": {
-                "total": self.signals_generated_stats["total"],
-                "by_type": self.signals_generated_stats["by_type"],
-                "by_scan_type": self.signals_generated_stats["by_scan_type"],
-            },
-            "system_status": self.system_status,
-            "cycle_time_stats": {
-                "total_seconds": self.cycle_time_stats["total_seconds"],
-                "count": self.cycle_time_stats["count"],
-                "min_seconds": self.cycle_time_stats["min_seconds"],
-                "max_seconds": self.cycle_time_stats["max_seconds"],
-                "target_compliance_count": self.cycle_time_stats["target_compliance_count"],
-                "average_seconds": (
-                    self.cycle_time_stats["total_seconds"] / self.cycle_time_stats["count"]
-                    if self.cycle_time_stats["count"] > 0
-                    else 0.0
-                ),
-            },
-        }
+                "signals_generated": {
+                    "total": self.signals_generated_stats["total"],
+                    "by_type": self.signals_generated_stats["by_type"],
+                    "by_scan_type": self.signals_generated_stats["by_scan_type"],
+                },
+                "system_status": self.system_status,
+                "cycle_time_stats": {
+                    "total_seconds": self.cycle_time_stats["total_seconds"],
+                    "count": self.cycle_time_stats["count"],
+                    "min_seconds": self.cycle_time_stats["min_seconds"],
+                    "max_seconds": self.cycle_time_stats["max_seconds"],
+                    "target_compliance_count": self.cycle_time_stats[
+                        "target_compliance_count"
+                    ],
+                    "average_seconds": (
+                        self.cycle_time_stats["total_seconds"]
+                        / self.cycle_time_stats["count"]
+                        if self.cycle_time_stats["count"] > 0
+                        else 0.0
+                    ),
+                },
+            }
         except Exception as e:
             logger.error(f"Failed to get metrics summary: {e}")
             return {"error": str(e)}
@@ -291,7 +282,9 @@ metrics = MetricsManager()
 F = TypeVar("F", bound=Callable[..., Coroutine[Any, Any, Any]])
 
 
-def track_job(job_id: str) -> Callable[[F], F]:
+def track_job(
+    job_id: str, manager: Optional[MetricsManager] = None
+) -> Callable[[F], F]:
     """Decorator to track job execution time and status."""
 
     def decorator(func: F) -> F:
@@ -307,11 +300,13 @@ def track_job(job_id: str) -> Callable[[F], F]:
             finally:
                 duration = time.time() - start_time
                 try:
-                    # Use the global metrics instance to track job execution
-                    metrics.job_execution_counter.labels(
+                    # Use the provided manager or global metrics instance
+                    (manager or metrics).job_execution_counter.labels(
                         job_id=job_id, status=status
                     ).inc()
-                    metrics.job_latency_summary.labels(job_id=job_id).observe(duration)
+                    (manager or metrics).job_latency_summary.labels(
+                        job_id=job_id
+                    ).observe(duration)
                 except Exception:  # nosec B110
                     # Silently handle metrics errors to not interfere with job execution
                     pass
@@ -319,17 +314,6 @@ def track_job(job_id: str) -> Callable[[F], F]:
         return cast(F, wrapper)
 
     return decorator
-
-
-def record_signal(signal_type: str, scan_type: str) -> None:
-    """Record signal generation event."""
-    try:
-        metrics.signals_generated_counter.labels(
-            signal_type=signal_type, scan_type=scan_type
-        ).inc()
-    except Exception:  # nosec B110
-        # Silently handle metrics errors to not interfere with application flow
-        pass
 
 
 def record_cycle_time(duration: float) -> None:
@@ -356,19 +340,36 @@ def record_cycle_time(duration: float) -> None:
         pass
 
 
-def set_kill_switch_status(active: bool) -> None:
-    """Set kill switch status metric."""
+def record_signal(
+    signal_type: str, scan_type: str, manager: Optional[MetricsManager] = None
+) -> None:
+    """Record signal generation event."""
     try:
-        metrics.kill_switch_status.set(1 if active else 0)
+        (manager or metrics).signals_generated_counter.labels(
+            signal_type=signal_type, scan_type=scan_type
+        ).inc()
     except Exception:  # nosec B110
         # Silently handle metrics errors to not interfere with application flow
         pass
 
 
-def set_circuit_breaker_status(component: str, open_status: bool) -> None:
+def set_kill_switch_status(
+    active: bool, manager: Optional[MetricsManager] = None
+) -> None:
+    """Set kill switch status metric."""
+    try:
+        (manager or metrics).kill_switch_status.set(1 if active else 0)
+    except Exception:  # nosec B110
+        # Silently handle metrics errors to not interfere with application flow
+        pass
+
+
+def set_circuit_breaker_status(
+    component: str, open_status: bool, manager: Optional[MetricsManager] = None
+) -> None:
     """Set circuit breaker status metric."""
     try:
-        metrics.circuit_breaker_status.labels(component=component).set(
+        (manager or metrics).circuit_breaker_status.labels(component=component).set(
             1 if open_status else 0
         )
     except Exception:  # nosec B110
