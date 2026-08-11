@@ -56,8 +56,11 @@ class RateLimiter:
 
             # Remove timestamps older than window_size
             # Use > to ensure we maintain strict max_ops limit in any window
+            # Capture current_time again after cleanup to ensure accurate window calculation
+            # This prevents race conditions where cleanup takes significant time
+            cleanup_time = current_time
             while (
-                self.timestamps and current_time - self.timestamps[0] > self.window_size
+                self.timestamps and cleanup_time - self.timestamps[0] > self.window_size
             ):
                 self.timestamps.popleft()
 
@@ -188,8 +191,10 @@ class AsyncRateLimiter:
 
             # Remove timestamps older than window_size
             # Use > to ensure we maintain strict max_ops limit in any window
+            # Capture current_time again after cleanup to ensure accurate window calculation
+            cleanup_time = current_time
             while (
-                self.timestamps and current_time - self.timestamps[0] > self.window_size
+                self.timestamps and cleanup_time - self.timestamps[0] > self.window_size
             ):
                 self.timestamps.popleft()
 
@@ -223,9 +228,10 @@ class AsyncRateLimiter:
                 time_until_oldest_expires = (
                     oldest_timestamp + self.window_size - current_time
                 )
-                # Sleep until the oldest token expires
-                # Use a small sleep time to be more deterministic
-                sleep_time = max(0.001, time_until_oldest_expires)
+                # Sleep until the oldest token expires, with a small buffer to account for scheduling delays
+                # Use max(0.001, ...) to ensure we always sleep at least a tiny amount
+                buffer = self.window_size * 0.05  # 5% buffer
+                sleep_time = max(0.001, time_until_oldest_expires - buffer)
             else:
                 sleep_time = 0.05
             await asyncio.sleep(sleep_time)
@@ -330,6 +336,16 @@ _smart_rate_limiter_lock = threading.Lock()
 # Singleton instances with default parameters
 _order_rate_limiter_instance: AsyncRateLimiter | None = None
 _smart_order_rate_limiter_instance: AsyncRateLimiter | None = None
+
+def _reset_singletons_for_testing() -> None:
+    """Reset singleton instances for testing purposes only.
+
+    This function should ONLY be used in test environments to ensure
+    that singleton instances are recreated with the latest implementation.
+    """
+    global _order_rate_limiter_instance, _smart_order_rate_limiter_instance
+    _order_rate_limiter_instance = None
+    _smart_order_rate_limiter_instance = None
 
 
 def get_order_rate_limiter(

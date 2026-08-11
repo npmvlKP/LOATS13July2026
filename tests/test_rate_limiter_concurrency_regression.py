@@ -11,6 +11,7 @@ import pytest
 
 from src.loats.utils.rate_limiter import (
     AsyncRateLimiter,
+    _reset_singletons_for_testing,
     get_order_rate_limiter,
     get_smart_order_rate_limiter,
 )
@@ -18,6 +19,11 @@ from src.loats.utils.rate_limiter import (
 
 class TestRateLimiterConcurrencyRegression:
     """Regression tests for rate limiter concurrency behavior."""
+
+    @pytest.fixture(autouse=True)
+    def reset_singletons(self) -> None:
+        """Reset singleton instances before each test to ensure clean state."""
+        _reset_singletons_for_testing()
 
     @pytest.mark.asyncio
     async def test_order_rate_limiter_concurrency(self) -> None:

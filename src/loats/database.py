@@ -280,6 +280,7 @@ class Database:
                 stop_loss REAL,
                 take_profit REAL,
                 trailing_stop_loss REAL,
+                idempotency_key TEXT,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL,
                 created_at_ms INTEGER NOT NULL DEFAULT 0,
@@ -1380,11 +1381,13 @@ class Database:
 
     def store_order(self, order: Order) -> bool:
         """
-        Store order record.
+        Store order record with idempotency check.
         Args:
             order: Order model instance
         Returns:
             True successful
+        Raises:
+            ValueError: If duplicate order detected (same idempotency_key)
         """
         now = datetime.now(UTC)
         now_iso = now.isoformat()
@@ -1393,15 +1396,30 @@ class Database:
 
         conn = self._get_connection()
         cursor = conn.cursor()
+
+        # Check for duplicate order using idempotency_key if provided
+        if order.idempotency_key:
+            cursor.execute(
+                "SELECT order_id FROM orders WHERE idempotency_key = ?",
+                (order.idempotency_key,)
+            )
+            existing_order = cursor.fetchone()
+            if existing_order:
+                raise ValueError(
+                    f"Duplicate order detected. Order with idempotency_key "
+                    f"'{order.idempotency_key}' already exists as order_id "
+                    f"'{existing_order[0]}'"
+                )
+
         cursor.execute(
             """
             INSERT OR REPLACE INTO orders
             (order_id, symbol, quantity, order_type, price, trigger_price,
              variety, transaction_type, product_type, status, timestamp,
              filled_quantity, average_price, stop_loss, take_profit,
-             trailing_stop_loss, created_at, updated_at, created_at_ms,
+             trailing_stop_loss, idempotency_key, created_at, updated_at, created_at_ms,
              updated_at_ms, timestamp_ms)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 order.order_id,
@@ -1420,6 +1438,7 @@ class Database:
                 order.stop_loss,
                 order.take_profit,
                 order.trailing_stop_loss,
+                order.idempotency_key,
                 now_iso,
                 now_iso,
                 now_ms,
@@ -1427,13 +1446,16 @@ class Database:
                 ts_ms,
             ),
         )
-        conn.commit()
+
+        # Log audit before commit to ensure consistency
         self._log_audit(
             action="CREATE",
             entity_type="order",
             entity_id=order.order_id,
             new_state=self._model_to_dict(order),
         )
+
+        conn.commit()
         return True
 
     def get_order(self, order_id: str) -> Order | None:
@@ -1522,6 +1544,9 @@ class Database:
         else:
             timestamp = datetime.fromisoformat(row[10])
 
+        # Extract idempotency_key if available (column 16)
+        idempotency_key = row[16] if len(row) > 16 else None
+
         return Order(
             order_id=row[0],
             symbol=row[1],
@@ -1539,6 +1564,7 @@ class Database:
             stop_loss=row[13],
             take_profit=row[14],
             trailing_stop_loss=row[15],
+            idempotency_key=idempotency_key,
         )
 
     # -------------------------------------------------------------------------
