@@ -3,6 +3,7 @@
 Tests that verify thread-safety of circuit breaker statistics when accessed
 concurrently from both synchronous and asynchronous contexts.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -19,6 +20,7 @@ from src.loats.utils.circuit_breaker import (
     CircuitState,
 )
 
+
 class TestCircuitBreakerConcurrency:
     """Concurrency tests for circuit breaker race conditions."""
 
@@ -33,7 +35,9 @@ class TestCircuitBreakerConcurrency:
                 cb.call(lambda: 42)
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=num_threads) as executor:
-            futures = [executor.submit(make_successful_calls) for _ in range(num_threads)]
+            futures = [
+                executor.submit(make_successful_calls) for _ in range(num_threads)
+            ]
             concurrent.futures.wait(futures)
 
         stats = cb.stats
@@ -101,7 +105,7 @@ class TestCircuitBreakerConcurrency:
         async def make_async_failing_calls() -> None:
             for _ in range(num_failures_per_task):
                 try:
-                    await cb.call_async(lambda: (1 / 0))
+                    await cb.call_async(lambda: 1 / 0)
                 except ZeroDivisionError:
                     pass  # Expected
 
@@ -155,8 +159,12 @@ class TestCircuitBreakerConcurrency:
 
         # Run sync workers in thread pool
         sync_results: list[Any] = []
-        with concurrent.futures.ThreadPoolExecutor(max_workers=num_sync_threads) as executor:
-            sync_futures = [executor.submit(sync_worker) for _ in range(num_sync_threads)]
+        with concurrent.futures.ThreadPoolExecutor(
+            max_workers=num_sync_threads
+        ) as executor:
+            sync_futures = [
+                executor.submit(sync_worker) for _ in range(num_sync_threads)
+            ]
             for future in concurrent.futures.as_completed(sync_futures):
                 sync_results.append(future.result())
 
@@ -174,7 +182,10 @@ class TestCircuitBreakerConcurrency:
         assert stats.failed_calls > 0
         assert stats.rejected_calls == 0
         # Verify that the sum of all call types equals total calls
-        assert stats.successful_calls + stats.failed_calls + stats.rejected_calls == expected_total
+        assert (
+            stats.successful_calls + stats.failed_calls + stats.rejected_calls
+            == expected_total
+        )
 
         # Verify consecutive counters are non-negative (race condition would cause negative values)
         assert stats.consecutive_failures >= 0
@@ -204,7 +215,9 @@ class TestCircuitBreakerConcurrency:
             return failures
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=num_threads) as executor:
-            futures = [executor.submit(make_failures_until_open) for _ in range(num_threads)]
+            futures = [
+                executor.submit(make_failures_until_open) for _ in range(num_threads)
+            ]
             concurrent.futures.wait(futures)
 
         # Verify circuit is open
@@ -257,7 +270,7 @@ class TestCircuitBreakerConcurrency:
         config = CircuitBreakerConfig(
             failure_threshold=3,
             success_threshold=2,
-            timeout=0.1  # Short timeout for testing
+            timeout=0.1,  # Short timeout for testing
         )
         cb = CircuitBreaker("state_transition_test", config=config)
 
@@ -337,12 +350,16 @@ class TestCircuitBreakerConcurrency:
 
         # Run async workers
         async_tasks = [async_worker(i) for i in range(num_async_workers)]
-        async_results = await asyncio.gather(*async_tasks, return_exceptions=True)
+        await asyncio.gather(*async_tasks, return_exceptions=True)
 
         # Run sync workers
         sync_results: list[Any] = []
-        with concurrent.futures.ThreadPoolExecutor(max_workers=num_sync_workers) as executor:
-            sync_futures = [executor.submit(sync_worker, i) for i in range(num_sync_workers)]
+        with concurrent.futures.ThreadPoolExecutor(
+            max_workers=num_sync_workers
+        ) as executor:
+            sync_futures = [
+                executor.submit(sync_worker, i) for i in range(num_sync_workers)
+            ]
             for future in concurrent.futures.as_completed(sync_futures):
                 sync_results.append(future.result())
 
@@ -359,4 +376,6 @@ class TestCircuitBreakerConcurrency:
         assert stats.consecutive_successes >= 0
 
         # Verify the sum makes sense
-        assert (stats.successful_calls + stats.failed_calls + stats.rejected_calls) == expected_total
+        assert (
+            stats.successful_calls + stats.failed_calls + stats.rejected_calls
+        ) == expected_total

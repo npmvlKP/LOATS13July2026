@@ -2,14 +2,15 @@
 Comprehensive test suite for scheduler module coverage improvement.
 This test suite targets specific lines that are missing coverage in scheduler.py.
 """
+
 import asyncio
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from datetime import datetime, timezone
-import datetime
 
 from src.loats.scheduler import TradingScheduler, scheduler
 from src.loats.models import Signal, SignalType
+
 
 class TestSchedulerCoverage:
     """Comprehensive test suite for scheduler module coverage."""
@@ -94,7 +95,6 @@ class TestSchedulerCoverage:
         await scheduler_instance._add_jobs()
 
         # Verify that add_job was called for all expected jobs
-        expected_jobs = ["ta_scan", "sentiment_scan", "signal_generation", "market_status_check", "data_cleanup"]
         assert mock_add_job.call_count == 5
 
         # Check that each job was added with correct parameters
@@ -131,10 +131,7 @@ class TestSchedulerCoverage:
         mock_task1.cancel = MagicMock()
         mock_task2.cancel = MagicMock()
 
-        scheduler_instance.scan_tasks = {
-            "task1": mock_task1,
-            "task2": mock_task2
-        }
+        scheduler_instance.scan_tasks = {"task1": mock_task1, "task2": mock_task2}
 
         await scheduler_instance.shutdown()
 
@@ -149,9 +146,11 @@ class TestSchedulerCoverage:
     @pytest.mark.asyncio
     async def test_run_ta_scan_task(self, scheduler_instance):
         """Test run_ta_scan method (lines 253-254, 265-266)."""
+
         # Mock the _ta_scan_task method
         async def mock_scan_coro():
             return None
+
         mock_scan_task = AsyncMock(side_effect=mock_scan_coro)
         scheduler_instance._ta_scan_task = mock_scan_task
 
@@ -160,11 +159,12 @@ class TestSchedulerCoverage:
             # Create a proper async task that can be awaited
             async def mock_task_coro():
                 return None
+
             mock_task = asyncio.ensure_future(mock_task_coro())
             mock_create_task.return_value = mock_task
 
             # Mock the task to be stored in scan_tasks
-            with patch.object(scheduler_instance, 'scan_tasks', {}):
+            with patch.object(scheduler_instance, "scan_tasks", {}):
                 await scheduler_instance.run_ta_scan()
 
                 # Verify task was created and stored - check that it was called with a coroutine
@@ -176,7 +176,9 @@ class TestSchedulerCoverage:
     async def test_ta_scan_task_with_kill_switch(self, scheduler_instance):
         """Test _ta_scan_task with kill switch active (lines 282-283)."""
         # Mock kill switch to be active
-        with patch("src.loats.scheduler.alerts.is_kill_switch_active", return_value=True):
+        with patch(
+            "src.loats.scheduler.alerts.is_kill_switch_active", return_value=True
+        ):
             with pytest.raises(Exception):  # KillSwitchError
                 await scheduler_instance._ta_scan_task()
 
@@ -185,9 +187,18 @@ class TestSchedulerCoverage:
         """Test _ta_scan_task with no history data (lines 293-307)."""
         # Mock dependencies
         with (
-            patch.object(scheduler_instance, "_safe_get_history", new_callable=AsyncMock, return_value=None),
-            patch.object(scheduler_instance, "_safe_get_quotes", new_callable=AsyncMock),
-            patch("src.loats.scheduler.alerts.is_kill_switch_active", return_value=False),
+            patch.object(
+                scheduler_instance,
+                "_safe_get_history",
+                new_callable=AsyncMock,
+                return_value=None,
+            ),
+            patch.object(
+                scheduler_instance, "_safe_get_quotes", new_callable=AsyncMock
+            ),
+            patch(
+                "src.loats.scheduler.alerts.is_kill_switch_active", return_value=False
+            ),
         ):
             await scheduler_instance._ta_scan_task()
 
@@ -196,9 +207,11 @@ class TestSchedulerCoverage:
     @pytest.mark.asyncio
     async def test_run_sentiment_scan_task(self, scheduler_instance):
         """Test run_sentiment_scan method (lines 346, 348-349)."""
+
         # Mock the _sentiment_scan_task method
         async def mock_scan_coro():
             return None
+
         mock_scan_task = AsyncMock(side_effect=mock_scan_coro)
         scheduler_instance._sentiment_scan_task = mock_scan_task
 
@@ -207,11 +220,12 @@ class TestSchedulerCoverage:
             # Create a proper async task that can be awaited
             async def mock_task_coro():
                 return None
+
             mock_task = asyncio.ensure_future(mock_task_coro())
             mock_create_task.return_value = mock_task
 
             # Mock the task to be stored in scan_tasks
-            with patch.object(scheduler_instance, 'scan_tasks', {}):
+            with patch.object(scheduler_instance, "scan_tasks", {}):
                 await scheduler_instance.run_sentiment_scan()
 
                 # Verify task was created and stored - check that it was called with a coroutine
@@ -223,16 +237,20 @@ class TestSchedulerCoverage:
     async def test_sentiment_scan_task_with_kill_switch(self, scheduler_instance):
         """Test _sentiment_scan_task with kill switch active (lines 365-368)."""
         # Mock kill switch to be active
-        with patch("src.loats.scheduler.alerts.is_kill_switch_active", return_value=True):
+        with patch(
+            "src.loats.scheduler.alerts.is_kill_switch_active", return_value=True
+        ):
             with pytest.raises(Exception):  # KillSwitchError
                 await scheduler_instance._sentiment_scan_task()
 
     @pytest.mark.asyncio
     async def test_run_signal_generation_task(self, scheduler_instance):
         """Test run_signal_generation method (lines 396-399)."""
+
         # Mock the _signal_generation_task method
         async def mock_scan_coro():
             return None
+
         mock_scan_task = AsyncMock(side_effect=mock_scan_coro)
         scheduler_instance._signal_generation_task = mock_scan_task
 
@@ -241,11 +259,12 @@ class TestSchedulerCoverage:
             # Create a proper async task that can be awaited
             async def mock_task_coro():
                 return None
+
             mock_task = asyncio.ensure_future(mock_task_coro())
             mock_create_task.return_value = mock_task
 
             # Mock the task to be stored in scan_tasks
-            with patch.object(scheduler_instance, 'scan_tasks', {}):
+            with patch.object(scheduler_instance, "scan_tasks", {}):
                 await scheduler_instance.run_signal_generation()
 
                 # Verify task was created and stored - check that it was called with a coroutine
@@ -257,16 +276,20 @@ class TestSchedulerCoverage:
     async def test_signal_generation_task_with_kill_switch(self, scheduler_instance):
         """Test _signal_generation_task with kill switch active (lines 420-424)."""
         # Mock kill switch to be active
-        with patch("src.loats.scheduler.alerts.is_kill_switch_active", return_value=True):
+        with patch(
+            "src.loats.scheduler.alerts.is_kill_switch_active", return_value=True
+        ):
             with pytest.raises(Exception):  # KillSwitchError
                 await scheduler_instance._signal_generation_task()
 
     @pytest.mark.asyncio
     async def test_check_market_status_task(self, scheduler_instance):
         """Test check_market_status method (lines 438-441)."""
+
         # Mock the _market_status_check_task method
         async def mock_scan_coro():
             return None
+
         mock_scan_task = AsyncMock(side_effect=mock_scan_coro)
         scheduler_instance._market_status_check_task = mock_scan_task
 
@@ -275,11 +298,12 @@ class TestSchedulerCoverage:
             # Create a proper async task that can be awaited
             async def mock_task_coro():
                 return None
+
             mock_task = asyncio.ensure_future(mock_task_coro())
             mock_create_task.return_value = mock_task
 
             # Mock the task to be stored in scan_tasks
-            with patch.object(scheduler_instance, 'scan_tasks', {}):
+            with patch.object(scheduler_instance, "scan_tasks", {}):
                 await scheduler_instance.check_market_status()
 
                 # Verify task was created and stored - check that it was called with a coroutine
@@ -300,7 +324,11 @@ class TestSchedulerCoverage:
         scheduler_instance.scheduler.remove_job = mock_remove_job
 
         # Mock jobs to exist
-        mock_get_job.side_effect = lambda job_id: MagicMock() if job_id in ["ta_scan", "sentiment_scan", "signal_generation"] else None
+        mock_get_job.side_effect = lambda job_id: (
+            MagicMock()
+            if job_id in ["ta_scan", "sentiment_scan", "signal_generation"]
+            else None
+        )
 
         await scheduler_instance._market_status_check_task()
 
@@ -328,9 +356,11 @@ class TestSchedulerCoverage:
     @pytest.mark.asyncio
     async def test_run_data_cleanup_task(self, scheduler_instance):
         """Test run_data_cleanup method (lines 486-487)."""
+
         # Mock the _data_cleanup_task method
         async def mock_scan_coro():
             return None
+
         mock_scan_task = AsyncMock(side_effect=mock_scan_coro)
         scheduler_instance._data_cleanup_task = mock_scan_task
 
@@ -339,11 +369,12 @@ class TestSchedulerCoverage:
             # Create a proper async task that can be awaited
             async def mock_task_coro():
                 return None
+
             mock_task = asyncio.ensure_future(mock_task_coro())
             mock_create_task.return_value = mock_task
 
             # Mock the task to be stored in scan_tasks
-            with patch.object(scheduler_instance, 'scan_tasks', {}):
+            with patch.object(scheduler_instance, "scan_tasks", {}):
                 await scheduler_instance.run_data_cleanup()
 
                 # Verify task was created and stored - check that it was called with a coroutine
@@ -417,7 +448,9 @@ class TestSchedulerCoverage:
         # Test unknown job
         with patch("src.loats.scheduler.logger") as mock_logger:
             await scheduler_instance.run_once("unknown_job")
-            mock_logger.warning.assert_called_once_with("Unknown job ID: %s", "unknown_job")
+            mock_logger.warning.assert_called_once_with(
+                "Unknown job ID: %s", "unknown_job"
+            )
 
     @pytest.mark.asyncio
     async def test_get_jobs_method(self, scheduler_instance):
@@ -427,13 +460,13 @@ class TestSchedulerCoverage:
         mock_job1.id = "job1"
         mock_job1.name = "Test Job 1"
         mock_job1.trigger = "interval"
-        mock_job1.next_run_time = datetime.datetime.now(datetime.timezone.utc)
+        mock_job1.next_run_time = datetime.datetime.now(datetime.UTC)
 
         mock_job2 = MagicMock()
         mock_job2.id = "job2"
         mock_job2.name = "Test Job 2"
         mock_job2.trigger = "cron"
-        mock_job2.next_run_time = datetime.datetime.now(datetime.timezone.utc)
+        mock_job2.next_run_time = datetime.datetime.now(datetime.UTC)
 
         scheduler_instance.scheduler.get_jobs.return_value = [mock_job1, mock_job2]
 
@@ -461,15 +494,21 @@ class TestSchedulerCoverage:
     async def test_check_kill_switch_method(self, scheduler_instance):
         """Test _check_kill_switch method (lines 655-656)."""
         # Test with kill switch inactive
-        with patch("src.loats.scheduler.alerts.is_kill_switch_active", return_value=False):
+        with patch(
+            "src.loats.scheduler.alerts.is_kill_switch_active", return_value=False
+        ):
             scheduler_instance._check_kill_switch()  # Should not raise
 
         # Test with kill switch active
-        with patch("src.loats.scheduler.alerts.is_kill_switch_active", return_value=True):
+        with patch(
+            "src.loats.scheduler.alerts.is_kill_switch_active", return_value=True
+        ):
             with patch("src.loats.scheduler.logger") as mock_logger:
                 with pytest.raises(Exception):  # KillSwitchError
                     scheduler_instance._check_kill_switch()
-                mock_logger.error.assert_called_once_with("Kill switch active trading operations blocked")
+                mock_logger.error.assert_called_once_with(
+                    "Kill switch active trading operations blocked"
+                )
 
     @pytest.mark.asyncio
     async def test_is_running_method(self, scheduler_instance):
@@ -504,19 +543,25 @@ class TestSchedulerCoverage:
     async def test_safe_get_history_method(self, scheduler_instance):
         """Test _safe_get_history method with circuit breaker (lines 236-239)."""
         # Mock async_client.get_history
-        with patch("src.loats.scheduler.async_client.get_history", new_callable=AsyncMock) as mock_get_history:
+        with patch(
+            "src.loats.scheduler.async_client.get_history", new_callable=AsyncMock
+        ) as mock_get_history:
             mock_get_history.return_value = {"data": "test"}
 
             result = await scheduler_instance._safe_get_history("NIFTY", "15m")
 
             assert result == {"data": "test"}
-            mock_get_history.assert_awaited_once_with(symbol="NIFTY", interval="15m", from_date=None, to_date=None)
+            mock_get_history.assert_awaited_once_with(
+                symbol="NIFTY", interval="15m", from_date=None, to_date=None
+            )
 
     @pytest.mark.asyncio
     async def test_safe_get_quotes_method(self, scheduler_instance):
         """Test _safe_get_quotes method with circuit breaker (lines 253-254, 265-266)."""
         # Mock async_client.get_quotes
-        with patch("src.loats.scheduler.async_client.get_quotes", new_callable=AsyncMock) as mock_get_quotes:
+        with patch(
+            "src.loats.scheduler.async_client.get_quotes", new_callable=AsyncMock
+        ) as mock_get_quotes:
             mock_get_quotes.return_value = {"data": "test"}
 
             result = await scheduler_instance._safe_get_quotes(["NIFTY"])
@@ -528,7 +573,9 @@ class TestSchedulerCoverage:
     async def test_safe_get_position_book_method(self, scheduler_instance):
         """Test _safe_get_position_book method with circuit breaker (lines 438-441)."""
         # Mock async_client.get_position_book
-        with patch("src.loats.scheduler.async_client.get_position_book", new_callable=AsyncMock) as mock_get_position:
+        with patch(
+            "src.loats.scheduler.async_client.get_position_book", new_callable=AsyncMock
+        ) as mock_get_position:
             mock_get_position.return_value = {"data": "test"}
 
             result = await scheduler_instance._safe_get_position_book()
@@ -540,7 +587,9 @@ class TestSchedulerCoverage:
     async def test_safe_get_funds_method(self, scheduler_instance):
         """Test _safe_get_funds method with circuit breaker (lines 450-455)."""
         # Mock async_client.get_funds
-        with patch("src.loats.scheduler.async_client.get_funds", new_callable=AsyncMock) as mock_get_funds:
+        with patch(
+            "src.loats.scheduler.async_client.get_funds", new_callable=AsyncMock
+        ) as mock_get_funds:
             mock_get_funds.return_value = {"data": "test"}
 
             result = await scheduler_instance._safe_get_funds()

@@ -37,6 +37,7 @@ logger = get_logger(__name__)
 # Settings must be accessed after all imports to avoid circular imports
 settings = get_settings()
 
+
 class AlertSystem:
     """Alert system using Telegram bot notifications kill switch.
     `AlertSystem` accepts an optional ``Database` instance constructor.
@@ -845,6 +846,7 @@ class AlertSystem:
             logger.error(f"Error handling message: {e}")
             if update.message:
                 await update.message.reply_text(f"❌ Error: {e!s}")
+
 
 # Export a default instance
 alerts = AlertSystem()

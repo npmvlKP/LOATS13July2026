@@ -22,6 +22,7 @@ T = TypeVar("T")
 # Import Redis as optional dependency
 try:
     import redis.asyncio as redis
+
     REDIS_AVAILABLE = True
 except ImportError:
     REDIS_AVAILABLE = False
@@ -84,7 +85,9 @@ class CacheManager:
                 ttl=self.config.ttl_seconds,
             )
             self._cache_type = "in_memory_ttl"
-            logger.debug(f"DEBUG INIT: Created cache - _cache={self._cache is not None}")
+            logger.debug(
+                f"DEBUG INIT: Created cache - _cache={self._cache is not None}"
+            )
 
             self._initialized = True
             logger.info(
@@ -140,13 +143,17 @@ class CacheManager:
             with self._init_lock:
                 if not self._initialized:
                     await self.initialize()
-            logger.debug(f"DEBUG SET: After init - _initialized={self._initialized}, _cache={self._cache is not None}")
+            logger.debug(
+                f"DEBUG SET: After init - _initialized={self._initialized}, _cache={self._cache is not None}"
+            )
 
         # After initialization, check if we have a valid cache backend
         logger.debug(f"DEBUG SET: Backend check - _cache={self._cache is not None}")
         if self._cache is None:
             # This should not happen, but if it does, try to initialize again
-            logger.error(f"Cache not properly initialized: _cache={self._cache}, _initialized={self._initialized}")
+            logger.error(
+                f"Cache not properly initialized: _cache={self._cache}, _initialized={self._initialized}"
+            )
             with self._init_lock:
                 if self._cache is None:
                     await self.initialize()
@@ -174,7 +181,9 @@ class CacheManager:
                 self._cache[cache_key] = value_str
                 self._cache_stats["sets"] += 1
                 cache_size = len(self._cache)
-            logger.debug(f"In-memory cache set successful. Current cache size: {cache_size}")
+            logger.debug(
+                f"In-memory cache set successful. Current cache size: {cache_size}"
+            )
             return True
 
         except Exception as e:

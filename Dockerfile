@@ -51,11 +51,11 @@ COPY src/ ./src/
 # Copy scripts (health checks, etc.)
 COPY quick_health_check.py verify_project_health.py ./
 
-# Create non-root user for security (optional - uncomment if needed)
-# RUN addgroup --system --gid 1001 loats && \
-#     adduser --system --uid 1001 --ingroup loats loats && \
-#     chown -R loats:loats /app
-# USER loats
+# Create non-root user for security
+RUN addgroup --system --gid 1001 loats && \
+    adduser --system --uid 1001 --ingroup loats loats && \
+    chown -R loats:loats /app
+USER loats
 
 # Health check using the project's quick health check script
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \

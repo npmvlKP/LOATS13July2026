@@ -17,6 +17,7 @@ from .options import options
 
 logger = get_logger(__name__)
 
+
 class StrikeSelectionEngine:
     """High-performance strike selection engine with <5ms latency guarantee."""
 
@@ -30,7 +31,7 @@ class StrikeSelectionEngine:
         option_chain: list[OptionContract],
         strategy: str = "atm_straddle",
         width: int = 1,
-        max_strikes: int = 5
+        max_strikes: int = 5,
     ) -> list[float]:
         """Select optimal strikes based on strategy with <5ms latency.
 
@@ -86,18 +87,22 @@ class StrikeSelectionEngine:
             return selected
 
         finally:
-            duration = (datetime.datetime.now(datetime.UTC) - start_time).total_seconds()
+            duration = (
+                datetime.datetime.now(datetime.UTC) - start_time
+            ).total_seconds()
             if duration > 0.005:  # 5ms threshold
-                logger.warning(f"Strike selection exceeded 5ms target: {duration*1000:.2f}ms")
+                logger.warning(
+                    f"Strike selection exceeded 5ms target: {duration * 1000:.2f}ms"
+                )
             else:
-                logger.debug(f"Strike selection completed in {duration*1000:.2f}ms")
+                logger.debug(f"Strike selection completed in {duration * 1000:.2f}ms")
 
     async def _select_atm_straddle_strikes(
         self,
         underlying_price: float,
         strikes: list[float],
         width: int,
-        max_strikes: int
+        max_strikes: int,
     ) -> list[float]:
         """Select ATM straddle strikes using binary search for O(log n) performance."""
         if not strikes:
@@ -119,8 +124,11 @@ class StrikeSelectionEngine:
 
         # Handle case where exact match not found
         if left > right:
-            if right >= 0 and (left >= len(strikes) or
-                              abs(strikes[right] - underlying_price) <= abs(strikes[left] - underlying_price)):
+            if right >= 0 and (
+                left >= len(strikes)
+                or abs(strikes[right] - underlying_price)
+                <= abs(strikes[left] - underlying_price)
+            ):
                 best_idx = right
             else:
                 best_idx = left
@@ -142,7 +150,7 @@ class StrikeSelectionEngine:
         underlying_price: float,
         option_chain: list[OptionContract],
         width: int,
-        max_strikes: int
+        max_strikes: int,
     ) -> list[float]:
         """Select delta-neutral strikes using pre-calculated Greeks."""
         if not option_chain:
@@ -181,18 +189,14 @@ class StrikeSelectionEngine:
         underlying_price: float,
         option_chain: list[OptionContract],
         width: int,
-        max_strikes: int
+        max_strikes: int,
     ) -> list[float]:
         """Select strikes based on open interest analysis."""
         if not option_chain:
             return []
 
         # Sort by open interest (descending)
-        sorted_by_oi = sorted(
-            option_chain,
-            key=lambda x: x.open_interest,
-            reverse=True
-        )
+        sorted_by_oi = sorted(option_chain, key=lambda x: x.open_interest, reverse=True)
 
         selected = []
         for opt in sorted_by_oi:
@@ -204,10 +208,7 @@ class StrikeSelectionEngine:
         return selected
 
     async def calculate_optimal_strike_spacing(
-        self,
-        underlying_price: float,
-        implied_volatility: float,
-        days_to_expiry: int
+        self, underlying_price: float, implied_volatility: float, days_to_expiry: int
     ) -> float:
         """Calculate optimal strike spacing based on market conditions.
 
@@ -238,7 +239,7 @@ class StrikeSelectionEngine:
         self,
         selected_strikes: list[float],
         option_chain: list[OptionContract],
-        underlying_price: float
+        underlying_price: float,
     ) -> dict[str, Any]:
         """Analyze efficiency of selected strikes.
 
@@ -255,7 +256,7 @@ class StrikeSelectionEngine:
                 "coverage_score": 0.0,
                 "liquidity_score": 0.0,
                 "delta_coverage": 0.0,
-                "atm_proximity": 0.0
+                "atm_proximity": 0.0,
             }
 
         # Calculate coverage score
@@ -263,8 +264,15 @@ class StrikeSelectionEngine:
         coverage = len(set(selected_strikes) & all_strikes) / len(selected_strikes)
 
         # Calculate liquidity score (average OI of selected strikes)
-        selected_contracts = [opt for opt in option_chain if opt.strike_price in selected_strikes]
-        avg_oi = sum(opt.open_interest for opt in selected_contracts) / len(selected_contracts) if selected_contracts else 0
+        selected_contracts = [
+            opt for opt in option_chain if opt.strike_price in selected_strikes
+        ]
+        avg_oi = (
+            sum(opt.open_interest for opt in selected_contracts)
+            / len(selected_contracts)
+            if selected_contracts
+            else 0
+        )
 
         # Calculate delta coverage
         deltas = [abs(opt.delta) for opt in selected_contracts]
@@ -272,7 +280,9 @@ class StrikeSelectionEngine:
 
         # Calculate ATM proximity
         atm_distances = [abs(strike - underlying_price) for strike in selected_strikes]
-        avg_atm_distance = sum(atm_distances) / len(atm_distances) if atm_distances else 0
+        avg_atm_distance = (
+            sum(atm_distances) / len(atm_distances) if atm_distances else 0
+        )
         atm_proximity = 1.0 / (1.0 + avg_atm_distance) if avg_atm_distance > 0 else 1.0
 
         return {
@@ -281,15 +291,17 @@ class StrikeSelectionEngine:
             "delta_coverage": float(delta_range),
             "atm_proximity": float(atm_proximity),
             "selected_count": len(selected_strikes),
-            "available_count": len(all_strikes)
+            "available_count": len(all_strikes),
         }
 
     def clear_cache(self) -> None:
         """Clear the strike selection cache."""
         self._cache.clear()
 
+
 # Module-level singleton instance
 strike_selector = StrikeSelectionEngine()
+
 
 # Async wrapper for module-level access
 async def select_strikes(
@@ -297,7 +309,7 @@ async def select_strikes(
     option_chain: list[OptionContract],
     strategy: str = "atm_straddle",
     width: int = 1,
-    max_strikes: int = 5
+    max_strikes: int = 5,
 ) -> list[float]:
     """Async wrapper for strike selection."""
     return await strike_selector.select_strikes(

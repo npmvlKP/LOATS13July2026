@@ -92,6 +92,7 @@ async def test_extract_article_content_exception():
         content = analyzer._extract_article_content("http://test.com")
         assert content == ""
 
+
 @pytest.mark.asyncio
 async def test_analyze_symbol_sentiment_cache_hit():
     """Test cache hit in analyze_symbol_sentiment (lines 114-121)."""
@@ -106,6 +107,7 @@ async def test_analyze_symbol_sentiment_cache_hit():
         assert result.symbol == "TEST"
         assert result.sentiment_score == 0.5
         assert result.sentiment_label == "positive"
+
 
 @pytest.mark.asyncio
 async def test_analyze_symbol_sentiment_cache_miss():
@@ -126,6 +128,7 @@ async def test_analyze_symbol_sentiment_cache_miss():
         assert result.sentiment_label == "neutral"
         mock_parse.assert_called_once()
         mock_cache_set.assert_called_once()
+
 
 @pytest.mark.asyncio
 async def test_analyze_symbol_sentiment_with_news_items():
@@ -166,9 +169,7 @@ async def test_analyze_symbol_sentiment_with_news_items():
 
     with (
         unittest.mock.patch("src.loats.sentiment.cache_manager.get", return_value=None),
-        unittest.mock.patch.object(
-            analyzer, "parse_rss_feed", return_value=news_items
-        ),
+        unittest.mock.patch.object(analyzer, "parse_rss_feed", return_value=news_items),
         unittest.mock.patch("src.loats.sentiment.cache_manager.set"),
     ):
         result = await analyzer.analyze_symbol_sentiment(
@@ -182,6 +183,7 @@ async def test_analyze_symbol_sentiment_with_news_items():
         # Average score: (0.8 - 0.6 + 0.05) / 3 = 0.25 / 3 ≈ 0.083
         assert abs(result.sentiment_score - 0.083) < 0.01
         assert result.sentiment_label == "neutral"
+
 
 @pytest.mark.asyncio
 async def test_analyze_symbol_sentiment_positive_overall():
@@ -203,9 +205,7 @@ async def test_analyze_symbol_sentiment_positive_overall():
 
     with (
         unittest.mock.patch("src.loats.sentiment.cache_manager.get", return_value=None),
-        unittest.mock.patch.object(
-            analyzer, "parse_rss_feed", return_value=news_items
-        ),
+        unittest.mock.patch.object(analyzer, "parse_rss_feed", return_value=news_items),
         unittest.mock.patch("src.loats.sentiment.cache_manager.set"),
     ):
         result = await analyzer.analyze_symbol_sentiment(
@@ -213,6 +213,7 @@ async def test_analyze_symbol_sentiment_positive_overall():
         )
         assert result.sentiment_score == 0.9
         assert result.sentiment_label == "positive"
+
 
 @pytest.mark.asyncio
 async def test_analyze_symbol_sentiment_negative_overall():
@@ -234,9 +235,7 @@ async def test_analyze_symbol_sentiment_negative_overall():
 
     with (
         unittest.mock.patch("src.loats.sentiment.cache_manager.get", return_value=None),
-        unittest.mock.patch.object(
-            analyzer, "parse_rss_feed", return_value=news_items
-        ),
+        unittest.mock.patch.object(analyzer, "parse_rss_feed", return_value=news_items),
         unittest.mock.patch("src.loats.sentiment.cache_manager.set"),
     ):
         result = await analyzer.analyze_symbol_sentiment(
@@ -244,6 +243,7 @@ async def test_analyze_symbol_sentiment_negative_overall():
         )
         assert result.sentiment_score == -0.8
         assert result.sentiment_label == "negative"
+
 
 @pytest.mark.asyncio
 async def test_parse_rss_feed_with_valid_entries():
@@ -256,14 +256,20 @@ async def test_parse_rss_feed_with_valid_entries():
         unittest.mock.MagicMock(
             title="Test News",
             link="http://test.com/news1",
-            published_parsed=(2023, 1, 1, 12, 0, 0, 0, 0, 0)
+            published_parsed=(2023, 1, 1, 12, 0, 0, 0, 0, 0),
         )
     ]
 
     with (
-        unittest.mock.patch("src.loats.sentiment.feedparser.parse", return_value=mock_feed),
-        unittest.mock.patch.object(analyzer, "_extract_article_content", return_value="Test content"),
-        unittest.mock.patch.object(analyzer, "analyze_text", return_value=(0.5, "positive")),
+        unittest.mock.patch(
+            "src.loats.sentiment.feedparser.parse", return_value=mock_feed
+        ),
+        unittest.mock.patch.object(
+            analyzer, "_extract_article_content", return_value="Test content"
+        ),
+        unittest.mock.patch.object(
+            analyzer, "analyze_text", return_value=(0.5, "positive")
+        ),
     ):
         results = await analyzer.parse_rss_feed("http://test.com/rss", max_items=5)
         assert len(results) == 1
@@ -281,12 +287,14 @@ def test_preprocess_text():
     result = analyzer.preprocess_text("Hello\nworld\twith\nextra\tspaces")
     assert result == "Hello world with extra spaces"
 
+
 def test_filter_significant_news_empty():
     """Test filter_significant_news with empty list."""
     analyzer = SentimentAnalyzer()
     analyzer.set_threshold(0.5)
     result = analyzer.filter_significant_news([])
     assert result == []
+
 
 def test_filter_significant_news_all_significant():
     """Test filter_significant_news where all items are significant."""
@@ -316,6 +324,7 @@ def test_filter_significant_news_all_significant():
 
     result = analyzer.filter_significant_news(news_items)
     assert len(result) == 2
+
 
 def test_filter_significant_news_none_significant():
     """Test filter_significant_news where no items are significant."""

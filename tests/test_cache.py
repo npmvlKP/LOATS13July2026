@@ -42,9 +42,9 @@ class TestCacheConfig:
         """Test that Redis config parameters are removed from CacheConfig."""
         config = CacheConfig()
         # Verify Redis parameters are not present
-        assert not hasattr(config, 'redis_host')
-        assert not hasattr(config, 'redis_port')
-        assert not hasattr(config, 'redis_password')
+        assert not hasattr(config, "redis_host")
+        assert not hasattr(config, "redis_port")
+        assert not hasattr(config, "redis_password")
 
 
 class TestCacheManager:
@@ -102,7 +102,9 @@ class TestCacheManager:
         assert result is None
 
     @pytest.mark.asyncio
-    async def test_get_falsy_values_regression(self, cache_manager: CacheManager) -> None:
+    async def test_get_falsy_values_regression(
+        self, cache_manager: CacheManager
+    ) -> None:
         """Regression test: cache should return falsy values like 0, 0.0, '', False, [].
 
         This test verifies that the bug where falsy values were treated as cache misses

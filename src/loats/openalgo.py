@@ -159,6 +159,7 @@ def _check_kill_switch() -> None:
         # Log audit entry for kill switch activation
         try:
             from .database import db
+
             db._log_audit(
                 action="BLOCK",
                 entity_type="order",
@@ -166,7 +167,7 @@ def _check_kill_switch() -> None:
                 user="system",
                 metadata={"reason": "Kill switch active"},
                 previous_state=None,
-                new_state={"status": "blocked", "reason": "kill_switch_active"}
+                new_state={"status": "blocked", "reason": "kill_switch_active"},
             )
         except Exception as e:
             logger.error(f"Failed to write audit log for kill switch block: {e}")
@@ -181,6 +182,7 @@ async def _async_check_kill_switch() -> None:
         # Log audit entry for kill switch activation
         try:
             from .database import db
+
             db._log_audit(
                 action="BLOCK",
                 entity_type="order",
@@ -188,7 +190,7 @@ async def _async_check_kill_switch() -> None:
                 user="system",
                 metadata={"reason": "Kill switch active"},
                 previous_state=None,
-                new_state={"status": "blocked", "reason": "kill_switch_active"}
+                new_state={"status": "blocked", "reason": "kill_switch_active"},
             )
         except Exception as e:
             logger.error(f"Failed to write audit log for kill switch block: {e}")
@@ -606,7 +608,9 @@ class AsyncOpenAlgoClient:
     ) -> dict[str, Any]:
         # Create cache key based on parameters
         cache_key_data = f"{symbol}:{interval}:{from_date}:{to_date}"
-        cache_key = f"history:{hashlib.sha256(cache_key_data.encode('utf-8')).hexdigest()}"
+        cache_key = (
+            f"history:{hashlib.sha256(cache_key_data.encode('utf-8')).hexdigest()}"
+        )
 
         # Try to get cached result first
         cached_result = await cache_manager.get(cache_key)
@@ -640,7 +644,9 @@ class AsyncOpenAlgoClient:
     ) -> dict[str, Any]:
         # Create cache key based on parameters
         cache_key_data = f"{symbol}:{expiry}"
-        cache_key = f"option_chain:{hashlib.sha256(cache_key_data.encode('utf-8')).hexdigest()}"
+        cache_key = (
+            f"option_chain:{hashlib.sha256(cache_key_data.encode('utf-8')).hexdigest()}"
+        )
 
         # Try to get cached result first
         cached_result = await cache_manager.get(cache_key)

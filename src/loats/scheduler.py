@@ -101,6 +101,7 @@ NSE_HOLIDAYS: frozenset[datetime.date] = frozenset(
     datetime.date(y, m, d) for y, m, d in _NSE_HOLIDAY_TUPLES
 )
 
+
 class TradingScheduler:
     """Scheduler trading scans operations."""
 
@@ -225,12 +226,14 @@ class TradingScheduler:
                 # FIX-R5-F-02: Close scheduler's database connection pool to prevent leaks
                 # The scheduler uses the shared module-level db singleton, but we need to ensure
                 # proper cleanup of any async resources during shutdown
-                if hasattr(self, 'db') and self.db:
+                if hasattr(self, "db") and self.db:
                     try:
                         await self.db.async_close_all()
                         logger.info("Scheduler database connections closed")
                     except Exception as e:
-                        logger.warning(f"Error closing scheduler database connections: {e}")
+                        logger.warning(
+                            f"Error closing scheduler database connections: {e}"
+                        )
             except Exception:
                 logger.exception("Error shutting down scheduler")
                 raise
@@ -730,6 +733,7 @@ class TradingScheduler:
     def is_running(self) -> bool:
         """Check scheduler running."""
         return self.running
+
 
 # Export default instance
 scheduler = TradingScheduler()

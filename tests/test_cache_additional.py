@@ -31,9 +31,9 @@ class TestCacheConfigAdditional:
         assert config.cache_type == "memory"
 
         # Verify Redis parameters are not present
-        assert not hasattr(config, 'redis_host')
-        assert not hasattr(config, 'redis_port')
-        assert not hasattr(config, 'redis_password')
+        assert not hasattr(config, "redis_host")
+        assert not hasattr(config, "redis_port")
+        assert not hasattr(config, "redis_password")
 
 
 class TestCacheManagerAdditional:
