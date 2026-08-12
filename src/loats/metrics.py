@@ -276,7 +276,7 @@ metrics = MetricsManager()
 F = TypeVar("F", bound=Callable[..., Any])
 
 def track_job(
-    job_id: str, manager: Optional[MetricsManager] = None
+    job_id: str, manager: "MetricsManager | None" = None
 ) -> Callable[[F], F]:
     """Decorator to track job execution time and status."""
 
@@ -332,7 +332,7 @@ def record_cycle_time(duration: float) -> None:
         pass
 
 def record_signal(
-    signal_type: str, scan_type: str, manager: Optional[MetricsManager] = None
+    signal_type: str, scan_type: str, manager: "MetricsManager | None" = None
 ) -> None:
     """Record signal generation event."""
     try:
@@ -344,7 +344,7 @@ def record_signal(
         pass
 
 def set_kill_switch_status(
-    active: bool, manager: Optional[MetricsManager] = None
+    active: bool, manager: "MetricsManager | None" = None
 ) -> None:
     """Set kill switch status metric."""
     try:
@@ -354,7 +354,7 @@ def set_kill_switch_status(
         pass
 
 def set_circuit_breaker_status(
-    component: str, open_status: bool, manager: Optional[MetricsManager] = None
+    component: str, open_status: bool, manager: "MetricsManager | None" = None
 ) -> None:
     """Set circuit breaker status metric."""
     try:

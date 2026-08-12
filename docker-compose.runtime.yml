@@ -6,8 +6,6 @@
 #
 # LITE: No Redis, no Prometheus, no external service dependencies
 
-version: "3.9"
-
 services:
   # LOATS Application - Lightweight options analysis (RUNTIME mode)
   loats:
