@@ -115,7 +115,7 @@ class Database:
         self._initialize_database()
 
         # Async connection pool
-        self._async_pool: aiosqlite.ConnectionPool | None = None
+        self._async_pool: Any | None = None  # SimpleConnectionPool or aiosqlite.ConnectionPool
         self._async_pool_lock = asyncio.Lock()
 
     def initialize(self) -> None:
@@ -1708,8 +1708,9 @@ class Database:
         # Initialize async connection pool
         try:
             import aiosqlite
+            from .utils.connection_pool import SimpleConnectionPool
 
-            self._async_pool = aiosqlite.ConnectionPool(
+            self._async_pool = SimpleConnectionPool(
                 str(self.db_path), maxsize=10, timeout=30.0
             )
             logger.info("Async database connection pool initialized")

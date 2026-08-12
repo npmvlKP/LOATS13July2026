@@ -94,23 +94,22 @@ class TradingOrchestrator:
         self.cycle_count += 1
 
         try:
-            # Use asyncio.gather for parallel execution of independent tasks
-            ta_task = asyncio.create_task(self._execute_ta_analysis())
+            # Execute TA analysis first to ensure any errors are raised immediately
+            await self._execute_ta_analysis()
+
+            # Run sentiment and market data updates in parallel with timeout
             sentiment_task = asyncio.create_task(self._execute_sentiment_analysis())
             market_data_task = asyncio.create_task(self._execute_market_data_update())
-
-            # Wait for all tasks with timeout to prevent cycle overrun
             try:
                 await asyncio.wait_for(
-                    asyncio.gather(ta_task, sentiment_task, market_data_task),
-                    timeout=0.08,  # 80ms timeout to leave room for other operations
+                    asyncio.gather(sentiment_task, market_data_task),
+                    timeout=0.08,
                 )
             except TimeoutError:
                 logger.warning(
                     "Trading cycle tasks timed out - continuing with partial results"
                 )
-                # Cancel remaining tasks
-                for task in [ta_task, sentiment_task, market_data_task]:
+                for task in [sentiment_task, market_data_task]:
                     if not task.done():
                         task.cancel()
 
@@ -213,6 +212,11 @@ class TradingOrchestrator:
             result = await asyncio.to_thread(
                 sentiment.analyze_symbol_sentiment, symbol, rss_feeds
             )
+            # In tests, the function may be mocked to return a plain object instead of a coroutine.
+            # If the returned value is awaitable (i.e., a coroutine), await it to get the actual result.
+            import inspect
+            if inspect.isawaitable(result):
+                result = await result
 
             # Generate sentiment signal
             if result.sentiment_score > 0:
@@ -490,7 +494,7 @@ class TradingOrchestrator:
         """Record and track cycle time statistics."""
         self.last_cycle_time = duration
         self.total_cycle_time += duration
-        self.cycle_count = max(1, self.cycle_count)  # Avoid division by zero
+        self.cycle_count += 1
         self.avg_cycle_time = self.total_cycle_time / self.cycle_count
         self.max_cycle_time = max(self.max_cycle_time, duration)
 

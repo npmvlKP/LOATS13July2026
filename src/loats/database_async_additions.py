@@ -42,7 +42,8 @@ async def _async_create_signal(self: Database, signal: Signal) -> bool:
     now_ms = int(now.timestamp() * 1000)
     ts_ms = int(signal.timestamp.timestamp() * 1000)
 
-    async with self._async_pool.acquire() as conn:
+    conn = await self._async_pool.acquire()
+    try:
         async with conn.cursor() as cursor:
             await cursor.execute(
                 """
@@ -66,6 +67,8 @@ async def _async_create_signal(self: Database, signal: Signal) -> bool:
                 ),
             )
         await conn.commit()
+    finally:
+        await self._async_pool.release(conn)
 
     # Async audit logging
     await _async_log_audit(
@@ -93,7 +96,8 @@ async def _async_store_historical_data(
     now_iso = now.isoformat()
     now_ms = int(now.timestamp() * 1000)
 
-    async with self._async_pool.acquire() as conn:
+    conn = await self._async_pool.acquire()
+    try:
         async with conn.cursor() as cursor:
             for item in data:
                 ts_ms = int(item.timestamp.timestamp() * 1000)
@@ -119,6 +123,8 @@ async def _async_store_historical_data(
                     ),
                 )
         await conn.commit()
+    finally:
+        await self._async_pool.release(conn)
     return True
 
 
@@ -136,7 +142,8 @@ async def _async_store_quote(self: Database, quote: QuoteData) -> bool:
     now_ms = int(now.timestamp() * 1000)
     ts_ms = int(quote.timestamp.timestamp() * 1000)
 
-    async with self._async_pool.acquire() as conn:
+    conn = await self._async_pool.acquire()
+    try:
         async with conn.cursor() as cursor:
             await cursor.execute(
                 """
@@ -162,6 +169,8 @@ async def _async_store_quote(self: Database, quote: QuoteData) -> bool:
                 ),
             )
         await conn.commit()
+    finally:
+        await self._async_pool.release(conn)
     return True
 
 
@@ -182,7 +191,8 @@ async def _async_store_position(self: Database, position: Position) -> bool:
     ts_str = ts.isoformat() if isinstance(ts, datetime) else str(ts)
     ts_ms = int(ts.timestamp() * 1000) if isinstance(ts, datetime) else now_ms
 
-    async with self._async_pool.acquire() as conn:
+    conn = await self._async_pool.acquire()
+    try:
         async with conn.cursor() as cursor:
             await cursor.execute(
                 """
@@ -207,6 +217,8 @@ async def _async_store_position(self: Database, position: Position) -> bool:
                 ),
             )
         await conn.commit()
+    finally:
+        await self._async_pool.release(conn)
     return True
 
 
@@ -224,7 +236,8 @@ async def _async_store_funds(self: Database, funds: FundsData) -> bool:
     now_ms = int(now.timestamp() * 1000)
     ts_ms = int(funds.timestamp.timestamp() * 1000)
 
-    async with self._async_pool.acquire() as conn:
+    conn = await self._async_pool.acquire()
+    try:
         async with conn.cursor() as cursor:
             await cursor.execute(
                 """
@@ -245,6 +258,8 @@ async def _async_store_funds(self: Database, funds: FundsData) -> bool:
                 ),
             )
         await conn.commit()
+    finally:
+        await self._async_pool.release(conn)
     return True
 
 
@@ -259,7 +274,8 @@ async def _async_get_latest_signals(
     ):
         return []
 
-    async with self._async_pool.acquire() as conn:
+    conn = await self._async_pool.acquire()
+    try:
         async with conn.cursor() as cursor:
             if scan_type is not None:
                 await cursor.execute(
@@ -279,6 +295,8 @@ async def _async_get_latest_signals(
                     (symbol, limit),
                 )
             rows = await cursor.fetchall()
+    finally:
+        await self._async_pool.release(conn)
     return [self._row_to_signal(row) for row in rows]
 
 
@@ -310,7 +328,8 @@ async def _async_update_trade(self: Database, trade: Trade) -> bool:
         else None
     )
 
-    async with self._async_pool.acquire() as conn:
+    conn = await self._async_pool.acquire()
+    try:
         async with conn.cursor() as cursor:
             await cursor.execute(
                 """
@@ -355,6 +374,8 @@ async def _async_update_trade(self: Database, trade: Trade) -> bool:
                 ),
             )
         await conn.commit()
+    finally:
+        await self._async_pool.release(conn)
 
     # Async audit logging
     await _async_log_audit(
@@ -383,20 +404,25 @@ async def _async_update_order_status(
     now_iso = now.isoformat()
     now_ms = int(now.timestamp() * 1000)
 
-    async with self._async_pool.acquire() as conn:
+    conn = await self._async_pool.acquire()
+    try:
         async with conn.cursor() as cursor:
             await cursor.execute(
                 "UPDATE orders SET status = ?, updated_at = ?, updated_at_ms = ? WHERE order_id = ?",
                 (status, now_iso, now_ms, order_id),
             )
+            updated = cursor.rowcount > 0
         await conn.commit()
-    return True
+    finally:
+        await self._async_pool.release(conn)
+    return updated
 
 
 async def async_get_trade(self: Database, trade_id: str) -> Trade | None:
     """Async get trade by ID."""
     if AIOSQLITE_AVAILABLE and hasattr(self, "_async_pool") and self._async_pool:
-        async with self._async_pool.acquire() as conn:
+        conn = await self._async_pool.acquire()
+        try:
             async with conn.cursor() as cursor:
                 await cursor.execute(
                     "SELECT * FROM trades WHERE trade_id = ?", (trade_id,)
@@ -405,6 +431,8 @@ async def async_get_trade(self: Database, trade_id: str) -> Trade | None:
                 if row is None:
                     return None
                 return self._row_to_trade(row)
+        finally:
+            await self._async_pool.release(conn)
     else:
         # Fallback to sync method
         return self.get_trade(trade_id)
@@ -460,7 +488,8 @@ async def _async_log_audit(
         ) from e
 
     # Write to async database
-    async with self._async_pool.acquire() as conn:
+    conn = await self._async_pool.acquire()
+    try:
         async with conn.cursor() as cursor:
             await cursor.execute(
                 """
@@ -484,6 +513,8 @@ async def _async_log_audit(
                 ),
             )
         await conn.commit()
+    finally:
+        await self._async_pool.release(conn)
 
 
 # Add async methods to Database class if they don't exist
