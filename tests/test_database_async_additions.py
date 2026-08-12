@@ -9,7 +9,7 @@ import asyncio
 import json
 import tempfile
 import unittest
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -27,29 +27,41 @@ from src.loats.models import (
     Trade,
 )
 
-@pytest.fixture
-def temp_db():
-    """Create a temporary database for testing."""
-    with tempfile.TemporaryDirectory() as temp_dir:
-        db_path = Path(temp_dir) / "test.db"
-        audit_log_path = Path(temp_dir) / "test_audit.jsonl"
-
-        # Initialize database
-        db = Database(db_path=db_path, audit_log_path=audit_log_path)
-        db._initialize_database()
-
-        # Ensure async methods are extended
-        extend_database_class()
-
-        yield db
-
-        # Clean up
-        db.close_all()
-
-class TestDatabaseAsyncAdditions(unittest.IsolatedAsyncioTestCase):
+class TestDatabaseAsyncAdditions:
     """Test suite for async database operations."""
 
-    async def test_extend_database_class(self):
+    @pytest.fixture
+    def temp_db(self):
+        """Create a temporary database for testing."""
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp_dir:
+            db_path = Path(temp_dir) / "test.db"
+            audit_log_path = Path(temp_dir) / "test_audit.jsonl"
+
+            # Initialize database
+            db = Database(db_path=db_path, audit_log_path=audit_log_path)
+            db._initialize_database()
+
+            # Ensure async methods are extended
+            extend_database_class()
+
+            yield db
+
+            # Clean up - close async pool first, then sync connections
+            if hasattr(db, "_async_pool") and db._async_pool is not None:
+                try:
+                    loop = asyncio.new_event_loop()
+                    try:
+                        loop.run_until_complete(db.async_close_all())
+                    except Exception:
+                        pass
+                    finally:
+                        loop.close()
+                except Exception:
+                    pass
+                db._async_pool = None
+            db.close_all()
+
+    def test_extend_database_class(self):
         """Test that the Database class is properly extended with async methods."""
         # Ensure the extension function works
         extend_database_class()
@@ -155,7 +167,7 @@ class TestDatabaseAsyncAdditions(unittest.IsolatedAsyncioTestCase):
         historical_data = [
             HistoricalData(
                 symbol="TEST",
-                timestamp=now,
+                timestamp=now - timedelta(minutes=1),
                 open=100.0,
                 high=105.0,
                 low=99.0,
@@ -294,15 +306,15 @@ class TestDatabaseAsyncAdditions(unittest.IsolatedAsyncioTestCase):
         # Initialize async pool
         await temp_db.async_initialize()
 
-        # Create test signals
-        now = datetime.now(UTC)
+        # Create test signals with increasing timestamps
+        base_time = datetime.now(UTC)
         signals = [
             Signal(
                 signal_id=f"test_signal_{i:03d}",
                 symbol="TEST",
                 signal_type="BUY" if i % 2 == 0 else "SELL",
                 strength=0.7 + i * 0.05,
-                timestamp=now,
+                timestamp=base_time - timedelta(seconds=10 - i),
                 indicators={"rsi": 30.0 + i * 2, "macd": 1.0 + i * 0.2},
                 confidence=0.8 + i * 0.02,
                 metadata={"scan_type": "technical", "source": "test"},

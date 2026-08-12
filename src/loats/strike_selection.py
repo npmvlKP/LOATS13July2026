@@ -17,7 +17,6 @@ from .options import options
 
 logger = get_logger(__name__)
 
-
 class StrikeSelectionEngine:
     """High-performance strike selection engine with <5ms latency guarantee."""
 
@@ -54,7 +53,13 @@ class StrikeSelectionEngine:
 
         try:
             # Use cached result if available and parameters match
-            cache_key = f"{underlying_price:.2f}_{strategy}_{width}_{max_strikes}"
+            # Include option_chain signature in cache key to avoid returning
+            # cached results for different option chains
+            chain_sig = (
+                len(option_chain),
+                option_chain[0].strike_price if option_chain else 0,
+            )
+            cache_key = f"{underlying_price:.2f}_{strategy}_{width}_{max_strikes}_{chain_sig}"
             if cache_key in self._cache:
                 return self._cache[cache_key]
 
@@ -124,16 +129,28 @@ class StrikeSelectionEngine:
 
         # Handle case where exact match not found
         if left > right:
-            if right >= 0 and (
-                left >= len(strikes)
-                or abs(strikes[right] - underlying_price)
-                <= abs(strikes[left] - underlying_price)
-            ):
-                best_idx = right
+            # Price below all strikes
+            if right == -1:
+                best_idx = 0
+            # Price above all strikes
+            elif left >= len(strikes):
+                best_idx = len(strikes) - 1
             else:
-                best_idx = left
+                # Choose closer strike (existing logic)
+                if right >= 0 and (
+                    left >= len(strikes)
+                    or abs(strikes[right] - underlying_price)
+                    <= abs(strikes[left] - underlying_price)
+                ):
+                    best_idx = right
+                else:
+                    best_idx = left
 
-        # Select strikes around ATM
+        # Edge cases: price below all strikes or above all strikes – return only nearest strike
+        if right == -1 or left >= len(strikes):
+            return [strikes[best_idx]][:max_strikes]
+
+        # Select strikes around ATM for normal cases
         selected = []
         start_idx = max(0, best_idx - width)
         end_idx = min(len(strikes) - 1, best_idx + width)
@@ -143,7 +160,8 @@ class StrikeSelectionEngine:
                 break
             selected.append(strikes[i])
 
-        return selected
+        # Ensure we don't exceed max_strikes
+        return selected[:max_strikes]
 
     async def _select_delta_neutral_strikes(
         self,
@@ -208,7 +226,10 @@ class StrikeSelectionEngine:
         return selected
 
     async def calculate_optimal_strike_spacing(
-        self, underlying_price: float, implied_volatility: float, days_to_expiry: int
+        self,
+        underlying_price: float,
+        implied_volatility: float,
+        days_to_expiry: int
     ) -> float:
         """Calculate optimal strike spacing based on market conditions.
 
@@ -298,10 +319,8 @@ class StrikeSelectionEngine:
         """Clear the strike selection cache."""
         self._cache.clear()
 
-
 # Module-level singleton instance
 strike_selector = StrikeSelectionEngine()
-
 
 # Async wrapper for module-level access
 async def select_strikes(

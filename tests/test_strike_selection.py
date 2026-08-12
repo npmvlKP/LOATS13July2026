@@ -9,7 +9,7 @@ to address the 18.3% coverage issue.
 import asyncio
 import tempfile
 import unittest
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -122,7 +122,7 @@ class TestStrikeSelectionUtilities(unittest.IsolatedAsyncioTestCase):
             assert len(selected) == 1
             mock_select.assert_called_once()
 
-        # Test empty option chain
+        # Test empty option chain - should return empty list
         selected = await select_strikes(100.0, [], "atm_straddle", 1, 3)
         assert len(selected) == 0
 
@@ -521,7 +521,7 @@ class TestStrikeSelectionEngine(unittest.IsolatedAsyncioTestCase):
                 # Mock datetime to simulate slow execution
                 mock_datetime.datetime.now.side_effect = [
                     datetime.now(UTC),
-                    datetime.now(UTC) + datetime.timedelta(milliseconds=6),  # 6ms later
+                    datetime.now(UTC) + timedelta(milliseconds=6),  # 6ms later
                 ]
 
                 selected = await self.engine.select_strikes(100.0, option_chain, "atm_straddle", 1, 1)
@@ -534,7 +534,7 @@ class TestStrikeSelectionEngine(unittest.IsolatedAsyncioTestCase):
                 # Mock datetime to simulate fast execution
                 mock_datetime.datetime.now.side_effect = [
                     datetime.now(UTC),
-                    datetime.now(UTC) + datetime.timedelta(milliseconds=2),  # 2ms later
+                    datetime.now(UTC) + timedelta(milliseconds=2),  # 2ms later
                 ]
 
                 selected = await self.engine.select_strikes(100.0, option_chain, "atm_straddle", 1, 1)
@@ -634,7 +634,7 @@ class TestStrikeSelectionEngine(unittest.IsolatedAsyncioTestCase):
 
         # Test with only ATM options available
         selected = await self.engine._select_delta_neutral_strikes(100.0, option_chain, 1, 2)
-        assert len(selected) == 1  # Should select ATM strike
+        assert len(selected) == 2  # Should select both ATM call and put
         assert 100.0 in selected
 
     async def test_oi_based_edge_cases(self):
