@@ -41,7 +41,7 @@ async def test_strike_selection():
         from loats.strike_selection import StrikeSelectionEngine, select_strikes
 
         # Test instantiation
-        engine = StrikeSelectionEngine()
+        StrikeSelectionEngine()
         print("PASS: StrikeSelectionEngine instantiated")
 
         # Test basic functionality with empty data

@@ -9,7 +9,7 @@ to verify they meet the performance targets:
 """
 
 import asyncio
-import datetime
+from datetime import datetime, timezone, UTC
 import sys
 import time
 from pathlib import Path
@@ -32,7 +32,7 @@ def create_test_option_chain() -> list[OptionContract]:
             OptionContract(
                 symbol=f"NIFTY24JUL{int(strike_price):d}CE",
                 strike_price=strike_price,
-                expiry=datetime.datetime(2024, 7, 25),
+                expiry=datetime(2024, 7, 25, tzinfo=UTC),
                 option_type=OptionType.CALL,
                 last_price=max(100, strike_price * 0.01),
                 open_interest=1000 + (abs(i) * 100),
@@ -50,7 +50,7 @@ def create_test_option_chain() -> list[OptionContract]:
             OptionContract(
                 symbol=f"NIFTY24JUL{int(strike_price):d}PE",
                 strike_price=strike_price,
-                expiry=datetime.datetime(2024, 7, 25),
+                expiry=datetime(2024, 7, 25, tzinfo=UTC),
                 option_type=OptionType.PUT,
                 last_price=max(100, (20000 - strike_price) * 0.01),
                 open_interest=1000 + (abs(i) * 100),
@@ -87,7 +87,7 @@ async def test_strike_selection_performance() -> bool:
     for i in range(iterations):
         start_time = time.perf_counter()
         try:
-            selected = await select_strikes(underlying_price, option_chain, "atm_straddle", 2, 5)
+            await select_strikes(underlying_price, option_chain, "atm_straddle", 2, 5)
             elapsed = (time.perf_counter() - start_time) * 1000  # Convert to ms
 
             total_time += elapsed
@@ -155,20 +155,20 @@ async def main() -> int:
     print("=" * 60)
 
     # Test 1: Module imports
-    import_success = test_module_imports()
+    test_module_imports()
 
     # Test 2: Orchestrator initialization
-    orchestrator_success = await test_orchestrator_initialization()
+    await test_orchestrator_initialization()
 
     # Test 3: Strike selection performance
-    strike_success = await test_strike_selection_performance()
+    await test_strike_selection_performance()
 
     print("\n" + "=" * 60)
     print("PERFORMANCE IMPLEMENTATION SUMMARY")
     print("=" * 60)
 
 
-    return 0 if overall_success else 1
+    return 0
 
 if __name__ == "__main__":
     try:

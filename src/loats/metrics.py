@@ -11,7 +11,6 @@ from typing import Any, Optional, TypeVar, cast
 
 from .loats_logging import get_logger
 
-
 # Lightweight replacements for the MagicMock based test stubs.
 class _Metric:
     """Simple metric object exposing ``inc``, ``observe`` and ``set`` methods.
@@ -30,7 +29,6 @@ class _Metric:
     def set(self, value: Any) -> None:
         self._callback(value)
 
-
 class _MetricFactory:
     """Factory returning a metric object bound to ``labels`` and a callback.
 
@@ -48,7 +46,6 @@ class _MetricFactory:
         bound = tuple(label_kwargs.values())
         return _Metric(lambda *args: self._callback(*bound, *args))
 
-
 class _SimpleSetter:
     """Wrapper exposing a ``set`` method that forwards to ``callback``.
     Used for boolean style metrics.
@@ -60,9 +57,7 @@ class _SimpleSetter:
     def set(self, value: Any) -> None:
         self._callback(value)
 
-
 logger = get_logger(__name__)
-
 
 @functools.lru_cache(maxsize=1)
 class MetricsManager:
@@ -275,12 +270,10 @@ class MetricsManager:
             logger.error(f"Failed to start metrics server: {e}")
             self._server_started = False
 
-
 # Initialize the singleton
 metrics = MetricsManager()
 
-F = TypeVar("F", bound=Callable[..., Coroutine[Any, Any, Any]])
-
+F = TypeVar("F", bound=Callable[..., Any])
 
 def track_job(
     job_id: str, manager: Optional[MetricsManager] = None
@@ -315,7 +308,6 @@ def track_job(
 
     return decorator
 
-
 def record_cycle_time(duration: float) -> None:
     """Record trading cycle execution time."""
     try:
@@ -339,7 +331,6 @@ def record_cycle_time(duration: float) -> None:
         # Silently handle metrics errors to not interfere with application flow
         pass
 
-
 def record_signal(
     signal_type: str, scan_type: str, manager: Optional[MetricsManager] = None
 ) -> None:
@@ -352,7 +343,6 @@ def record_signal(
         # Silently handle metrics errors to not interfere with application flow
         pass
 
-
 def set_kill_switch_status(
     active: bool, manager: Optional[MetricsManager] = None
 ) -> None:
@@ -362,7 +352,6 @@ def set_kill_switch_status(
     except Exception:  # nosec B110
         # Silently handle metrics errors to not interfere with application flow
         pass
-
 
 def set_circuit_breaker_status(
     component: str, open_status: bool, manager: Optional[MetricsManager] = None
@@ -376,17 +365,14 @@ def set_circuit_breaker_status(
         # Silently handle metrics errors to not interfere with application flow
         pass
 
-
 def get_metrics_summary() -> dict[str, Any]:
     """Get summary of all metrics."""
     return metrics.get_metrics_summary()
-
 
 def start_metrics_server(port: int = 8001) -> None:
     """Start the metrics server (standalone function for compatibility)."""
     manager = MetricsManager()
     manager.start_server(port)
-
 
 def start_http_server(port: int) -> None:
     """Start a lightweight HTTP server exposing metrics as JSON.

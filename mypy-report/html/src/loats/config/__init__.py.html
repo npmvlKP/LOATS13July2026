@@ -1,0 +1,60 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<link rel="stylesheet" type="text/css" href="../../../../mypy-html.css">
+</head>
+<body>
+<h2>src.loats.config</h2>
+<table>
+<caption>src\loats\config\__init__.py</caption>
+<tbody><tr>
+<td class="table-lines"><pre><span id="L1" class="lineno"><a class="lineno" href="#L1">1</a></span>
+<span id="L2" class="lineno"><a class="lineno" href="#L2">2</a></span>
+<span id="L3" class="lineno"><a class="lineno" href="#L3">3</a></span>
+<span id="L4" class="lineno"><a class="lineno" href="#L4">4</a></span>
+<span id="L5" class="lineno"><a class="lineno" href="#L5">5</a></span>
+<span id="L6" class="lineno"><a class="lineno" href="#L6">6</a></span>
+<span id="L7" class="lineno"><a class="lineno" href="#L7">7</a></span>
+<span id="L8" class="lineno"><a class="lineno" href="#L8">8</a></span>
+<span id="L9" class="lineno"><a class="lineno" href="#L9">9</a></span>
+<span id="L10" class="lineno"><a class="lineno" href="#L10">10</a></span>
+<span id="L11" class="lineno"><a class="lineno" href="#L11">11</a></span>
+<span id="L12" class="lineno"><a class="lineno" href="#L12">12</a></span>
+<span id="L13" class="lineno"><a class="lineno" href="#L13">13</a></span>
+<span id="L14" class="lineno"><a class="lineno" href="#L14">14</a></span>
+<span id="L15" class="lineno"><a class="lineno" href="#L15">15</a></span>
+<span id="L16" class="lineno"><a class="lineno" href="#L16">16</a></span>
+<span id="L17" class="lineno"><a class="lineno" href="#L17">17</a></span>
+<span id="L18" class="lineno"><a class="lineno" href="#L18">18</a></span>
+<span id="L19" class="lineno"><a class="lineno" href="#L19">19</a></span>
+<span id="L20" class="lineno"><a class="lineno" href="#L20">20</a></span>
+<span id="L21" class="lineno"><a class="lineno" href="#L21">21</a></span>
+<span id="L22" class="lineno"><a class="lineno" href="#L22">22</a></span>
+</pre></td>
+<td class="table-code"><pre><span class="line-empty" title="No Anys on this line!">"""Configuration package for LOATS13July2026."""</span>
+<span class="line-empty" title="No Anys on this line!"></span>
+<span class="line-precise" title="No Anys on this line!">from __future__ import annotations</span>
+<span class="line-empty" title="No Anys on this line!"></span>
+<span class="line-precise" title="No Anys on this line!">from .settings import Settings, get_settings</span>
+<span class="line-empty" title="No Anys on this line!"></span>
+<span class="line-empty" title="No Anys on this line!"># ``settings`` is deliberately NOT re-exported from this package.</span>
+<span class="line-empty" title="No Anys on this line!">#</span>
+<span class="line-empty" title="No Anys on this line!"># ``loats.config.settings`` is a real submodule. Importing it binds the</span>
+<span class="line-empty" title="No Anys on this line!"># *module object* as an attribute of this package, and Python only consults a</span>
+<span class="line-empty" title="No Anys on this line!"># module-level ``__getattr__`` when normal attribute lookup fails. A lazy</span>
+<span class="line-empty" title="No Anys on this line!"># ``settings`` accessor defined here is therefore permanently shadowed:</span>
+<span class="line-empty" title="No Anys on this line!"># ``from loats.config import settings`` yields the module, not a ``Settings``</span>
+<span class="line-empty" title="No Anys on this line!"># instance, while a ``TYPE_CHECKING`` declaration would make mypy believe the</span>
+<span class="line-empty" title="No Anys on this line!"># opposite — a silent type/runtime divergence.</span>
+<span class="line-empty" title="No Anys on this line!">#</span>
+<span class="line-empty" title="No Anys on this line!"># Use one of the following instead:</span>
+<span class="line-empty" title="No Anys on this line!">#   * ``from loats.config import get_settings`` — the lru_cached accessor</span>
+<span class="line-empty" title="No Anys on this line!">#     used throughout ``src/loats`` (lazy, single shared instance).</span>
+<span class="line-empty" title="No Anys on this line!">#   * ``from loats import settings`` — the top-level lazy accessor, which is</span>
+<span class="line-empty" title="No Anys on this line!">#     not shadowed because there is no ``loats/settings.py`` submodule.</span>
+<span class="line-precise" title="No Anys on this line!">__all__ = ["Settings", "get_settings"]</span>
+</pre></td>
+</tr></tbody>
+</table>
+</body>
+</html>

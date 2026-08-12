@@ -6,7 +6,7 @@ This test suite targets specific lines that are missing coverage in scheduler.py
 import asyncio
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 
 from src.loats.scheduler import TradingScheduler, scheduler
 from src.loats.models import Signal, SignalType
@@ -460,13 +460,13 @@ class TestSchedulerCoverage:
         mock_job1.id = "job1"
         mock_job1.name = "Test Job 1"
         mock_job1.trigger = "interval"
-        mock_job1.next_run_time = datetime.now(timezone.utc)
+        mock_job1.next_run_time = datetime.now(UTC)
 
         mock_job2 = MagicMock()
         mock_job2.id = "job2"
         mock_job2.name = "Test Job 2"
         mock_job2.trigger = "cron"
-        mock_job2.next_run_time = datetime.now(timezone.utc)
+        mock_job2.next_run_time = datetime.now(UTC)
 
         scheduler_instance.scheduler.get_jobs.return_value = [mock_job1, mock_job2]
 
