@@ -5,10 +5,9 @@ This test verifies that the fix for R5-F-14 works correctly.
 """
 
 import tempfile
-import os
-import json
 from pathlib import Path
-from datetime import datetime, timezone
+import json
+from datetime import datetime, timezone, UTC
 import sqlite3
 
 # Add the src directory to the path so we can import the Database class
@@ -36,8 +35,8 @@ def test_audit_log_dual_write_consistency():
             quantity=10,
             entry_price=100.0,
             exit_price=110.0,
-            entry_time=datetime.now(timezone.utc),
-            exit_time=datetime.now(timezone.utc),
+            entry_time=datetime.now(UTC),
+            exit_time=datetime.now(UTC),
             transaction_type=TransactionType.BUY,
             product_type=ProductType.MIS,
             pnl=100.0,
@@ -72,7 +71,7 @@ def test_audit_log_dual_write_consistency():
         print("\nTesting JSONL write failure scenario...")
 
         # Make audit log file read-only to simulate write failure
-        os.chmod(audit_log_path, 0o444)  # Read-only
+        Path(audit_log_path).chmod(0o444)  # Read-only
 
         try:
             # This should raise an exception due to JSONL write failure
@@ -82,8 +81,8 @@ def test_audit_log_dual_write_consistency():
                 quantity=5,
                 entry_price=50.0,
                 exit_price=55.0,
-                entry_time=datetime.now(timezone.utc),
-                exit_time=datetime.now(timezone.utc),
+                entry_time=datetime.now(UTC),
+                exit_time=datetime.now(UTC),
                 transaction_type=TransactionType.SELL,
                 product_type=ProductType.NRML,
                 pnl=25.0,
@@ -93,7 +92,7 @@ def test_audit_log_dual_write_consistency():
 
             try:
                 db.create_trade(trade2)
-                assert False, "Expected RuntimeError due to JSONL write failure"
+                raise AssertionError("Expected RuntimeError due to JSONL write failure")
             except RuntimeError as e:
                 print(f"[+] Correctly caught expected error: {e}")
                 assert "Failed to write audit log entry to JSONL file" in str(e)
@@ -101,7 +100,7 @@ def test_audit_log_dual_write_consistency():
 
         finally:
             # Restore write permissions
-            os.chmod(audit_log_path, 0o644)
+            Path(audit_log_path).chmod(0o644)
 
         # Verify that no partial audit trail was created
         conn = sqlite3.connect(db_path)
@@ -131,8 +130,8 @@ def test_audit_log_dual_write_consistency():
             quantity=15,
             entry_price=75.0,
             exit_price=80.0,
-            entry_time=datetime.now(timezone.utc),
-            exit_time=datetime.now(timezone.utc),
+            entry_time=datetime.now(UTC),
+            exit_time=datetime.now(UTC),
             transaction_type=TransactionType.BUY,
             product_type=ProductType.CNC,
             pnl=75.0,

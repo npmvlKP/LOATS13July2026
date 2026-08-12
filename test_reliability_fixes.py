@@ -53,7 +53,7 @@ class TestReliabilityFixes(unittest.IsolatedAsyncioTestCase):
         # Close database connections
         try:
             await self.db.async_close_all()
-        except:
+        except Exception:
             pass
 
         # Clean up temporary files
@@ -63,7 +63,7 @@ class TestReliabilityFixes(unittest.IsolatedAsyncioTestCase):
             if self.audit_log_path.exists():
                 self.audit_log_path.unlink()
             self.temp_dir.rmdir()
-        except:
+        except Exception:
             pass
 
     async def test_r5_f_02_scheduler_db_cleanup(self):
@@ -232,7 +232,7 @@ class TestReliabilityFixes(unittest.IsolatedAsyncioTestCase):
 
         def failing_open(*args, **kwargs):
             if 'test_audit.jsonl' in str(args[0]):
-                raise IOError("Simulated file write failure")
+                raise OSError("Simulated file write failure")
             return original_open(*args, **kwargs)
 
         # Patch the Path.open method

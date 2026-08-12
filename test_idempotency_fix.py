@@ -54,7 +54,7 @@ def test_idempotency_key_functionality():
 
         # Try to store the same order again with the same idempotency key - should fail
         try:
-            result2 = db.store_order(order1)
+            db.store_order(order1)
             print("❌ Duplicate order was allowed - idempotency check failed!")
             return False
         except ValueError as e:

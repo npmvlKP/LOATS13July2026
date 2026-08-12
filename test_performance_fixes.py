@@ -87,8 +87,6 @@ async def test_circuit_breaker_retry_config_not_rebound():
     # Patch _calculate_delay to capture the config object
     captured_configs = []
 
-    original_calculate_delay = None
-
     def mock_calculate_delay(config, attempt):
         captured_configs.append(config)
         return 0.01  # Short delay for testing
