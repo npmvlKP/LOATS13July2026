@@ -59,7 +59,7 @@ from .models import (
     TransactionType,
 )
 from .utils.cache import cache_manager
-from .utils.circuit_breaker import OPENALGO_CIRCUIT_BREAKER
+from .utils.circuit_breaker import CircuitBreakerOpenError, OPENALGO_CIRCUIT_BREAKER
 from .utils.payload_builder import (
     build_cancel_order_payload,
     build_modify_order_payload,
@@ -390,6 +390,12 @@ class OpenAlgoClient:
         take_profit: float | None = None,
         trailing_stop_loss: float | None = None,
     ) -> dict[str, Any]:
+        """
+        Place an order with circuit breaker protection.
+
+        Note: Circuit breaker is applied without retry to avoid duplicate orders.
+        When the circuit is open, this method fails fast with CircuitBreakerOpenError.
+        """
         _check_kill_switch()
         # Use higher rate limits for order operations (50 ops per second)
         if not get_sync_order_rate_limiter().acquire():
@@ -410,14 +416,18 @@ class OpenAlgoClient:
             trailing_stop_loss=trailing_stop_loss,
         )
 
-        return self._request(
-            "POST",
-            "place_order",
-            json=payload,
-            idempotency_key=_get_idempotency_key(
-                f"place:{_order_payload_digest(payload)}"
-            ),
-        )
+        # Wrap order placement in circuit breaker without retry
+        def _place_order_impl() -> dict[str, Any]:
+            return self._request(
+                "POST",
+                "place_order",
+                json=payload,
+                idempotency_key=_get_idempotency_key(
+                    f"place:{_order_payload_digest(payload)}"
+                ),
+            )
+
+        return OPENALGO_CIRCUIT_BREAKER.call(_place_order_impl)
 
     def place_smart_order(
         self,
@@ -434,6 +444,12 @@ class OpenAlgoClient:
         product_type: str | ProductType = "MIS",
         metadata: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
+        """
+        Place a smart order with circuit breaker protection.
+
+        Note: Circuit breaker is applied without retry to avoid duplicate orders.
+        When the circuit is open, this method fails fast with CircuitBreakerOpenError.
+        """
         _check_kill_switch()
         # Use higher rate limits for smart order operations (50 ops per second)
         if not get_sync_smart_order_rate_limiter().acquire():
@@ -455,14 +471,18 @@ class OpenAlgoClient:
             metadata=metadata,
         )
 
-        return self._request(
-            "POST",
-            "place_smart_order",
-            json=payload,
-            idempotency_key=_get_idempotency_key(
-                f"place_smart_order:{_order_payload_digest(payload)}"
-            ),
-        )
+        # Wrap smart order placement in circuit breaker without retry
+        def _place_smart_order_impl() -> dict[str, Any]:
+            return self._request(
+                "POST",
+                "place_smart_order",
+                json=payload,
+                idempotency_key=_get_idempotency_key(
+                    f"place_smart_order:{_order_payload_digest(payload)}"
+                ),
+            )
+
+        return OPENALGO_CIRCUIT_BREAKER.call(_place_smart_order_impl)
 
     def modify_order(
         self,
@@ -475,6 +495,12 @@ class OpenAlgoClient:
         take_profit: float | None = None,
         trailing_stop_loss: float | None = None,
     ) -> dict[str, Any]:
+        """
+        Modify an order with circuit breaker protection.
+
+        Note: Circuit breaker is applied without retry to avoid duplicate modifications.
+        When the circuit is open, this method fails fast with CircuitBreakerOpenError.
+        """
         _check_kill_switch()
         payload = build_modify_order_payload(
             order_id=order_id,
@@ -487,22 +513,37 @@ class OpenAlgoClient:
             trailing_stop_loss=trailing_stop_loss,
         )
 
-        return self._request(
-            "POST",
-            "modify_order",
-            json=payload,
-            idempotency_key=_get_idempotency_key(f"modify:{order_id}"),
-        )
+        # Wrap order modification in circuit breaker without retry
+        def _modify_order_impl() -> dict[str, Any]:
+            return self._request(
+                "POST",
+                "modify_order",
+                json=payload,
+                idempotency_key=_get_idempotency_key(f"modify:{order_id}"),
+            )
+
+        return OPENALGO_CIRCUIT_BREAKER.call(_modify_order_impl)
 
     def cancel_order(self, order_id: str) -> dict[str, Any]:
+        """
+        Cancel an order with circuit breaker protection.
+
+        Note: Circuit breaker is applied without retry to avoid duplicate cancellations.
+        When the circuit is open, this method fails fast with CircuitBreakerOpenError.
+        """
         _check_kill_switch()
         payload = {"order_id": order_id}
-        return self._request(
-            "POST",
-            "cancel_order",
-            json=payload,
-            idempotency_key=_get_idempotency_key(f"cancel:{order_id}"),
-        )
+
+        # Wrap order cancellation in circuit breaker without retry
+        def _cancel_order_impl() -> dict[str, Any]:
+            return self._request(
+                "POST",
+                "cancel_order",
+                json=payload,
+                idempotency_key=_get_idempotency_key(f"cancel:{order_id}"),
+            )
+
+        return OPENALGO_CIRCUIT_BREAKER.call(_cancel_order_impl)
 
     def get_order_status(self, order_id: str) -> dict[str, Any]:
         payload = {"order_id": order_id}

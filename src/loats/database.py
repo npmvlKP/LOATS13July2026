@@ -32,14 +32,12 @@ from .models import (
 try:
     import aiosqlite
 except ImportError:
-    aiosqlite = None  # Type checker hint
+    aiosqlite = None  # type: ignore[assignment]
 
 logger = get_logger(__name__)
 
 T = TypeVar("T", bound=BaseModel)
 
-# -------------------------------------------------------------------------
-# SQLite PRAGMA configuration (F-PERF-1 fix)
 # -------------------------------------------------------------------------
 # FIX-F-PERF-1:
 #   PRAGMAs in SQLite are **per-connection** settings; opening a new

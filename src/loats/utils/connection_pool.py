@@ -4,7 +4,8 @@ This provides basic connection pooling functionality since aiosqlite doesn't hav
 """
 
 import asyncio
-from typing import AsyncGenerator, Optional
+from typing import Optional
+from collections.abc import AsyncGenerator
 import aiosqlite
 from collections import deque
 import logging
