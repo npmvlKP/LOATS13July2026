@@ -9,7 +9,7 @@ import pytest
 from cachetools import TTLCache
 from pydantic import BaseModel
 
-from src.loats.utils.cache import (
+from loats.utils.cache import (
     CacheConfig,
     CacheManager,
     cache_manager,

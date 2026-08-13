@@ -4,8 +4,8 @@ Tests for database module.
 
 from datetime import UTC, datetime, timedelta
 
-from src.loats.database import Database
-from src.loats.models import (
+from loats.database import Database
+from loats.models import (
     FundsData,
     HistoricalData,
     Order,

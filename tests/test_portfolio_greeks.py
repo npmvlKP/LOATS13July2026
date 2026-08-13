@@ -6,8 +6,8 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from src.loats.models import Greeks, OptionContract, OptionType
-from src.loats.options import OptionsAnalysis
+from loats.models import Greeks, OptionContract, OptionType
+from loats.options import OptionsAnalysis
 
 
 class TestPortfolioGreeks:

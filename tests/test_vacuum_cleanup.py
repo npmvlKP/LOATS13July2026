@@ -9,8 +9,8 @@ from pathlib import Path
 
 import pytest
 
-from src.loats.database import Database
-from src.loats.models import Trade
+from loats.database import Database
+from loats.models import Trade
 
 
 def test_vacuum_method():

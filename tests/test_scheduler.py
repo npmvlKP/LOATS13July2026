@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from src.loats.scheduler import TradingScheduler
+from loats.scheduler import TradingScheduler
 
 
 @pytest.fixture
@@ -44,7 +44,7 @@ async def test_start_shutdown(scheduler):
 @pytest.mark.asyncio
 async def test_ta_scan_task_tracks_metrics(scheduler):
     """TA scan task must record job execution metrics via track_job."""
-    from src.loats.metrics import MetricsManager
+    from loats.metrics import MetricsManager
 
     manager = MetricsManager()
     manager.reset_for_testing()

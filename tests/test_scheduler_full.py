@@ -3,8 +3,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from src.loats.models import SentimentAnalysisResult
-from src.loats.scheduler import TradingScheduler
+from loats.models import SentimentAnalysisResult
+from loats.scheduler import TradingScheduler
 
 
 @pytest.fixture

@@ -8,7 +8,7 @@ import time
 
 import pytest
 
-from src.loats.utils.rate_limiter import (
+from loats.utils.rate_limiter import (
     AsyncRateLimiter,
     RateLimiter,
     SyncRateLimiter,

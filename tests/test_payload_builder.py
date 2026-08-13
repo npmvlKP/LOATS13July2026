@@ -9,13 +9,13 @@ import unittest
 from enum import Enum
 from unittest.mock import patch
 
-from src.loats.models import (
+from loats.models import (
     OrderType,
     OrderVariety,
     ProductType,
     TransactionType,
 )
-from src.loats.utils.payload_builder import (
+from loats.utils.payload_builder import (
     _enum_to_value,
     build_cancel_order_payload,
     build_modify_order_payload,

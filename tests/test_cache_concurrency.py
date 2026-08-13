@@ -8,7 +8,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
-from src.loats.utils.cache import CacheConfig, CacheManager
+from loats.utils.cache import CacheConfig, CacheManager
 
 
 class TestCacheConcurrency:

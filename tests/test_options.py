@@ -8,8 +8,8 @@ import pytest
 from vollib.black_scholes import black_scholes
 from vollib.black_scholes.implied_volatility import implied_volatility
 
-from src.loats.models import Greeks, OptionContract, OptionType
-from src.loats.options import (
+from loats.models import Greeks, OptionContract, OptionType
+from loats.options import (
     ExpiredContractError,
     OptionsAnalysis,
     calculate_greeks,

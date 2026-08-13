@@ -62,8 +62,8 @@ class CacheManager:
         """Initialize cache manager with in-memory cache."""
         self.config = config
         self._cache: TTLCache[str, Any] | None = None
-        self._cache_lock = threading.Lock()
-        self._init_lock = threading.Lock()  # Threading lock for initialization
+        self._cache_lock = asyncio.Lock()  # Use asyncio.Lock for async operations
+        self._init_lock = asyncio.Lock()  # Async lock for initialization
         self._cache_stats = {
             "hits": 0,
             "misses": 0,
@@ -118,7 +118,7 @@ class CacheManager:
         try:
             if self._cache:
                 # Get from in-memory cache
-                with self._cache_lock:
+                async with self._cache_lock:
                     result = self._cache.get(cache_key)
                     if result is not None:
                         self._cache_stats["hits"] += 1
@@ -140,7 +140,7 @@ class CacheManager:
         logger.debug(f"DEBUG SET: Initial check - _initialized={self._initialized}")
         if not self._initialized:
             logger.debug("DEBUG SET: Cache not initialized, initializing...")
-            with self._init_lock:
+            async with self._init_lock:
                 if not self._initialized:
                     await self.initialize()
             logger.debug(
@@ -154,7 +154,7 @@ class CacheManager:
             logger.error(
                 f"Cache not properly initialized: _cache={self._cache}, _initialized={self._initialized}"
             )
-            with self._init_lock:
+            async with self._init_lock:
                 if self._cache is None:
                     await self.initialize()
 
@@ -177,7 +177,7 @@ class CacheManager:
 
             # Use in-memory cache
             logger.debug("DEBUG: Taking in-memory cache branch")
-            with self._cache_lock:
+            async with self._cache_lock:
                 self._cache[cache_key] = value_str
                 self._cache_stats["sets"] += 1
                 cache_size = len(self._cache)
@@ -227,7 +227,7 @@ class CacheManager:
 
         if self._cache is not None:
             # Get from in-memory cache
-            with self._cache_lock:
+            async with self._cache_lock:
                 result = self._cache.get(cache_key)
                 if result is not None:
                     self._cache_stats["hits"] += 1
@@ -266,7 +266,7 @@ class CacheManager:
         try:
             if self._cache:
                 # Delete from in-memory cache
-                with self._cache_lock:
+                async with self._cache_lock:
                     if cache_key in self._cache:
                         del self._cache[cache_key]
                         self._cache_stats["deletes"] += 1
@@ -286,7 +286,7 @@ class CacheManager:
         try:
             if self._cache:
                 # Clear in-memory cache
-                with self._cache_lock:
+                async with self._cache_lock:
                     if pattern == "*":
                         # Clear all cache
                         count = len(self._cache)

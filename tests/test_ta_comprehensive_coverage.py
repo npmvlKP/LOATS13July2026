@@ -11,8 +11,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.loats.models import HistoricalData, TAIndicator
-from src.loats.ta import (
+from loats.models import HistoricalData, TAIndicator
+from loats.ta import (
     TechnicalAnalysis,
     calculate_atr,
     calculate_cmf,
@@ -109,7 +109,7 @@ class TestSupertrendCoreCoverage:
     def test_supertrend_core_function_direct(self):
         """Test the _supertrend_core function directly."""
         # Import the core function
-        from src.loats.ta import _supertrend_core
+        from loats.ta import _supertrend_core
 
         # Create test data
         n = 10

@@ -16,7 +16,7 @@ def test_configure_logging_test_mode():
     os.environ["ENVIRONMENT"] = "test"
 
     # Import after setting environment
-    from src.loats.loats_logging import configure_logging
+    from loats.loats_logging import configure_logging
 
     # Mock Path.mkdir detect it's called
     with patch("pathlib.Path.mkdir") as mock_mkdir:
@@ -54,7 +54,7 @@ def test_configure_logging_production_mode():
         del os.environ["ENVIRONMENT"]
 
     # Import after setting environment
-    from src.loats.loats_logging import configure_logging
+    from loats.loats_logging import configure_logging
 
     # Mock Path.mkdir avoid creating actual directories
     with patch("pathlib.Path.mkdir") as mock_mkdir:
@@ -90,7 +90,7 @@ def test_logs_directory_not_created_in_test_mode():
     os.environ["ENVIRONMENT"] = "test"
 
     # Import after setting environment
-    from src.loats.loats_logging import configure_logging
+    from loats.loats_logging import configure_logging
 
     # Mock Path.mkdir detect it's called
     with patch("pathlib.Path.mkdir") as mock_mkdir:
@@ -111,7 +111,7 @@ def test_logs_directory_created_in_production_mode():
         del os.environ["ENVIRONMENT"]
 
     # Import after setting environment
-    from src.loats.loats_logging import configure_logging
+    from loats.loats_logging import configure_logging
 
     # Mock Path.mkdir detect it's called
     with patch("pathlib.Path.mkdir") as mock_mkdir:
@@ -141,7 +141,7 @@ def test_environment_based_logging_configuration():
     logging.root.handlers = []
 
     # Import configure logging explicitly test production mode
-    from src.loats.loats_logging import configure_logging
+    from loats.loats_logging import configure_logging
 
     # Mock Path.mkdir detect it's called
     with patch("pathlib.Path.mkdir") as mock_mkdir:

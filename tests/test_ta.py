@@ -3,8 +3,8 @@ from datetime import UTC, datetime, timedelta
 import pandas as pd
 import pytest
 
-from src.loats.models import HistoricalData, TAIndicator
-from src.loats.ta import (
+from loats.models import HistoricalData, TAIndicator
+from loats.ta import (
     TechnicalAnalysis,
     calculate_atr,
     calculate_cmf,

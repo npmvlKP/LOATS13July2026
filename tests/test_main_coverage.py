@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from src.loats.main import TradingSystem
+from loats.main import TradingSystem
 
 
 @pytest.fixture

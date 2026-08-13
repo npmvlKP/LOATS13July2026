@@ -15,7 +15,7 @@ import time
 
 import pytest
 
-from src.loats.utils.rate_limiter import (
+from loats.utils.rate_limiter import (
     get_order_rate_limiter,
     get_smart_order_rate_limiter,
 )

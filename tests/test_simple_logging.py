@@ -18,7 +18,7 @@ def test_logging_test_mode():
     os.environ["ENVIRONMENT"] = "test"
 
     # Import after setting environment
-    from src.loats.loats_logging import configure_logging
+    from loats.loats_logging import configure_logging
 
     # Configure logging in test mode
     configure_logging(test_mode=True)
@@ -52,7 +52,7 @@ def test_logging_production_mode():
         del os.environ["ENVIRONMENT"]
 
     # Import after setting environment
-    from src.loats.loats_logging import configure_logging
+    from loats.loats_logging import configure_logging
 
     # Mock the Path.mkdir to avoid creating actual directories
     with patch("pathlib.Path.mkdir") as mock_mkdir:

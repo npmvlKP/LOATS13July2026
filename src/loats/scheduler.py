@@ -735,5 +735,6 @@ class TradingScheduler:
         return self.running
 
 
-# Export default instance
+# Export default instance and provide backward-compatible alias
 scheduler = TradingScheduler()
+Scheduler = TradingScheduler  # Backward compatibility alias

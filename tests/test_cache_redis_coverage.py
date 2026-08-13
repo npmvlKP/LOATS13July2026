@@ -6,7 +6,7 @@ Focuses on Redis-specific functionality and edge cases.
 import pytest
 from cachetools import TTLCache
 
-from src.loats.utils.cache import (
+from loats.utils.cache import (
     CacheConfig,
     CacheManager,
 )

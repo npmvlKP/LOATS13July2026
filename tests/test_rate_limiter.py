@@ -8,9 +8,9 @@ import time
 
 import pytest
 
-from src.loats.config import get_settings
-from src.loats.loats_logging import get_logger
-from src.loats.utils.rate_limiter import (
+from loats.config import get_settings
+from loats.loats_logging import get_logger
+from loats.utils.rate_limiter import (
     AsyncRateLimiter,
     RateLimiter,
     RateLimitExceededError,
@@ -466,13 +466,13 @@ class TestRateLimiterConcurrencyBurst:
 
         This test addresses R5-F-01 / F-CONC-3-R - production blocker for order paths.
         """
-        from src.loats.utils.rate_limiter import (
+        from loats.utils.rate_limiter import (
             RateLimitExceededError,
             get_order_rate_limiter,
         )
 
         # Reset singleton to ensure clean test
-        from src.loats.utils.rate_limiter import _reset_singletons_for_testing
+        from loats.utils.rate_limiter import _reset_singletons_for_testing
 
         _reset_singletons_for_testing()
 
@@ -541,7 +541,7 @@ class TestRateLimiterConcurrencyBurst:
         This test ensures that the singleton pattern doesn't break under
         high concurrent load, which is critical for production reliability.
         """
-        from src.loats.utils.rate_limiter import (
+        from loats.utils.rate_limiter import (
             _reset_singletons_for_testing,
             get_order_rate_limiter,
         )

@@ -19,10 +19,10 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.loats.database import Database
-from src.loats.models import ProductType, Trade, TransactionType
-from src.loats.ta import calculate_rsi, calculate_supertrend
-from src.loats.utils.cache import cache_manager
+from loats.database import Database
+from loats.models import ProductType, Trade, TransactionType
+from loats.ta import calculate_rsi, calculate_supertrend
+from loats.utils.cache import cache_manager
 
 
 @pytest.fixture
@@ -337,10 +337,10 @@ class TestAPILatency:
     @pytest.mark.asyncio
     async def test_api_response_time(self) -> None:
         """Benchmark API response times with mock data."""
-        from src.loats.openalgo import async_client
+        from loats.openalgo import async_client
 
         # Mock the async client
-        with patch("src.loats.openalgo.async_client.get_quotes") as mock_get_quotes:
+        with patch("loats.openalgo.async_client.get_quotes") as mock_get_quotes:
             mock_get_quotes.return_value = {
                 "status": "success",
                 "data": {
@@ -364,10 +364,10 @@ class TestAPILatency:
     @pytest.mark.asyncio
     async def test_batch_api_performance(self) -> None:
         """Benchmark batch API operations."""
-        from src.loats.openalgo import async_client
+        from loats.openalgo import async_client
 
         # Mock multiple API calls
-        with patch("src.loats.openalgo.async_client.get_history") as mock_get_history:
+        with patch("loats.openalgo.async_client.get_history") as mock_get_history:
             mock_get_history.return_value = {"status": "success", "data": []}
 
             symbols = [f"TEST{i}" for i in range(10)]

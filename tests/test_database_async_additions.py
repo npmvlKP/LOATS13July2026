@@ -15,9 +15,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from src.loats.database import Database
-from src.loats.database_async_additions import AIOSQLITE_AVAILABLE, extend_database_class
-from src.loats.models import (
+from loats.database import Database
+from loats.database_async_additions import AIOSQLITE_AVAILABLE, extend_database_class
+from loats.models import (
     AuditLogEntry,
     FundsData,
     HistoricalData,
