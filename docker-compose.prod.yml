@@ -1,0 +1,83 @@
+# LOATS13July2026 - Production Docker Compose Configuration
+# This is the PRODUCTION deployment configuration for actual runtime
+# Uses python -m loats.main as the entry point for production deployment
+#
+# For CI/CD testing, use docker-compose.yml instead
+# For development with hot-reload, use docker-compose.runtime.yml
+
+version: "3.9"
+
+services:
+  # LOATS Application - Production deployment
+  loats:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: loats13july2026_prod
+    restart: unless-stopped
+    command: ["python", "-m", "loats.main"]
+    environment:
+      # OpenAlgo Configuration (set these in .env)
+      - OPENALGO_API_KEY=${OPENALGO_API_KEY}
+      - OPENALGO_BASE_URL=${OPENALGO_BASE_URL:-http://host.docker.internal:5000}
+      - OPENALGO_MODE=ANALYZE
+      # Metrics Configuration
+      - METRICS_PORT=8001
+      # Python environment
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
+      - TZ=Asia/Kolkata
+    env_file:
+      - .env
+    volumes:
+      # Mount logs directory for persistence
+      - loats_logs:/app/logs
+      # Mount audit database for persistence
+      - loats_data:/app/data
+    ports:
+      - "8001:8001"  # Prometheus metrics server
+    networks:
+      - loats_network
+    # Resource limits (adjust based on your workload)
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 1G
+        reservations:
+          cpus: "0.5"
+          memory: 256M
+    # Security: read-only root filesystem (except logs/data)
+    read_only: false  # Set to true after ensuring all write paths are in volumes
+    # Security: no new privileges
+    security_opt:
+      - no-new-privileges:true
+    # Stop signal for graceful shutdown
+    stop_grace_period: 30s
+    # Health check for production monitoring
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+networks:
+  loats_network:
+    driver: bridge
+    # Production: internal network for security
+    internal: false
+
+volumes:
+  loats_logs:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${PWD:-.}/logs
+  loats_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${PWD:-.}/data
