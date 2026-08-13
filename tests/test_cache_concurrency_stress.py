@@ -48,13 +48,13 @@ class TestCacheConcurrencyStress:
                     # Set a value
                     value = f"thread_{thread_id}_op_{i}"
                     asyncio.run(cache_manager.set(key, value))
-                    
+
                     # Get the value immediately
                     result = asyncio.run(cache_manager.get(key))
-                    
+
                     # Verify we got a valid result (not None)
                     assert result is not None, f"Thread {thread_id}, op {i}: Got None"
-                    
+
                     # Small delay to increase contention
                     time.sleep(0.001)
             except Exception as e:
@@ -83,7 +83,7 @@ class TestCacheConcurrencyStress:
                     key = f"thread_{thread_id}_key_{i}"
                     value = f"value_{thread_id}_{i}"
                     asyncio.run(cache_manager.set(key, value, ttl=60))
-                    
+
                     # Verify the value was set
                     result = asyncio.run(cache_manager.get(key))
                     assert result == value, f"Thread {thread_id}: Expected {value}, got {result}"
@@ -203,7 +203,7 @@ class TestCacheConcurrencyStress:
                 futures.append(executor.submit(setter, t))
             for t in range(num_clearers):
                 futures.append(executor.submit(clearer, t))
-            
+
             for future in as_completed(futures):
                 future.result()
 

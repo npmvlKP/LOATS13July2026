@@ -79,17 +79,24 @@ OPENALGO_MODE=ANALYZE
 
 ### Docker Deployment
 
-**Two Docker Compose configurations are available:**
+**Three Docker Compose configurations are available:**
 
 1. **CI/CD Testing**: `docker-compose.yml`
    - Runs quick health check on startup
    - Includes development volume mounts for hot-reload
    - For testing and validation only
+   - Health check: `python quick_health_check.py`
 
-2. **Production Runtime**: `docker-compose.runtime.yml`
-   - Starts the actual trading system (`loats.main:cli_main`)
+2. **Production Deployment**: `docker-compose.prod.yml`
+   - Starts the actual trading system using `python -m loats.main`
    - No development mounts (production-ready)
-   - For actual deployment
+   - For actual production deployment
+   - Health check: `curl http://localhost:8001/` (metrics endpoint)
+   - Higher resource limits (2 CPU, 1GB RAM)
+
+3. **Development Runtime**: `docker-compose.runtime.yml`
+   - Starts the trading system with development features
+   - For development with runtime testing
 
 **Usage:**
 
@@ -97,11 +104,18 @@ OPENALGO_MODE=ANALYZE
 # For CI/CD testing
 docker compose -f docker-compose.yml up
 
-# For production runtime
+# For production deployment (RECOMMENDED for live deployment)
+docker compose -f docker-compose.prod.yml up -d
+
+# For development runtime
 docker compose -f docker-compose.runtime.yml up
 ```
 
-**Important:** The default `Dockerfile` uses `quick_health_check.py` as CMD for CI/CD purposes. For runtime deployment, use the `command` override in `docker-compose.runtime.yml` or build with a custom CMD.
+**Important:**
+- The default `Dockerfile` uses `quick_health_check.py` as CMD for CI/CD purposes
+- For production deployment, use `docker-compose.prod.yml` which overrides the command
+- Production deployment uses `python -m loats.main` as the entry point
+- Metrics endpoint is available at `http://localhost:8001/`
 
 ### Quality Gates
 
