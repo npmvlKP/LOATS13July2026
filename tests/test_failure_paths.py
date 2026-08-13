@@ -543,8 +543,9 @@ class TestRateLimiterFailurePaths:
         )
 
         # Reset both global rate limiter singletons to ensure test isolation
+        global _order_rate_limiter_instance, _smart_order_rate_limiter_instance
+
         with _rate_limiter_lock:
-            global _order_rate_limiter_instance
             _order_rate_limiter_instance = None
 
         with _smart_rate_limiter_lock:
