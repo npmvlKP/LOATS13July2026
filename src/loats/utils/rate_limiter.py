@@ -42,6 +42,7 @@ class RateLimiter:
         # Initialize sliding‑window state
         self.timestamps: deque[float] = deque()
         self.lock: asyncio.Lock = asyncio.Lock()
+
     async def acquire(self) -> bool:
         """Acquire token for operation.
 
@@ -313,6 +314,7 @@ class RateLimitExceededError(Exception):
         self.message: str = message
         super().__init__(self.message)
 
+
 # Singleton infrastructure – recreated after accidental removal.
 # Two independent locks protect the default singleton and the custom‑parameter
 # cache. They are lightweight and guarantee thread‑safe lazy initialisation.
@@ -348,6 +350,7 @@ _smart_rate_limiter_lock = threading.Lock()
 _sync_rate_limiter_lock = threading.Lock()
 _sync_smart_rate_limiter_lock = threading.Lock()
 
+
 # Public factory functions – used throughout the codebase and tests.
 def get_order_rate_limiter(
     max_ops: int | None = None, window_size: float = 1.0
@@ -363,7 +366,9 @@ def get_order_rate_limiter(
         with _rate_limiter_lock:
             global _order_rate_limiter_instance
             if _order_rate_limiter_instance is None:
-                _order_rate_limiter_instance = AsyncRateLimiter(max_ops=50, window_size=window_size)
+                _order_rate_limiter_instance = AsyncRateLimiter(
+                    max_ops=50, window_size=window_size
+                )
             return _order_rate_limiter_instance
 
     # If default singleton already exists, ignore custom params and return it
@@ -375,7 +380,9 @@ def get_order_rate_limiter(
     key = (max_ops, window_size)
     with _custom_lock:
         if key not in _custom_order_rate_limiters:
-            _custom_order_rate_limiters[key] = AsyncRateLimiter(max_ops=max_ops, window_size=window_size)
+            _custom_order_rate_limiters[key] = AsyncRateLimiter(
+                max_ops=max_ops, window_size=window_size
+            )
         return _custom_order_rate_limiters[key]
 
 
@@ -391,7 +398,9 @@ def get_smart_order_rate_limiter(
         with _smart_rate_limiter_lock:
             global _smart_order_rate_limiter_instance
             if _smart_order_rate_limiter_instance is None:
-                _smart_order_rate_limiter_instance = AsyncRateLimiter(max_ops=50, window_size=window_size)
+                _smart_order_rate_limiter_instance = AsyncRateLimiter(
+                    max_ops=50, window_size=window_size
+                )
             return _smart_order_rate_limiter_instance
 
     # If default singleton already exists, ignore custom params and return it
@@ -402,8 +411,11 @@ def get_smart_order_rate_limiter(
     key = (max_ops, window_size)
     with _custom_lock:
         if key not in _custom_smart_order_rate_limiters:
-            _custom_smart_order_rate_limiters[key] = AsyncRateLimiter(max_ops=max_ops, window_size=window_size)
+            _custom_smart_order_rate_limiters[key] = AsyncRateLimiter(
+                max_ops=max_ops, window_size=window_size
+            )
         return _custom_smart_order_rate_limiters[key]
+
 
 def get_sync_order_rate_limiter(
     max_ops: int | None = None, window_size: float = 1.0
@@ -419,7 +431,9 @@ def get_sync_order_rate_limiter(
         with _sync_rate_limiter_lock:
             global _sync_order_rate_limiter
             if _sync_order_rate_limiter is None:
-                _sync_order_rate_limiter = SyncRateLimiter(max_ops=50, window_size=window_size)
+                _sync_order_rate_limiter = SyncRateLimiter(
+                    max_ops=50, window_size=window_size
+                )
             return _sync_order_rate_limiter
 
     # If default singleton already exists, ignore custom params and return it
@@ -431,8 +445,11 @@ def get_sync_order_rate_limiter(
     key = (max_ops, window_size)
     with _custom_lock:
         if key not in _sync_custom_order_rate_limiters:
-            _sync_custom_order_rate_limiters[key] = SyncRateLimiter(max_ops=max_ops, window_size=window_size)
+            _sync_custom_order_rate_limiters[key] = SyncRateLimiter(
+                max_ops=max_ops, window_size=window_size
+            )
         return _sync_custom_order_rate_limiters[key]
+
 
 def get_sync_smart_order_rate_limiter(
     max_ops: int | None = None, window_size: float = 1.0
@@ -446,7 +463,9 @@ def get_sync_smart_order_rate_limiter(
         with _sync_smart_rate_limiter_lock:
             global _sync_smart_order_rate_limiter
             if _sync_smart_order_rate_limiter is None:
-                _sync_smart_order_rate_limiter = SyncRateLimiter(max_ops=50, window_size=window_size)
+                _sync_smart_order_rate_limiter = SyncRateLimiter(
+                    max_ops=50, window_size=window_size
+                )
             return _sync_smart_order_rate_limiter
 
     # If default singleton already exists, ignore custom params and return it
@@ -457,7 +476,9 @@ def get_sync_smart_order_rate_limiter(
     key = (max_ops, window_size)
     with _custom_lock:
         if key not in _sync_custom_smart_order_rate_limiters:
-            _sync_custom_smart_order_rate_limiters[key] = SyncRateLimiter(max_ops=max_ops, window_size=window_size)
+            _sync_custom_smart_order_rate_limiters[key] = SyncRateLimiter(
+                max_ops=max_ops, window_size=window_size
+            )
         return _sync_custom_smart_order_rate_limiters[key]
 
 

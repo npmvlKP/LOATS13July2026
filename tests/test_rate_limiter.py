@@ -9,6 +9,7 @@ import time
 import pytest
 
 from src.loats.config import get_settings
+from src.loats.loats_logging import get_logger
 from src.loats.utils.rate_limiter import (
     AsyncRateLimiter,
     RateLimiter,
@@ -16,6 +17,8 @@ from src.loats.utils.rate_limiter import (
     get_order_rate_limiter,
     get_smart_order_rate_limiter,
 )
+
+logger = get_logger(__name__)
 
 
 class TestRateLimiter:
@@ -447,3 +450,126 @@ class TestRateLimiterIntegration:
         second_burst_successful = sum(second_burst_results)
         assert second_burst_successful >= 1  # Should get at least 1
         assert second_burst_successful <= 3  # Should get at most 3
+
+
+class TestRateLimiterConcurrencyBurst:
+    """Tests for rate limiter burst concurrency behavior (R5-F-01 / F-CONC-3-R)."""
+
+    @pytest.mark.asyncio
+    async def test_rapid_place_order_burst_with_singleton(self) -> None:
+        """Test 100 rapid place_order calls through singleton limiter.
+
+        Validates that:
+        1. Singleton behavior is maintained under concurrent load
+        2. Rate limit is strictly enforced (max_ops=50 in 1-second window)
+        3. Calls beyond the limit raise RateLimitExceededError
+
+        This test addresses R5-F-01 / F-CONC-3-R - production blocker for order paths.
+        """
+        from src.loats.utils.rate_limiter import (
+            RateLimitExceededError,
+            get_order_rate_limiter,
+        )
+
+        # Reset singleton to ensure clean test
+        from src.loats.utils.rate_limiter import _reset_singletons_for_testing
+
+        _reset_singletons_for_testing()
+
+        # Verify singleton behavior before burst
+        limiter1 = get_order_rate_limiter()
+        limiter2 = get_order_rate_limiter()
+        assert limiter1 is limiter2, "Singleton behavior must be maintained"
+
+        # Mock place_order behavior - just test rate limiting
+        async def mock_place_order(call_id: int) -> tuple[int, bool, Exception | None]:
+            """Mock place_order that uses the singleton rate limiter."""
+            limiter = get_order_rate_limiter()
+
+            # Verify we're using the same singleton instance
+            assert (
+                limiter is limiter1
+            ), f"Call {call_id} must use same singleton instance"
+
+            try:
+                acquired = await limiter.acquire()
+                if not acquired:
+                    raise RateLimitExceededError("Rate limit exceeded")
+                return (call_id, True, None)
+            except RateLimitExceededError as e:
+                return (call_id, False, e)
+
+        # Fire 100 rapid concurrent calls
+        num_calls = 100
+        calls = [mock_place_order(i) for i in range(num_calls)]
+        results = await asyncio.gather(*calls, return_exceptions=True)
+
+        # Count successes and failures
+        successful = []
+        failed = []
+
+        for result in results:
+            if isinstance(result, Exception):
+                failed.append(result)
+            elif isinstance(result, tuple):
+                call_id, success, error = result
+                if success and error is None:
+                    successful.append(call_id)
+                elif error is not None:
+                    failed.append(error)
+
+        # Assertions for rate limiting behavior
+        assert (
+            len(successful) == 50
+        ), f"Expected exactly 50 successful calls, got {len(successful)}"
+        assert len(failed) == 50, f"Expected exactly 50 failed calls, got {len(failed)}"
+
+        # Verify all failures are RateLimitExceededError
+        for failure in failed:
+            assert isinstance(
+                failure, RateLimitExceededError
+            ), f"All failures must be RateLimitExceededError, got {type(failure)}"
+
+        # Verify singleton is still the same instance after burst
+        limiter3 = get_order_rate_limiter()
+        assert limiter3 is limiter1, "Singleton must be maintained after burst"
+
+    @pytest.mark.asyncio
+    async def test_singleton_identity_under_concurrent_stress(self) -> None:
+        """Verify singleton instance identity remains stable under concurrent stress.
+
+        This test ensures that the singleton pattern doesn't break under
+        high concurrent load, which is critical for production reliability.
+        """
+        from src.loats.utils.rate_limiter import (
+            _reset_singletons_for_testing,
+            get_order_rate_limiter,
+        )
+
+        # Reset singleton to ensure clean test
+        _reset_singletons_for_testing()
+
+        # Get initial instance
+        initial_instance = get_order_rate_limiter()
+
+        # Create many concurrent calls that all get the singleton
+        async def get_and_verify_singleton(task_id: int) -> bool:
+            """Get limiter and verify it's the same instance."""
+            limiter = get_order_rate_limiter()
+            is_same = limiter is initial_instance
+            if not is_same:
+                logger.error(f"Task {task_id} got different singleton instance!")
+            return is_same
+
+        # Fire 50 concurrent singleton accesses
+        tasks = [get_and_verify_singleton(i) for i in range(50)]
+        results = await asyncio.gather(*tasks)
+
+        # All tasks must have received the same singleton instance
+        assert all(
+            results
+        ), "All concurrent accesses must return same singleton instance"
+
+        # Final verification
+        final_instance = get_order_rate_limiter()
+        assert final_instance is initial_instance, "Final instance must match initial"
