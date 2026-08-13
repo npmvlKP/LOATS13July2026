@@ -70,6 +70,8 @@ from .utils.rate_limiter import (
     RateLimitExceededError,
     get_order_rate_limiter,
     get_smart_order_rate_limiter,
+    get_sync_order_rate_limiter,
+    get_sync_smart_order_rate_limiter,
 )
 
 if TYPE_CHECKING:
@@ -389,6 +391,11 @@ class OpenAlgoClient:
         trailing_stop_loss: float | None = None,
     ) -> dict[str, Any]:
         _check_kill_switch()
+        # Use higher rate limits for order operations (50 ops per second)
+        if not get_sync_order_rate_limiter().acquire():
+            logger.warning("Rate limit exceeded order placement")
+            raise RateLimitExceededError("Rate limit exceeded")
+
         payload = build_place_order_payload(
             symbol=symbol,
             quantity=quantity,
@@ -428,6 +435,11 @@ class OpenAlgoClient:
         metadata: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         _check_kill_switch()
+        # Use higher rate limits for smart order operations (50 ops per second)
+        if not get_sync_smart_order_rate_limiter().acquire():
+            logger.warning("Rate limit exceeded smart order placement")
+            raise RateLimitExceededError("Rate limit exceeded")
+
         payload = build_place_smart_order_payload(
             symbol=symbol,
             quantity=quantity,
