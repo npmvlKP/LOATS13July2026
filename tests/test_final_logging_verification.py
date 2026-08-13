@@ -27,7 +27,7 @@ def test_final_logging_verification():
     logging.root.handlers = []
 
     # Import and configure logging
-    from src.loats.loats_logging import configure_logging, get_logger
+    from loats.loats_logging import configure_logging, get_logger
 
     with patch("pathlib.Path.mkdir") as mock_mkdir:
         configure_logging(test_mode=True)
@@ -114,7 +114,7 @@ def test_final_logging_verification():
 
     with patch("pathlib.Path.mkdir") as mock_mkdir:
         # Import the package (this will trigger initialization)
-        import src.loats
+        import loats
 
         # Check that mkdir was not called
         mock_mkdir.assert_not_called()

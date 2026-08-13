@@ -11,9 +11,9 @@ from __future__ import annotations
 
 import types
 
-import src.loats as loats_pkg
-import src.loats.config as config_pkg
-from src.loats.config.settings import Settings
+import loats as loats_pkg
+import loats.config as config_pkg
+from loats.config.settings import Settings
 
 
 def test_config_package_exports_only_class_and_accessor() -> None:

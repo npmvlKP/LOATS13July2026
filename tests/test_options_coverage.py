@@ -10,8 +10,8 @@ from unittest.mock import patch, MagicMock
 import numpy as np
 from scipy.optimize import brentq, newton
 
-from src.loats.models import Greeks, OptionContract, OptionType
-from src.loats.options import (
+from loats.models import Greeks, OptionContract, OptionType
+from loats.options import (
     ExpiredContractError,
     OptionsAnalysis,
     OptionsEngine,

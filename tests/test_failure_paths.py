@@ -15,22 +15,22 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from src.loats.alerts import AlertSystem
-from src.loats.openalgo import async_client
-from src.loats.scheduler import TradingScheduler
-from src.loats.utils.circuit_breaker import (
+from loats.alerts import AlertSystem
+from loats.openalgo import async_client
+from loats.scheduler import TradingScheduler
+from loats.utils.circuit_breaker import (
     OPENALGO_CIRCUIT_BREAKER,
     TELEGRAM_CIRCUIT_BREAKER,
     CircuitBreaker,
     CircuitBreakerConfig,
     CircuitBreakerOpenError,
 )
-from src.loats.utils.rate_limiter import (
+from loats.utils.rate_limiter import (
     RateLimitExceededError,
     get_order_rate_limiter,
     get_smart_order_rate_limiter,
 )
-from src.loats.utils.retry import RetryConfig, retry_async, retry_sync
+from loats.utils.retry import RetryConfig, retry_async, retry_sync
 
 logger = logging.getLogger(__name__)
 
@@ -278,7 +278,7 @@ class TestRetryExhaustedScenarios:
     @pytest.mark.asyncio
     async def test_openalgo_retry_exhausted_scenario(self) -> None:
         """Test OpenAlgo API retry exhausted scenario."""
-        from src.loats.utils.retry import OPENALGO_RETRY_CONFIG
+        from loats.utils.retry import OPENALGO_RETRY_CONFIG
 
         # Mock consistently failing API
         with patch(
@@ -535,7 +535,7 @@ class TestRateLimiterFailurePaths:
 
     def setup_method(self) -> None:
         """Reset rate limiters before each test."""
-        from src.loats.utils.rate_limiter import (
+        from loats.utils.rate_limiter import (
             _order_rate_limiter_instance,
             _smart_order_rate_limiter_instance,
             _rate_limiter_lock,

@@ -3,8 +3,8 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from src.loats.models import NewsItem
-from src.loats.sentiment import SentimentAnalyzer
+from loats.models import NewsItem
+from loats.sentiment import SentimentAnalyzer
 
 
 @pytest.fixture

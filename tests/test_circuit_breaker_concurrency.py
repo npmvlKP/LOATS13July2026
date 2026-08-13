@@ -13,7 +13,7 @@ from typing import Any
 
 import pytest
 
-from src.loats.utils.circuit_breaker import (
+from loats.utils.circuit_breaker import (
     CircuitBreaker,
     CircuitBreakerConfig,
     CircuitBreakerOpenError,

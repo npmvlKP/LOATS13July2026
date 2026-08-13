@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.loats.openalgo import KillSwitchError
+from loats.openalgo import KillSwitchError
 
 
 def test_kill_switch_check():
@@ -16,7 +16,7 @@ def test_kill_switch_check():
         mock_alerts.is_kill_switch_active.return_value = True
         mock_get_alerts.return_value = mock_alerts
 
-        from src.loats.openalgo import _check_kill_switch
+        from loats.openalgo import _check_kill_switch
 
         with pytest.raises(KillSwitchError):
             _check_kill_switch()

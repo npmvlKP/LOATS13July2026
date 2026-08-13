@@ -5,16 +5,16 @@ from unittest.mock import patch
 
 import pytest
 
-from src.loats.utils.circuit_breaker import (
+from loats.utils.circuit_breaker import (
     CircuitBreaker,
     CircuitBreakerConfig,
     CircuitBreakerOpenError,
 )
-from src.loats.utils.resilience import (
+from loats.utils.resilience import (
     circuit_breaker_retry_async,
     circuit_breaker_retry_sync,
 )
-from src.loats.utils.retry import RetryConfig
+from loats.utils.retry import RetryConfig
 
 
 class TestCircuitBreakerRetryComposition:

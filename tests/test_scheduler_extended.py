@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from src.loats.scheduler import TradingScheduler
+from loats.scheduler import TradingScheduler
 
 
 @pytest.fixture

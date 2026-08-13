@@ -9,14 +9,14 @@ import time
 
 import pytest
 
-from src.loats.utils.circuit_breaker import (
+from loats.utils.circuit_breaker import (
     CircuitBreaker,
     CircuitBreakerConfig,
     CircuitBreakerOpenError,
     CircuitBreakerStats,
     CircuitState,
 )
-from src.loats.utils.retry import (
+from loats.utils.retry import (
     DATABASE_RETRY_CONFIG,
     HTTP_RETRY_CONFIG,
     OPENALGO_RETRY_CONFIG,

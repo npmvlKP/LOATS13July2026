@@ -16,9 +16,9 @@ from unittest.mock import MagicMock, patch
 import numpy as np
 import pytest
 
-from src.loats.database import Database
-from src.loats.models import OptionContract, OptionType
-from src.loats.strike_selection import StrikeSelectionEngine, select_strikes
+from loats.database import Database
+from loats.models import OptionContract, OptionType
+from loats.strike_selection import StrikeSelectionEngine, select_strikes
 
 @pytest.fixture
 def temp_db():

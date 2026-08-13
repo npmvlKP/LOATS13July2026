@@ -11,7 +11,7 @@ from unittest.mock import patch
 # Add src directory path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.loats.loats_logging import configure_logging
+from loats.loats_logging import configure_logging
 
 
 def test_logging_implementation():

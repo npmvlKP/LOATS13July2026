@@ -5,8 +5,8 @@ from datetime import UTC, datetime
 
 import pytest
 
-from src.loats.models import NewsItem
-from src.loats.sentiment import SentimentAnalyzer
+from loats.models import NewsItem
+from loats.sentiment import SentimentAnalyzer
 
 
 @pytest.mark.asyncio

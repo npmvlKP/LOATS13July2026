@@ -9,7 +9,7 @@ import time
 
 import pytest
 
-from src.loats.utils.rate_limiter import (
+from loats.utils.rate_limiter import (
     AsyncRateLimiter,
     _reset_singletons_for_testing,
     get_order_rate_limiter,

@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.loats.metrics import (
+from loats.metrics import (
     MetricsManager,
     record_signal,
     set_circuit_breaker_status,

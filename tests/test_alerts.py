@@ -10,8 +10,8 @@ from telegram.ext import (
     Application,
 )
 
-from src.loats.alerts import AlertSystem
-from src.loats.models import (
+from loats.alerts import AlertSystem
+from loats.models import (
     Order,
     OrderStatus,
     OrderType,

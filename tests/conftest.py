@@ -12,8 +12,8 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from src.loats.database import Database
-from src.loats.models import (
+from loats.database import Database
+from loats.models import (
     HistoricalData,
     Order,
     OrderStatus,
@@ -27,9 +27,9 @@ from src.loats.models import (
 )
 
 if TYPE_CHECKING:
-    from src.loats.config.settings import Settings
+    from loats.config.settings import Settings
 
-from src.loats.loats_logging import configure_logging
+from loats.loats_logging import configure_logging
 
 @pytest.fixture(autouse=True)
 def configure_test_logging() -> None:
@@ -41,7 +41,7 @@ def test_settings() -> Settings:
     """Create test settings for temporary paths."""
     from pydantic import SecretStr
 
-    from src.loats.config.settings import Settings
+    from loats.config.settings import Settings
 
     with tempfile.TemporaryDirectory() as temp_dir:
         temp_path = Path(temp_dir)
@@ -163,7 +163,7 @@ def pytest_configure(config: pytest.Config) -> None:
 @pytest.fixture(autouse=True, scope="function")
 async def clear_cache_before_each_test() -> None:
     """Clear cache before each test to prevent stale data."""
-    from src.loats.utils.cache import cache_manager
+    from loats.utils.cache import cache_manager
 
     if cache_manager._cache:
         await cache_manager.clear()
@@ -171,7 +171,7 @@ async def clear_cache_before_each_test() -> None:
 @pytest.fixture(autouse=True, scope="function")
 def reset_metrics_before_each_test() -> None:
     """Reset metrics manager state before each test to ensure isolation."""
-    from src.loats.metrics import MetricsManager
+    from loats.metrics import MetricsManager
 
     manager = MetricsManager()
     manager.reset_for_testing()
@@ -179,7 +179,7 @@ def reset_metrics_before_each_test() -> None:
 @pytest.fixture(autouse=True, scope="function")
 def reset_circuit_breakers_before_each_test() -> None:
     """Reset circuit breakers state before each test to ensure isolation."""
-    from src.loats.utils.circuit_breaker import (
+    from loats.utils.circuit_breaker import (
         OPENALGO_CIRCUIT_BREAKER,
         TELEGRAM_CIRCUIT_BREAKER,
     )
@@ -191,7 +191,7 @@ def reset_circuit_breakers_before_each_test() -> None:
 @pytest.fixture(autouse=True, scope="function")
 def reset_rate_limiters_before_each_test() -> None:
     """Reset rate limiter singletons before each test to ensure isolation."""
-    from src.loats.utils.rate_limiter import (
+    from loats.utils.rate_limiter import (
         _order_rate_limiter_instance,
         _smart_order_rate_limiter_instance,
         _rate_limiter_lock,

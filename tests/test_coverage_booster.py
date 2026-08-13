@@ -4,11 +4,11 @@ This test file serves as a template for adding tests to boost coverage.
 """
 
 import pytest
-from src.loats.ta import TechnicalAnalysis
-from src.loats.metrics import MetricsManager
-from src.loats.options import OptionsEngine
-from src.loats.scheduler import TradingScheduler
-from src.loats.alerts import AlertSystem
+from loats.ta import TechnicalAnalysis
+from loats.metrics import MetricsManager
+from loats.options import OptionsEngine
+from loats.scheduler import TradingScheduler
+from loats.alerts import AlertSystem
 
 
 def test_technical_analysis_initialization():

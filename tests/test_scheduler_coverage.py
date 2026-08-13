@@ -8,8 +8,8 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from datetime import datetime, timezone, UTC
 
-from src.loats.scheduler import TradingScheduler, scheduler
-from src.loats.models import Signal, SignalType
+from loats.scheduler import TradingScheduler, scheduler
+from loats.models import Signal, SignalType
 
 
 class TestSchedulerCoverage:

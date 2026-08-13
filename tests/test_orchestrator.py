@@ -16,9 +16,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from src.loats.alerts import AlertSystem
-from src.loats.database import Database
-from src.loats.models import (
+from loats.alerts import AlertSystem
+from loats.database import Database
+from loats.models import (
     HistoricalData,
     OptionContract,
     OptionType,
@@ -26,8 +26,8 @@ from src.loats.models import (
     Signal,
     SignalType,
 )
-from src.loats.orchestrator import TradingOrchestrator, get_cycle_stats
-from src.loats.openalgo import KillSwitchError
+from loats.orchestrator import TradingOrchestrator, get_cycle_stats
+from loats.openalgo import KillSwitchError
 
 
 @pytest.fixture
@@ -130,7 +130,7 @@ class TestTradingOrchestrator(unittest.IsolatedAsyncioTestCase):
 
     async def test_execute_sentiment_analysis(self):
         """Test sentiment analysis execution."""
-        from src.loats.models import SentimentAnalysisResult
+        from loats.models import SentimentAnalysisResult
 
         # Create a proper SentimentAnalysisResult object
         mock_result = SentimentAnalysisResult(

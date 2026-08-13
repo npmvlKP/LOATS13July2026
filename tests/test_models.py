@@ -7,7 +7,7 @@ from datetime import datetime
 import pytest
 from pydantic import ValidationError
 
-from src.loats.models import (
+from loats.models import (
     AuditLogEntry,
     FundsData,
     Greeks,

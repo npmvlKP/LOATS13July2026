@@ -11,7 +11,7 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 
-from src.loats.metrics import (
+from loats.metrics import (
     MetricsManager,
     set_circuit_breaker_status,
     set_kill_switch_status,

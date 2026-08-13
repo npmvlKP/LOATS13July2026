@@ -4,8 +4,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from src.loats.alerts import AlertSystem
-from src.loats.models import (
+from loats.alerts import AlertSystem
+from loats.models import (
     Signal,
     SignalType,
 )

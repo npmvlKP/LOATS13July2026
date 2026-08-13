@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from src.loats.main import TradingSystem, main
+from loats.main import TradingSystem, main
 
 
 @pytest.fixture

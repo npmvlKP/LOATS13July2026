@@ -1,8 +1,8 @@
 import json
 from datetime import UTC, datetime
 
-from src.loats.database import Database
-from src.loats.models import AuditLogEntry
+from loats.database import Database
+from loats.models import AuditLogEntry
 
 
 def test_canonical_serialization(db: Database):
