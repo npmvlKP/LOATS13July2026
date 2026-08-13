@@ -473,12 +473,19 @@ def _reset_singletons_for_testing() -> None:
     """
     global _order_rate_limiter_instance, _smart_order_rate_limiter_instance
     global _default_order_rate_limiter, _default_smart_order_rate_limiter
+    global _sync_order_rate_limiter, _sync_smart_order_rate_limiter
 
     _order_rate_limiter_instance = None
     _smart_order_rate_limiter_instance = None
     _default_order_rate_limiter = None
     _default_smart_order_rate_limiter = None
 
+    # Clear synchronous rate limiter singletons
+    _sync_order_rate_limiter = None
+    _sync_smart_order_rate_limiter = None
+
     # Also clear custom caches to avoid cross‑test contamination.
     _custom_order_rate_limiters.clear()
     _custom_smart_order_rate_limiters.clear()
+    _sync_custom_order_rate_limiters.clear()
+    _sync_custom_smart_order_rate_limiters.clear()

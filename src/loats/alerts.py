@@ -374,7 +374,7 @@ class AlertSystem:
                 f"{emoji} <b>TRADE {action.upper()}</b> {emoji}\n\n"
                 f"<b>Trade ID:</b> {html.escape(trade.trade_id)}\n"
                 f"<b>Symbol:</b> {html.escape(trade.symbol)}\n"
-                f"<b>Strategy:</b> {html.escape(trade.strategy)}\n"
+                f"<b>Strategy:</b> {html.escape(trade.strategy or '')}\n"
                 f"<b>Type:</b> {html.escape(trade.transaction_type.value if trade.transaction_type else 'N/A')}\n"
                 f"<b>Quantity:</b> {trade.quantity}\n"
                 f"<b>Entry Price:</b> {trade.entry_price:.2f}\n"
