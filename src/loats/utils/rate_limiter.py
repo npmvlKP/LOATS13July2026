@@ -323,9 +323,17 @@ _custom_lock = threading.Lock()
 _default_order_rate_limiter: AsyncRateLimiter | None = None
 _default_smart_order_rate_limiter: AsyncRateLimiter | None = None
 
+# Synchronous rate limiter singletons
+_sync_order_rate_limiter: SyncRateLimiter | None = None
+_sync_smart_order_rate_limiter: SyncRateLimiter | None = None
+
 # Custom singleton caches keyed by (max_ops, window_size).
 _custom_order_rate_limiters: dict[tuple[int, float], AsyncRateLimiter] = {}
 _custom_smart_order_rate_limiters: dict[tuple[int, float], AsyncRateLimiter] = {}
+
+# Synchronous custom rate limiter caches
+_sync_custom_order_rate_limiters: dict[tuple[int, float], SyncRateLimiter] = {}
+_sync_custom_smart_order_rate_limiters: dict[tuple[int, float], SyncRateLimiter] = {}
 
 # Backward‑compatible names expected by existing test suite and modules.
 # These aliases act as the true singleton storage accessed by the test fixtures.
@@ -335,6 +343,10 @@ _smart_order_rate_limiter_instance: AsyncRateLimiter | None = None
 # Separate locks guard each singleton to avoid cross‑contamination.
 _rate_limiter_lock = _default_lock
 _smart_rate_limiter_lock = threading.Lock()
+
+# Synchronous rate limiter locks
+_sync_rate_limiter_lock = threading.Lock()
+_sync_smart_rate_limiter_lock = threading.Lock()
 
 # Public factory functions – used throughout the codebase and tests.
 def get_order_rate_limiter(
@@ -392,6 +404,61 @@ def get_smart_order_rate_limiter(
         if key not in _custom_smart_order_rate_limiters:
             _custom_smart_order_rate_limiters[key] = AsyncRateLimiter(max_ops=max_ops, window_size=window_size)
         return _custom_smart_order_rate_limiters[key]
+
+def get_sync_order_rate_limiter(
+    max_ops: int | None = None, window_size: float = 1.0
+) -> SyncRateLimiter:
+    """Return a shared ``SyncRateLimiter`` for synchronous order‑rate limiting.
+
+    * No ``max_ops`` → return the *process‑wide* default singleton (50 ops/sec).
+    * ``max_ops`` supplied → return a stable instance cached per ``(max_ops,
+      window_size)`` pair.
+    """
+    if max_ops is None:
+        # Default singleton – use synchronous lock
+        with _sync_rate_limiter_lock:
+            global _sync_order_rate_limiter
+            if _sync_order_rate_limiter is None:
+                _sync_order_rate_limiter = SyncRateLimiter(max_ops=50, window_size=window_size)
+            return _sync_order_rate_limiter
+
+    # If default singleton already exists, ignore custom params and return it
+    with _sync_rate_limiter_lock:
+        if _sync_order_rate_limiter is not None:
+            return _sync_order_rate_limiter
+
+    # Custom parameters – use cache keyed by (max_ops, window_size)
+    key = (max_ops, window_size)
+    with _custom_lock:
+        if key not in _sync_custom_order_rate_limiters:
+            _sync_custom_order_rate_limiters[key] = SyncRateLimiter(max_ops=max_ops, window_size=window_size)
+        return _sync_custom_order_rate_limiters[key]
+
+def get_sync_smart_order_rate_limiter(
+    max_ops: int | None = None, window_size: float = 1.0
+) -> SyncRateLimiter:
+    """Return a shared ``SyncRateLimiter`` for synchronous smart‑order limiting.
+
+    Mirrors :func:`get_sync_order_rate_limiter` but uses a distinct default singleton.
+    """
+    if max_ops is None:
+        # Default singleton – use synchronous lock
+        with _sync_smart_rate_limiter_lock:
+            global _sync_smart_order_rate_limiter
+            if _sync_smart_order_rate_limiter is None:
+                _sync_smart_order_rate_limiter = SyncRateLimiter(max_ops=50, window_size=window_size)
+            return _sync_smart_order_rate_limiter
+
+    # If default singleton already exists, ignore custom params and return it
+    with _sync_smart_rate_limiter_lock:
+        if _sync_smart_order_rate_limiter is not None:
+            return _sync_smart_order_rate_limiter
+
+    key = (max_ops, window_size)
+    with _custom_lock:
+        if key not in _sync_custom_smart_order_rate_limiters:
+            _sync_custom_smart_order_rate_limiters[key] = SyncRateLimiter(max_ops=max_ops, window_size=window_size)
+        return _sync_custom_smart_order_rate_limiters[key]
 
 
 # ---------------------------------------------------------------------------
