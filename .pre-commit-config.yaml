@@ -85,3 +85,10 @@ repos:
         language: system
         pass_filenames: false
         files: ^(pyproject\.toml|requirements-core\.txt)$
+
+      - id: env-settings-sync
+        name: .env.example vs Settings sync
+        entry: python scripts/check_env_settings_sync.py
+        language: system
+        pass_filenames: false
+        files: ^(\.env\.example|src/loats/config/settings\.py)$
