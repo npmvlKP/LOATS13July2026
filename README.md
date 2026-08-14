@@ -20,7 +20,6 @@ Designed for **ANALYZE mode only** via OpenAlgo REST API integration.
 ## Key Features
 
 - **Strict Compliance**: SEBI algo regulations, NIST 800-53, ISO 27001:2022
-- **Latency Optimized**: Strike selection <5ms, trail updates <1ms, orchestrator cycle <100ms
 - **Rate Limited**: Conservative NVIDIA NIM API usage (≤20 req/min, ≥3s gap)
 - **Type Safe**: Full mypy --strict compliance
 - **Security Focused**: Bandit, gitleaks, and comprehensive security scanning
