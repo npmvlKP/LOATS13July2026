@@ -33,7 +33,9 @@ class TestCircuitBreakerThreadSafety:
 
         # Execute parallel sync calls
         with ThreadPoolExecutor(max_workers=10) as executor:
-            futures = [executor.submit(cb.call, successful_call) for _ in range(num_calls)]
+            futures = [
+                executor.submit(cb.call, successful_call) for _ in range(num_calls)
+            ]
             results = [f.result() for f in futures]
 
         # All calls should succeed
@@ -131,7 +133,9 @@ class TestCircuitBreakerThreadSafety:
         results = asyncio.run(run_parallel())
 
         for result in results:
-            if isinstance(result, Exception) and not isinstance(result, CircuitBreakerOpenError):
+            if isinstance(result, Exception) and not isinstance(
+                result, CircuitBreakerOpenError
+            ):
                 failure_count += 1
 
         # At least failure_threshold calls should fail
@@ -182,7 +186,9 @@ class TestCircuitBreakerThreadSafety:
                             pass
                     else:
                         try:
-                            result = executor.submit(cb.call, successful_sync_call).result()
+                            result = executor.submit(
+                                cb.call, successful_sync_call
+                            ).result()
                             if result == "sync_success":
                                 success_count += 1
                         except CircuitBreakerOpenError:
@@ -199,7 +205,9 @@ class TestCircuitBreakerThreadSafety:
 
             results = await asyncio.gather(*tasks, return_exceptions=True)
             for result in results:
-                if isinstance(result, Exception) and not isinstance(result, CircuitBreakerOpenError):
+                if isinstance(result, Exception) and not isinstance(
+                    result, CircuitBreakerOpenError
+                ):
                     failure_count += 1
                 elif result in ("sync_success", "async_success"):
                     success_count += 1
@@ -221,7 +229,9 @@ class TestCircuitBreakerThreadSafety:
 
     def test_concurrent_state_transitions(self):
         """Test that state transitions are thread-safe under concurrent access."""
-        config = CircuitBreakerConfig(failure_threshold=3, success_threshold=2, timeout=0.5)
+        config = CircuitBreakerConfig(
+            failure_threshold=3, success_threshold=2, timeout=0.5
+        )
         cb = CircuitBreaker(name="test_state_transition", config=config)
 
         num_workers = 20
@@ -258,7 +268,10 @@ class TestCircuitBreakerThreadSafety:
         assert stats.total_calls >= 0
         assert stats.successful_calls >= 0
         assert stats.failed_calls >= 0
-        assert stats.total_calls == stats.successful_calls + stats.failed_calls + stats.rejected_calls
+        assert (
+            stats.total_calls
+            == stats.successful_calls + stats.failed_calls + stats.rejected_calls
+        )
 
     def test_stats_consistency_under_load(self):
         """Test that statistics remain consistent under heavy concurrent load."""
@@ -274,7 +287,9 @@ class TestCircuitBreakerThreadSafety:
 
         # Execute many parallel calls
         with ThreadPoolExecutor(max_workers=20) as executor:
-            futures = [executor.submit(cb.call, mixed_call, i) for i in range(num_calls)]
+            futures = [
+                executor.submit(cb.call, mixed_call, i) for i in range(num_calls)
+            ]
             results = []
             for f in futures:
                 try:
@@ -385,4 +400,7 @@ class TestCircuitBreakerThreadSafety:
             assert stats.consecutive_failures == 0
             assert stats.consecutive_successes == 0
         else:
-            assert stats.total_calls == stats.successful_calls + stats.failed_calls + stats.rejected_calls
+            assert (
+                stats.total_calls
+                == stats.successful_calls + stats.failed_calls + stats.rejected_calls
+            )

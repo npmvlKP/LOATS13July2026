@@ -714,9 +714,9 @@ class AsyncOpenAlgoClient:
         payload = {"symbol": symbol, "expiry": expiry}
         result = await self._request("POST", "option_chain", json=payload)
 
-        # Cache the result for 2 minutes (120 seconds)
+        # Cache the result for 5 minutes (300 seconds)
         try:
-            await cache_manager.set(cache_key, json.dumps(result), ttl=120)
+            await cache_manager.set(cache_key, json.dumps(result), ttl=300)
             logger.debug(f"Cached option chain for {symbol}")
         except Exception as e:
             logger.warning(f"Failed to cache option chain result: {e}")

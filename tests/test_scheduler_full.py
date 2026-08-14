@@ -9,7 +9,7 @@ from loats.scheduler import TradingScheduler
 
 @pytest.fixture
 def scheduler():
-    with patch("src.loats.scheduler.AsyncIOScheduler") as mock_aps:
+    with patch("loats.scheduler.AsyncIOScheduler") as mock_aps:
         instance = TradingScheduler()
         instance.scheduler = mock_aps
         return instance
@@ -21,7 +21,7 @@ async def test_run_ta_scan_success(scheduler):
         patch(
             "src.loats.scheduler.async_client", new_callable=AsyncMock
         ) as mock_client,
-        patch("src.loats.scheduler.technical_analysis") as mock_ta,
+        patch("loats.scheduler.technical_analysis") as mock_ta,
     ):
         mock_client.get_history.return_value = {
             "data": [

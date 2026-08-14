@@ -18,7 +18,7 @@ class TestSchedulerCoverage:
     @pytest.fixture
     def scheduler_instance(self):
         """Create a TradingScheduler instance with mocked dependencies."""
-        with patch("src.loats.scheduler.AsyncIOScheduler") as mock_aps:
+        with patch("loats.scheduler.AsyncIOScheduler") as mock_aps:
             instance = TradingScheduler()
             instance.scheduler = mock_aps
             return instance
@@ -27,14 +27,14 @@ class TestSchedulerCoverage:
     async def test_is_market_open_weekday_during_hours(self, scheduler_instance):
         """Test is_market_open during market hours (lines 146-148)."""
         # Mock datetime to be during market hours on a weekday
-        with patch("src.loats.scheduler.datetime") as mock_datetime:
+        with patch("loats.scheduler.datetime") as mock_datetime:
             # Set up mock for weekday during market hours
             mock_now = datetime(2023, 1, 16, 10, 0, 0)  # Monday 10 AM
             mock_datetime.datetime.now.return_value = mock_now
             mock_datetime.date = datetime.date
 
             # Mock timezone
-            with patch("src.loats.scheduler.ZoneInfo") as mock_zone:
+            with patch("loats.scheduler.ZoneInfo") as mock_zone:
                 mock_tz = MagicMock()
                 mock_zone.return_value = mock_tz
 
@@ -45,7 +45,7 @@ class TestSchedulerCoverage:
     async def test_is_market_open_weekend(self, scheduler_instance):
         """Test is_market_open on weekend (lines 146-148)."""
         # Mock datetime to be on a weekend
-        with patch("src.loats.scheduler.datetime") as mock_datetime:
+        with patch("loats.scheduler.datetime") as mock_datetime:
             # Set up mock for weekend
             mock_now = datetime(2023, 1, 14, 10, 0, 0)  # Saturday 10 AM
             mock_datetime.datetime.now.return_value = mock_now
@@ -58,7 +58,7 @@ class TestSchedulerCoverage:
     async def test_is_market_open_holiday(self, scheduler_instance):
         """Test is_market_open on holiday (lines 146-148)."""
         # Mock datetime to be on a holiday
-        with patch("src.loats.scheduler.datetime") as mock_datetime:
+        with patch("loats.scheduler.datetime") as mock_datetime:
             # Set up mock for holiday (Republic Day 2026-01-26)
             mock_now = datetime(2026, 1, 26, 10, 0, 0)
             mock_datetime.datetime.now.return_value = mock_now
@@ -71,14 +71,14 @@ class TestSchedulerCoverage:
     async def test_is_market_open_before_hours(self, scheduler_instance):
         """Test is_market_open before market hours (lines 146-148)."""
         # Mock datetime to be before market hours
-        with patch("src.loats.scheduler.datetime") as mock_datetime:
+        with patch("loats.scheduler.datetime") as mock_datetime:
             # Set up mock for before market hours
             mock_now = datetime(2023, 1, 16, 8, 0, 0)  # Monday 8 AM
             mock_datetime.datetime.now.return_value = mock_now
             mock_datetime.date = datetime.date
 
             # Mock timezone
-            with patch("src.loats.scheduler.ZoneInfo") as mock_zone:
+            with patch("loats.scheduler.ZoneInfo") as mock_zone:
                 mock_tz = MagicMock()
                 mock_zone.return_value = mock_tz
 
@@ -446,7 +446,7 @@ class TestSchedulerCoverage:
         mock_data_cleanup.assert_awaited_once()
 
         # Test unknown job
-        with patch("src.loats.scheduler.logger") as mock_logger:
+        with patch("loats.scheduler.logger") as mock_logger:
             await scheduler_instance.run_once("unknown_job")
             mock_logger.warning.assert_called_once_with(
                 "Unknown job ID: %s", "unknown_job"
@@ -483,7 +483,7 @@ class TestSchedulerCoverage:
         """Test get_circuit_breaker_status method (lines 629-630)."""
         # Mock circuit breaker status
         mock_status = {"state": "CLOSED", "failure_count": 0}
-        with patch("src.loats.scheduler.OPENALGO_CIRCUIT_BREAKER") as mock_cb:
+        with patch("loats.scheduler.OPENALGO_CIRCUIT_BREAKER") as mock_cb:
             mock_cb.get_status.return_value = mock_status
 
             status = scheduler_instance.get_circuit_breaker_status()
@@ -503,7 +503,7 @@ class TestSchedulerCoverage:
         with patch(
             "src.loats.scheduler.alerts.is_kill_switch_active", return_value=True
         ):
-            with patch("src.loats.scheduler.logger") as mock_logger:
+            with patch("loats.scheduler.logger") as mock_logger:
                 with pytest.raises(Exception):  # KillSwitchError
                     scheduler_instance._check_kill_switch()
                 mock_logger.error.assert_called_once_with(

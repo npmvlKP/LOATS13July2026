@@ -160,7 +160,7 @@ class TestSupertrendCoreCoverage:
         )
 
         # Test with Numba disabled by mocking
-        with patch("src.loats.ta.NUMBA_AVAILABLE", False):
+        with patch("loats.ta.NUMBA_AVAILABLE", False):
             supertrend, direction = calculate_supertrend(df, period=5, multiplier=2.0)
 
             # Should still work with fallback implementation

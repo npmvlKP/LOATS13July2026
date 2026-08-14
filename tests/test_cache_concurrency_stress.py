@@ -86,7 +86,9 @@ class TestCacheConcurrencyStress:
 
                     # Verify the value was set
                     result = asyncio.run(cache_manager.get(key))
-                    assert result == value, f"Thread {thread_id}: Expected {value}, got {result}"
+                    assert (
+                        result == value
+                    ), f"Thread {thread_id}: Expected {value}, got {result}"
             except Exception as e:
                 errors.append((thread_id, str(e)))
 
@@ -154,8 +156,9 @@ class TestCacheConcurrencyStress:
                         # Odd threads: get (should not crash)
                         result = asyncio.run(cache_manager.get(key))
                         # Result can be None if deleted, or a string if not
-                        assert result is None or isinstance(result, str), \
-                            f"Unexpected result type: {type(result)}"
+                        assert result is None or isinstance(
+                            result, str
+                        ), f"Unexpected result type: {type(result)}"
                     time.sleep(0.001)
             except Exception as e:
                 errors.append((thread_id, i, str(e)))
@@ -227,7 +230,11 @@ class TestCacheConcurrencyStress:
                 for i in range(operations_per_thread):
                     # Mix of get, set, and stats operations
                     if i % 3 == 0:
-                        asyncio.run(cache_manager.set(f"thread_{thread_id}_key_{i}", f"value_{i}"))
+                        asyncio.run(
+                            cache_manager.set(
+                                f"thread_{thread_id}_key_{i}", f"value_{i}"
+                            )
+                        )
                     elif i % 3 == 1:
                         asyncio.run(cache_manager.get(f"key_{i % 100}"))
                     else:
@@ -249,8 +256,9 @@ class TestCacheConcurrencyStress:
 
         # Verify final stats are consistent
         final_stats = await cache_manager.get_cache_stats()
-        assert final_stats["hits"] + final_stats["misses"] >= 0, \
-            "Total operations should be non-negative"
+        assert (
+            final_stats["hits"] + final_stats["misses"] >= 0
+        ), "Total operations should be non-negative"
 
     @pytest.mark.asyncio
     async def test_high_contention_single_key(self, cache_manager):

@@ -165,11 +165,11 @@ class TestOptionsCoverage:
         """Test calculate_greeks exception fallback (lines 137-149)."""
         # Mock the vollib functions to raise exceptions and test fallback
         with (
-            patch("src.loats.options.delta") as mock_delta,
-            patch("src.loats.options.gamma") as mock_gamma,
-            patch("src.loats.options.theta") as mock_theta,
-            patch("src.loats.options.vega") as mock_vega,
-            patch("src.loats.options.rho") as mock_rho,
+            patch("loats.options.delta") as mock_delta,
+            patch("loats.options.gamma") as mock_gamma,
+            patch("loats.options.theta") as mock_theta,
+            patch("loats.options.vega") as mock_vega,
+            patch("loats.options.rho") as mock_rho,
         ):
             # Set up mocks to raise exceptions
             mock_delta.side_effect = Exception("Test exception")
@@ -241,7 +241,7 @@ class TestOptionsCoverage:
     ) -> None:
         """Test calculate_implied_volatility fallback methods (lines 200-234)."""
         # Test with price that might cause vollib to fail, triggering fallback
-        with patch("src.loats.options.implied_volatility") as mock_iv:
+        with patch("loats.options.implied_volatility") as mock_iv:
             mock_iv.side_effect = Exception("vollib failed")
 
             iv = options_engine.calculate_implied_volatility(
@@ -263,9 +263,9 @@ class TestOptionsCoverage:
         """Test calculate_implied_volatility brentq fallback (lines 210-214)."""
         # Test scenario where brentq might be used as fallback
         with (
-            patch("src.loats.options.implied_volatility") as mock_iv,
-            patch("src.loats.options.black_scholes") as mock_bs,
-            patch("src.loats.options.brentq") as mock_brentq,
+            patch("loats.options.implied_volatility") as mock_iv,
+            patch("loats.options.black_scholes") as mock_bs,
+            patch("loats.options.brentq") as mock_brentq,
         ):
             mock_iv.side_effect = Exception("vollib failed")
 
@@ -298,11 +298,11 @@ class TestOptionsCoverage:
         """Test calculate_implied_volatility Newton method fallback (lines 216-234)."""
         # Test scenario where Newton method might be used as fallback
         with (
-            patch("src.loats.options.implied_volatility") as mock_iv,
-            patch("src.loats.options.black_scholes") as mock_bs,
-            patch("src.loats.options.brentq") as mock_brentq,
-            patch("src.loats.options.newton") as mock_newton,
-            patch("src.loats.options.vega") as mock_vega,
+            patch("loats.options.implied_volatility") as mock_iv,
+            patch("loats.options.black_scholes") as mock_bs,
+            patch("loats.options.brentq") as mock_brentq,
+            patch("loats.options.newton") as mock_newton,
+            patch("loats.options.vega") as mock_vega,
         ):
             mock_iv.side_effect = Exception("vollib failed")
 
@@ -494,11 +494,11 @@ class TestOptionsCoverage:
         """Test standalone calculate_greeks exception fallback (lines 383-393)."""
         # Mock the vollib functions to raise specific exceptions that trigger fallback
         with (
-            patch("src.loats.options.delta") as mock_delta,
-            patch("src.loats.options.gamma") as mock_gamma,
-            patch("src.loats.options.theta") as mock_theta,
-            patch("src.loats.options.vega") as mock_vega,
-            patch("src.loats.options.rho") as mock_rho,
+            patch("loats.options.delta") as mock_delta,
+            patch("loats.options.gamma") as mock_gamma,
+            patch("loats.options.theta") as mock_theta,
+            patch("loats.options.vega") as mock_vega,
+            patch("loats.options.rho") as mock_rho,
         ):
             # Set up mocks to raise ValueError (which triggers fallback)
             mock_delta.side_effect = ValueError("Test exception")
@@ -540,7 +540,7 @@ class TestOptionsCoverage:
     def test_standalone_calculate_implied_volatility_fallback(self) -> None:
         """Test standalone calculate_implied_volatility fallback (lines 426-428)."""
         # Test with price that might cause vollib to fail, triggering fallback
-        with patch("src.loats.options.implied_volatility") as mock_iv:
+        with patch("loats.options.implied_volatility") as mock_iv:
             # Mock to raise specific exceptions that trigger fallback
             mock_iv.side_effect = ValueError("vollib failed")
 

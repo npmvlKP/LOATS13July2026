@@ -28,12 +28,7 @@ from .models import (
     Trade,
 )
 
-# Import aiosqlite for async operations
-try:
-    import aiosqlite
-except ImportError:
-    aiosqlite = None  # type: ignore[assignment]
-
+# Note: aiosqlite is imported locally in async methods where needed
 logger = get_logger(__name__)
 
 T = TypeVar("T", bound=BaseModel)
@@ -113,7 +108,9 @@ class Database:
         self._initialize_database()
 
         # Async connection pool
-        self._async_pool: Any | None = None  # SimpleConnectionPool or aiosqlite.ConnectionPool
+        self._async_pool: Any | None = (
+            None  # SimpleConnectionPool or aiosqlite.ConnectionPool
+        )
         self._async_pool_lock = asyncio.Lock()
 
     def initialize(self) -> None:
@@ -306,6 +303,75 @@ class Database:
         cursor.execute(
             "CREATE INDEX IF NOT EXISTS idx_quotes_timestamp ON quotes(timestamp)"
         )
+        conn.commit()
+
+        # Ensure schema is up to date (migrate old databases)
+        self._migrate_schema(conn)
+
+    def _migrate_schema(self, conn: sqlite3.Connection) -> None:
+        """
+        Migrate database schema to ensure all required columns exist.
+        This handles cases where old database files are used.
+        """
+        cursor = conn.cursor()
+
+        # Get current table schemas
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        tables = [row[0] for row in cursor.fetchall()]
+
+        # Define required columns for each table
+        migrations = {
+            "signals": [
+                ("created_at_ms", "INTEGER NOT NULL DEFAULT 0"),
+                ("timestamp_ms", "INTEGER NOT NULL DEFAULT 0"),
+            ],
+            "trades": [
+                ("created_at_ms", "INTEGER NOT NULL DEFAULT 0"),
+                ("updated_at_ms", "INTEGER NOT NULL DEFAULT 0"),
+                ("entry_time_ms", "INTEGER NOT NULL DEFAULT 0"),
+                ("exit_time_ms", "INTEGER"),
+            ],
+            "historical_data": [
+                ("created_at_ms", "INTEGER NOT NULL DEFAULT 0"),
+                ("timestamp_ms", "INTEGER NOT NULL DEFAULT 0"),
+            ],
+            "quotes": [
+                ("created_at_ms", "INTEGER NOT NULL DEFAULT 0"),
+                ("timestamp_ms", "INTEGER NOT NULL DEFAULT 0"),
+            ],
+            "positions": [
+                ("created_at_ms", "INTEGER NOT NULL DEFAULT 0"),
+                ("timestamp_ms", "INTEGER NOT NULL DEFAULT 0"),
+            ],
+            "funds": [
+                ("created_at_ms", "INTEGER NOT NULL DEFAULT 0"),
+                ("timestamp_ms", "INTEGER NOT NULL DEFAULT 0"),
+            ],
+            "orders": [
+                ("created_at_ms", "INTEGER NOT NULL DEFAULT 0"),
+                ("updated_at_ms", "INTEGER NOT NULL DEFAULT 0"),
+                ("timestamp_ms", "INTEGER NOT NULL DEFAULT 0"),
+            ],
+            "audit_log": [
+                ("timestamp_ms", "INTEGER NOT NULL DEFAULT 0"),
+            ],
+        }
+
+        # Apply migrations for each table
+        for table_name, columns in migrations.items():
+            if table_name not in tables:
+                continue
+
+            cursor.execute(f"PRAGMA table_info({table_name})")
+            existing_columns = {row[1] for row in cursor.fetchall()}
+
+            for column_name, column_def in columns:
+                if column_name not in existing_columns:
+                    logger.info(f"Adding column {column_name} to table {table_name}")
+                    cursor.execute(
+                        f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_def}"
+                    )
+
         conn.commit()
 
     def _get_connection(self) -> sqlite3.Connection:
@@ -1399,7 +1465,7 @@ class Database:
         if order.idempotency_key:
             cursor.execute(
                 "SELECT order_id FROM orders WHERE idempotency_key = ?",
-                (order.idempotency_key,)
+                (order.idempotency_key,),
             )
             existing_order = cursor.fetchone()
             if existing_order:
@@ -1479,7 +1545,7 @@ class Database:
             order_id: Order identifier
             status: New status value
         Returns:
-            True successful
+            True if order was found and updated, False if order doesn't exist
         """
         now = datetime.now(UTC)
         now_iso = now.isoformat()
@@ -1487,6 +1553,13 @@ class Database:
 
         conn = self._get_connection()
         cursor = conn.cursor()
+
+        # Check if order exists first
+        cursor.execute("SELECT 1 FROM orders WHERE order_id = ?", (order_id,))
+        if cursor.fetchone() is None:
+            return False
+
+        # Update the order
         cursor.execute(
             "UPDATE orders SET status = ?, updated_at = ?, updated_at_ms = ? WHERE order_id = ?",
             (status, now_iso, now_ms, order_id),

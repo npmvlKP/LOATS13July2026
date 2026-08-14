@@ -134,7 +134,7 @@ class TestMetricsServer:
         manager = MetricsManager()
 
         # Mock the start_http_server function
-        with patch("src.loats.metrics.start_http_server") as mock_start_server:
+        with patch("loats.metrics.start_http_server") as mock_start_server:
             manager.start_server()
 
             # Should call start_http_server with default port
@@ -148,7 +148,7 @@ class TestMetricsServer:
         manager = MetricsManager()
 
         # Mock the start_http_server function
-        with patch("src.loats.metrics.start_http_server") as mock_start_server:
+        with patch("loats.metrics.start_http_server") as mock_start_server:
             manager.start_server(port=9000)
 
             # Should call start_http_server with custom port
@@ -162,7 +162,7 @@ class TestMetricsServer:
         manager = MetricsManager()
 
         # Mock the start_http_server function
-        with patch("src.loats.metrics.start_http_server") as mock_start_server:
+        with patch("loats.metrics.start_http_server") as mock_start_server:
             # Start server first time
             manager.start_server()
             mock_start_server.assert_called_once()
@@ -182,7 +182,7 @@ class TestMetricsServer:
 
         # Mock the start_http_server function to raise exception
         with patch(
-            "src.loats.metrics.start_http_server", side_effect=Exception("Port in use")
+            "loats.metrics.start_http_server", side_effect=Exception("Port in use")
         ):
             # Should not raise exception
             manager.start_server()
@@ -193,7 +193,7 @@ class TestMetricsServer:
     def test_start_metrics_server_function(self) -> None:
         """Test the start_metrics_server function."""
         # Mock the start_http_server function
-        with patch("src.loats.metrics.start_http_server") as mock_start_server:
+        with patch("loats.metrics.start_http_server") as mock_start_server:
             start_metrics_server(port=8080)
 
             # Should call start_http_server with custom port
@@ -323,7 +323,9 @@ class TestSignalRecording:
             # Record different signal types with the test manager
             record_signal(signal_type="BUY", scan_type="ta_scan", manager=manager)
             record_signal(signal_type="SELL", scan_type="ta_scan", manager=manager)
-            record_signal(signal_type="NEUTRAL", scan_type="sentiment_scan", manager=manager)
+            record_signal(
+                signal_type="NEUTRAL", scan_type="sentiment_scan", manager=manager
+            )
 
             # Should have called the counter three times
             assert mock_labels.call_count == 3
@@ -356,9 +358,15 @@ class TestStatusMetrics:
             mock_labels.return_value = mock_gauge
 
             # Set circuit breaker status for different components with the test manager
-            set_circuit_breaker_status(component="openalgo", open_status=True, manager=manager)
-            set_circuit_breaker_status(component="database", open_status=False, manager=manager)
-            set_circuit_breaker_status(component="openalgo", open_status=True, manager=manager)
+            set_circuit_breaker_status(
+                component="openalgo", open_status=True, manager=manager
+            )
+            set_circuit_breaker_status(
+                component="database", open_status=False, manager=manager
+            )
+            set_circuit_breaker_status(
+                component="openalgo", open_status=True, manager=manager
+            )
 
             # Should have called the gauge appropriately
             assert mock_labels.call_count == 3
@@ -378,7 +386,7 @@ class TestMetricsIntegration:
         manager = MetricsManager()
 
         # Start metrics server
-        with patch("src.loats.metrics.start_http_server"):
+        with patch("loats.metrics.start_http_server"):
             manager.start_server(port=8001)
 
         # Record some signals with the test manager
@@ -387,7 +395,9 @@ class TestMetricsIntegration:
             mock_labels.return_value = mock_counter
 
             record_signal(signal_type="BUY", scan_type="ta_scan", manager=manager)
-            record_signal(signal_type="SELL", scan_type="sentiment_scan", manager=manager)
+            record_signal(
+                signal_type="SELL", scan_type="sentiment_scan", manager=manager
+            )
 
             assert mock_counter.inc.call_count == 2
 
@@ -504,7 +514,9 @@ class TestMetricsEdgeCases:
             mock_labels.return_value = mock_counter
 
             # Test with special characters using the test manager
-            record_signal(signal_type="BUY_SIGNAL_🚀", scan_type="ta-scan_v1.0", manager=manager)
+            record_signal(
+                signal_type="BUY_SIGNAL_🚀", scan_type="ta-scan_v1.0", manager=manager
+            )
 
             mock_labels.assert_called_once_with(
                 signal_type="BUY_SIGNAL_🚀", scan_type="ta-scan_v1.0"
@@ -515,7 +527,9 @@ class TestMetricsEdgeCases:
             mock_gauge = MagicMock()
             mock_labels.return_value = mock_gauge
 
-            set_circuit_breaker_status(component="openalgo-api_v2", open_status=True, manager=manager)
+            set_circuit_breaker_status(
+                component="openalgo-api_v2", open_status=True, manager=manager
+            )
             mock_labels.assert_called_once_with(component="openalgo-api_v2")
 
     def test_multiple_metrics_managers(self) -> None:
@@ -539,7 +553,7 @@ class TestMetricsEdgeCases:
         manager = MetricsManager()
 
         # Test with very high port number
-        with patch("src.loats.metrics.start_http_server") as mock_start_server:
+        with patch("loats.metrics.start_http_server") as mock_start_server:
             manager.start_server(port=65535)  # Maximum port number
             mock_start_server.assert_called_once_with(65535)
 
@@ -547,7 +561,7 @@ class TestMetricsEdgeCases:
         manager._server_started = False
 
         # Test with low port number
-        with patch("src.loats.metrics.start_http_server") as mock_start_server:
+        with patch("loats.metrics.start_http_server") as mock_start_server:
             manager.start_server(port=1)  # Minimum port number
             mock_start_server.assert_called_once_with(1)
 

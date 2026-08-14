@@ -20,6 +20,7 @@ from loats.database import Database
 from loats.models import OptionContract, OptionType
 from loats.strike_selection import StrikeSelectionEngine, select_strikes
 
+
 @pytest.fixture
 def temp_db():
     """Create a temporary database for testing."""
@@ -35,6 +36,7 @@ def temp_db():
 
         # Clean up
         db.close_all()
+
 
 class TestStrikeSelectionUtilities(unittest.IsolatedAsyncioTestCase):
     """Test suite for strike selection utility functions."""
@@ -98,33 +100,42 @@ class TestStrikeSelectionUtilities(unittest.IsolatedAsyncioTestCase):
         selected = await select_strikes(100.0, option_chain, "atm_straddle", 1, 3)
         assert len(selected) == 3
         assert 100.0 in selected  # ATM strike should be included
-        assert 95.0 in selected   # 1 strike below ATM
+        assert 95.0 in selected  # 1 strike below ATM
         assert 105.0 in selected  # 1 strike above ATM
 
         # Test delta neutral strategy
-        with patch("src.loats.strike_selection.StrikeSelectionEngine._select_delta_neutral_strikes") as mock_select:
+        with patch(
+            "loats.strike_selection.StrikeSelectionEngine._select_delta_neutral_strikes"
+        ) as mock_select:
             mock_select.return_value = [100.0, 105.0]
             selected = await select_strikes(100.0, option_chain, "delta_neutral", 1, 2)
             assert len(selected) == 2
             mock_select.assert_called_once()
 
         # Test OI based strategy
-        with patch("src.loats.strike_selection.StrikeSelectionEngine._select_oi_based_strikes") as mock_select:
+        with patch(
+            "loats.strike_selection.StrikeSelectionEngine._select_oi_based_strikes"
+        ) as mock_select:
             mock_select.return_value = [95.0, 100.0]
             selected = await select_strikes(100.0, option_chain, "oi_based", 1, 2)
             assert len(selected) == 2
             mock_select.assert_called_once()
 
         # Test unknown strategy (should default to ATM straddle)
-        with patch("src.loats.strike_selection.StrikeSelectionEngine._select_atm_straddle_strikes") as mock_select:
+        with patch(
+            "loats.strike_selection.StrikeSelectionEngine._select_atm_straddle_strikes"
+        ) as mock_select:
             mock_select.return_value = [100.0]
-            selected = await select_strikes(100.0, option_chain, "unknown_strategy", 1, 1)
+            selected = await select_strikes(
+                100.0, option_chain, "unknown_strategy", 1, 1
+            )
             assert len(selected) == 1
             mock_select.assert_called_once()
 
         # Test empty option chain - should return empty list
         selected = await select_strikes(100.0, [], "atm_straddle", 1, 3)
         assert len(selected) == 0
+
 
 class TestStrikeSelectionEngine(unittest.IsolatedAsyncioTestCase):
     """Test suite for StrikeSelectionEngine."""
@@ -141,9 +152,9 @@ class TestStrikeSelectionEngine(unittest.IsolatedAsyncioTestCase):
 
     async def test_select_strikes_atm_straddle(self):
         """Test ATM straddle strike selection."""
-        # Create test option chain
+        # Create test option chain (used for type reference only)
         now = datetime.now(UTC)
-        option_chain = [
+        _ = [
             OptionContract(
                 symbol="TEST24JUL95CE",
                 strike_price=95.0,
@@ -208,17 +219,21 @@ class TestStrikeSelectionEngine(unittest.IsolatedAsyncioTestCase):
                 rho=0.03,
                 quantity=1,
             ),
-        ]
+        ]  # Used for type reference only
 
         # Test ATM straddle selection
-        selected = await self.engine._select_atm_straddle_strikes(100.0, [95.0, 100.0, 105.0, 110.0], 1, 3)
+        selected = await self.engine._select_atm_straddle_strikes(
+            100.0, [95.0, 100.0, 105.0, 110.0], 1, 3
+        )
         assert len(selected) == 3
         assert 100.0 in selected  # ATM strike
-        assert 95.0 in selected   # 1 strike below ATM
+        assert 95.0 in selected  # 1 strike below ATM
         assert 105.0 in selected  # 1 strike above ATM
 
         # Test with wider width
-        selected = await self.engine._select_atm_straddle_strikes(100.0, [95.0, 100.0, 105.0, 110.0], 2, 5)
+        selected = await self.engine._select_atm_straddle_strikes(
+            100.0, [95.0, 100.0, 105.0, 110.0], 2, 5
+        )
         assert len(selected) == 4  # Should include 95, 100, 105, 110 (but max 4)
         assert 100.0 in selected
         assert 95.0 in selected
@@ -226,7 +241,9 @@ class TestStrikeSelectionEngine(unittest.IsolatedAsyncioTestCase):
         assert 110.0 in selected
 
         # Test with underlying price between strikes
-        selected = await self.engine._select_atm_straddle_strikes(97.5, [95.0, 100.0, 105.0], 1, 3)
+        selected = await self.engine._select_atm_straddle_strikes(
+            97.5, [95.0, 100.0, 105.0], 1, 3
+        )
         assert len(selected) == 2  # Should include 95 and 100 (closest to 97.5)
         assert 95.0 in selected
         assert 100.0 in selected
@@ -335,7 +352,9 @@ class TestStrikeSelectionEngine(unittest.IsolatedAsyncioTestCase):
         ]
 
         # Test delta neutral selection (target delta = 0)
-        selected = await self.engine._select_delta_neutral_strikes(100.0, option_chain, 1, 2)
+        selected = await self.engine._select_delta_neutral_strikes(
+            100.0, option_chain, 1, 2
+        )
 
         # Should select strikes that create a delta-neutral position
         # For example, 100CE (delta=0.5) + 100PE (delta=-0.5) = net delta 0
@@ -482,13 +501,17 @@ class TestStrikeSelectionEngine(unittest.IsolatedAsyncioTestCase):
         # First call should not be cached
         with patch.object(self.engine, "_select_atm_straddle_strikes") as mock_select:
             mock_select.return_value = [100.0]
-            selected1 = await self.engine.select_strikes(100.0, option_chain, "atm_straddle", 1, 1)
+            selected1 = await self.engine.select_strikes(
+                100.0, option_chain, "atm_straddle", 1, 1
+            )
             assert len(selected1) == 1
             mock_select.assert_called_once()
 
         # Second call with same parameters should be cached
         with patch.object(self.engine, "_select_atm_straddle_strikes") as mock_select:
-            selected2 = await self.engine.select_strikes(100.0, option_chain, "atm_straddle", 1, 1)
+            selected2 = await self.engine.select_strikes(
+                100.0, option_chain, "atm_straddle", 1, 1
+            )
             assert len(selected2) == 1
             mock_select.assert_not_called()  # Should not be called due to cache
 
@@ -516,28 +539,32 @@ class TestStrikeSelectionEngine(unittest.IsolatedAsyncioTestCase):
         ]
 
         # Test that performance warning is logged when exceeding 5ms threshold
-        with patch("src.loats.strike_selection.logger") as mock_logger:
-            with patch("src.loats.strike_selection.datetime") as mock_datetime:
+        with patch("loats.strike_selection.logger") as mock_logger:
+            with patch("loats.strike_selection.datetime") as mock_datetime:
                 # Mock datetime to simulate slow execution
                 mock_datetime.datetime.now.side_effect = [
                     datetime.now(UTC),
                     datetime.now(UTC) + timedelta(milliseconds=6),  # 6ms later
                 ]
 
-                selected = await self.engine.select_strikes(100.0, option_chain, "atm_straddle", 1, 1)
+                selected = await self.engine.select_strikes(
+                    100.0, option_chain, "atm_straddle", 1, 1
+                )
                 assert len(selected) == 1
                 mock_logger.warning.assert_called_once()
 
         # Test that debug message is logged for fast execution
-        with patch("src.loats.strike_selection.logger") as mock_logger:
-            with patch("src.loats.strike_selection.datetime") as mock_datetime:
+        with patch("loats.strike_selection.logger") as mock_logger:
+            with patch("loats.strike_selection.datetime") as mock_datetime:
                 # Mock datetime to simulate fast execution
                 mock_datetime.datetime.now.side_effect = [
                     datetime.now(UTC),
                     datetime.now(UTC) + timedelta(milliseconds=2),  # 2ms later
                 ]
 
-                selected = await self.engine.select_strikes(100.0, option_chain, "atm_straddle", 1, 1)
+                selected = await self.engine.select_strikes(
+                    100.0, option_chain, "atm_straddle", 1, 1
+                )
                 assert len(selected) == 1
                 mock_logger.debug.assert_called_once()
 
@@ -569,7 +596,9 @@ class TestStrikeSelectionEngine(unittest.IsolatedAsyncioTestCase):
             )
         ]
 
-        selected = await self.engine.select_strikes(100.0, option_chain, "atm_straddle", 1, 3)
+        selected = await self.engine.select_strikes(
+            100.0, option_chain, "atm_straddle", 1, 3
+        )
         assert len(selected) == 1
         assert 100.0 in selected
 
@@ -633,7 +662,9 @@ class TestStrikeSelectionEngine(unittest.IsolatedAsyncioTestCase):
         ]
 
         # Test with only ATM options available
-        selected = await self.engine._select_delta_neutral_strikes(100.0, option_chain, 1, 2)
+        selected = await self.engine._select_delta_neutral_strikes(
+            100.0, option_chain, 1, 2
+        )
         assert len(selected) == 2  # Should select both ATM call and put
         assert 100.0 in selected
 
@@ -697,6 +728,7 @@ class TestStrikeSelectionEngine(unittest.IsolatedAsyncioTestCase):
         assert len(selected) == 2
         # Should select strikes closest to ATM
         assert 100.0 in selected
+
 
 if __name__ == "__main__":
     # Run the tests

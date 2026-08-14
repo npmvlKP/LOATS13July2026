@@ -205,8 +205,7 @@ class Order(BaseModel):
     take_profit: float | None = Field(default=None, gt=0)
     trailing_stop_loss: float | None = Field(default=None, gt=0)
     idempotency_key: str | None = Field(
-        default=None,
-        description="Unique key to prevent duplicate order submissions"
+        default=None, description="Unique key to prevent duplicate order submissions"
     )
 
 

@@ -13,14 +13,14 @@ def trading_system():
 
 @pytest.mark.asyncio
 async def test_trading_system_initialization_failure(trading_system):
-    with patch("src.loats.main.initialize_cache", side_effect=Exception("Init error")):
+    with patch("loats.main.initialize_cache", side_effect=Exception("Init error")):
         with pytest.raises(Exception, match="Init error"):
             await trading_system.initialize()
 
 
 @pytest.mark.asyncio
 async def test_trading_system_start_failure(trading_system):
-    with patch("src.loats.main.alerts.start", side_effect=Exception("Start error")):
+    with patch("loats.main.alerts.start", side_effect=Exception("Start error")):
         with pytest.raises(Exception, match="Start error"):
             await trading_system.start()
 

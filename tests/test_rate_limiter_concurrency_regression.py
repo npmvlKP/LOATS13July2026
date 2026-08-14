@@ -45,9 +45,9 @@ class TestRateLimiterConcurrencyRegression:
         # Should have approximately 50 successful acquisitions (max_ops from singleton default)
         # Allow for small timing variations in concurrent scenarios (45-55 range)
         successful = sum(results)
-        assert 45 <= successful <= 55, (
-            f"Expected 45-55 successful acquisitions, got {successful}"
-        )
+        assert (
+            45 <= successful <= 55
+        ), f"Expected 45-55 successful acquisitions, got {successful}"
 
         # Verify that the singleton behavior works correctly
         limiter1 = get_order_rate_limiter()
@@ -76,9 +76,9 @@ class TestRateLimiterConcurrencyRegression:
         # Should have approximately 50 successful acquisitions (max_ops from singleton default)
         # Allow for small timing variations in concurrent scenarios (45-55 range)
         successful = sum(results)
-        assert 45 <= successful <= 55, (
-            f"Expected 45-55 successful acquisitions, got {successful}"
-        )
+        assert (
+            45 <= successful <= 55
+        ), f"Expected 45-55 successful acquisitions, got {successful}"
 
         # Verify that the singleton behavior works correctly
         limiter1 = get_smart_order_rate_limiter()
@@ -119,29 +119,29 @@ class TestRateLimiterConcurrencyRegression:
         # Should have approximately 50 successful order acquisitions (from singleton default)
         # Allow for small timing variations in concurrent scenarios (45-55 range)
         order_successful = sum(results[:50])
-        assert 45 <= order_successful <= 55, (
-            f"Expected 45-55 successful order acquisitions, got {order_successful}"
-        )
+        assert (
+            45 <= order_successful <= 55
+        ), f"Expected 45-55 successful order acquisitions, got {order_successful}"
 
         # Should have approximately 50 successful smart order acquisitions (from singleton default)
         # Allow for small timing variations in concurrent scenarios (45-55 range)
         smart_successful = sum(results[50:])
-        assert 45 <= smart_successful <= 55, (
-            f"Expected 45-55 successful smart order acquisitions, got {smart_successful}"
-        )
+        assert (
+            45 <= smart_successful <= 55
+        ), f"Expected 45-55 successful smart order acquisitions, got {smart_successful}"
 
         # Verify that both limiters are singletons
         order_limiter1 = get_order_rate_limiter()
         order_limiter2 = get_order_rate_limiter()
-        assert order_limiter1 is order_limiter2, (
-            "Order rate limiter should be a singleton"
-        )
+        assert (
+            order_limiter1 is order_limiter2
+        ), "Order rate limiter should be a singleton"
 
         smart_limiter1 = get_smart_order_rate_limiter()
         smart_limiter2 = get_smart_order_rate_limiter()
-        assert smart_limiter1 is smart_limiter2, (
-            "Smart order rate limiter should be a singleton"
-        )
+        assert (
+            smart_limiter1 is smart_limiter2
+        ), "Smart order rate limiter should be a singleton"
 
     @pytest.mark.asyncio
     async def test_rate_limiter_time_window_enforcement(self) -> None:
@@ -161,9 +161,9 @@ class TestRateLimiterConcurrencyRegression:
             results.append(result)
 
         # Should all fail
-        assert all(not result for result in results), (
-            "All requests after max_ops should fail"
-        )
+        assert all(
+            not result for result in results
+        ), "All requests after max_ops should fail"
 
         # Wait for the window to expire
         await asyncio.sleep(1.1)  # Slightly more than window size
@@ -235,9 +235,9 @@ class TestRateLimiterConcurrencyRegression:
         # Allow for some small timing variations due to system scheduling
         for wait_time in wait_times:
             assert wait_time >= 0.0, "Wait time should be non-negative"
-            assert wait_time <= 1.2, (
-                f"Wait time {wait_time} should not exceed window size + buffer (allowing for small timing variations)"
-            )
+            assert (
+                wait_time <= 1.2
+            ), f"Wait time {wait_time} should not exceed window size + buffer (allowing for small timing variations)"
 
         # Verify singleton behavior
         limiter1 = get_order_rate_limiter()

@@ -9,7 +9,7 @@ from loats.scheduler import TradingScheduler
 
 @pytest.fixture
 def scheduler():
-    with patch("src.loats.scheduler.AsyncIOScheduler") as mock_aps:
+    with patch("loats.scheduler.AsyncIOScheduler") as mock_aps:
         instance = TradingScheduler()
         instance.scheduler = mock_aps
         return instance

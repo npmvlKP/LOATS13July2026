@@ -17,12 +17,13 @@ from .options import options
 
 logger = get_logger(__name__)
 
+
 class StrikeSelectionEngine:
     """High-performance strike selection engine with <5ms latency guarantee."""
 
     def __init__(self) -> None:
         """Initialize StrikeSelectionEngine."""
-        self._cache: dict[str, Any] = {}
+        self._cache: dict[str, list[float]] = {}
 
     async def select_strikes(
         self,
@@ -59,7 +60,9 @@ class StrikeSelectionEngine:
                 len(option_chain),
                 option_chain[0].strike_price if option_chain else 0,
             )
-            cache_key = f"{underlying_price:.2f}_{strategy}_{width}_{max_strikes}_{chain_sig}"
+            cache_key = (
+                f"{underlying_price:.2f}_{strategy}_{width}_{max_strikes}_{chain_sig}"
+            )
             if cache_key in self._cache:
                 return self._cache[cache_key]
 
@@ -151,7 +154,7 @@ class StrikeSelectionEngine:
             return [strikes[best_idx]][:max_strikes]
 
         # Select strikes around ATM for normal cases
-        selected = []
+        selected: list[float] = []
         start_idx = max(0, best_idx - width)
         end_idx = min(len(strikes) - 1, best_idx + width)
 
@@ -181,7 +184,7 @@ class StrikeSelectionEngine:
         calls.sort(key=lambda x: abs(x.strike_price - underlying_price))
         puts.sort(key=lambda x: abs(x.strike_price - underlying_price))
 
-        selected = []
+        selected: list[float] = []
 
         # Add ATM call and put for delta neutrality
         if calls and len(selected) < max_strikes:
@@ -195,9 +198,17 @@ class StrikeSelectionEngine:
                 break
             if opt.strike_price not in selected:
                 # Simple heuristic: prefer strikes with delta close to 0.5 for calls, -0.5 for puts
-                if opt.option_type == OptionType.CALL and abs(opt.delta - 0.5) < 0.1:
+                if (
+                    opt.option_type == OptionType.CALL
+                    and opt.delta is not None
+                    and abs(opt.delta - 0.5) < 0.1
+                ):
                     selected.append(opt.strike_price)
-                elif opt.option_type == OptionType.PUT and abs(opt.delta + 0.5) < 0.1:
+                elif (
+                    opt.option_type == OptionType.PUT
+                    and opt.delta is not None
+                    and abs(opt.delta + 0.5) < 0.1
+                ):
                     selected.append(opt.strike_price)
 
         return selected[:max_strikes]
@@ -216,7 +227,7 @@ class StrikeSelectionEngine:
         # Sort by open interest (descending)
         sorted_by_oi = sorted(option_chain, key=lambda x: x.open_interest, reverse=True)
 
-        selected = []
+        selected: list[float] = []
         for opt in sorted_by_oi:
             if len(selected) >= max_strikes:
                 break
@@ -226,10 +237,7 @@ class StrikeSelectionEngine:
         return selected
 
     async def calculate_optimal_strike_spacing(
-        self,
-        underlying_price: float,
-        implied_volatility: float,
-        days_to_expiry: int
+        self, underlying_price: float, implied_volatility: float, days_to_expiry: int
     ) -> float:
         """Calculate optimal strike spacing based on market conditions.
 
@@ -251,7 +259,9 @@ class StrikeSelectionEngine:
         time_to_expiry = days_to_expiry / 252.0  # Trading days
 
         # Calculate expected price movement (1 standard deviation)
-        expected_move = underlying_price * implied_volatility * np.sqrt(time_to_expiry)
+        expected_move = float(
+            underlying_price * implied_volatility * np.sqrt(time_to_expiry)
+        )
 
         # Use 0.5 standard deviations as optimal spacing
         return max(5.0, expected_move * 0.5)  # Minimum 5 point spacing
@@ -296,7 +306,7 @@ class StrikeSelectionEngine:
         )
 
         # Calculate delta coverage
-        deltas = [abs(opt.delta) for opt in selected_contracts]
+        deltas = [abs(opt.delta) for opt in selected_contracts if opt.delta is not None]
         delta_range = max(deltas) - min(deltas) if deltas else 0
 
         # Calculate ATM proximity
@@ -319,8 +329,10 @@ class StrikeSelectionEngine:
         """Clear the strike selection cache."""
         self._cache.clear()
 
+
 # Module-level singleton instance
 strike_selector = StrikeSelectionEngine()
+
 
 # Async wrapper for module-level access
 async def select_strikes(

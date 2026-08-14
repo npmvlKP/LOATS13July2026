@@ -174,9 +174,11 @@ class TradingOrchestrator:
 
                 if signal_result:
                     signal_type, strength = signal_result
+                    from .models import SignalType
+
                     signal = Signal(
                         symbol=symbol,
-                        signal_type=signal_type,
+                        signal_type=SignalType(signal_type),
                         strength=strength,
                         timestamp=datetime.datetime.now(datetime.UTC),
                         indicators={ind.name: ind.value for ind in indicators},
@@ -208,15 +210,8 @@ class TradingOrchestrator:
                 "https://www.bloombergquint.com/markets-feed",
             ]
 
-            # Use asyncio.to_thread to avoid blocking event loop
-            result = await asyncio.to_thread(
-                sentiment.analyze_symbol_sentiment, symbol, rss_feeds
-            )
-            # In tests, the function may be mocked to return a plain object instead of a coroutine.
-            # If the returned value is awaitable (i.e., a coroutine), await it to get the actual result.
-            import inspect
-            if inspect.isawaitable(result):
-                result = await result
+            # Call the async sentiment analysis function directly
+            result = await sentiment.analyze_symbol_sentiment(symbol, rss_feeds)
 
             # Generate sentiment signal
             if result.sentiment_score > 0:
@@ -227,9 +222,11 @@ class TradingOrchestrator:
                 signal_type = "NEUTRAL"
 
             if abs(result.sentiment_score) >= settings.sentiment_threshold:
+                from .models import SignalType
+
                 signal = Signal(
                     symbol=symbol,
-                    signal_type=signal_type,
+                    signal_type=SignalType(signal_type),
                     strength=abs(result.sentiment_score),
                     timestamp=datetime.datetime.now(datetime.UTC),
                     indicators={"sentiment_score": result.sentiment_score},
@@ -357,9 +354,11 @@ class TradingOrchestrator:
                     }
                 )
 
+            from .models import SignalType
+
             signal = Signal(
                 symbol=symbol,
-                signal_type=signal_type,
+                signal_type=SignalType(signal_type),
                 strength=combined_strength,
                 timestamp=datetime.datetime.now(datetime.UTC),
                 indicators=indicators,
@@ -399,15 +398,17 @@ class TradingOrchestrator:
                 return
 
             # Check position limits
-            positions = await db.get_position(symbol=settings.default_symbol)
+            positions = await asyncio.to_thread(
+                db.get_position, symbol=settings.default_symbol
+            )
             if positions and positions.quantity > settings.max_position_size:
                 logger.warning(f"Position limit exceeded: {positions.quantity}")
-                await alerts.send_risk_alert(
+                await alerts.send_alert(
                     f"Position limit exceeded: {positions.quantity}", "position_limit"
                 )
 
             # Check margin utilization
-            funds = await db.get_latest_funds()
+            funds = await asyncio.to_thread(db.get_latest_funds)
             if (
                 funds
                 and funds.utilized_margin / funds.available_margin
@@ -416,7 +417,7 @@ class TradingOrchestrator:
                 logger.warning(
                     f"Margin utilization high: {funds.utilized_margin / funds.available_margin:.2%}"
                 )
-                await alerts.send_risk_alert(
+                await alerts.send_alert(
                     f"High margin utilization: {funds.utilized_margin / funds.available_margin:.2%}",
                     "margin_utilization",
                 )
