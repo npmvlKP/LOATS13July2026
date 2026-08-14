@@ -13,7 +13,7 @@ from loats.models import (
 
 @pytest.fixture
 def mock_settings():
-    with patch("src.loats.alerts.settings") as m:
+    with patch("loats.alerts.settings") as m:
         m.telegram_chat_id = "123"
         token = MagicMock()
         token.get_secret_value.return_value = "token"
@@ -23,7 +23,7 @@ def mock_settings():
 
 @pytest.mark.asyncio
 async def test_alert_system_initialization_no_config():
-    with patch("src.loats.alerts.settings") as m:
+    with patch("loats.alerts.settings") as m:
         m.telegram_bot_token = None
         alert_system = AlertSystem()
         await alert_system.initialize()
@@ -33,8 +33,8 @@ async def test_alert_system_initialization_no_config():
 @pytest.mark.asyncio
 async def test_alert_system_initialization_success(mock_settings):
     with (
-        patch("src.loats.alerts.Bot"),
-        patch("src.loats.alerts.Application") as mock_app_cls,
+        patch("loats.alerts.Bot"),
+        patch("loats.alerts.Application") as mock_app_cls,
     ):
         alert_system = AlertSystem()
         await alert_system.initialize()
@@ -72,7 +72,7 @@ async def test_alert_system_send_signal_alert(mock_settings):
 async def test_alert_system_kill_switch(mock_settings):
     alert_system = AlertSystem()
     alert_system.bot = AsyncMock()
-    with patch("src.loats.alerts.async_client", new_callable=AsyncMock) as mock_client:
+    with patch("loats.alerts.async_client", new_callable=AsyncMock) as mock_client:
         mock_client.get_all_orders.return_value = {
             "data": [{"order_id": "1", "status": "OPEN"}]
         }
@@ -88,7 +88,7 @@ async def test_alert_system_kill_switch(mock_settings):
 async def test_alert_system_send_position_alert(mock_settings):
     alert_system = AlertSystem()
     alert_system.bot = AsyncMock()
-    with patch("src.loats.alerts.async_client", new_callable=AsyncMock) as mock_client:
+    with patch("loats.alerts.async_client", new_callable=AsyncMock) as mock_client:
         mock_client.get_position_book.return_value = {
             "data": [
                 {
@@ -119,7 +119,7 @@ async def test_alert_system_handle_commands(mock_settings):
 async def test_alert_system_initialize_bot_success(mock_settings):
     """Test _initialize_bot method (lines 80-88)."""
     alert_system = AlertSystem()
-    with patch("src.loats.alerts.Bot") as mock_bot_class:
+    with patch("loats.alerts.Bot") as mock_bot_class:
         mock_bot = AsyncMock()
         mock_bot_class.return_value = mock_bot
         bot = await alert_system._initialize_bot()
@@ -130,7 +130,7 @@ async def test_alert_system_initialize_bot_success(mock_settings):
 @pytest.mark.asyncio
 async def test_alert_system_initialize_bot_missing_token():
     """Test _initialize_bot method with missing token (lines 82-84)."""
-    with patch("src.loats.alerts.settings") as mock_settings:
+    with patch("loats.alerts.settings") as mock_settings:
         mock_settings.telegram_bot_token = None
         alert_system = AlertSystem()
         with pytest.raises(ValueError, match="Telegram bot token not configured"):
@@ -140,7 +140,7 @@ async def test_alert_system_initialize_bot_missing_token():
 @pytest.mark.asyncio
 async def test_alert_system_initialize_bot_missing_chat_id():
     """Test _initialize_bot method with missing chat ID (lines 85-87)."""
-    with patch("src.loats.alerts.settings") as mock_settings:
+    with patch("loats.alerts.settings") as mock_settings:
         mock_settings.telegram_bot_token = MagicMock()
         mock_settings.telegram_bot_token.get_secret_value.return_value = "token"
         mock_settings.telegram_chat_id = None

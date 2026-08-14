@@ -407,15 +407,24 @@ async def _async_update_order_status(
     conn = await self._async_pool.acquire()
     try:
         async with conn.cursor() as cursor:
+            # Check if order exists first
+            await cursor.execute("SELECT 1 FROM orders WHERE order_id = ?", (order_id,))
+            row = await cursor.fetchone()
+            exists = row is not None
+
+            if not exists:
+                await conn.commit()  # Commit before returning
+                return False
+
+            # Update the order
             await cursor.execute(
                 "UPDATE orders SET status = ?, updated_at = ?, updated_at_ms = ? WHERE order_id = ?",
                 (status, now_iso, now_ms, order_id),
             )
-            updated = cursor.rowcount > 0
         await conn.commit()
+        return True
     finally:
         await self._async_pool.release(conn)
-    return updated
 
 
 async def async_get_trade(self: Database, trade_id: str) -> Trade | None:
@@ -517,97 +526,124 @@ async def _async_log_audit(
         await self._async_pool.release(conn)
 
 
+# Helper wrapper functions for async operations
+async def _async_create_signal_wrapper(self: Database, signal: Signal) -> bool:
+    """Async wrapper create_signal() avoid blocking event loop."""
+    if AIOSQLITE_AVAILABLE and hasattr(self, "_async_pool") and self._async_pool:
+        return await self._async_create_signal(signal)  # type: ignore[attr-defined,no-any-return]
+    else:
+        return await asyncio.to_thread(self.create_signal, signal)
+
+
+async def _async_store_historical_data_wrapper(
+    self: Database, data: list[HistoricalData]
+) -> bool:
+    """Async wrapper store_historical_data() avoid blocking event loop."""
+    if AIOSQLITE_AVAILABLE and hasattr(self, "_async_pool") and self._async_pool:
+        return await self._async_store_historical_data(data)  # type: ignore[attr-defined,no-any-return]
+    else:
+        return await asyncio.to_thread(self.store_historical_data, data)
+
+
+async def _async_store_quote_wrapper(self: Database, quote: QuoteData) -> bool:
+    """Async wrapper store_quote() avoid blocking event loop."""
+    if AIOSQLITE_AVAILABLE and hasattr(self, "_async_pool") and self._async_pool:
+        return await self._async_store_quote(quote)  # type: ignore[attr-defined,no-any-return]
+    else:
+        return await asyncio.to_thread(self.store_quote, quote)
+
+
+async def _async_store_position_wrapper(self: Database, position: Position) -> bool:
+    """Async wrapper store_position() avoid blocking event loop."""
+    if AIOSQLITE_AVAILABLE and hasattr(self, "_async_pool") and self._async_pool:
+        return await self._async_store_position(position)  # type: ignore[attr-defined,no-any-return]
+    else:
+        return await asyncio.to_thread(self.store_position, position)
+
+
+async def _async_store_funds_wrapper(self: Database, funds: FundsData) -> bool:
+    """Async wrapper store_funds() avoid blocking event loop."""
+    if AIOSQLITE_AVAILABLE and hasattr(self, "_async_pool") and self._async_pool:
+        return await self._async_store_funds(funds)  # type: ignore[attr-defined,no-any-return]
+    else:
+        return await asyncio.to_thread(self.store_funds, funds)
+
+
+async def _async_get_latest_signals_wrapper(
+    self: Database, symbol: str, limit: int = 10, scan_type: str | None = None
+) -> list[Signal]:
+    """Async wrapper get_latest_signals() avoid blocking event loop."""
+    if AIOSQLITE_AVAILABLE and hasattr(self, "_async_pool") and self._async_pool:
+        return await self._async_get_latest_signals(symbol, limit, scan_type)  # type: ignore[attr-defined,no-any-return]
+    else:
+        return await asyncio.to_thread(
+            self.get_latest_signals, symbol, limit, scan_type
+        )
+
+
+async def _async_update_trade_wrapper(self: Database, trade: Trade) -> bool:
+    """Async wrapper update_trade() avoid blocking event loop."""
+    if AIOSQLITE_AVAILABLE and hasattr(self, "_async_pool") and self._async_pool:
+        return await self._async_update_trade(trade)  # type: ignore[attr-defined,no-any-return]
+    else:
+        return await asyncio.to_thread(self.update_trade, trade)
+
+
+async def _async_update_order_status_wrapper(
+    self: Database, order_id: str, status: str
+) -> bool:
+    """Async wrapper update_order_status() avoid blocking event loop."""
+    if AIOSQLITE_AVAILABLE and hasattr(self, "_async_pool") and self._async_pool:
+        return await self._async_update_order_status(order_id, status)  # type: ignore[attr-defined,no-any-return]
+    else:
+        return await asyncio.to_thread(self.update_order_status, order_id, status)
+
+
 # Add async methods to Database class if they don't exist
-def extend_database_class():
+def extend_database_class() -> None:
     """Extend the Database class with async methods."""
     from .database import Database
 
+    # Add core async methods
     if not hasattr(Database, "_async_create_signal"):
-        Database._async_create_signal = _async_create_signal
-        Database._async_store_historical_data = _async_store_historical_data
-        Database._async_store_quote = _async_store_quote
-        Database._async_store_position = _async_store_position
-        Database._async_store_funds = _async_store_funds
-        Database._async_get_latest_signals = _async_get_latest_signals
-        Database._async_update_trade = _async_update_trade
-        Database._async_update_order_status = _async_update_order_status
-        Database.async_get_trade = async_get_trade
-        Database._async_log_audit = _async_log_audit
+        Database._async_create_signal = _async_create_signal  # type: ignore[attr-defined]
+        Database._async_store_historical_data = _async_store_historical_data  # type: ignore[attr-defined]
+        Database._async_store_quote = _async_store_quote  # type: ignore[attr-defined]
+        Database._async_store_position = _async_store_position  # type: ignore[attr-defined]
+        Database._async_store_funds = _async_store_funds  # type: ignore[attr-defined]
+        Database._async_get_latest_signals = _async_get_latest_signals  # type: ignore[attr-defined]
+        Database._async_update_trade = _async_update_trade  # type: ignore[attr-defined]
+        Database._async_update_order_status = _async_update_order_status  # type: ignore[attr-defined]
+        Database.async_get_trade = async_get_trade  # type: ignore[attr-defined]
+        Database._async_log_audit = _async_log_audit  # type: ignore[attr-defined]
 
-    # Update async wrapper methods to use true async when available
-    async def async_create_signal_wrapper(self: Database, signal: Signal) -> bool:
-        """Async wrapper create_signal() avoid blocking event loop."""
-        if AIOSQLITE_AVAILABLE and hasattr(self, "_async_pool") and self._async_pool:
-            return await self._async_create_signal(signal)
+    # Add optimized wrapper methods
+    _add_wrapper_method(Database, "async_create_signal", _async_create_signal_wrapper)
+    _add_wrapper_method(
+        Database, "async_store_historical_data", _async_store_historical_data_wrapper
+    )
+    _add_wrapper_method(Database, "async_store_quote", _async_store_quote_wrapper)
+    _add_wrapper_method(Database, "async_store_position", _async_store_position_wrapper)
+    _add_wrapper_method(Database, "async_store_funds", _async_store_funds_wrapper)
+    _add_wrapper_method(
+        Database, "async_get_latest_signals", _async_get_latest_signals_wrapper
+    )
+    _add_wrapper_method(Database, "async_update_trade", _async_update_trade_wrapper)
+    _add_wrapper_method(
+        Database, "async_update_order_status", _async_update_order_status_wrapper
+    )
+
+
+def _add_wrapper_method(cls: type[Database], name: str, method: Any) -> None:
+    """Add a wrapper method to the Database class if it doesn't exist."""
+    if not hasattr(cls, name):
+        setattr(cls, name, method)
+        method_obj = getattr(cls, name)
+        if hasattr(method_obj, "_is_optimized"):
+            method_obj._is_optimized = True
         else:
-            return await asyncio.to_thread(self.create_signal, signal)
-
-    async def async_store_historical_data_wrapper(
-        self: Database, data: list[HistoricalData]
-    ) -> bool:
-        """Async wrapper store_historical_data() avoid blocking event loop."""
-        if AIOSQLITE_AVAILABLE and hasattr(self, "_async_pool") and self._async_pool:
-            return await self._async_store_historical_data(data)
-        else:
-            return await asyncio.to_thread(self.store_historical_data, data)
-
-    async def async_store_quote_wrapper(self: Database, quote: QuoteData) -> bool:
-        """Async wrapper store_quote() avoid blocking event loop."""
-        if AIOSQLITE_AVAILABLE and hasattr(self, "_async_pool") and self._async_pool:
-            return await self._async_store_quote(quote)
-        else:
-            return await asyncio.to_thread(self.store_quote, quote)
-
-    async def async_store_position_wrapper(self: Database, position: Position) -> bool:
-        """Async wrapper store_position() avoid blocking event loop."""
-        if AIOSQLITE_AVAILABLE and hasattr(self, "_async_pool") and self._async_pool:
-            return await self._async_store_position(position)
-        else:
-            return await asyncio.to_thread(self.store_position, position)
-
-    async def async_store_funds_wrapper(self: Database, funds: FundsData) -> bool:
-        """Async wrapper store_funds() avoid blocking event loop."""
-        if AIOSQLITE_AVAILABLE and hasattr(self, "_async_pool") and self._async_pool:
-            return await self._async_store_funds(funds)
-        else:
-            return await asyncio.to_thread(self.store_funds, funds)
-
-    async def async_get_latest_signals_wrapper(
-        self: Database, symbol: str, limit: int = 10, scan_type: str | None = None
-    ) -> list[Signal]:
-        """Async wrapper get_latest_signals() avoid blocking event loop."""
-        if AIOSQLITE_AVAILABLE and hasattr(self, "_async_pool") and self._async_pool:
-            return await self._async_get_latest_signals(symbol, limit, scan_type)
-        else:
-            return await asyncio.to_thread(
-                self.get_latest_signals, symbol, limit, scan_type
-            )
-
-    async def async_update_trade_wrapper(self: Database, trade: Trade) -> bool:
-        """Async wrapper update_trade() avoid blocking event loop."""
-        if AIOSQLITE_AVAILABLE and hasattr(self, "_async_pool") and self._async_pool:
-            return await self._async_update_trade(trade)
-        else:
-            return await asyncio.to_thread(self.update_trade, trade)
-
-    async def async_update_order_status_wrapper(
-        self: Database, order_id: str, status: str
-    ) -> bool:
-        """Async wrapper update_order_status() avoid blocking event loop."""
-        if AIOSQLITE_AVAILABLE and hasattr(self, "_async_pool") and self._async_pool:
-            return await self._async_update_order_status(order_id, status)
-        else:
-            return await asyncio.to_thread(self.update_order_status, order_id, status)
-
-    # Override the async methods
-    Database.async_create_signal = async_create_signal_wrapper
-    Database.async_store_historical_data = async_store_historical_data_wrapper
-    Database.async_store_quote = async_store_quote_wrapper
-    Database.async_store_position = async_store_position_wrapper
-    Database.async_store_funds = async_store_funds_wrapper
-    Database.async_get_latest_signals = async_get_latest_signals_wrapper
-    Database.async_update_trade = async_update_trade_wrapper
-    Database.async_update_order_status = async_update_order_status_wrapper
+            # Add the attribute dynamically - MyPy can't track this
+            object.__setattr__(method_obj, "_is_optimized", True)
 
 
 # Initialize the extension

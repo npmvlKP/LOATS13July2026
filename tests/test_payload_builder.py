@@ -23,6 +23,7 @@ from loats.utils.payload_builder import (
     build_place_smart_order_payload,
 )
 
+
 class TestPayloadBuilderUtilities(unittest.TestCase):
     """Test suite for payload builder utility functions."""
 
@@ -50,6 +51,7 @@ class TestPayloadBuilderUtilities(unittest.TestCase):
 
         result = _enum_to_value(TestEnum.VALUE1)
         assert result == "value1"
+
 
 class TestBuildPlaceOrderPayload(unittest.TestCase):
     """Test suite for build_place_order_payload function."""
@@ -148,6 +150,7 @@ class TestBuildPlaceOrderPayload(unittest.TestCase):
             "product_type": "MIS",
         }
         assert payload == expected
+
 
 class TestBuildPlaceSmartOrderPayload(unittest.TestCase):
     """Test suite for build_place_smart_order_payload function."""
@@ -250,6 +253,7 @@ class TestBuildPlaceSmartOrderPayload(unittest.TestCase):
         }
         assert payload == expected
 
+
 class TestBuildModifyOrderPayload(unittest.TestCase):
     """Test suite for build_modify_order_payload function."""
 
@@ -324,6 +328,7 @@ class TestBuildModifyOrderPayload(unittest.TestCase):
         }
         assert payload == expected
 
+
 class TestBuildCancelOrderPayload(unittest.TestCase):
     """Test suite for build_cancel_order_payload function."""
 
@@ -348,6 +353,7 @@ class TestBuildCancelOrderPayload(unittest.TestCase):
             "order_id": "67890",
         }
         assert payload == expected
+
 
 class TestPayloadBuilderEdgeCases(unittest.TestCase):
     """Test suite for payload builder edge cases."""
@@ -497,6 +503,7 @@ class TestPayloadBuilderEdgeCases(unittest.TestCase):
             "metadata": complex_metadata,
         }
         assert payload == expected
+
 
 if __name__ == "__main__":
     # Run the tests

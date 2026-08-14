@@ -91,6 +91,12 @@ class Settings(BaseSettings):
     max_total_exposure: Decimal = Field(
         Decimal("1000000.00"), description="Maximum total exposure"
     )
+    max_position_size: int = Field(
+        1000, description="Maximum position size for risk management"
+    )
+    max_margin_utilization: float = Field(
+        0.8, description="Maximum margin utilization ratio (0.0-1.0)"
+    )
 
     # Timezone Configuration
     timezone: str = Field(

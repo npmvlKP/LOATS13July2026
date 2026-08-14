@@ -12,7 +12,7 @@ This document defines and documents the consistent cache policy implemented acro
 |----------|-----------|-----------|
 | `get_quotes` | 60 seconds | Market data changes frequently, but 60s is sufficient for most trading decisions |
 | `get_history` | 300 seconds (5 minutes) | Historical data rarely changes; caching reduces redundant API calls |
-| `get_option_chain` | 120 seconds (2 minutes) | Option chains change slowly; frequently used for Greeks calculations |
+| `get_option_chain` | 300 seconds (5 minutes) | Option chains change slowly; frequently used for Greeks calculations |
 | `get_position_book` | 30 seconds | Position data updates frequently but not every call; reduces API load |
 | `get_funds` | 60 seconds | Funds information changes infrequently; 60s provides good balance |
 | `analyze_symbol_sentiment` | 300 seconds (5 minutes) | Sentiment analysis is computationally expensive; 5-minute cache is appropriate |

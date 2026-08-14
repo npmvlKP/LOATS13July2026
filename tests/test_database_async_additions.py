@@ -27,6 +27,7 @@ from loats.models import (
     Trade,
 )
 
+
 class TestDatabaseAsyncAdditions:
     """Test suite for async database operations."""
 
@@ -79,7 +80,9 @@ class TestDatabaseAsyncAdditions:
             "async_get_trade",
             "_async_log_audit",
         ]:
-            assert hasattr(Database, method_name), f"Database should have {method_name} method"
+            assert hasattr(
+                Database, method_name
+            ), f"Database should have {method_name} method"
 
         # Verify that wrapper methods are added
         for method_name in [
@@ -92,7 +95,9 @@ class TestDatabaseAsyncAdditions:
             "async_update_trade",
             "async_update_order_status",
         ]:
-            assert hasattr(Database, method_name), f"Database should have {method_name} method"
+            assert hasattr(
+                Database, method_name
+            ), f"Database should have {method_name} method"
 
     async def test_async_create_signal(self, temp_db):
         """Test async signal creation."""
@@ -123,17 +128,21 @@ class TestDatabaseAsyncAdditions:
         assert len(signals) == 1
         assert signals[0].signal_id == "test_signal_001"
 
-        # Verify audit log was created
-        assert temp_db.audit_log_path.exists()
-        with temp_db.audit_log_path.open("r", encoding="utf-8") as f:
-            lines = f.readlines()
-            assert len(lines) >= 1
+        # Verify audit log was created in database (may skip JSONL in test mode)
+        conn = temp_db._get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT COUNT(*) FROM audit_log WHERE entity_id = ?", ("test_signal_001",)
+        )
+        count = cursor.fetchone()[0]
+        conn.close()
+        assert count >= 1
 
     async def test_async_create_signal_fallback(self, temp_db):
         """Test async signal creation fallback when aiosqlite is not available."""
         if AIOSQLITE_AVAILABLE:
             # Temporarily disable aiosqlite for this test
-            with patch("src.loats.database_async_additions.AIOSQLITE_AVAILABLE", False):
+            with patch("loats.database_async_additions.AIOSQLITE_AVAILABLE", False):
                 # Create test signal
                 signal = Signal(
                     signal_id="test_signal_002",
@@ -194,7 +203,9 @@ class TestDatabaseAsyncAdditions:
         # Verify data was stored
         conn = temp_db._get_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT COUNT(*) FROM historical_data WHERE symbol = ?", ("TEST",))
+        cursor.execute(
+            "SELECT COUNT(*) FROM historical_data WHERE symbol = ?", ("TEST",)
+        )
         count = cursor.fetchone()[0]
         conn.close()
         assert count == 2
@@ -373,7 +384,9 @@ class TestDatabaseAsyncAdditions:
             temp_db.create_signal(signal)
 
         # Test async signal retrieval with scan type filter
-        retrieved_signals = await temp_db.async_get_latest_signals("TEST", limit=10, scan_type="technical")
+        retrieved_signals = await temp_db.async_get_latest_signals(
+            "TEST", limit=10, scan_type="technical"
+        )
         assert len(retrieved_signals) == 1
         assert retrieved_signals[0].signal_id == "signal_tech_001"
 
@@ -440,7 +453,9 @@ class TestDatabaseAsyncAdditions:
         await temp_db.async_initialize()
 
         # Test async order status update (no existing order, should return False)
-        result = await temp_db.async_update_order_status("nonexistent_order", "COMPLETED")
+        result = await temp_db.async_update_order_status(
+            "nonexistent_order", "COMPLETED"
+        )
         assert result is False
 
     async def test_async_get_trade(self, temp_db):
@@ -509,7 +524,9 @@ class TestDatabaseAsyncAdditions:
         # Verify audit entry was stored in database
         conn = temp_db._get_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT COUNT(*) FROM audit_log WHERE entity_id = ?", ("test_id_001",))
+        cursor.execute(
+            "SELECT COUNT(*) FROM audit_log WHERE entity_id = ?", ("test_id_001",)
+        )
         count = cursor.fetchone()[0]
         conn.close()
         assert count == 1
@@ -544,7 +561,7 @@ class TestDatabaseAsyncAdditions:
         """Test async methods when aiosqlite is not available."""
         if AIOSQLITE_AVAILABLE:
             # Temporarily disable aiosqlite for this test
-            with patch("src.loats.database_async_additions.AIOSQLITE_AVAILABLE", False):
+            with patch("loats.database_async_additions.AIOSQLITE_AVAILABLE", False):
                 # Create test signal
                 signal = Signal(
                     signal_id="test_signal_004",
@@ -586,6 +603,7 @@ class TestDatabaseAsyncAdditions:
                     entity_id="test_id_002",
                     user="test_user",
                 )
+
 
 if __name__ == "__main__":
     # Run the tests

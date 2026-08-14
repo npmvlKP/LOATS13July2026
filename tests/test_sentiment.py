@@ -32,7 +32,7 @@ def test_preprocess_text(analyzer):
 @pytest.mark.asyncio
 async def test_analyze_symbol_sentiment(analyzer):
     with patch(
-        "src.loats.sentiment.SentimentAnalyzer.parse_rss_feed", new_callable=AsyncMock
+        "loats.sentiment.SentimentAnalyzer.parse_rss_feed", new_callable=AsyncMock
     ) as mock_parse:
         mock_parse.return_value = [
             NewsItem(

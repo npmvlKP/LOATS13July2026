@@ -85,7 +85,7 @@ async def test_parse_rss_feed_exception():
 async def test_extract_article_content_exception():
     """Test exception handling in _extract_article_content."""
     analyzer = SentimentAnalyzer()
-    with unittest.mock.patch("src.loats.sentiment.Article") as mock_article_class:
+    with unittest.mock.patch("loats.sentiment.Article") as mock_article_class:
         mock_article = unittest.mock.MagicMock()
         mock_article.download.side_effect = Exception("Download error")
         mock_article_class.return_value = mock_article
@@ -98,7 +98,7 @@ async def test_analyze_symbol_sentiment_cache_hit():
     """Test cache hit in analyze_symbol_sentiment (lines 114-121)."""
     analyzer = SentimentAnalyzer()
     with unittest.mock.patch(
-        "src.loats.sentiment.cache_manager.get",
+        "loats.sentiment.cache_manager.get",
         return_value='{"symbol": "TEST", "sentiment_score": 0.5, "sentiment_label": "positive", "news_count": 10, "positive_count": 6, "negative_count": 2, "neutral_count": 2, "top_news": [], "timestamp": "2023-01-01T00:00:00Z"}',
     ):
         result = await analyzer.analyze_symbol_sentiment(
@@ -114,11 +114,11 @@ async def test_analyze_symbol_sentiment_cache_miss():
     """Test cache miss in analyze_symbol_sentiment (lines 122-181)."""
     analyzer = SentimentAnalyzer()
     with (
-        unittest.mock.patch("src.loats.sentiment.cache_manager.get", return_value=None),
+        unittest.mock.patch("loats.sentiment.cache_manager.get", return_value=None),
         unittest.mock.patch.object(
             analyzer, "parse_rss_feed", return_value=[]
         ) as mock_parse,
-        unittest.mock.patch("src.loats.sentiment.cache_manager.set") as mock_cache_set,
+        unittest.mock.patch("loats.sentiment.cache_manager.set") as mock_cache_set,
     ):
         result = await analyzer.analyze_symbol_sentiment(
             "TEST", ["http://test.com"], max_items=5
@@ -168,9 +168,9 @@ async def test_analyze_symbol_sentiment_with_news_items():
     ]
 
     with (
-        unittest.mock.patch("src.loats.sentiment.cache_manager.get", return_value=None),
+        unittest.mock.patch("loats.sentiment.cache_manager.get", return_value=None),
         unittest.mock.patch.object(analyzer, "parse_rss_feed", return_value=news_items),
-        unittest.mock.patch("src.loats.sentiment.cache_manager.set"),
+        unittest.mock.patch("loats.sentiment.cache_manager.set"),
     ):
         result = await analyzer.analyze_symbol_sentiment(
             "TEST", ["http://test.com"], max_items=5
@@ -204,9 +204,9 @@ async def test_analyze_symbol_sentiment_positive_overall():
     ]
 
     with (
-        unittest.mock.patch("src.loats.sentiment.cache_manager.get", return_value=None),
+        unittest.mock.patch("loats.sentiment.cache_manager.get", return_value=None),
         unittest.mock.patch.object(analyzer, "parse_rss_feed", return_value=news_items),
-        unittest.mock.patch("src.loats.sentiment.cache_manager.set"),
+        unittest.mock.patch("loats.sentiment.cache_manager.set"),
     ):
         result = await analyzer.analyze_symbol_sentiment(
             "TEST", ["http://test.com"], max_items=5
@@ -234,9 +234,9 @@ async def test_analyze_symbol_sentiment_negative_overall():
     ]
 
     with (
-        unittest.mock.patch("src.loats.sentiment.cache_manager.get", return_value=None),
+        unittest.mock.patch("loats.sentiment.cache_manager.get", return_value=None),
         unittest.mock.patch.object(analyzer, "parse_rss_feed", return_value=news_items),
-        unittest.mock.patch("src.loats.sentiment.cache_manager.set"),
+        unittest.mock.patch("loats.sentiment.cache_manager.set"),
     ):
         result = await analyzer.analyze_symbol_sentiment(
             "TEST", ["http://test.com"], max_items=5

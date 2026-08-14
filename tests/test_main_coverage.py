@@ -46,11 +46,11 @@ async def test_trading_system_initialization_success(trading_system):
 async def test_trading_system_initialization_failed_audit_log(trading_system):
     """Test initialization with failed audit log integrity (lines 40-41)."""
     with (
-        patch("src.loats.main.initialize_cache", new_callable=AsyncMock),
-        patch("src.loats.main.db.async_initialize", new_callable=AsyncMock),
-        patch("src.loats.main.db.async_verify_audit_log_integrity", return_value=False),
-        patch("src.loats.main.alerts.initialize", new_callable=AsyncMock),
-        patch("src.loats.main.scheduler.initialize", new_callable=AsyncMock),
+        patch("loats.main.initialize_cache", new_callable=AsyncMock),
+        patch("loats.main.db.async_initialize", new_callable=AsyncMock),
+        patch("loats.main.db.async_verify_audit_log_integrity", return_value=False),
+        patch("loats.main.alerts.initialize", new_callable=AsyncMock),
+        patch("loats.main.scheduler.initialize", new_callable=AsyncMock),
     ):
         await trading_system.initialize()
         # Should still complete initialization even with audit log warning
@@ -60,8 +60,8 @@ async def test_trading_system_initialization_failed_audit_log(trading_system):
 async def test_trading_system_initialization_exception(trading_system):
     """Test initialization exception handling (lines 45-47)."""
     with (
-        patch("src.loats.main.initialize_cache", new_callable=AsyncMock),
-        patch("src.loats.main.db.async_initialize", side_effect=Exception("DB error")),
+        patch("loats.main.initialize_cache", new_callable=AsyncMock),
+        patch("loats.main.db.async_initialize", side_effect=Exception("DB error")),
     ):
         with pytest.raises(Exception, match="DB error"):
             await trading_system.initialize()
@@ -105,9 +105,7 @@ async def test_trading_system_start_success(trading_system):
 @pytest.mark.asyncio
 async def test_trading_system_start_exception(trading_system):
     """Test start exception handling (lines 64-66)."""
-    with (
-        patch("src.loats.main.alerts.start", side_effect=Exception("Start error")),
-    ):
+    with (patch("loats.main.alerts.start", side_effect=Exception("Start error")),):
         with pytest.raises(Exception, match="Start error"):
             await trading_system.start()
         assert trading_system.running is False
@@ -135,7 +133,7 @@ async def test_trading_system_shutdown_success(trading_system):
         patch(
             "src.loats.main.alerts.shutdown", new_callable=AsyncMock
         ) as mock_alerts_shutdown,
-        patch("src.loats.main.close_cache") as mock_close_cache,
+        patch("loats.main.close_cache") as mock_close_cache,
         patch(
             "src.loats.main.db.async_close_all", new_callable=AsyncMock
         ) as mock_db_close,
@@ -206,11 +204,11 @@ async def test_make_signal_handler_windows(trading_system):
 
         # Mock the async task creation to avoid actual shutdown
         with (
-            patch("src.loats.main.alerts.send_system_alert", new_callable=AsyncMock),
-            patch("src.loats.main.scheduler.shutdown", new_callable=AsyncMock),
-            patch("src.loats.main.alerts.shutdown", new_callable=AsyncMock),
-            patch("src.loats.main.close_cache"),
-            patch("src.loats.main.db.async_close_all", new_callable=AsyncMock),
+            patch("loats.main.alerts.send_system_alert", new_callable=AsyncMock),
+            patch("loats.main.scheduler.shutdown", new_callable=AsyncMock),
+            patch("loats.main.alerts.shutdown", new_callable=AsyncMock),
+            patch("loats.main.close_cache"),
+            patch("loats.main.db.async_close_all", new_callable=AsyncMock),
         ):
             # Call the signal handler
             handler(signal.SIGINT, None)

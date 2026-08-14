@@ -12,6 +12,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
 class SimpleConnectionPool:
     """
     Simple async connection pool for aiosqlite.
@@ -28,11 +29,15 @@ class SimpleConnectionPool:
     async def _create_connection(self) -> aiosqlite.Connection:
         """Create a new database connection."""
         if self._connections_created >= self.maxsize:
-            raise RuntimeError(f"Maximum pool size of {self.maxsize} connections reached")
+            raise RuntimeError(
+                f"Maximum pool size of {self.maxsize} connections reached"
+            )
 
         conn = await aiosqlite.connect(self.database, timeout=self.timeout)
         self._connections_created += 1
-        logger.debug(f"Created new connection, total connections: {self._connections_created}")
+        logger.debug(
+            f"Created new connection, total connections: {self._connections_created}"
+        )
         return conn
 
     async def acquire(self) -> aiosqlite.Connection:
@@ -40,13 +45,17 @@ class SimpleConnectionPool:
         async with self._lock:
             if self._pool:
                 conn = self._pool.popleft()
-                logger.debug(f"Reusing connection from pool, remaining in pool: {len(self._pool)}")
+                logger.debug(
+                    f"Reusing connection from pool, remaining in pool: {len(self._pool)}"
+                )
                 try:
                     # Test the connection
                     await conn.execute("SELECT 1")
                     return conn
                 except Exception as e:
-                    logger.warning(f"Connection test failed, creating new connection: {e}")
+                    logger.warning(
+                        f"Connection test failed, creating new connection: {e}"
+                    )
                     # Connection is bad, create a new one
                     await conn.close()
                     self._connections_created -= 1
@@ -72,7 +81,7 @@ class SimpleConnectionPool:
             self._connections_created = 0
             logger.debug("All connections closed")
 
-    def __del__(self):
+    def __del__(self) -> None:
         """Clean up connections when the pool is garbage collected."""
         # Note: This may not be reliable for async cleanup
         pass

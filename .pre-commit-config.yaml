@@ -62,7 +62,14 @@ repos:
         entry: pytest
         language: system
         pass_filenames: false
-        args: [--cov, --cov-fail-under=80]
+        args: [--cov, --cov-fail-under=80, --cov-report=term-missing, --cov-report=json]
+        stages: [pre-push]
+
+      - id: per-module-coverage
+        name: per-module coverage check
+        entry: python scripts/check_per_module_coverage.py
+        language: system
+        pass_filenames: false
         stages: [pre-push]
 
       - id: pip-audit

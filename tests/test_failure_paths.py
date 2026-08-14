@@ -138,7 +138,7 @@ class TestCircuitBreakerOpenScenarios:
         scheduler = TradingScheduler()
 
         # Mock failing OpenAlgo API calls at the client level
-        with patch("src.loats.openalgo.async_client.get_quotes") as mock_get_quotes:
+        with patch("loats.openalgo.async_client.get_quotes") as mock_get_quotes:
             mock_get_quotes.side_effect = ConnectionError("API unavailable")
 
             # First call should exhaust retries and raise ConnectionError, opening circuit breaker
@@ -305,7 +305,7 @@ class TestRetryExhaustedScenarios:
         scheduler = TradingScheduler()
 
         # Mock failing history API
-        with patch("src.loats.openalgo.async_client.get_history") as mock_get_history:
+        with patch("loats.openalgo.async_client.get_history") as mock_get_history:
             mock_get_history.side_effect = ConnectionError("History API failed")
 
             # First call should exhaust retries and raise ConnectionError, opening circuit breaker
@@ -535,21 +535,14 @@ class TestRateLimiterFailurePaths:
 
     def setup_method(self) -> None:
         """Reset rate limiters before each test."""
-        from loats.utils.rate_limiter import (
-            _order_rate_limiter_instance,
-            _smart_order_rate_limiter_instance,
-            _rate_limiter_lock,
-            _smart_rate_limiter_lock,
-        )
+        import loats.utils.rate_limiter as rate_limiter_module
 
         # Reset both global rate limiter singletons to ensure test isolation
-        global _order_rate_limiter_instance, _smart_order_rate_limiter_instance
+        with rate_limiter_module._rate_limiter_lock:
+            rate_limiter_module._order_rate_limiter_instance = None
 
-        with _rate_limiter_lock:
-            _order_rate_limiter_instance = None
-
-        with _smart_rate_limiter_lock:
-            _smart_order_rate_limiter_instance = None
+        with rate_limiter_module._smart_rate_limiter_lock:
+            rate_limiter_module._smart_order_rate_limiter_instance = None
 
     @pytest.mark.asyncio
     async def test_order_rate_limiter_exceeded(self) -> None:

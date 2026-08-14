@@ -16,7 +16,7 @@ def trading_system():
 async def test_trading_system_initialization(trading_system):
     # patch function, not frozen instance method
     with (
-        patch("src.loats.main.db._initialize_database") as mock_db_init,
+        patch("loats.main.db._initialize_database") as mock_db_init,
         patch(
             "src.loats.main.db.verify_audit_log_integrity", return_value=True
         ) as mock_db_verify,
@@ -26,7 +26,7 @@ async def test_trading_system_initialization(trading_system):
         patch(
             "src.loats.main.scheduler.initialize", new_callable=AsyncMock
         ) as mock_scheduler_init,
-        patch("src.loats.main.metrics.start_server") as mock_metrics_start,
+        patch("loats.main.metrics.start_server") as mock_metrics_start,
     ):
         await trading_system.initialize()
         mock_db_init.assert_called_once()
@@ -109,7 +109,7 @@ async def test_signal_handler_triggers_graceful_shutdown(trading_system):
         patch(
             "src.loats.main.alerts.shutdown", new_callable=AsyncMock
         ) as mock_alerts_shutdown,
-        patch("src.loats.main.close_cache") as mock_close_cache,
+        patch("loats.main.close_cache") as mock_close_cache,
         patch(
             "src.loats.main.db.async_close_all", new_callable=AsyncMock
         ) as mock_db_close_all,

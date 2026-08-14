@@ -25,7 +25,7 @@ def test_config_package_exports_only_class_and_accessor() -> None:
 def test_config_settings_attribute_is_the_submodule() -> None:
     """``config.settings`` resolves to the module, matching runtime reality."""
     assert isinstance(config_pkg.settings, types.ModuleType)
-    assert config_pkg.settings.__name__ == "src.loats.config.settings"
+    assert config_pkg.settings.__name__ == "loats.config.settings"
 
 
 def test_get_settings_returns_cached_settings_instance() -> None:

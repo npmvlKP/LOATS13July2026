@@ -310,7 +310,26 @@ class TradingScheduler:
                 logger.warning("Skipping signal generation, unable fetch quotes")
                 return
 
+            # Validate quote dict shape on entry (R5-F-09)
+            if not quotes.get("data"):
+                logger.warning("Skipping signal generation, quotes data missing")
+                return
+
             quote_data = quotes.get("data", {}).get(symbol, {})
+            if not quote_data:
+                logger.warning(
+                    "Skipping signal generation, quote data for symbol missing"
+                )
+                return
+
+            # Validate required quote fields
+            required_fields = ["last_price", "open", "high", "low", "close", "volume"]
+            missing_fields = [f for f in required_fields if f not in quote_data]
+            if missing_fields:
+                logger.warning(
+                    f"Skipping signal generation, missing quote fields: {missing_fields}"
+                )
+                return
             current_price = quote_data.get("last_price", 0)
 
             signal_result = technical_analysis.generate_signal(
@@ -486,33 +505,54 @@ class TradingScheduler:
                 logger.warning("Skipping signal generation, unable fetch quotes")
                 return
 
+            # Validate quote dict shape on entry (R5-F-09)
+            if not quotes.get("data"):
+                logger.warning("Skipping signal generation, quotes data missing")
+                return
+
             quote_data = quotes.get("data", {}).get(symbol, {})
+            if not quote_data:
+                logger.warning(
+                    "Skipping signal generation, quote data for symbol missing"
+                )
+                return
+
+            # Validate required quote fields
+            required_fields = ["last_price", "open", "high", "low", "close", "volume"]
+            missing_fields = [f for f in required_fields if f not in quote_data]
+            if missing_fields:
+                logger.warning(
+                    f"Skipping signal generation, missing quote fields: {missing_fields}"
+                )
+                return
+
             current_price = quote_data.get("last_price", 0)
 
             position_data = await self._safe_get_position_book()
             funds_data = await self._safe_get_funds()
 
             if position_data and position_data.get("data"):
-                for pos in position_data["data"]:
+                positions = position_data.get("data", [])
+                for pos in positions:
                     pos_model = Position(
-                        symbol=pos["symbol"],
-                        quantity=pos["quantity"],
-                        average_price=pos["average_price"],
-                        last_price=pos["last_price"],
-                        pnl=pos["pnl"],
-                        product_type=pos["product_type"],
-                        buy_quantity=pos["buy_quantity"],
-                        sell_quantity=pos["sell_quantity"],
+                        symbol=pos.get("symbol", ""),
+                        quantity=pos.get("quantity", 0),
+                        average_price=pos.get("average_price", 0.0),
+                        last_price=pos.get("last_price", 0.0),
+                        pnl=pos.get("pnl", 0.0),
+                        product_type=pos.get("product_type", "MIS"),
+                        buy_quantity=pos.get("buy_quantity", 0),
+                        sell_quantity=pos.get("sell_quantity", 0),
                     )
                     await self.db.async_store_position(pos_model)
 
             if funds_data and funds_data.get("data"):
-                funds = funds_data["data"]
+                funds = funds_data.get("data", {})
                 funds_model = FundsData(
-                    available_cash=funds["available_cash"],
-                    utilized_margin=funds["utilized_margin"],
-                    available_margin=funds["available_margin"],
-                    total_equity=funds["total_equity"],
+                    available_cash=funds.get("available_cash", 0.0),
+                    utilized_margin=funds.get("utilized_margin", 0.0),
+                    available_margin=funds.get("available_margin", 0.0),
+                    total_equity=funds.get("total_equity", 0.0),
                     timestamp=datetime.datetime.now(datetime.UTC),
                 )
                 await self.db.async_store_funds(funds_model)
