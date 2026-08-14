@@ -195,6 +195,8 @@ class MetricsManager:
         """Set kill switch status metric."""
         try:
             self.system_status["kill_switch_active"] = active
+            # Also update the Prometheus-style metric for consistency
+            self.kill_switch_status.set(1 if active else 0)
         except Exception as e:
             logger.warning(f"Failed to set kill switch status: {e}")
 
@@ -202,6 +204,10 @@ class MetricsManager:
         """Set circuit breaker status metric."""
         try:
             self.system_status["circuit_breaker_status"][component] = open_status
+            # Also update the Prometheus-style metric for consistency
+            self.circuit_breaker_status.labels(component=component).set(
+                1 if open_status else 0
+            )
         except Exception as e:
             logger.warning(f"Failed to set circuit breaker status: {e}")
 

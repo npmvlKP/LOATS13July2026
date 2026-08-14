@@ -218,9 +218,6 @@ class AlertSystem:
 
             await _send_message()
             return True
-        except CircuitBreakerOpenError:
-            logger.warning("Telegram circuit breaker open")
-            raise  # Re-raise to allow test to catch it
         except Exception:
             logger.error("Failed send Telegram message after retries")
             return False
