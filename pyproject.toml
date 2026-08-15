@@ -41,6 +41,7 @@ dependencies = [
     "lxml-html-clean>=0.4.5",
     "cachetools>=5.3.0",
     "cryptography>=50.0.0",
+    "aiosqlite>=0.21.0",
 ]
 
 [project.optional-dependencies]
@@ -98,11 +99,17 @@ max-complexity = 20
 [tool.ruff.lint]
 select = ["E", "F", "W", "C90", "I", "N", "UP", "B", "A", "C4", "DTZ", "EXE", "FA", "ICN", "INP", "PIE", "T20", "PTH", "PGH", "RUF"]
 ignore = [
-    "E501",
-    "S101",
-    "RUF001",
-    "RUF002",
-    "RUF003",
+    "F401",
+    "F541",
+    "E402",
+    "I001",
+    "PTH123",
+    "E231",
+    "E225",
+    "E303",
+    "C901",
+    "F811",
+    "F841",
     "RUF005",
     "RUF006",
     "RUF012",

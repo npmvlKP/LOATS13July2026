@@ -176,9 +176,7 @@ class TestSchedulerCoverage:
     async def test_ta_scan_task_with_kill_switch(self, scheduler_instance):
         """Test _ta_scan_task with kill switch active (lines 282-283)."""
         # Mock kill switch to be active
-        with patch(
-            "src.loats.scheduler.alerts.is_kill_switch_active", return_value=True
-        ):
+        with patch("loats.scheduler.alerts.is_kill_switch_active", return_value=True):
             with pytest.raises(Exception):  # KillSwitchError
                 await scheduler_instance._ta_scan_task()
 
@@ -196,9 +194,7 @@ class TestSchedulerCoverage:
             patch.object(
                 scheduler_instance, "_safe_get_quotes", new_callable=AsyncMock
             ),
-            patch(
-                "src.loats.scheduler.alerts.is_kill_switch_active", return_value=False
-            ),
+            patch("loats.scheduler.alerts.is_kill_switch_active", return_value=False),
         ):
             await scheduler_instance._ta_scan_task()
 
@@ -237,9 +233,7 @@ class TestSchedulerCoverage:
     async def test_sentiment_scan_task_with_kill_switch(self, scheduler_instance):
         """Test _sentiment_scan_task with kill switch active (lines 365-368)."""
         # Mock kill switch to be active
-        with patch(
-            "src.loats.scheduler.alerts.is_kill_switch_active", return_value=True
-        ):
+        with patch("loats.scheduler.alerts.is_kill_switch_active", return_value=True):
             with pytest.raises(Exception):  # KillSwitchError
                 await scheduler_instance._sentiment_scan_task()
 
@@ -276,9 +270,7 @@ class TestSchedulerCoverage:
     async def test_signal_generation_task_with_kill_switch(self, scheduler_instance):
         """Test _signal_generation_task with kill switch active (lines 420-424)."""
         # Mock kill switch to be active
-        with patch(
-            "src.loats.scheduler.alerts.is_kill_switch_active", return_value=True
-        ):
+        with patch("loats.scheduler.alerts.is_kill_switch_active", return_value=True):
             with pytest.raises(Exception):  # KillSwitchError
                 await scheduler_instance._signal_generation_task()
 
@@ -494,15 +486,11 @@ class TestSchedulerCoverage:
     async def test_check_kill_switch_method(self, scheduler_instance):
         """Test _check_kill_switch method (lines 655-656)."""
         # Test with kill switch inactive
-        with patch(
-            "src.loats.scheduler.alerts.is_kill_switch_active", return_value=False
-        ):
+        with patch("loats.scheduler.alerts.is_kill_switch_active", return_value=False):
             scheduler_instance._check_kill_switch()  # Should not raise
 
         # Test with kill switch active
-        with patch(
-            "src.loats.scheduler.alerts.is_kill_switch_active", return_value=True
-        ):
+        with patch("loats.scheduler.alerts.is_kill_switch_active", return_value=True):
             with patch("loats.scheduler.logger") as mock_logger:
                 with pytest.raises(Exception):  # KillSwitchError
                     scheduler_instance._check_kill_switch()
@@ -544,7 +532,7 @@ class TestSchedulerCoverage:
         """Test _safe_get_history method with circuit breaker (lines 236-239)."""
         # Mock async_client.get_history
         with patch(
-            "src.loats.scheduler.async_client.get_history", new_callable=AsyncMock
+            "loats.scheduler.async_client.get_history", new_callable=AsyncMock
         ) as mock_get_history:
             mock_get_history.return_value = {"data": "test"}
 
@@ -560,7 +548,7 @@ class TestSchedulerCoverage:
         """Test _safe_get_quotes method with circuit breaker (lines 253-254, 265-266)."""
         # Mock async_client.get_quotes
         with patch(
-            "src.loats.scheduler.async_client.get_quotes", new_callable=AsyncMock
+            "loats.scheduler.async_client.get_quotes", new_callable=AsyncMock
         ) as mock_get_quotes:
             mock_get_quotes.return_value = {"data": "test"}
 
@@ -574,7 +562,7 @@ class TestSchedulerCoverage:
         """Test _safe_get_position_book method with circuit breaker (lines 438-441)."""
         # Mock async_client.get_position_book
         with patch(
-            "src.loats.scheduler.async_client.get_position_book", new_callable=AsyncMock
+            "loats.scheduler.async_client.get_position_book", new_callable=AsyncMock
         ) as mock_get_position:
             mock_get_position.return_value = {"data": "test"}
 
@@ -588,7 +576,7 @@ class TestSchedulerCoverage:
         """Test _safe_get_funds method with circuit breaker (lines 450-455)."""
         # Mock async_client.get_funds
         with patch(
-            "src.loats.scheduler.async_client.get_funds", new_callable=AsyncMock
+            "loats.scheduler.async_client.get_funds", new_callable=AsyncMock
         ) as mock_get_funds:
             mock_get_funds.return_value = {"data": "test"}
 

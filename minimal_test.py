@@ -18,7 +18,9 @@ async def minimal_test():
 
     # Initialize
     await cache.initialize()
-    print(f"Cache initialized: type={cache._cache_type}, cache={cache._cache is not None}")
+    print(
+        f"Cache initialized: type={cache._cache_type}, cache={cache._cache is not None}"
+    )
 
     # Test direct cache access
     cache_key = "loats:test"
@@ -33,6 +35,7 @@ async def minimal_test():
 
     # Check cache contents
     print(f"Cache contents: {dict(cache._cache)}")
+
 
 if __name__ == "__main__":
     asyncio.run(minimal_test())

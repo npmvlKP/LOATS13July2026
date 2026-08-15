@@ -13,7 +13,7 @@ def test_kill_switch_directly():
 
     sys.path.insert(0, str(Path(__file__).parent.parent.resolve()))
 
-    with patch("src.loats.alerts.alerts") as mock_alerts:
+    with patch("loats.alerts.alerts") as mock_alerts:
         mock_alerts.is_kill_switch_active.return_value = True
 
         from src.loats.openalgo import KillSwitchError, _check_kill_switch

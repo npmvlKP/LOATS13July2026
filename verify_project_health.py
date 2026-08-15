@@ -19,14 +19,15 @@ def run_command(cmd: list[str]) -> bool:
     except Exception:
         return False
 
+
 def check_code_quality() -> bool:
     """Check code quality tools are available"""
     tools = [
-        ['ruff', '--version'],
-        ['black', '--version'],
-        ['isort', '--version'],
-        ['mypy', '--version'],
-        ['bandit', '--version']
+        ["ruff", "--version"],
+        ["black", "--version"],
+        ["isort", "--version"],
+        ["mypy", "--version"],
+        ["bandit", "--version"],
     ]
 
     print("[TOOLS] Checking code quality tools...")
@@ -38,11 +39,12 @@ def check_code_quality() -> bool:
 
     return True
 
+
 def check_test_suite() -> bool:
     """Check test suite can be discovered"""
     print("[TESTS] Checking test suite...")
 
-    test_files = list(Path('tests').glob('test_*.py'))
+    test_files = list(Path("tests").glob("test_*.py"))
     if not test_files:
         print("[FAIL] No test files found")
         return False
@@ -50,11 +52,12 @@ def check_test_suite() -> bool:
     print(f"[PASS] Found {len(test_files)} test files")
     return True
 
+
 def check_dependencies() -> bool:
     """Check dependency files exist"""
     print("[DEPS] Checking dependencies...")
 
-    required_files = ['requirements-core.txt', 'pyproject.toml']
+    required_files = ["requirements-core.txt", "pyproject.toml"]
     for file_path in required_files:
         if not Path(file_path).exists():
             print(f"[FAIL] Missing dependency file: {file_path}")
@@ -63,11 +66,12 @@ def check_dependencies() -> bool:
     print("[PASS] All dependency files present")
     return True
 
+
 def check_docker_setup() -> bool:
     """Check Docker configuration"""
     print("[DOCKER] Checking Docker setup...")
 
-    required_files = ['Dockerfile', 'docker-compose.yml']
+    required_files = ["Dockerfile", "docker-compose.yml"]
     for file_path in required_files:
         if not Path(file_path).exists():
             print(f"[FAIL] Missing Docker file: {file_path}")
@@ -76,14 +80,15 @@ def check_docker_setup() -> bool:
     print("[PASS] Docker configuration present")
     return True
 
+
 def check_ci_cd_setup() -> bool:
     """Check CI/CD configuration"""
     print("[CI/CD] Checking CI/CD setup...")
 
     ci_files = [
-        '.github/workflows/ci.yml',
-        '.github/workflows/security.yml',
-        '.pre-commit-config.yaml'
+        ".github/workflows/ci.yml",
+        ".github/workflows/security.yml",
+        ".pre-commit-config.yaml",
     ]
 
     for file_path in ci_files:
@@ -94,14 +99,12 @@ def check_ci_cd_setup() -> bool:
     print("[PASS] CI/CD configuration present")
     return True
 
+
 def check_security_configuration() -> bool:
     """Check security configuration files"""
     print("[SECURITY] Checking security configuration...")
 
-    security_files = [
-        '.gitleaks.toml',
-        '.gitignore'
-    ]
+    security_files = [".gitleaks.toml", ".gitignore"]
 
     for file_path in security_files:
         if not Path(file_path).exists():
@@ -111,11 +114,12 @@ def check_security_configuration() -> bool:
     print("[PASS] Security configuration present")
     return True
 
+
 def check_documentation() -> bool:
     """Check basic documentation exists"""
     print("[DOCS] Checking documentation...")
 
-    doc_files = ['README.md', 'DEPLOY.md', 'RUNBOOK.md']
+    doc_files = ["README.md", "DEPLOY.md", "RUNBOOK.md"]
     for file_path in doc_files:
         if not Path(file_path).exists():
             print(f"[FAIL] Missing documentation file: {file_path}")
@@ -123,6 +127,7 @@ def check_documentation() -> bool:
 
     print("[PASS] Documentation present")
     return True
+
 
 def main() -> int:
     """Run comprehensive health verification"""
@@ -136,7 +141,7 @@ def main() -> int:
         check_docker_setup,
         check_ci_cd_setup,
         check_security_configuration,
-        check_documentation
+        check_documentation,
     ]
 
     results = []
@@ -155,6 +160,7 @@ def main() -> int:
     else:
         print("[FAIL] Some comprehensive health checks failed")
         return 1
+
 
 if __name__ == "__main__":
     sys.exit(main())

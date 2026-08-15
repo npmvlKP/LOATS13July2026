@@ -17,13 +17,15 @@ from unittest.mock import patch, MagicMock
 
 # Import the modules we need to test
 import sys
-sys.path.insert(0, 'src')
+
+sys.path.insert(0, "src")
 
 from loats.database import Database
 from loats.scheduler import TradingScheduler
 from loats.openalgo import AsyncOpenAlgoClient
 from loats.utils.circuit_breaker import OPENALGO_CIRCUIT_BREAKER
 from loats.models import Signal, Trade, Order
+
 
 class TestReliabilityFixes(unittest.IsolatedAsyncioTestCase):
     """Test suite for reliability review fixes."""
@@ -37,9 +39,7 @@ class TestReliabilityFixes(unittest.IsolatedAsyncioTestCase):
 
         # Initialize database
         self.db = Database(
-            db_path=self.db_path,
-            audit_log_path=self.audit_log_path,
-            retention_days=30
+            db_path=self.db_path, audit_log_path=self.audit_log_path, retention_days=30
         )
 
         # Initialize scheduler
@@ -93,7 +93,10 @@ class TestReliabilityFixes(unittest.IsolatedAsyncioTestCase):
         await self.scheduler.shutdown()
 
         # Verify that async_close_all was called during shutdown
-        self.assertTrue(close_all_called, "R5-F-02: Scheduler should call db.async_close_all() during shutdown")
+        self.assertTrue(
+            close_all_called,
+            "R5-F-02: Scheduler should call db.async_close_all() during shutdown",
+        )
 
         print("✅ R5-F-02: Scheduler DB cleanup test passed")
 
@@ -115,7 +118,9 @@ class TestReliabilityFixes(unittest.IsolatedAsyncioTestCase):
         from loats.utils.circuit_breaker import CircuitBreakerOpenError
 
         # Manually open the circuit breaker
-        OPENALGO_CIRCUIT_BREAKER._state = "open"  # Access protected attribute for testing
+        OPENALGO_CIRCUIT_BREAKER._state = (
+            "open"  # Access protected attribute for testing
+        )
         OPENALGO_CIRCUIT_BREAKER._opened_at = 1.0
 
         # Verify circuit breaker is open
@@ -146,7 +151,7 @@ class TestReliabilityFixes(unittest.IsolatedAsyncioTestCase):
             timestamp="2024-01-15T10:30:00Z",
             indicators={"test_indicator": 0.5},
             confidence=0.8,
-            metadata={"test": "data", "scan_type": "test"}
+            metadata={"test": "data", "scan_type": "test"},
         )
 
         # Test the sync version
@@ -192,7 +197,7 @@ class TestReliabilityFixes(unittest.IsolatedAsyncioTestCase):
             timestamp="2024-01-15T11:30:00Z",
             indicators={"test_indicator": 0.3},
             confidence=0.6,
-            metadata={"test": "async", "scan_type": "test"}
+            metadata={"test": "async", "scan_type": "test"},
         )
 
         # Initialize async pool
@@ -224,19 +229,19 @@ class TestReliabilityFixes(unittest.IsolatedAsyncioTestCase):
             timestamp="2024-01-15T12:30:00Z",
             indicators={"test": 0.5},
             confidence=0.5,
-            metadata={"test": "failure"}
+            metadata={"test": "failure"},
         )
 
         # Mock the audit log file write to fail
         original_open = Path.open
 
         def failing_open(*args, **kwargs):
-            if 'test_audit.jsonl' in str(args[0]):
+            if "test_audit.jsonl" in str(args[0]):
                 raise OSError("Simulated file write failure")
             return original_open(*args, **kwargs)
 
         # Patch the Path.open method
-        with patch('pathlib.Path.open', side_effect=failing_open):
+        with patch("pathlib.Path.open", side_effect=failing_open):
             # This should raise a RuntimeError due to JSONL write failure
             with self.assertRaises(RuntimeError) as cm:
                 self.db.create_signal(test_signal)
@@ -263,7 +268,7 @@ class TestReliabilityFixes(unittest.IsolatedAsyncioTestCase):
                 timestamp=f"2024-01-15T1{i:02d}:30:00Z",
                 indicators={"test_indicator": 0.5 + i * 0.1},
                 confidence=0.7 + i * 0.1,
-                metadata={"test": f"comprehensive_{i}", "scan_type": "comprehensive"}
+                metadata={"test": f"comprehensive_{i}", "scan_type": "comprehensive"},
             )
             signals.append(signal)
             success = self.db.create_signal(signal)
@@ -289,7 +294,7 @@ class TestReliabilityFixes(unittest.IsolatedAsyncioTestCase):
                 timestamp=f"2024-01-15T1{i+5:02d}:30:00Z",
                 indicators={"async_indicator": 0.4 + i * 0.1},
                 confidence=0.6 + i * 0.1,
-                metadata={"test": f"async_comprehensive_{i}", "scan_type": "async"}
+                metadata={"test": f"async_comprehensive_{i}", "scan_type": "async"},
             )
             async_signals.append(signal)
             success = await self.db.async_create_signal(signal)
@@ -303,6 +308,7 @@ class TestReliabilityFixes(unittest.IsolatedAsyncioTestCase):
         self.assertGreater(len(final_lines), len(lines))
 
         print("✅ Comprehensive reliability scenarios test passed")
+
 
 if __name__ == "__main__":
     # Run the tests

@@ -18,6 +18,7 @@ python-telegram-bot>=20.7
 APScheduler>=3.10
 cachetools>=5.3.0
 cryptography>=50.0.0
+aiosqlite>=0.21.0
 pytest
 pytest-asyncio
 pytest-cov

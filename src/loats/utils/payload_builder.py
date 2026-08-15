@@ -1,13 +1,13 @@
 """Payload building utilities for OpenAlgo API requests."""
 
-from typing import Any
 from enum import Enum
+from typing import Any
 
 from ..models import (
     OrderType,
     OrderVariety,
-    TransactionType,
     ProductType,
+    TransactionType,
 )
 
 

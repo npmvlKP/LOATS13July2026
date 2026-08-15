@@ -189,12 +189,14 @@ class TestCircuitBreakerOpenScenarios:
             status = alert_system.get_circuit_breaker_status()
             assert status["telegram"]["state"] == "open"
 
-            # Second call should be rejected by circuit breaker
-            with pytest.raises(CircuitBreakerOpenError) as exc_info:
-                await alert_system._send_telegram_message("Test message")
+            # Second call is rejected by circuit breaker and must degrade
+            # gracefully (alerts must never crash the system) -> returns False.
+            result2 = await alert_system._send_telegram_message("Test message")
+            assert result2 is False
 
-            assert "telegram" in str(exc_info.value)
-            assert "open" in str(exc_info.value).lower()
+            # Circuit breaker must still be open (call was rejected, not retried)
+            status2 = alert_system.get_circuit_breaker_status()
+            assert status2["telegram"]["state"] == "open"
 
 
 class TestRetryExhaustedScenarios:
@@ -282,7 +284,7 @@ class TestRetryExhaustedScenarios:
 
         # Mock consistently failing API
         with patch(
-            "src.loats.openalgo.async_client.get_position_book"
+            "loats.openalgo.async_client.get_position_book"
         ) as mock_get_position:
             mock_get_position.side_effect = ConnectionError(
                 "API consistently unavailable"
@@ -503,7 +505,7 @@ class TestFailureRecoveryScenarios:
                 }
 
             with patch(
-                "src.loats.openalgo.async_client.get_quotes",
+                "loats.openalgo.async_client.get_quotes",
                 side_effect=mock_get_quotes,
             ):
                 # First call should fail after retries and open circuit breaker
@@ -646,7 +648,7 @@ class TestErrorPropagation:
             mock_init.return_value = mock_bot
 
             with patch(
-                "src.loats.openalgo.async_client.get_position_book"
+                "loats.openalgo.async_client.get_position_book"
             ) as mock_get_position:
                 mock_get_position.side_effect = ConnectionError("OpenAlgo down")
 

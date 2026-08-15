@@ -4,11 +4,10 @@ This provides basic connection pooling functionality since aiosqlite doesn't hav
 """
 
 import asyncio
-from typing import Optional
-from collections.abc import AsyncGenerator
-import aiosqlite
-from collections import deque
 import logging
+from collections import deque
+
+import aiosqlite
 
 logger = logging.getLogger(__name__)
 

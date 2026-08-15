@@ -41,8 +41,6 @@ def test_alert_system_initialization():
     assert alert_system is not None
 
 
-# TODO: Add more comprehensive tests for each module to improve coverage
-# These are just basic initialization tests to demonstrate the pattern
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

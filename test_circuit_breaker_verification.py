@@ -5,10 +5,14 @@ This test verifies that the circuit breaker is properly implemented for both GET
 """
 
 import asyncio
-from src.loats.utils.circuit_breaker import OPENALGO_CIRCUIT_BREAKER, CircuitBreakerOpenError
+from src.loats.utils.circuit_breaker import (
+    OPENALGO_CIRCUIT_BREAKER,
+    CircuitBreakerOpenError,
+)
 from src.loats.openalgo import AsyncOpenAlgoClient
 from unittest.mock import AsyncMock, patch
 import pytest
+
 
 def test_circuit_breaker_post_operations_protected():
     """Verify that POST operations (place_order, modify_order, cancel_order) are protected by circuit breaker."""
@@ -22,7 +26,9 @@ def test_circuit_breaker_post_operations_protected():
         raise ConnectionError("Simulated failure")
 
     # Test place_order
-    with patch.object(AsyncOpenAlgoClient, '_request', side_effect=mock_failing_request):
+    with patch.object(
+        AsyncOpenAlgoClient, "_request", side_effect=mock_failing_request
+    ):
         client = AsyncOpenAlgoClient("test_api_key")
 
         # First 3 calls should fail and open the circuit
@@ -41,6 +47,7 @@ def test_circuit_breaker_post_operations_protected():
 
     print("[PASS] POST operations are properly protected by circuit breaker")
 
+
 def test_circuit_breaker_get_operations_protected():
     """Verify that GET operations are protected by circuit breaker with retry."""
     print("Testing GET operations circuit breaker protection...")
@@ -53,7 +60,9 @@ def test_circuit_breaker_get_operations_protected():
         raise ConnectionError("Simulated failure")
 
     # Test get_quotes (GET operation)
-    with patch.object(AsyncOpenAlgoClient, '_request', side_effect=mock_failing_request):
+    with patch.object(
+        AsyncOpenAlgoClient, "_request", side_effect=mock_failing_request
+    ):
         client = AsyncOpenAlgoClient("test_api_key")
 
         # GET operations use retry decorator with 3 attempts by default
@@ -75,6 +84,7 @@ def test_circuit_breaker_get_operations_protected():
 
     print("[PASS] GET operations are properly protected by circuit breaker")
 
+
 def test_circuit_breaker_thread_safety():
     """Verify that circuit breaker statistics are thread-safe."""
     print("Testing circuit breaker thread safety...")
@@ -84,14 +94,16 @@ def test_circuit_breaker_thread_safety():
     import time
 
     # Create a circuit breaker with high threshold
-    cb = CircuitBreaker("thread_safety_test", config=CircuitBreakerConfig(failure_threshold=100))
+    cb = CircuitBreaker(
+        "thread_safety_test", config=CircuitBreakerConfig(failure_threshold=100)
+    )
 
     def make_calls():
         for _ in range(10):
             try:
                 cb.call(lambda: 42)  # Success
-                cb.call(lambda: 1/0)  # Failure
-            except:
+                cb.call(lambda: 1 / 0)  # Failure
+            except Exception:
                 pass
 
     # Run concurrent calls
@@ -109,9 +121,12 @@ def test_circuit_breaker_thread_safety():
 
     print("[PASS] Circuit breaker is thread-safe")
 
+
 if __name__ == "__main__":
     test_circuit_breaker_post_operations_protected()
     test_circuit_breaker_get_operations_protected()
     test_circuit_breaker_thread_safety()
     print("\n[SUCCESS] All circuit breaker verification tests passed!")
-    print("The circuit breaker implementation is fully functional and production-ready.")
+    print(
+        "The circuit breaker implementation is fully functional and production-ready."
+    )

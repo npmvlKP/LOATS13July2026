@@ -18,24 +18,31 @@ def check_python_version():
     print("[PASS] Python version check passed")
     return True
 
+
 def check_environment():
     """Check required environment variables (lenient for local testing)"""
     # For container/CI environments, these should be set
     # For local testing, we'll warn but not fail
-    required_vars = ['TZ', 'PYTHONDONTWRITEBYTECODE', 'PYTHONUNBUFFERED']
+    required_vars = ["TZ", "PYTHONDONTWRITEBYTECODE", "PYTHONUNBUFFERED"]
     missing_vars = [var for var in required_vars if var not in os.environ]
 
     if missing_vars:
-        print(f"[WARN] Missing environment variables: {missing_vars} (ok for local testing)")
+        print(
+            f"[WARN] Missing environment variables: {missing_vars} (ok for local testing)"
+        )
         # Only fail if we're in a container (indicated by presence of some container-specific env vars)
-        if any(var in os.environ for var in ['CONTAINER', 'DOCKER', 'KUBERNETES_SERVICE_HOST']):
+        if any(
+            var in os.environ
+            for var in ["CONTAINER", "DOCKER", "KUBERNETES_SERVICE_HOST"]
+        ):
             return False
     print("[PASS] Environment variables check passed")
     return True
 
+
 def check_imports():
     """Check critical imports work"""
-    critical_modules = ['src', 'src.loats', 'src.loats.utils']
+    critical_modules = ["src", "src.loats", "src.loats.utils"]
 
     for module_name in critical_modules:
         try:
@@ -50,14 +57,15 @@ def check_imports():
     print("[PASS] Critical imports check passed")
     return True
 
+
 def check_file_structure():
     """Check basic file structure exists"""
     required_files = [
-        'src/__init__.py',
-        'pyproject.toml',
-        'requirements-core.txt',
-        'Dockerfile',
-        'docker-compose.yml'
+        "src/__init__.py",
+        "pyproject.toml",
+        "requirements-core.txt",
+        "Dockerfile",
+        "docker-compose.yml",
     ]
 
     for file_path in required_files:
@@ -68,6 +76,7 @@ def check_file_structure():
     print("[PASS] File structure check passed")
     return True
 
+
 def main():
     """Run all health checks"""
     print("LOATS13July2026 Quick Health Check")
@@ -77,7 +86,7 @@ def main():
         check_python_version,
         check_environment,
         check_imports,
-        check_file_structure
+        check_file_structure,
     ]
 
     results = []
@@ -96,6 +105,7 @@ def main():
     else:
         print("[FAIL] Some health checks failed")
         return 1
+
 
 if __name__ == "__main__":
     sys.exit(main())

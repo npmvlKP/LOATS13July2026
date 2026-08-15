@@ -1,0 +1,5 @@
+Collecting aiosqlite
+  Using cached aiosqlite-0.22.1-py3-none-any.whl.metadata (4.3 kB)
+Using cached aiosqlite-0.22.1-py3-none-any.whl (17 kB)
+Installing collected packages: aiosqlite
+Successfully installed aiosqlite-0.22.1

@@ -18,9 +18,7 @@ def scheduler():
 @pytest.mark.asyncio
 async def test_run_ta_scan_success(scheduler):
     with (
-        patch(
-            "src.loats.scheduler.async_client", new_callable=AsyncMock
-        ) as mock_client,
+        patch("loats.scheduler.async_client", new_callable=AsyncMock) as mock_client,
         patch("loats.scheduler.technical_analysis") as mock_ta,
     ):
         mock_client.get_history.return_value = {
@@ -37,7 +35,7 @@ async def test_run_ta_scan_success(scheduler):
         }
         mock_client.get_quotes.return_value = {
             "data": {
-                "NSE:NIFTY50": {
+                "NIFTY": {
                     "last_price": 105,
                     "open": 100,
                     "high": 110,
@@ -47,7 +45,6 @@ async def test_run_ta_scan_success(scheduler):
                 }
             }
         }
-
         mock_ta.calculate_indicators.return_value = []
         mock_ta.generate_signal.return_value = ("BUY", 0.8)
 
@@ -65,9 +62,7 @@ async def test_run_ta_scan_success(scheduler):
 
 @pytest.mark.asyncio
 async def test_run_sentiment_scan_success(scheduler):
-    with patch(
-        "src.loats.scheduler.sentiment", new_callable=AsyncMock
-    ) as mock_sentiment:
+    with patch("loats.scheduler.sentiment", new_callable=AsyncMock) as mock_sentiment:
         mock_result = SentimentAnalysisResult(
             symbol="NSE:NIFTY50",
             timestamp=datetime.datetime.now(datetime.UTC),
@@ -92,9 +87,7 @@ async def test_run_sentiment_scan_success(scheduler):
 
 @pytest.mark.asyncio
 async def test_run_signal_generation_success(scheduler):
-    with patch(
-        "src.loats.scheduler.async_client", new_callable=AsyncMock
-    ) as mock_client:
+    with patch("loats.scheduler.async_client", new_callable=AsyncMock) as mock_client:
         db_instance = MagicMock()
         db_instance.async_get_latest_signals = AsyncMock(
             return_value=[MagicMock(strength=0.8, indicators={})]
@@ -106,7 +99,16 @@ async def test_run_signal_generation_success(scheduler):
         scheduler.db = db_instance
 
         mock_client.get_quotes.return_value = {
-            "data": {"NSE:NIFTY50": {"last_price": 105}}
+            "data": {
+                "NIFTY": {
+                    "last_price": 105,
+                    "open": 100,
+                    "high": 110,
+                    "low": 90,
+                    "close": 105,
+                    "volume": 1000,
+                }
+            }
         }
         mock_client.get_position_book.return_value = {"data": []}
         mock_client.get_funds.return_value = {

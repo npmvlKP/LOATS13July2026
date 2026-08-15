@@ -4,9 +4,13 @@ Debug script to check circuit breaker state after GET operations.
 """
 
 import asyncio
-from src.loats.utils.circuit_breaker import OPENALGO_CIRCUIT_BREAKER, CircuitBreakerOpenError
+from src.loats.utils.circuit_breaker import (
+    OPENALGO_CIRCUIT_BREAKER,
+    CircuitBreakerOpenError,
+)
 from src.loats.openalgo import AsyncOpenAlgoClient
 from unittest.mock import AsyncMock, patch
+
 
 def debug_get_operations():
     """Debug GET operations circuit breaker behavior."""
@@ -23,7 +27,9 @@ def debug_get_operations():
         raise ConnectionError("Simulated failure")
 
     # Test get_quotes (GET operation)
-    with patch.object(AsyncOpenAlgoClient, '_request', side_effect=mock_failing_request):
+    with patch.object(
+        AsyncOpenAlgoClient, "_request", side_effect=mock_failing_request
+    ):
         client = AsyncOpenAlgoClient("test_api_key")
 
         try:
@@ -36,6 +42,7 @@ def debug_get_operations():
 
         print(f"State after call: {OPENALGO_CIRCUIT_BREAKER.state.name}")
         print(f"Stats after call: {OPENALGO_CIRCUIT_BREAKER.stats}")
+
 
 if __name__ == "__main__":
     debug_get_operations()

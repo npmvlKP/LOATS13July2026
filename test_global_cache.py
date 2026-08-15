@@ -41,5 +41,6 @@ async def test_global_cache():
     await close_cache()
     print("Global cache closed")
 
+
 if __name__ == "__main__":
     asyncio.run(test_global_cache())

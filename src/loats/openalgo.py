@@ -59,7 +59,7 @@ from .models import (
     TransactionType,
 )
 from .utils.cache import cache_manager
-from .utils.circuit_breaker import CircuitBreakerOpenError, OPENALGO_CIRCUIT_BREAKER
+from .utils.circuit_breaker import OPENALGO_CIRCUIT_BREAKER, CircuitBreakerOpenError
 from .utils.payload_builder import (
     build_cancel_order_payload,
     build_modify_order_payload,
@@ -367,35 +367,11 @@ class OpenAlgoClient:
     def get_option_chain(
         self, symbol: str, expiry: str | None = None
     ) -> dict[str, Any]:
-        # Create cache key based on parameters
-        import hashlib
-        import json
-        cache_key_data = f"{symbol}:{expiry}"
-        cache_key = (
-            f"option_chain:{hashlib.sha256(cache_key_data.encode('utf-8')).hexdigest()}"
-        )
-
-        # Try to get cached result first
-        cached_result = cache_manager.get(cache_key)
-        if cached_result:
-            try:
-                logger.debug(f"Option chain cache hit for {symbol}")
-                return json.loads(cached_result)  # type: ignore[no-any-return]
-            except Exception as e:
-                logger.warning(f"Failed to parse cached option chain result: {e}")
-
-        # Cache miss - fetch from API
+        # Note: caching is intentionally omitted here; the shared cache_manager is
+        # async-only and cannot be awaited from this synchronous client. Use
+        # AsyncOpenAlgoClient.get_option_chain for cached access.
         payload = {"symbol": symbol, "expiry": expiry}
-        result = self._request("POST", "option_chain", json=payload)
-
-        # Cache the result for 5 minutes (300 seconds)
-        try:
-            cache_manager.set(cache_key, json.dumps(result), ttl=300)
-            logger.debug(f"Cached option chain for {symbol}")
-        except Exception as e:
-            logger.warning(f"Failed to cache option chain result: {e}")
-
-        return result
+        return self._request("POST", "option_chain", json=payload)
 
     def get_position_book(self) -> dict[str, Any]:
         return self._request("POST", "position_book")

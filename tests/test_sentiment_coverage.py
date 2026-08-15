@@ -75,7 +75,7 @@ async def test_parse_rss_feed_exception():
     """Test exception handling in parse_rss_feed."""
     analyzer = SentimentAnalyzer()
     with unittest.mock.patch(
-        "src.loats.sentiment.feedparser.parse", side_effect=Exception("Parse error")
+        "loats.sentiment.feedparser.parse", side_effect=Exception("Parse error")
     ):
         results = await analyzer.parse_rss_feed("http://test.com", max_items=1)
         assert results == []
@@ -261,9 +261,7 @@ async def test_parse_rss_feed_with_valid_entries():
     ]
 
     with (
-        unittest.mock.patch(
-            "src.loats.sentiment.feedparser.parse", return_value=mock_feed
-        ),
+        unittest.mock.patch("loats.sentiment.feedparser.parse", return_value=mock_feed),
         unittest.mock.patch.object(
             analyzer, "_extract_article_content", return_value="Test content"
         ),

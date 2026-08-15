@@ -15,12 +15,13 @@ if sys.platform == "win32":
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
 
+
 def verify_no_sql_injection():
     """Verify that no SQL injection patterns exist in database.py"""
 
     # Read the database file
     try:
-        with open('src/loats/database.py', 'r', encoding='utf-8') as f:
+        with open("src/loats/database.py", "r", encoding="utf-8") as f:
             content = f.read()
     except FileNotFoundError:
         print("ERROR: File 'src/loats/database.py' not found")
@@ -39,10 +40,10 @@ def verify_no_sql_injection():
     # Check for SQL injection patterns
     patterns = {
         "F-string SQL queries": r'cursor\.execute\(f["\'`]',
-        "String formatting (%s)": r'cursor\.execute\(.*\%s',
-        "String concatenation (+)": r'cursor\.execute\(.*\+.*',
-        ".format() method": r'cursor\.execute\(.*format\(.*\)',
-        "String interpolation (...)": r'cursor\.execute\(.*\.\.\.'
+        "String formatting (%s)": r"cursor\.execute\(.*\%s",
+        "String concatenation (+)": r"cursor\.execute\(.*\+.*",
+        ".format() method": r"cursor\.execute\(.*format\(.*\)",
+        "String interpolation (...)": r"cursor\.execute\(.*\.\.\.",
     }
 
     vulnerabilities_found = False
@@ -59,7 +60,7 @@ def verify_no_sql_injection():
     print()
 
     # Check for proper parameterized queries
-    param_queries = re.findall(r'cursor\.execute\(.*\?.*\)', content)
+    param_queries = re.findall(r"cursor\.execute\(.*\?.*\)", content)
     secure_queries = len(param_queries)
     print(f"SECURE QUERIES:")
     print(f"  Parameterized queries with ? placeholders: {secure_queries} ✅")
@@ -68,12 +69,12 @@ def verify_no_sql_injection():
     print()
     print("SECURITY FEATURES:")
     security_features = {
-        "Connection management": 'def _get_connection' in content,
-        "Audit logging": 'def _log_audit' in content,
-        "Cryptographic hashing": '_calculate_sha256' in content,
-        "Thread safety": 'threading.Lock' in content,
-        "UTC datetime handling": 'UTC' in content,
-        "Decimal finance handling": 'Decimal' in content
+        "Connection management": "def _get_connection" in content,
+        "Audit logging": "def _log_audit" in content,
+        "Cryptographic hashing": "_calculate_sha256" in content,
+        "Thread safety": "threading.Lock" in content,
+        "UTC datetime handling": "UTC" in content,
+        "Decimal finance handling": "Decimal" in content,
     }
 
     for name, present in security_features.items():
@@ -85,13 +86,16 @@ def verify_no_sql_injection():
 
     if vulnerabilities_found:
         print("RESULT: ❌ POTENTIAL SQL INJECTION VULNERABILITIES FOUND")
-        print("The database implementation may have security issues that need to be addressed.")
+        print(
+            "The database implementation may have security issues that need to be addressed."
+        )
         return False
     else:
         print("RESULT: ✅ NO SQL INJECTION VULNERABILITIES FOUND")
         print("The database implementation follows security best practices.")
         print("All SQL queries use proper parameterized queries with ? placeholders.")
         return True
+
 
 if __name__ == "__main__":
     success = verify_no_sql_injection()

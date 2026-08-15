@@ -34,9 +34,7 @@ async def test_trading_system_shutdown_not_running(trading_system):
 
 @pytest.mark.asyncio
 async def test_trading_system_run_once_failure(trading_system):
-    with patch(
-        "src.loats.main.scheduler.run_ta_scan", side_effect=Exception("Scan error")
-    ):
+    with patch("loats.main.scheduler.run_ta_scan", side_effect=Exception("Scan error")):
         with pytest.raises(Exception, match="Scan error"):
             await trading_system.run_once()
 
@@ -54,11 +52,9 @@ async def test_handle_shutdown_signal(trading_system):
 async def test_main_function_success():
     with (
         patch(
-            "src.loats.main.TradingSystem.initialize", new_callable=AsyncMock
+            "loats.main.TradingSystem.initialize", new_callable=AsyncMock
         ) as mock_init,
-        patch(
-            "src.loats.main.TradingSystem.start", new_callable=AsyncMock
-        ) as mock_start,
+        patch("loats.main.TradingSystem.start", new_callable=AsyncMock) as mock_start,
     ):
         await main()
         mock_init.assert_called_once()
@@ -69,11 +65,11 @@ async def test_main_function_success():
 async def test_main_function_failure():
     with (
         patch(
-            "src.loats.main.TradingSystem.initialize",
+            "loats.main.TradingSystem.initialize",
             side_effect=Exception("Main error"),
         ),
         patch(
-            "src.loats.main.TradingSystem.shutdown", new_callable=AsyncMock
+            "loats.main.TradingSystem.shutdown", new_callable=AsyncMock
         ) as mock_shutdown,
         patch("sys.exit") as mock_exit,
     ):
@@ -85,8 +81,6 @@ async def test_main_function_failure():
 @pytest.mark.asyncio
 async def test_start_already_running(trading_system):
     trading_system.running = True
-    with patch(
-        "src.loats.main.alerts.start", new_callable=AsyncMock
-    ) as mock_alerts_start:
+    with patch("loats.main.alerts.start", new_callable=AsyncMock) as mock_alerts_start:
         await trading_system.start()
         mock_alerts_start.assert_not_called()

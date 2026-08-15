@@ -17,12 +17,17 @@ from unittest.mock import patch, MagicMock
 
 # Import the modules we need to test
 import sys
-sys.path.insert(0, 'src')
+
+sys.path.insert(0, "src")
 
 from loats.database import Database
 from loats.scheduler import TradingScheduler
-from loats.utils.circuit_breaker import OPENALGO_CIRCUIT_BREAKER, CircuitBreakerOpenError
+from loats.utils.circuit_breaker import (
+    OPENALGO_CIRCUIT_BREAKER,
+    CircuitBreakerOpenError,
+)
 from loats.models import Signal
+
 
 class TestReliabilityFixesSimple(unittest.IsolatedAsyncioTestCase):
     """Simple test suite for reliability review fixes."""
@@ -36,9 +41,7 @@ class TestReliabilityFixesSimple(unittest.IsolatedAsyncioTestCase):
 
         # Initialize database
         self.db = Database(
-            db_path=self.db_path,
-            audit_log_path=self.audit_log_path,
-            retention_days=30
+            db_path=self.db_path, audit_log_path=self.audit_log_path, retention_days=30
         )
 
         # Initialize scheduler
@@ -92,7 +95,10 @@ class TestReliabilityFixesSimple(unittest.IsolatedAsyncioTestCase):
             pass  # Ignore any errors from mock objects
 
         # Verify that async_close_all was called during shutdown
-        self.assertTrue(close_all_called, "R5-F-02: Scheduler should call db.async_close_all() during shutdown")
+        self.assertTrue(
+            close_all_called,
+            "R5-F-02: Scheduler should call db.async_close_all() during shutdown",
+        )
 
         print("PASS: R5-F-02: Scheduler DB cleanup test passed")
 
@@ -114,7 +120,7 @@ class TestReliabilityFixesSimple(unittest.IsolatedAsyncioTestCase):
         # Manually open the circuit breaker by simulating failures
         for i in range(3):  # Trigger the failure threshold
             try:
-                await OPENALGO_CIRCUIT_BREAKER.call_async(lambda: 1/0)
+                await OPENALGO_CIRCUIT_BREAKER.call_async(lambda: 1 / 0)
             except Exception:
                 pass  # Ignore the division by zero error
 
@@ -146,7 +152,7 @@ class TestReliabilityFixesSimple(unittest.IsolatedAsyncioTestCase):
             timestamp="2024-01-15T10:30:00Z",
             indicators={"test_indicator": 0.5},
             confidence=0.8,
-            metadata={"test": "data", "scan_type": "test"}
+            metadata={"test": "data", "scan_type": "test"},
         )
 
         # Test the sync version
@@ -198,19 +204,19 @@ class TestReliabilityFixesSimple(unittest.IsolatedAsyncioTestCase):
             timestamp="2024-01-15T12:30:00Z",
             indicators={"test": 0.5},
             confidence=0.5,
-            metadata={"test": "failure"}
+            metadata={"test": "failure"},
         )
 
         # Mock the audit log file write to fail
         original_open = Path.open
 
         def failing_open(*args, **kwargs):
-            if 'test_audit.jsonl' in str(args[0]):
+            if "test_audit.jsonl" in str(args[0]):
                 raise OSError("Simulated file write failure")
             return original_open(*args, **kwargs)
 
         # Patch the Path.open method
-        with patch('pathlib.Path.open', side_effect=failing_open):
+        with patch("pathlib.Path.open", side_effect=failing_open):
             # This should raise a RuntimeError due to JSONL write failure
             with self.assertRaises(RuntimeError) as cm:
                 self.db.create_signal(test_signal)
@@ -221,6 +227,7 @@ class TestReliabilityFixesSimple(unittest.IsolatedAsyncioTestCase):
             self.assertIn("Database commit aborted to maintain consistency", error_msg)
 
         print("PASS: JSONL write failure handling test passed")
+
 
 if __name__ == "__main__":
     # Run the tests

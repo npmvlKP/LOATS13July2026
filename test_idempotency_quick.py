@@ -5,9 +5,11 @@ This test verifies that the idempotency key system is working correctly.
 """
 
 import sys
-sys.path.append('src')
+
+sys.path.append("src")
 
 from loats.openalgo import _get_idempotency_key, _order_payload_digest
+
 
 def test_idempotency_key_generation():
     """Test that idempotency keys are generated correctly."""
@@ -25,7 +27,9 @@ def test_idempotency_key_generation():
     identity2 = "test_order_456"
     key3 = _get_idempotency_key(identity2)
 
-    assert key1 != key3, f"Expected different keys for different identities, got {key1} == {key3}"
+    assert (
+        key1 != key3
+    ), f"Expected different keys for different identities, got {key1} == {key3}"
     print(f"[OK] Different identities return different keys: {key1} != {key3}")
 
     # Test 3: Test payload digest function
@@ -37,11 +41,18 @@ def test_idempotency_key_generation():
     digest2 = _order_payload_digest(payload2)
     digest3 = _order_payload_digest(payload3)
 
-    assert digest1 == digest2, f"Expected same digest for same payload, got {digest1} != {digest2}"
-    assert digest1 != digest3, f"Expected different digest for different payload, got {digest1} == {digest3}"
-    print(f"[OK] Payload digest works correctly: same payloads have same digest, different payloads have different digests")
+    assert (
+        digest1 == digest2
+    ), f"Expected same digest for same payload, got {digest1} != {digest2}"
+    assert (
+        digest1 != digest3
+    ), f"Expected different digest for different payload, got {digest1} == {digest3}"
+    print(
+        f"[OK] Payload digest works correctly: same payloads have same digest, different payloads have different digests"
+    )
 
     print("All idempotency tests passed! [OK]")
+
 
 if __name__ == "__main__":
     test_idempotency_key_generation()

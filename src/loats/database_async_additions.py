@@ -18,13 +18,13 @@ except ImportError:
 
 from .database import Database
 from .models import (
-    Signal,
-    HistoricalData,
-    QuoteData,
-    Position,
-    FundsData,
-    Trade,
     AuditLogEntry,
+    FundsData,
+    HistoricalData,
+    Position,
+    QuoteData,
+    Signal,
+    Trade,
 )
 
 

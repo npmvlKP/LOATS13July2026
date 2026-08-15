@@ -14,9 +14,10 @@ if sys.platform == "win32":
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
 
+
 def check_for_sql_injection_patterns(file_path):
     """Check for various SQL injection patterns in a file."""
-    with open(file_path, 'r', encoding='utf-8') as f:
+    with open(file_path, "r", encoding="utf-8") as f:
         content = f.read()
 
     # Check for f-string SQL patterns
@@ -25,10 +26,10 @@ def check_for_sql_injection_patterns(file_path):
 
     # Check for other dangerous patterns
     dangerous_patterns = [
-        r'cursor\.execute\(.*\%s',  # String formatting with %s
-        r'cursor\.execute\(.*\+.*',  # String concatenation
-        r'cursor\.execute\(.*format\(.*\)',  # .format() method
-        r'cursor\.execute\(.*\.\.\.',  # String interpolation
+        r"cursor\.execute\(.*\%s",  # String formatting with %s
+        r"cursor\.execute\(.*\+.*",  # String concatenation
+        r"cursor\.execute\(.*format\(.*\)",  # .format() method
+        r"cursor\.execute\(.*\.\.\.",  # String interpolation
     ]
 
     for pattern in dangerous_patterns:
@@ -36,40 +37,49 @@ def check_for_sql_injection_patterns(file_path):
         print(f"Pattern '{pattern}': {len(matches)} matches")
 
     # Check for proper parameterized queries
-    param_queries = re.findall(r'cursor\.execute\(.*\?.*\)', content)
+    param_queries = re.findall(r"cursor\.execute\(.*\?.*\)", content)
     print(f"Parameterized queries with ? placeholders: {len(param_queries)}")
 
     # Check for parameter tuples
-    param_tuples = re.findall(r'cursor\.execute\(.*\(.*\).*\)', content)
+    param_tuples = re.findall(r"cursor\.execute\(.*\(.*\).*\)", content)
     print(f"Queries with parameter tuples: {len(param_tuples)}")
 
-    return len(f_string_patterns) == 0 and all(len(re.findall(p, content)) == 0 for p in dangerous_patterns)
+    return len(f_string_patterns) == 0 and all(
+        len(re.findall(p, content)) == 0 for p in dangerous_patterns
+    )
+
 
 def verify_database_implementation(file_path):
     """Verify that the database implementation follows security best practices."""
-    with open(file_path, 'r', encoding='utf-8') as f:
+    with open(file_path, "r", encoding="utf-8") as f:
         content = f.read()
 
     # Check for proper connection management
-    has_connection_management = 'def _get_connection' in content
+    has_connection_management = "def _get_connection" in content
     print(f"Has connection management: {has_connection_management}")
 
     # Check for parameterized queries
-    has_param_queries = 'cursor.execute(' in content and '?' in content
+    has_param_queries = "cursor.execute(" in content and "?" in content
     print(f"Uses parameterized queries: {has_param_queries}")
 
     # Check for audit logging
-    has_audit_logging = 'def _log_audit' in content
+    has_audit_logging = "def _log_audit" in content
     print(f"Has audit logging: {has_audit_logging}")
 
     # Check for cryptographic hashing
-    has_hashing = '_calculate_sha256' in content
+    has_hashing = "_calculate_sha256" in content
     print(f"Has cryptographic hashing: {has_hashing}")
 
-    return has_connection_management and has_param_queries and has_audit_logging and has_hashing
+    return (
+        has_connection_management
+        and has_param_queries
+        and has_audit_logging
+        and has_hashing
+    )
+
 
 if __name__ == "__main__":
-    file_path = 'src/loats/database.py'
+    file_path = "src/loats/database.py"
 
     print("=" * 60)
     print("SQL INJECTION VULNERABILITY VERIFICATION")
