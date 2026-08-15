@@ -1762,11 +1762,11 @@ class Database:
         called during async application shutdown.
         """
         await asyncio.to_thread(self.close_all)
-        # Close async connection pool
+        # Close async connection pool with proper cleanup
         if hasattr(self, "_async_pool") and self._async_pool:
             try:
-                await self._async_pool.close()
-                logger.info("Async database connection pool closed")
+                await self._async_pool.close()  # Use proper close method that waits for connections
+                logger.info("Async database connection pool closed properly")
             except Exception as e:
                 logger.warning(f"Error closing async connection pool: {e}")
             self._async_pool = None
