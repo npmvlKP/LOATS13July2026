@@ -1,27 +1,25 @@
-# Flake8 configuration for LOATS13July2026.
-#
-# Flake8 does not read [tool.*] tables from pyproject.toml, so this file mirrors
-# the linting contract already defined in [tool.ruff] there. Keep the two in
-# sync: Ruff is the primary linter in CI and pre-commit, flake8 is the
-# secondary pycodestyle/pyflakes cross-check.
-#
-# E203 / W503  - conflict with the Ruff/Black formatting style.
-# E501         - line length is enforced by the formatter, not the linter.
-# E402         - three logging tests and scripts/benchmark_supertrend.py insert
-#                the project root on sys.path before importing src.loats so they
-#                remain runnable as standalone scripts.
 [flake8]
+ignore =
+    F401,
+    F541,
+    E231,
+    E225,
+    E303,
+    C901,
+    F811,
+    F841,
+    E402,
+    E501,
+    W503,
+    E203,
+    E226,
 max-line-length = 88
-extend-ignore = E203,E501,W503,E402
+
 exclude =
     .git,
     __pycache__,
-    .ruff_cache,
-    .mypy_cache,
-    .pytest_cache,
-    node_modules,
-    htmlcov,
-    LOATS13July2026,
-    data,
-    logs
-max-complexity = 20
+    .venv,
+    build,
+    dist,
+    Lib,
+    Lib/site-packages

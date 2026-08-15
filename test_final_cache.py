@@ -55,10 +55,7 @@ async def test_final_cache():
     # Test 2: Redis cache with fallback
     print("\n=== Test 2: Redis Cache (with fallback) ===")
     config_redis = CacheConfig(
-        cache_type="redis",
-        redis_host="localhost",
-        redis_port=6379,
-        redis_password=""
+        cache_type="redis", redis_host="localhost", redis_port=6379, redis_password=""
     )
     cache_redis = CacheManager(config_redis)
     await cache_redis.initialize()
@@ -92,6 +89,7 @@ async def test_final_cache():
     await cache_ttl.close()
 
     print("\n✅ All comprehensive cache tests passed!")
+
 
 if __name__ == "__main__":
     asyncio.run(test_final_cache())

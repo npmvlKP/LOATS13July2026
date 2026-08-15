@@ -22,6 +22,7 @@ from loats.orchestrator import orchestrator, get_cycle_stats
 from loats.models import OptionContract, OptionType
 from loats.metrics import record_cycle_time
 
+
 def create_test_option_chain() -> list[OptionContract]:
     """Create a test option chain for performance testing."""
     base_price = 19500.0
@@ -43,7 +44,7 @@ def create_test_option_chain() -> list[OptionContract]:
                 theta=-0.05,
                 vega=0.1,
                 rho=0.05,
-                quantity=1
+                quantity=1,
             )
         )
         strikes.append(
@@ -61,10 +62,11 @@ def create_test_option_chain() -> list[OptionContract]:
                 theta=-0.05,
                 vega=0.1,
                 rho=0.05,
-                quantity=1
+                quantity=1,
             )
         )
     return strikes
+
 
 async def test_strike_selection_performance() -> bool:
     """Test strike selection performance meets <5ms target."""
@@ -81,7 +83,7 @@ async def test_strike_selection_performance() -> bool:
     iterations = 100
     total_time = 0.0
     max_time = 0.0
-    min_time = float('inf')
+    min_time = float("inf")
     failures = 0
 
     for i in range(iterations):
@@ -116,6 +118,7 @@ async def test_strike_selection_performance() -> bool:
     print(f"  Performance Target: {'✅ PASS' if success else '❌ FAIL'}")
     return success
 
+
 async def test_orchestrator_initialization() -> bool:
     """Test orchestrator initialization."""
     print("\nTesting Orchestrator Initialization...")
@@ -128,13 +131,18 @@ async def test_orchestrator_initialization() -> bool:
         print(f"  Orchestrator initialization failed: {e} ❌")
         return False
 
+
 def test_module_imports() -> bool:
     """Test that all new modules can be imported successfully."""
     print("\nTesting Module Imports...")
 
     try:
         from loats.strike_selection import StrikeSelectionEngine, select_strikes
-        from loats.orchestrator import TradingOrchestrator, start_orchestrator, get_cycle_stats
+        from loats.orchestrator import (
+            TradingOrchestrator,
+            start_orchestrator,
+            get_cycle_stats,
+        )
 
         print("  ✅ strike_selection module imported successfully")
         print("  ✅ orchestrator module imported successfully")
@@ -147,6 +155,7 @@ def test_module_imports() -> bool:
     except Exception as e:
         print(f"  ❌ Unexpected error: {e}")
         return False
+
 
 async def main() -> int:
     """Run all performance tests."""
@@ -167,8 +176,8 @@ async def main() -> int:
     print("PERFORMANCE IMPLEMENTATION SUMMARY")
     print("=" * 60)
 
-
     return 0
+
 
 if __name__ == "__main__":
     try:

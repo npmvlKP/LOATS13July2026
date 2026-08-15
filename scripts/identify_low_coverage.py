@@ -29,13 +29,13 @@ src\\loats\\utils\\retry.py                   89      8    91%   137-139, 184-18
 print("Modules with coverage below 80%:")
 print("=" * 50)
 
-for line in coverage_data.strip().split('\n'):
+for line in coverage_data.strip().split("\n"):
     parts = line.split()
     if len(parts) >= 4:
         try:
             module = parts[0]
-            coverage = int(parts[3].rstrip('%'))
+            coverage = int(parts[3].rstrip("%"))
             if coverage < 80:
                 print(f"{module}: {coverage}%")
-        except:
+        except Exception:
             continue

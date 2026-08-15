@@ -16,6 +16,7 @@ from src.loats.utils.resilience import circuit_breaker_retry_async
 from src.loats.utils.circuit_breaker import CircuitBreaker, CircuitBreakerConfig
 from src.loats.utils.retry import RetryConfig
 
+
 async def test_cache_get_or_set_performance():
     """Test that get_or_set uses sync dict lookup instead of async-wrapped sync."""
     print("Testing R5-PERF-1: Cache get_or_set performance improvement...")
@@ -51,6 +52,7 @@ async def test_cache_get_or_set_performance():
     print("[OK] R5-PERF-1: Cache get_or_set performance improvement verified")
     await cache_manager.close()
 
+
 async def test_circuit_breaker_retry_config_caching():
     """Test that circuit_breaker_retry_async caches config instead of rebinding."""
     print("Testing R5-PERF-2: Circuit breaker retry config caching...")
@@ -76,6 +78,7 @@ async def test_circuit_breaker_retry_config_caching():
 
     print("[OK] R5-PERF-2: Circuit breaker retry config caching verified")
 
+
 async def test_circuit_breaker_retry_config_not_rebound():
     """Test that config is not rebound on every call by checking object identity."""
     print("Testing R5-PERF-2: Config object identity preservation...")
@@ -91,7 +94,9 @@ async def test_circuit_breaker_retry_config_not_rebound():
         captured_configs.append(config)
         return 0.01  # Short delay for testing
 
-    with patch('src.loats.utils.resilience._calculate_delay', side_effect=mock_calculate_delay):
+    with patch(
+        "src.loats.utils.resilience._calculate_delay", side_effect=mock_calculate_delay
+    ):
         # Create decorator with custom config
         decorated_func = circuit_breaker_retry_async(circuit_breaker, custom_config)
 
@@ -119,6 +124,7 @@ async def test_circuit_breaker_retry_config_not_rebound():
 
     print("[OK] R5-PERF-2: Config object identity preservation verified")
 
+
 async def main():
     """Run all performance improvement tests."""
     print("Running performance improvement verification tests...\n")
@@ -130,6 +136,7 @@ async def main():
     print("\n[SUCCESS] All performance improvement tests passed!")
     print("[OK] R5-PERF-1: Cache get_or_set uses sync dict lookup")
     print("[OK] R5-PERF-2: Circuit breaker retry config is cached")
+
 
 if __name__ == "__main__":
     asyncio.run(main())

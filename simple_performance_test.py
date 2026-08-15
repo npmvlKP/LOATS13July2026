@@ -12,13 +12,18 @@ from pathlib import Path
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
+
 def test_imports():
     """Test that all new modules can be imported successfully."""
     print("Testing Module Imports...")
 
     try:
         from loats.strike_selection import StrikeSelectionEngine, select_strikes
-        from loats.orchestrator import TradingOrchestrator, start_orchestrator, get_cycle_stats
+        from loats.orchestrator import (
+            TradingOrchestrator,
+            start_orchestrator,
+            get_cycle_stats,
+        )
         from loats.metrics import record_cycle_time
 
         print("PASS: strike_selection module imported successfully")
@@ -32,6 +37,7 @@ def test_imports():
     except Exception as e:
         print(f"FAIL: Unexpected error: {e}")
         return False
+
 
 async def test_strike_selection():
     """Test strike selection module exists and can be instantiated."""
@@ -53,6 +59,7 @@ async def test_strike_selection():
         print(f"FAIL: Strike selection test failed: {e}")
         return False
 
+
 async def test_orchestrator():
     """Test orchestrator module exists and can be initialized."""
     print("\nTesting Orchestrator Module...")
@@ -73,6 +80,7 @@ async def test_orchestrator():
         print(f"FAIL: Orchestrator test failed: {e}")
         return False
 
+
 async def test_metrics():
     """Test metrics function exists."""
     print("\nTesting Metrics Function...")
@@ -88,6 +96,7 @@ async def test_metrics():
     except Exception as e:
         print(f"FAIL: Metrics test failed: {e}")
         return False
+
 
 async def main():
     """Run all performance tests."""
@@ -116,8 +125,12 @@ async def main():
     print(f"Orchestrator: {'PASS' if orchestrator_success else 'FAIL'}")
     print(f"Metrics: {'PASS' if metrics_success else 'FAIL'}")
 
-    overall_success = import_success and strike_success and orchestrator_success and metrics_success
-    print(f"\nOverall Result: {'ALL TESTS PASSED' if overall_success else 'SOME TESTS FAILED'}")
+    overall_success = (
+        import_success and strike_success and orchestrator_success and metrics_success
+    )
+    print(
+        f"\nOverall Result: {'ALL TESTS PASSED' if overall_success else 'SOME TESTS FAILED'}"
+    )
 
     if overall_success:
         print(f"\nSUCCESS: Performance targets are now measurable and achievable!")
@@ -130,6 +143,7 @@ async def main():
         print(f"\nWARNING: Some performance issues detected. Check logs for details.")
 
     return 0 if overall_success else 1
+
 
 if __name__ == "__main__":
     try:

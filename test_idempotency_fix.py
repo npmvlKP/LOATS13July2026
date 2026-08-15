@@ -14,8 +14,16 @@ from pathlib import Path
 # Add the src directory to the Python path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from loats.models import Order, OrderType, OrderStatus, TransactionType, ProductType, OrderVariety
+from loats.models import (
+    Order,
+    OrderType,
+    OrderStatus,
+    TransactionType,
+    ProductType,
+    OrderVariety,
+)
 from loats.database import Database
+
 
 def test_idempotency_key_functionality():
     """Test that idempotency keys prevent duplicate orders."""
@@ -40,7 +48,7 @@ def test_idempotency_key_functionality():
             status=OrderStatus.OPEN,
             timestamp=datetime.now(UTC),
             filled_quantity=0,
-            idempotency_key="unique_key_123"
+            idempotency_key="unique_key_123",
         )
 
         # Store the first order - should succeed
@@ -80,12 +88,14 @@ def test_idempotency_key_functionality():
             timestamp=datetime.now(UTC),
             filled_quantity=0,
             idempotency_key="unique_key_456",
-            price=400.0
+            price=400.0,
         )
 
         try:
             result3 = db.store_order(order2)
-            print("✅ Different order with different idempotency key stored successfully")
+            print(
+                "✅ Different order with different idempotency key stored successfully"
+            )
             assert result3 is True
         except Exception as e:
             print(f"❌ Failed to store different order: {e}")
@@ -103,12 +113,14 @@ def test_idempotency_key_functionality():
             status=OrderStatus.OPEN,
             timestamp=datetime.now(UTC),
             filled_quantity=0,
-            idempotency_key=None  # No idempotency key
+            idempotency_key=None,  # No idempotency key
         )
 
         try:
             result4 = db.store_order(order3)
-            print("✅ Order without idempotency key stored successfully (backward compatibility)")
+            print(
+                "✅ Order without idempotency key stored successfully (backward compatibility)"
+            )
             assert result4 is True
         except Exception as e:
             print(f"❌ Failed to store order without idempotency key: {e}")
@@ -140,6 +152,7 @@ def test_idempotency_key_functionality():
         print("\n🎉 All idempotency key tests passed!")
         return True
 
+
 def test_audit_log_consistency():
     """Test that audit logs are written before database commits."""
 
@@ -163,7 +176,7 @@ def test_audit_log_consistency():
             status=OrderStatus.OPEN,
             timestamp=datetime.now(UTC),
             filled_quantity=0,
-            idempotency_key="audit_test_key"
+            idempotency_key="audit_test_key",
         )
 
         try:
@@ -191,6 +204,7 @@ def test_audit_log_consistency():
         print("\n🎉 Audit log consistency test passed!")
         return True
 
+
 if __name__ == "__main__":
     print("Testing Technical Debt Fixes")
     print("=" * 50)
@@ -209,7 +223,9 @@ if __name__ == "__main__":
     print(f"   Audit Log Test:        {'PASSED' if audit_result else 'FAILED'}")
 
     if idempotency_result and audit_result:
-        print("\nALL TESTS PASSED! Technical debt items R5-F-07 and R5-F-14 have been successfully resolved.")
+        print(
+            "\nALL TESTS PASSED! Technical debt items R5-F-07 and R5-F-14 have been successfully resolved."
+        )
         sys.exit(0)
     else:
         print("\nSOME TESTS FAILED! Please review the implementation.")

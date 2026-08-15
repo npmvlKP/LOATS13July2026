@@ -38,5 +38,6 @@ async def test_simple_cache():
 
     print("\nAll basic cache tests passed!")
 
+
 if __name__ == "__main__":
     asyncio.run(test_simple_cache())

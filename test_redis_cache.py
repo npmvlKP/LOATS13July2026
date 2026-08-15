@@ -40,10 +40,7 @@ async def test_redis_cache():
     # Test 2: Redis cache (will fallback to in-memory if Redis not available)
     print("\n2. Testing Redis cache (with fallback)...")
     config_redis = CacheConfig(
-        cache_type="redis",
-        redis_host="localhost",
-        redis_port=6379,
-        redis_password=""
+        cache_type="redis", redis_host="localhost", redis_port=6379, redis_password=""
     )
     cache_redis = CacheManager(config_redis)
     await cache_redis.initialize()
@@ -60,6 +57,7 @@ async def test_redis_cache():
     await cache_redis.close()
 
     print("\n✅ All cache tests completed successfully!")
+
 
 if __name__ == "__main__":
     asyncio.run(test_redis_cache())

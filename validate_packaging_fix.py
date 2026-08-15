@@ -18,22 +18,21 @@ from pathlib import Path
 # Ensure UTF-8 encoding for Windows
 if sys.platform == "win32":
     import io
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
-    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
+
 
 def run_command(cmd, timeout=30):
     """Run a command and return the result."""
     try:
         result = subprocess.run(
-            cmd,
-            shell=True,
-            capture_output=True,
-            text=True,
-            timeout=timeout
+            cmd, shell=True, capture_output=True, text=True, timeout=timeout
         )
         return result.returncode, result.stdout, result.stderr
     except subprocess.TimeoutExpired:
         return -1, "", "Command timed out"
+
 
 def test_package_import():
     """Test that the package can be imported correctly."""
@@ -47,9 +46,11 @@ def test_package_import():
 
         # Test import of key components
         from loats.main import TradingSystem
+
         print(f"✅ TradingSystem imported successfully")
 
         from loats.config import get_settings
+
         print(f"✅ get_settings imported successfully")
 
         return True
@@ -60,6 +61,7 @@ def test_package_import():
         print(f"❌ Unexpected error during import: {e}")
         return False
 
+
 def test_entry_point():
     """Test that the entry point works correctly."""
     print("\nTesting entry point...")
@@ -67,6 +69,7 @@ def test_entry_point():
     # Test that the entry point exists and is callable
     try:
         from loats.main import cli_main
+
         print(f"✅ Entry point 'cli_main' is accessible")
 
         # Test that it's a proper function (not a coroutine)
@@ -84,6 +87,7 @@ def test_entry_point():
         print(f"❌ Unexpected error testing entry point: {e}")
         return False
 
+
 def test_package_structure():
     """Test that the package structure is correct."""
     print("\nTesting package structure...")
@@ -91,13 +95,18 @@ def test_package_structure():
     # Check that the package is installed in the right location
     try:
         import loats
+
         package_path = Path(loats.__file__).parent
         print(f"✅ Package installed at: {package_path}")
 
         # Check that key modules exist
         expected_modules = [
-            'main.py', 'alerts.py', 'database.py', 'scheduler.py',
-            'config', 'utils'
+            "main.py",
+            "alerts.py",
+            "database.py",
+            "scheduler.py",
+            "config",
+            "utils",
         ]
 
         for module in expected_modules:
@@ -112,6 +121,7 @@ def test_package_structure():
     except Exception as e:
         print(f"❌ Error checking package structure: {e}")
         return False
+
 
 def main():
     """Run all validation tests."""
@@ -143,6 +153,7 @@ def main():
     else:
         print("\n❌ Some packaging tests FAILED! F-DEP-1 is NOT resolved.")
         return 1
+
 
 if __name__ == "__main__":
     sys.exit(main())

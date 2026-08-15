@@ -14,6 +14,7 @@ import re
 import sys
 from pathlib import Path
 
+
 def validate_html_injection_fix():
     """Validate NEW-M1: HTML injection fix."""
     print("Validating NEW-M1: HTML injection fix...")
@@ -24,22 +25,23 @@ def validate_html_injection_fix():
         return False
 
     try:
-        content = alerts_file.read_text(encoding='utf-8')
+        content = alerts_file.read_text(encoding="utf-8")
     except UnicodeDecodeError:
         try:
-            content = alerts_file.read_text(encoding='latin-1')
+            content = alerts_file.read_text(encoding="latin-1")
         except Exception as e:
             print(f"❌ Failed to read alerts.py: {e}")
             return False
 
     # Check for html.escape() usage
-    html_escape_pattern = r'html\.escape\('
+    html_escape_pattern = r"html\.escape\("
     if not re.search(html_escape_pattern, content):
         print("❌ html.escape() not found in alerts.py")
         return False
 
     print("NEW-M1: HTML injection fix validated - html.escape() is properly applied")
     return True
+
 
 def validate_env_example_sync():
     """Validate NEW-M2: .env.example synced with Settings."""
@@ -57,30 +59,46 @@ def validate_env_example_sync():
         return False
 
     try:
-        env_content = env_example_file.read_text(encoding='utf-8')
+        env_content = env_example_file.read_text(encoding="utf-8")
     except UnicodeDecodeError:
-        env_content = env_example_file.read_text(encoding='latin-1')
+        env_content = env_example_file.read_text(encoding="latin-1")
 
     try:
-        settings_content = settings_file.read_text(encoding='utf-8')
+        settings_content = settings_file.read_text(encoding="utf-8")
     except UnicodeDecodeError:
-        settings_content = settings_file.read_text(encoding='latin-1')
+        settings_content = settings_file.read_text(encoding="latin-1")
 
     # Check that all settings fields are represented in .env.example
     # Extract field names from settings.py
-    field_pattern = r'(\w+)\s*:\s*(?:SecretStr|str|int|float|Decimal|Path|list|Literal)\s*=\s*Field\('
+    field_pattern = r"(\w+)\s*:\s*(?:SecretStr|str|int|float|Decimal|Path|list|Literal)\s*=\s*Field\("
     fields = re.findall(field_pattern, settings_content)
 
     # Check that each field has a corresponding entry in .env.example
     missing_fields = []
     for field in fields:
         # Skip fields that might not need .env entries (like computed fields)
-        if field in ['environment', 'sqlite_db_path', 'audit_log_path', 'retention_days',
-                     'ta_scan_interval', 'sentiment_scan_interval', 'signal_scan_interval',
-                     'default_symbol', 'default_timeframe', 'sentiment_threshold',
-                     'request_timeout', 'openalgo_mode', 'nifty_lot_size', 'max_order_value',
-                     'max_daily_orders', 'max_ops', 'circuit_limit_pct', 'max_position_per_symbol',
-                     'max_total_exposure', 'timezone']:
+        if field in [
+            "environment",
+            "sqlite_db_path",
+            "audit_log_path",
+            "retention_days",
+            "ta_scan_interval",
+            "sentiment_scan_interval",
+            "signal_scan_interval",
+            "default_symbol",
+            "default_timeframe",
+            "sentiment_threshold",
+            "request_timeout",
+            "openalgo_mode",
+            "nifty_lot_size",
+            "max_order_value",
+            "max_daily_orders",
+            "max_ops",
+            "circuit_limit_pct",
+            "max_position_per_symbol",
+            "max_total_exposure",
+            "timezone",
+        ]:
             continue
 
         env_var = field.upper()
@@ -94,6 +112,7 @@ def validate_env_example_sync():
     print("NEW-M2: .env.example synced with Settings validated")
     return True
 
+
 def validate_quantity_fix():
     """Validate NEW-M3: quantity=1 hardcoded fix."""
     print("Validating NEW-M3: quantity=1 hardcoded fix...")
@@ -104,24 +123,25 @@ def validate_quantity_fix():
         return False
 
     try:
-        content = options_file.read_text(encoding='utf-8')
+        content = options_file.read_text(encoding="utf-8")
     except UnicodeDecodeError:
-        content = options_file.read_text(encoding='latin-1')
+        content = options_file.read_text(encoding="latin-1")
 
     # Check for contract.quantity usage in calculate_portfolio_greeks
-    contract_quantity_pattern = r'contract_quantity\s*=\s*contract\.quantity'
+    contract_quantity_pattern = r"contract_quantity\s*=\s*contract\.quantity"
     if not re.search(contract_quantity_pattern, content):
         print("❌ contract.quantity not found in options.py")
         return False
 
     # Check that there are no hardcoded quantity=1 assignments
-    hardcoded_pattern = r'quantity\s*=\s*1\b'
+    hardcoded_pattern = r"quantity\s*=\s*1\b"
     if re.search(hardcoded_pattern, content):
         print("❌ Found hardcoded quantity=1 in options.py")
         return False
 
     print("NEW-M3: quantity=1 hardcoded fix validated - uses contract.quantity")
     return True
+
 
 def validate_expired_contract_error():
     """Validate NEW-M4: negative t clamping fix."""
@@ -133,20 +153,20 @@ def validate_expired_contract_error():
         return False
 
     try:
-        content = options_file.read_text(encoding='utf-8')
+        content = options_file.read_text(encoding="utf-8")
     except UnicodeDecodeError:
-        content = options_file.read_text(encoding='latin-1')
+        content = options_file.read_text(encoding="latin-1")
 
     # Check for ExpiredContractError class definition
-    expired_error_pattern = r'class ExpiredContractError\('
+    expired_error_pattern = r"class ExpiredContractError\("
     if not re.search(expired_error_pattern, content):
         print("❌ ExpiredContractError class not found")
         return False
 
     # Check for ExpiredContractError usage in key methods
     error_usage_patterns = [
-        r'if t <= 0:.*raise ExpiredContractError',
-        r'if t <= 0:.*allow_expired'
+        r"if t <= 0:.*raise ExpiredContractError",
+        r"if t <= 0:.*allow_expired",
     ]
 
     found_usage = False
@@ -159,8 +179,11 @@ def validate_expired_contract_error():
         print("❌ ExpiredContractError not properly used for negative t validation")
         return False
 
-    print("NEW-M4: negative t clamping fix validated - ExpiredContractError properly raised")
+    print(
+        "NEW-M4: negative t clamping fix validated - ExpiredContractError properly raised"
+    )
     return True
+
 
 def main():
     """Main validation function."""
@@ -171,7 +194,7 @@ def main():
         validate_html_injection_fix,
         validate_env_example_sync,
         validate_quantity_fix,
-        validate_expired_contract_error
+        validate_expired_contract_error,
     ]
 
     results = []
@@ -192,9 +215,12 @@ def main():
     print(f"NEW-M4 (negative t fix): {'PASS' if results[3] else 'FAIL'}")
 
     all_passed = all(results)
-    print(f"\nOverall Result: {'ALL VALIDATIONS PASSED' if all_passed else 'SOME VALIDATIONS FAILED'}")
+    print(
+        f"\nOverall Result: {'ALL VALIDATIONS PASSED' if all_passed else 'SOME VALIDATIONS FAILED'}"
+    )
 
     return 0 if all_passed else 1
+
 
 if __name__ == "__main__":
     sys.exit(main())

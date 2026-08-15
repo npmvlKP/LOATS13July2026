@@ -17,13 +17,13 @@ async def main():
         # Initialize database
         db = Database(db_path=db_path, audit_log_path=audit_log_path)
         db._initialize_database()
-        
+
         # Ensure async methods are extended
         extend_database_class()
-        
+
         # Initialize async pool
         await db.async_initialize()
-        
+
         # Manually test the query inside the async function
         print("Testing query manually...")
         conn = await db._async_pool.acquire()
@@ -38,13 +38,13 @@ async def main():
                 print(f"Row is not None: {row is not None}")
         finally:
             await db._async_pool.release(conn)
-        
+
         # Now test the actual async_update_order_status function
         print("\nTesting async_update_order_status...")
         result = await db.async_update_order_status("nonexistent_order", "COMPLETED")
         print(f"Result: {result}")
         print(f"Expected: False")
-        
+
         # Clean up
         if hasattr(db, "_async_pool") and db._async_pool:
             await db.async_close_all()

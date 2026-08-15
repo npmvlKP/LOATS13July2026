@@ -6,11 +6,15 @@ according to the current architecture.
 """
 
 import asyncio
-from src.loats.utils.circuit_breaker import OPENALGO_CIRCUIT_BREAKER, CircuitBreakerOpenError
+from src.loats.utils.circuit_breaker import (
+    OPENALGO_CIRCUIT_BREAKER,
+    CircuitBreakerOpenError,
+)
 from src.loats.openalgo import AsyncOpenAlgoClient
 from src.loats.utils.resilience import openalgo_circuit_breaker_retry_async
 from unittest.mock import AsyncMock, patch
 import pytest
+
 
 def test_circuit_breaker_post_operations_protected():
     """Verify that POST operations (place_order, modify_order, cancel_order) are protected by circuit breaker."""
@@ -24,7 +28,9 @@ def test_circuit_breaker_post_operations_protected():
         raise ConnectionError("Simulated failure")
 
     # Test place_order
-    with patch.object(AsyncOpenAlgoClient, '_request', side_effect=mock_failing_request):
+    with patch.object(
+        AsyncOpenAlgoClient, "_request", side_effect=mock_failing_request
+    ):
         client = AsyncOpenAlgoClient("test_api_key")
 
         # First 3 calls should fail and open the circuit
@@ -42,6 +48,7 @@ def test_circuit_breaker_post_operations_protected():
             asyncio.run(client.place_order("TEST", 1, "MARKET"))
 
     print("[PASS] POST operations are properly protected by circuit breaker")
+
 
 def test_circuit_breaker_get_operations_with_retry_protected():
     """Verify that GET operations are protected by circuit breaker with retry composition."""
@@ -62,7 +69,9 @@ def test_circuit_breaker_get_operations_with_retry_protected():
         raise ConnectionError("Simulated failure")
 
     # Test that the retry + circuit breaker composition works correctly
-    with patch.object(AsyncOpenAlgoClient, '_request', side_effect=mock_failing_request):
+    with patch.object(
+        AsyncOpenAlgoClient, "_request", side_effect=mock_failing_request
+    ):
         # First call should exhaust retries and open the circuit
         try:
             asyncio.run(test_get_operation())
@@ -78,6 +87,7 @@ def test_circuit_breaker_get_operations_with_retry_protected():
 
     print("[PASS] GET operations are properly protected by circuit breaker with retry")
 
+
 def test_circuit_breaker_thread_safety():
     """Verify that circuit breaker statistics are thread-safe."""
     print("Testing circuit breaker thread safety...")
@@ -87,14 +97,16 @@ def test_circuit_breaker_thread_safety():
     import time
 
     # Create a circuit breaker with high threshold
-    cb = CircuitBreaker("thread_safety_test", config=CircuitBreakerConfig(failure_threshold=100))
+    cb = CircuitBreaker(
+        "thread_safety_test", config=CircuitBreakerConfig(failure_threshold=100)
+    )
 
     def make_calls():
         for _ in range(10):
             try:
                 cb.call(lambda: 42)  # Success
-                cb.call(lambda: 1/0)  # Failure
-            except:
+                cb.call(lambda: 1 / 0)  # Failure
+            except Exception:
                 pass
 
     # Run concurrent calls
@@ -111,6 +123,7 @@ def test_circuit_breaker_thread_safety():
     assert stats.consecutive_successes >= 0
 
     print("[PASS] Circuit breaker is thread-safe")
+
 
 def test_circuit_breaker_architecture_consistency():
     """Verify that the circuit breaker architecture is consistent across GET and POST operations."""
@@ -129,13 +142,16 @@ def test_circuit_breaker_architecture_consistency():
 
     print("[PASS] Circuit breaker architecture is consistent")
 
+
 if __name__ == "__main__":
     test_circuit_breaker_post_operations_protected()
     test_circuit_breaker_get_operations_with_retry_protected()
     test_circuit_breaker_thread_safety()
     test_circuit_breaker_architecture_consistency()
     print("\n[SUCCESS] All circuit breaker verification tests passed!")
-    print("The circuit breaker implementation is fully functional and production-ready.")
+    print(
+        "The circuit breaker implementation is fully functional and production-ready."
+    )
     print("\nGate Scorecard Update:")
     print("[PASS] R5-F-06: POST operations are protected by circuit breaker")
     print("[PASS] R5-3: Circuit breaker statistics are thread-safe")

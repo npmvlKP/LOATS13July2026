@@ -6,9 +6,11 @@ This test verifies that the idempotency key system is working correctly.
 
 import sys
 import time
-sys.path.append('src')
+
+sys.path.append("src")
 
 from loats.openalgo import _get_idempotency_key, _order_payload_digest
+
 
 def test_idempotency_key_generation():
     """Test that idempotency keys are generated correctly."""
@@ -26,7 +28,9 @@ def test_idempotency_key_generation():
     identity2 = "test_order_456"
     key3 = _get_idempotency_key(identity2)
 
-    assert key1 != key3, f"Expected different keys for different identities, got {key1} == {key3}"
+    assert (
+        key1 != key3
+    ), f"Expected different keys for different identities, got {key1} == {key3}"
     print(f"✓ Different identities return different keys: {key1} != {key3}")
 
     # Test 3: Test payload digest function
@@ -38,19 +42,28 @@ def test_idempotency_key_generation():
     digest2 = _order_payload_digest(payload2)
     digest3 = _order_payload_digest(payload3)
 
-    assert digest1 == digest2, f"Expected same digest for same payload, got {digest1} != {digest2}"
-    assert digest1 != digest3, f"Expected different digest for different payload, got {digest1} == {digest3}"
-    print(f"✓ Payload digest works correctly: same payloads have same digest, different payloads have different digests")
+    assert (
+        digest1 == digest2
+    ), f"Expected same digest for same payload, got {digest1} != {digest2}"
+    assert (
+        digest1 != digest3
+    ), f"Expected different digest for different payload, got {digest1} == {digest3}"
+    print(
+        f"✓ Payload digest works correctly: same payloads have same digest, different payloads have different digests"
+    )
 
     # Test 4: Test TTL expiration (wait for TTL to expire)
     print("Testing TTL expiration (waiting 301 seconds)...")
     time.sleep(301)  # Wait for TTL to expire
 
     key4 = _get_idempotency_key(identity)
-    assert key1 != key4, f"Expected different key after TTL expiration, got {key1} == {key4}"
+    assert (
+        key1 != key4
+    ), f"Expected different key after TTL expiration, got {key1} == {key4}"
     print(f"✓ TTL expiration works: old key {key1} != new key {key4}")
 
     print("All idempotency tests passed! ✓")
+
 
 if __name__ == "__main__":
     test_idempotency_key_generation()

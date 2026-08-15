@@ -17,20 +17,16 @@ def trading_system():
 async def test_trading_system_initialization_success(trading_system):
     """Test successful initialization (lines 34-47)."""
     with (
+        patch("loats.main.initialize_cache", new_callable=AsyncMock) as mock_cache_init,
+        patch("loats.main.db.async_initialize", new_callable=AsyncMock) as mock_db_init,
         patch(
-            "src.loats.main.initialize_cache", new_callable=AsyncMock
-        ) as mock_cache_init,
-        patch(
-            "src.loats.main.db.async_initialize", new_callable=AsyncMock
-        ) as mock_db_init,
-        patch(
-            "src.loats.main.db.async_verify_audit_log_integrity", return_value=True
+            "loats.main.db.async_verify_audit_log_integrity", return_value=True
         ) as mock_db_verify,
         patch(
-            "src.loats.main.alerts.initialize", new_callable=AsyncMock
+            "loats.main.alerts.initialize", new_callable=AsyncMock
         ) as mock_alerts_init,
         patch(
-            "src.loats.main.scheduler.initialize", new_callable=AsyncMock
+            "loats.main.scheduler.initialize", new_callable=AsyncMock
         ) as mock_scheduler_init,
     ):
         await trading_system.initialize()
@@ -79,17 +75,15 @@ async def test_trading_system_start_already_running(trading_system):
 async def test_trading_system_start_success(trading_system):
     """Test successful start (lines 54-66)."""
     with (
+        patch("loats.main.alerts.start", new_callable=AsyncMock) as mock_alerts_start,
         patch(
-            "src.loats.main.alerts.start", new_callable=AsyncMock
-        ) as mock_alerts_start,
-        patch(
-            "src.loats.main.scheduler.start", new_callable=AsyncMock
+            "loats.main.scheduler.start", new_callable=AsyncMock
         ) as mock_scheduler_start,
         patch(
-            "src.loats.main.alerts.send_system_alert", new_callable=AsyncMock
+            "loats.main.alerts.send_system_alert", new_callable=AsyncMock
         ) as mock_send_alert,
         patch(
-            "src.loats.main.TradingSystem._wait_for_shutdown", new_callable=AsyncMock
+            "loats.main.TradingSystem._wait_for_shutdown", new_callable=AsyncMock
         ) as mock_wait,
     ):
         await trading_system.start()
@@ -125,18 +119,16 @@ async def test_trading_system_shutdown_success(trading_system):
     trading_system.running = True
     with (
         patch(
-            "src.loats.main.alerts.send_system_alert", new_callable=AsyncMock
+            "loats.main.alerts.send_system_alert", new_callable=AsyncMock
         ) as mock_send_alert,
         patch(
-            "src.loats.main.scheduler.shutdown", new_callable=AsyncMock
+            "loats.main.scheduler.shutdown", new_callable=AsyncMock
         ) as mock_scheduler_shutdown,
         patch(
-            "src.loats.main.alerts.shutdown", new_callable=AsyncMock
+            "loats.main.alerts.shutdown", new_callable=AsyncMock
         ) as mock_alerts_shutdown,
         patch("loats.main.close_cache") as mock_close_cache,
-        patch(
-            "src.loats.main.db.async_close_all", new_callable=AsyncMock
-        ) as mock_db_close,
+        patch("loats.main.db.async_close_all", new_callable=AsyncMock) as mock_db_close,
     ):
         await trading_system.shutdown()
         assert trading_system.running is False
@@ -155,7 +147,7 @@ async def test_trading_system_shutdown_exception(trading_system):
     trading_system.running = True
     with (
         patch(
-            "src.loats.main.alerts.send_system_alert",
+            "loats.main.alerts.send_system_alert",
             side_effect=Exception("Shutdown error"),
         ),
     ):
@@ -167,14 +159,12 @@ async def test_trading_system_shutdown_exception(trading_system):
 async def test_trading_system_run_once_success(trading_system):
     """Test run_once successful execution (lines 132-142)."""
     with (
+        patch("loats.main.scheduler.run_ta_scan", new_callable=AsyncMock) as mock_ta,
         patch(
-            "src.loats.main.scheduler.run_ta_scan", new_callable=AsyncMock
-        ) as mock_ta,
-        patch(
-            "src.loats.main.scheduler.run_sentiment_scan", new_callable=AsyncMock
+            "loats.main.scheduler.run_sentiment_scan", new_callable=AsyncMock
         ) as mock_sentiment,
         patch(
-            "src.loats.main.scheduler.run_signal_generation", new_callable=AsyncMock
+            "loats.main.scheduler.run_signal_generation", new_callable=AsyncMock
         ) as mock_signal,
     ):
         await trading_system.run_once()
@@ -187,9 +177,7 @@ async def test_trading_system_run_once_success(trading_system):
 async def test_trading_system_run_once_exception(trading_system):
     """Test run_once exception handling (lines 140-142)."""
     with (
-        patch(
-            "src.loats.main.scheduler.run_ta_scan", side_effect=Exception("Scan error")
-        ),
+        patch("loats.main.scheduler.run_ta_scan", side_effect=Exception("Scan error")),
     ):
         with pytest.raises(Exception, match="Scan error"):
             await trading_system.run_once()
@@ -226,7 +214,7 @@ async def test_handle_shutdown_signal(trading_system):
     trading_system.running = True
     with (
         patch(
-            "src.loats.main.TradingSystem.shutdown", new_callable=AsyncMock
+            "loats.main.TradingSystem.shutdown", new_callable=AsyncMock
         ) as mock_shutdown,
     ):
         await trading_system._handle_shutdown_signal(signal.SIGTERM)

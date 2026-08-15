@@ -1,4 +1,5 @@
 """Import smoke-test for loats modules."""
+
 import sys
 
 sys.path.insert(0, "src")

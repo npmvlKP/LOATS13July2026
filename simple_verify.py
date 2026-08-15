@@ -6,19 +6,20 @@ Simple SQL Injection Verification Script
 import re
 import sys
 
-def main():
-    file_path = 'src/loats/database.py'
 
-    with open(file_path, 'r', encoding='utf-8') as f:
+def main():
+    file_path = "src/loats/database.py"
+
+    with open(file_path, "r", encoding="utf-8") as f:
         content = f.read()
 
     # Check for SQL injection patterns
     patterns = {
-        'f-string SQL': r'cursor\.execute\(f["\'`]',
-        '%s formatting': r'cursor\.execute\(.*\%s',
-        'string concatenation': r'cursor\.execute\(.*\+.*',
-        '.format() method': r'cursor\.execute\(.*format\(.*\)',
-        'string interpolation': r'cursor\.execute\(.*\.\.\.'
+        "f-string SQL": r'cursor\.execute\(f["\'`]',
+        "%s formatting": r"cursor\.execute\(.*\%s",
+        "string concatenation": r"cursor\.execute\(.*\+.*",
+        ".format() method": r"cursor\.execute\(.*format\(.*\)",
+        "string interpolation": r"cursor\.execute\(.*\.\.\.",
     }
 
     print("SQL INJECTION PATTERN VERIFICATION")
@@ -33,7 +34,7 @@ def main():
             vulnerabilities_found = True
 
     # Check for proper parameterized queries
-    param_queries = len(re.findall(r'cursor\.execute\(.*\?.*\)', content))
+    param_queries = len(re.findall(r"cursor\.execute\(.*\?.*\)", content))
     print(f"Parameterized queries: {param_queries}")
 
     print("\n" + "=" * 50)
@@ -44,6 +45,7 @@ def main():
         print("RESULT: NO SQL INJECTION VULNERABILITIES FOUND")
         print("The database implementation is secure")
         return 0
+
 
 if __name__ == "__main__":
     sys.exit(main())

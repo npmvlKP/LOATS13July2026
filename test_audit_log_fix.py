@@ -12,10 +12,12 @@ import sqlite3
 
 # Add the src directory to the path so we can import the Database class
 import sys
-sys.path.insert(0, 'src')
+
+sys.path.insert(0, "src")
 
 from loats.database import Database
 from loats.models import Trade, TransactionType, ProductType
+
 
 def test_audit_log_dual_write_consistency():
     """Test that audit log dual-write maintains consistency."""
@@ -41,7 +43,7 @@ def test_audit_log_dual_write_consistency():
             product_type=ProductType.MIS,
             pnl=100.0,
             status="COMPLETED",
-            strategy="test_strategy"
+            strategy="test_strategy",
         )
 
         # Test successful audit log write
@@ -51,15 +53,17 @@ def test_audit_log_dual_write_consistency():
         # Verify both audit trails exist
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
-        cursor.execute("SELECT COUNT(*) FROM audit_log WHERE entity_id = ?", ("test_trade_123",))
+        cursor.execute(
+            "SELECT COUNT(*) FROM audit_log WHERE entity_id = ?", ("test_trade_123",)
+        )
         db_count = cursor.fetchone()[0]
         conn.close()
 
         # Check JSONL file
-        with open(audit_log_path, 'r', encoding='utf-8') as f:
+        with open(audit_log_path, "r", encoding="utf-8") as f:
             jsonl_lines = f.readlines()
 
-        jsonl_count = sum(1 for line in jsonl_lines if 'test_trade_123' in line)
+        jsonl_count = sum(1 for line in jsonl_lines if "test_trade_123" in line)
 
         print(f"Database audit entries: {db_count}")
         print(f"JSONL audit entries: {jsonl_count}")
@@ -87,7 +91,7 @@ def test_audit_log_dual_write_consistency():
                 product_type=ProductType.NRML,
                 pnl=25.0,
                 status="COMPLETED",
-                strategy="test_strategy_2"
+                strategy="test_strategy_2",
             )
 
             try:
@@ -105,20 +109,28 @@ def test_audit_log_dual_write_consistency():
         # Verify that no partial audit trail was created
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
-        cursor.execute("SELECT COUNT(*) FROM audit_log WHERE entity_id = ?", ("test_trade_456",))
+        cursor.execute(
+            "SELECT COUNT(*) FROM audit_log WHERE entity_id = ?", ("test_trade_456",)
+        )
         db_count_after_failure = cursor.fetchone()[0]
         conn.close()
 
-        with open(audit_log_path, 'r', encoding='utf-8') as f:
+        with open(audit_log_path, "r", encoding="utf-8") as f:
             jsonl_lines_after = f.readlines()
 
-        jsonl_count_after = sum(1 for line in jsonl_lines_after if 'test_trade_456' in line)
+        jsonl_count_after = sum(
+            1 for line in jsonl_lines_after if "test_trade_456" in line
+        )
 
         print(f"Database audit entries after failure: {db_count_after_failure}")
         print(f"JSONL audit entries after failure: {jsonl_count_after}")
 
-        assert db_count_after_failure == 0, f"Expected 0 DB audit entries after failure, got {db_count_after_failure}"
-        assert jsonl_count_after == 0, f"Expected 0 JSONL audit entries after failure, got {jsonl_count_after}"
+        assert (
+            db_count_after_failure == 0
+        ), f"Expected 0 DB audit entries after failure, got {db_count_after_failure}"
+        assert (
+            jsonl_count_after == 0
+        ), f"Expected 0 JSONL audit entries after failure, got {jsonl_count_after}"
 
         print("✓ Dual-write consistency maintained - no partial audit trails created")
 
@@ -136,7 +148,7 @@ def test_audit_log_dual_write_consistency():
             product_type=ProductType.CNC,
             pnl=75.0,
             status="COMPLETED",
-            strategy="test_strategy_3"
+            strategy="test_strategy_3",
         )
 
         db.create_trade(trade3)
@@ -144,25 +156,36 @@ def test_audit_log_dual_write_consistency():
         # Verify both audit trails were created successfully
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
-        cursor.execute("SELECT COUNT(*) FROM audit_log WHERE entity_id = ?", ("test_trade_789",))
+        cursor.execute(
+            "SELECT COUNT(*) FROM audit_log WHERE entity_id = ?", ("test_trade_789",)
+        )
         db_count_recovery = cursor.fetchone()[0]
         conn.close()
 
-        with open(audit_log_path, 'r', encoding='utf-8') as f:
+        with open(audit_log_path, "r", encoding="utf-8") as f:
             jsonl_lines_recovery = f.readlines()
 
-        jsonl_count_recovery = sum(1 for line in jsonl_lines_recovery if 'test_trade_789' in line)
+        jsonl_count_recovery = sum(
+            1 for line in jsonl_lines_recovery if "test_trade_789" in line
+        )
 
         print(f"Database audit entries after recovery: {db_count_recovery}")
         print(f"JSONL audit entries after recovery: {jsonl_count_recovery}")
 
-        assert db_count_recovery == 1, f"Expected 1 DB audit entry after recovery, got {db_count_recovery}"
-        assert jsonl_count_recovery == 1, f"Expected 1 JSONL audit entry after recovery, got {jsonl_count_recovery}"
+        assert (
+            db_count_recovery == 1
+        ), f"Expected 1 DB audit entry after recovery, got {db_count_recovery}"
+        assert (
+            jsonl_count_recovery == 1
+        ), f"Expected 1 JSONL audit entry after recovery, got {jsonl_count_recovery}"
 
         print("✓ Recovery successful - both audit trails created consistently")
 
         db.close()
-        print("\n✅ All tests passed! Audit log dual-write consistency fix is working correctly.")
+        print(
+            "\n✅ All tests passed! Audit log dual-write consistency fix is working correctly."
+        )
+
 
 if __name__ == "__main__":
     test_audit_log_dual_write_consistency()

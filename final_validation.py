@@ -1,12 +1,15 @@
 #!/usr/bin/env python
 """Final validation of P2 fixes."""
+
 import subprocess
 import sys
 
 print("=== FINAL VALIDATION ===\n")
 
 print("1. MyPy Strict Mode:")
-result = subprocess.run([sys.executable, "-m", "mypy", "src/", "--strict"], capture_output=True, text=True)
+result = subprocess.run(
+    [sys.executable, "-m", "mypy", "src/", "--strict"], capture_output=True, text=True
+)
 if result.returncode == 0:
     print("   PASSED")
 else:
@@ -14,7 +17,9 @@ else:
     print(result.stdout)
 
 print("\n2. Ruff Linting:")
-result = subprocess.run([sys.executable, "-m", "ruff", "check", "src/"], capture_output=True, text=True)
+result = subprocess.run(
+    [sys.executable, "-m", "ruff", "check", "src/"], capture_output=True, text=True
+)
 if result.returncode == 0:
     print("   PASSED")
 else:

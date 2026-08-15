@@ -14,9 +14,17 @@ from pathlib import Path
 # Add the src directory to the Python path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from loats.models import Order, OrderType, OrderStatus, TransactionType, ProductType, OrderVariety
+from loats.models import (
+    Order,
+    OrderType,
+    OrderStatus,
+    TransactionType,
+    ProductType,
+    OrderVariety,
+)
 from loats.database import Database
 from loats.scheduler import TradingScheduler
+
 
 def test_idempotency_key_functionality():
     """Test that idempotency keys prevent duplicate orders (R5-F-07)."""
@@ -42,7 +50,7 @@ def test_idempotency_key_functionality():
             status=OrderStatus.OPEN,
             timestamp=datetime.now(UTC),
             filled_quantity=0,
-            idempotency_key="unique_key_123"
+            idempotency_key="unique_key_123",
         )
 
         # Store the first order - should succeed
@@ -82,12 +90,14 @@ def test_idempotency_key_functionality():
             timestamp=datetime.now(UTC),
             filled_quantity=0,
             idempotency_key="unique_key_456",
-            price=400.0
+            price=400.0,
         )
 
         try:
             result3 = db.store_order(order2)
-            print("[OK] Different order with different idempotency key stored successfully")
+            print(
+                "[OK] Different order with different idempotency key stored successfully"
+            )
             assert result3 is True
         except Exception as e:
             print(f"[FAIL] Failed to store different order: {e}")
@@ -105,12 +115,14 @@ def test_idempotency_key_functionality():
             status=OrderStatus.OPEN,
             timestamp=datetime.now(UTC),
             filled_quantity=0,
-            idempotency_key=None  # No idempotency key
+            idempotency_key=None,  # No idempotency key
         )
 
         try:
             result4 = db.store_order(order3)
-            print("[OK] Order without idempotency key stored successfully (backward compatibility)")
+            print(
+                "[OK] Order without idempotency key stored successfully (backward compatibility)"
+            )
             assert result4 is True
         except Exception as e:
             print(f"[FAIL] Failed to store order without idempotency key: {e}")
@@ -146,6 +158,7 @@ def test_idempotency_key_functionality():
         # Clean up temp directory
         shutil.rmtree(temp_dir, ignore_errors=True)
 
+
 def test_nse_holiday_calendar():
     """Test that NSE holiday calendar is implemented (R5-F-08)."""
 
@@ -154,15 +167,15 @@ def test_nse_holiday_calendar():
 
     # Test that the holiday calendar exists in the module
     try:
-        assert hasattr(scheduler_module, 'NSE_HOLIDAYS')
+        assert hasattr(scheduler_module, "NSE_HOLIDAYS")
         assert len(scheduler_module.NSE_HOLIDAYS) > 0
         print("[OK] NSE holiday calendar exists and has entries")
 
         # Check that it contains the expected format (date objects)
         sample_holiday = next(iter(scheduler_module.NSE_HOLIDAYS))
-        assert hasattr(sample_holiday, 'year')
-        assert hasattr(sample_holiday, 'month')
-        assert hasattr(sample_holiday, 'day')
+        assert hasattr(sample_holiday, "year")
+        assert hasattr(sample_holiday, "month")
+        assert hasattr(sample_holiday, "day")
         print("[OK] NSE holiday calendar contains date objects")
 
     except Exception as e:
@@ -171,7 +184,7 @@ def test_nse_holiday_calendar():
 
     # Test that the TradingScheduler class has the is_market_open method
     try:
-        assert hasattr(scheduler_module.TradingScheduler, 'is_market_open')
+        assert hasattr(scheduler_module.TradingScheduler, "is_market_open")
         print("[OK] is_market_open method exists in TradingScheduler class")
     except Exception as e:
         print(f"[FAIL] is_market_open method check failed: {e}")
@@ -179,6 +192,7 @@ def test_nse_holiday_calendar():
 
     print("\n[SUCCESS] NSE holiday calendar test passed!")
     return True
+
 
 def test_audit_log_consistency():
     """Test that audit logs are written before database commits (R5-F-14)."""
@@ -204,7 +218,7 @@ def test_audit_log_consistency():
             status=OrderStatus.OPEN,
             timestamp=datetime.now(UTC),
             filled_quantity=0,
-            idempotency_key="audit_test_key"
+            idempotency_key="audit_test_key",
         )
 
         try:
@@ -236,16 +250,17 @@ def test_audit_log_consistency():
         # Clean up temp directory
         shutil.rmtree(temp_dir, ignore_errors=True)
 
+
 def test_dependencies_in_pyproject():
     """Test that required dependencies are in pyproject.toml (R5-F-22)."""
 
     pyproject_path = Path(__file__).parent / "pyproject.toml"
 
     try:
-        content = pyproject_path.read_text(encoding='utf-8')
+        content = pyproject_path.read_text(encoding="utf-8")
 
         # Check for required dependencies
-        required_deps = ['lxml>=', 'lxml-html-clean>=', 'cryptography>=']
+        required_deps = ["lxml>=", "lxml-html-clean>=", "cryptography>="]
         missing_deps = []
 
         for dep in required_deps:
@@ -262,6 +277,7 @@ def test_dependencies_in_pyproject():
     except Exception as e:
         print(f"[FAIL] Error checking pyproject.toml: {e}")
         return False
+
 
 if __name__ == "__main__":
     print("Testing Technical Debt Fixes")
@@ -285,13 +301,23 @@ if __name__ == "__main__":
 
     print("\n" + "=" * 50)
     print("TEST RESULTS:")
-    print(f"   Idempotency Key Test (R5-F-07): {'PASSED' if idempotency_result else 'FAILED'}")
-    print(f"   NSE Holiday Calendar (R5-F-08): {'PASSED' if holiday_result else 'FAILED'}")
-    print(f"   Audit Log Test (R5-F-14):        {'PASSED' if audit_result else 'FAILED'}")
-    print(f"   Dependencies Test (R5-F-22):     {'PASSED' if deps_result else 'FAILED'}")
+    print(
+        f"   Idempotency Key Test (R5-F-07): {'PASSED' if idempotency_result else 'FAILED'}"
+    )
+    print(
+        f"   NSE Holiday Calendar (R5-F-08): {'PASSED' if holiday_result else 'FAILED'}"
+    )
+    print(
+        f"   Audit Log Test (R5-F-14):        {'PASSED' if audit_result else 'FAILED'}"
+    )
+    print(
+        f"   Dependencies Test (R5-F-22):     {'PASSED' if deps_result else 'FAILED'}"
+    )
 
     if idempotency_result and holiday_result and audit_result and deps_result:
-        print("\nALL TESTS PASSED! All technical debt items have been successfully resolved.")
+        print(
+            "\nALL TESTS PASSED! All technical debt items have been successfully resolved."
+        )
         sys.exit(0)
     else:
         print("\nSOME TESTS FAILED! Please review the implementation.")

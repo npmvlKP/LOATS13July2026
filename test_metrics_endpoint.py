@@ -12,31 +12,33 @@ async def test_metrics_endpoint():
     try:
         # Check settings
         print(f"Settings metrics_port: {settings.metrics_port}")
-        
+
         # Initialize trading system (which should start metrics server)
         ts = TradingSystem()
-        
+
         # Initialize the system (this should start the metrics server)
         print("Initializing trading system...")
         await ts.initialize()
-        
+
         # Give the server time to start
         print("Waiting for metrics server to start...")
         await asyncio.sleep(2)
-        
+
         # Test the metrics endpoint
         print(f"Connecting to http://localhost:{settings.metrics_port}/")
         try:
             conn = HTTPConnection("localhost", settings.metrics_port)
             conn.request("GET", "/")
             response = conn.getresponse()
-            
+
             print(f"Response status: {response.status}")
             print(f"Response headers: {response.getheaders()}")
-            
+
             body = response.read()
-            print(f"Response body (first 500 chars): {body[:500].decode('utf-8', errors='ignore')}")
-            
+            print(
+                f"Response body (first 500 chars): {body[:500].decode('utf-8', errors='ignore')}"
+            )
+
             if response.status == 200:
                 print("[OK] Metrics endpoint is responding correctly!")
                 conn.close()
@@ -51,6 +53,7 @@ async def test_metrics_endpoint():
     except Exception as e:
         print(f"Test failed with exception: {e}")
         import traceback
+
         traceback.print_exc()
         return False
     finally:

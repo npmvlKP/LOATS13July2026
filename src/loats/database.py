@@ -404,8 +404,10 @@ class Database:
                 # Stale connection, close and remove
                 try:
                     thread_local_conn.close()
-                except Exception:
-                    pass  # Ignore errors during cleanup
+                except Exception as cleanup_error:
+                    logger.debug(
+                        f"Ignoring error closing stale connection: {cleanup_error}"
+                    )
                 del self._thread_local.connection
 
         # Slow path: open new connection with optimized settings
@@ -1779,6 +1781,7 @@ class Database:
         # Initialize async connection pool
         try:
             import aiosqlite
+
             from .utils.connection_pool import SimpleConnectionPool
 
             self._async_pool = SimpleConnectionPool(
