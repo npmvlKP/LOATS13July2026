@@ -21,6 +21,7 @@ from loats.models import (
     AuditLogEntry,
     FundsData,
     HistoricalData,
+    Order,
     Position,
     QuoteData,
     Signal,
@@ -603,6 +604,420 @@ class TestDatabaseAsyncAdditions:
                     entity_id="test_id_002",
                     user="test_user",
                 )
+
+    async def test_core_async_create_signal(self, temp_db):
+        """Test the core async signal creation method directly."""
+        if not AIOSQLITE_AVAILABLE:
+            pytest.skip("aiosqlite not available")
+
+        # Initialize async pool
+        await temp_db.async_initialize()
+
+        # Create test signal
+        signal = Signal(
+            signal_id="test_core_signal_001",
+            symbol="CORE",
+            signal_type="BUY",
+            strength=0.85,
+            timestamp=datetime.now(UTC),
+            indicators={"rsi": 25.0, "macd": 2.0},
+            confidence=0.95,
+            metadata={"scan_type": "core_test", "source": "test"},
+        )
+
+        # Test the core async method directly
+        result = await temp_db._async_create_signal(signal)
+        assert result is True
+
+        # Verify signal was created
+        signals = temp_db.get_latest_signals("CORE", limit=1)
+        assert len(signals) == 1
+        assert signals[0].signal_id == "test_core_signal_001"
+
+    async def test_core_async_store_historical_data(self, temp_db):
+        """Test the core async historical data storage method directly."""
+        if not AIOSQLITE_AVAILABLE:
+            pytest.skip("aiosqlite not available")
+
+        # Initialize async pool
+        await temp_db.async_initialize()
+
+        # Create test historical data
+        now = datetime.now(UTC)
+        historical_data = [
+            HistoricalData(
+                symbol="CORE",
+                timestamp=now - timedelta(minutes=2),
+                open=100.0,
+                high=106.0,
+                low=98.0,
+                close=105.0,
+                volume=15000,
+                interval="1d",
+            ),
+            HistoricalData(
+                symbol="CORE",
+                timestamp=now,
+                open=105.0,
+                high=110.0,
+                low=104.0,
+                close=109.0,
+                volume=18000,
+                interval="1d",
+            ),
+        ]
+
+        # Test the core async method directly
+        result = await temp_db._async_store_historical_data(historical_data)
+        assert result is True
+
+        # Verify data was stored
+        conn = temp_db._get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT COUNT(*) FROM historical_data WHERE symbol = ?", ("CORE",)
+        )
+        count = cursor.fetchone()[0]
+        conn.close()
+        assert count == 2
+
+    async def test_core_async_store_quote(self, temp_db):
+        """Test the core async quote storage method directly."""
+        if not AIOSQLITE_AVAILABLE:
+            pytest.skip("aiosqlite not available")
+
+        # Initialize async pool
+        await temp_db.async_initialize()
+
+        # Create test quote data
+        now = datetime.now(UTC)
+        quote = QuoteData(
+            symbol="CORE",
+            last_price=108.0,
+            open=105.0,
+            high=110.0,
+            low=104.5,
+            close=109.5,
+            volume=20000,
+            timestamp=now,
+            change=8.0,
+            change_percent=7.41,
+        )
+
+        # Test the core async method directly
+        result = await temp_db._async_store_quote(quote)
+        assert result is True
+
+        # Verify data was stored
+        conn = temp_db._get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM quotes WHERE symbol = ?", ("CORE",))
+        count = cursor.fetchone()[0]
+        conn.close()
+        assert count == 1
+
+    async def test_core_async_store_position(self, temp_db):
+        """Test the core async position storage method directly."""
+        if not AIOSQLITE_AVAILABLE:
+            pytest.skip("aiosqlite not available")
+
+        # Initialize async pool
+        await temp_db.async_initialize()
+
+        # Create test position
+        now = datetime.now(UTC)
+        position = Position(
+            symbol="CORE",
+            quantity=15,
+            average_price=105.0,
+            last_price=108.0,
+            pnl=45.0,
+            product_type="MIS",
+            buy_quantity=15,
+            sell_quantity=0,
+            timestamp=now,
+        )
+
+        # Test the core async method directly
+        result = await temp_db._async_store_position(position)
+        assert result is True
+
+        # Verify data was stored
+        conn = temp_db._get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM positions WHERE symbol = ?", ("CORE",))
+        count = cursor.fetchone()[0]
+        conn.close()
+        assert count == 1
+
+    async def test_core_async_store_funds(self, temp_db):
+        """Test the core async funds storage method directly."""
+        if not AIOSQLITE_AVAILABLE:
+            pytest.skip("aiosqlite not available")
+
+        # Initialize async pool
+        await temp_db.async_initialize()
+
+        # Create test funds data
+        now = datetime.now(UTC)
+        funds = FundsData(
+            available_cash=60000.0,
+            utilized_margin=25000.0,
+            available_margin=35000.0,
+            total_equity=85000.0,
+            timestamp=now,
+        )
+
+        # Test the core async method directly
+        result = await temp_db._async_store_funds(funds)
+        assert result is True
+
+        # Verify data was stored
+        conn = temp_db._get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM funds")
+        count = cursor.fetchone()[0]
+        conn.close()
+        assert count == 1
+
+    async def test_core_async_get_latest_signals(self, temp_db):
+        """Test the core async signal retrieval method directly."""
+        if not AIOSQLITE_AVAILABLE:
+            pytest.skip("aiosqlite not available")
+
+        # Initialize async pool
+        await temp_db.async_initialize()
+
+        # Create test signals using sync method
+        base_time = datetime.now(UTC)
+        signals = [
+            Signal(
+                signal_id=f"core_signal_{i:03d}",
+                symbol="CORE",
+                signal_type="BUY" if i % 2 == 0 else "SELL",
+                strength=0.75 + i * 0.03,
+                timestamp=base_time - timedelta(seconds=15 - i),
+                indicators={"rsi": 25.0 + i * 3, "macd": 1.2 + i * 0.3},
+                confidence=0.85 + i * 0.01,
+                metadata={"scan_type": "core_test", "source": "test"},
+            )
+            for i in range(4)
+        ]
+
+        # Store signals using sync method
+        for signal in signals:
+            temp_db.create_signal(signal)
+
+        # Test the core async method directly
+        retrieved_signals = await temp_db._async_get_latest_signals("CORE", limit=3)
+        assert len(retrieved_signals) == 3
+
+        # Verify the signals are the most recent ones
+        signal_ids = {signal.signal_id for signal in retrieved_signals}
+        assert "core_signal_003" in signal_ids
+        assert "core_signal_002" in signal_ids
+        assert "core_signal_001" in signal_ids
+
+    async def test_core_async_update_trade(self, temp_db):
+        """Test the core async trade update method directly."""
+        if not AIOSQLITE_AVAILABLE:
+            pytest.skip("aiosqlite not available")
+
+        # Initialize async pool
+        await temp_db.async_initialize()
+
+        # Create test trade using sync method
+        now = datetime.now(UTC)
+        trade = Trade(
+            trade_id="core_trade_001",
+            symbol="CORE",
+            quantity=20,
+            entry_price=105.0,
+            exit_price=None,
+            entry_time=now,
+            exit_time=None,
+            transaction_type="BUY",
+            product_type="MIS",
+            pnl=None,
+            status="OPEN",
+            strategy="core_strategy",
+        )
+
+        temp_db.create_trade(trade)
+
+        # Update trade
+        updated_trade = Trade(
+            trade_id="core_trade_001",
+            symbol="CORE",
+            quantity=20,
+            entry_price=105.0,
+            exit_price=110.0,
+            entry_time=now,
+            exit_time=now,
+            transaction_type="BUY",
+            product_type="MIS",
+            pnl=100.0,
+            status="COMPLETED",
+            strategy="core_strategy",
+        )
+
+        # Test the core async method directly
+        result = await temp_db._async_update_trade(updated_trade)
+        assert result is True
+
+        # Verify trade was updated
+        retrieved_trade = temp_db.get_trade("core_trade_001")
+        assert retrieved_trade is not None
+        assert retrieved_trade.status == "COMPLETED"
+        assert retrieved_trade.pnl == 100.0
+
+    async def test_core_async_update_order_status(self, temp_db):
+        """Test the core async order status update method directly."""
+        if not AIOSQLITE_AVAILABLE:
+            pytest.skip("aiosqlite not available")
+
+        # Initialize async pool
+        await temp_db.async_initialize()
+
+        # Create test order using sync method
+        now = datetime.now(UTC)
+        order = Order(
+            order_id="core_order_001",
+            symbol="CORE",
+            quantity=10,
+            order_type="LIMIT",
+            price=108.0,
+            trigger_price=None,
+            variety="regular",
+            transaction_type="BUY",
+            product_type="MIS",
+            status="OPEN",
+            timestamp=now,
+            filled_quantity=0,
+            average_price=108.0,  # Fixed: must be > 0
+            stop_loss=None,
+            take_profit=None,
+            trailing_stop_loss=None,
+            idempotency_key="core_test_key_001",
+        )
+
+        temp_db.store_order(order)
+
+        # Test the core async method directly
+        result = await temp_db._async_update_order_status("core_order_001", "COMPLETED")
+        assert result is True
+
+        # Verify order status was updated
+        updated_order = temp_db.get_order("core_order_001")
+        assert updated_order is not None
+        assert updated_order.status == "COMPLETED"
+
+    async def test_core_async_get_trade(self, temp_db):
+        """Test the core async trade retrieval method directly."""
+        if not AIOSQLITE_AVAILABLE:
+            pytest.skip("aiosqlite not available")
+
+        # Initialize async pool
+        await temp_db.async_initialize()
+
+        # Create test trade using sync method
+        now = datetime.now(UTC)
+        trade = Trade(
+            trade_id="core_trade_002",
+            symbol="CORE",
+            quantity=15,
+            entry_price=108.0,
+            exit_price=None,
+            entry_time=now,
+            exit_time=None,
+            transaction_type="BUY",
+            product_type="MIS",
+            pnl=None,
+            status="OPEN",
+            strategy="core_strategy",
+        )
+
+        temp_db.create_trade(trade)
+
+        # Test the core async method directly
+        retrieved_trade = await temp_db.async_get_trade("core_trade_002")
+        assert retrieved_trade is not None
+        assert retrieved_trade.trade_id == "core_trade_002"
+        assert retrieved_trade.symbol == "CORE"
+
+        # Test retrieval of nonexistent trade
+        nonexistent_trade = await temp_db.async_get_trade("nonexistent_core_trade")
+        assert nonexistent_trade is None
+
+    async def test_core_async_log_audit(self, temp_db):
+        """Test the core async audit logging method directly."""
+        if not AIOSQLITE_AVAILABLE:
+            pytest.skip("aiosqlite not available")
+
+        # Initialize async pool
+        await temp_db.async_initialize()
+
+        # Test the core async audit logging method directly
+        await temp_db._async_log_audit(
+            action="CORE_TEST",
+            entity_type="core_entity",
+            entity_id="core_id_001",
+            user="core_user",
+            metadata={"core_key": "core_value"},
+            previous_state={"old_core": "state"},
+            new_state={"new_core": "state"},
+        )
+
+        # Verify audit log was created
+        assert temp_db.audit_log_path.exists()
+        with temp_db.audit_log_path.open("r", encoding="utf-8") as f:
+            lines = f.readlines()
+            assert len(lines) >= 1
+
+        # Verify audit entry was stored in database
+        conn = temp_db._get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT COUNT(*) FROM audit_log WHERE entity_id = ?", ("core_id_001",)
+        )
+        count = cursor.fetchone()[0]
+        conn.close()
+        assert count == 1
+
+    async def test_pool_lifecycle_and_cleanup(self, temp_db):
+        """Test proper pool lifecycle management and cleanup."""
+        if not AIOSQLITE_AVAILABLE:
+            pytest.skip("aiosqlite not available")
+
+        # Initialize async pool
+        await temp_db.async_initialize()
+
+        # Verify pool was created
+        assert hasattr(temp_db, "_async_pool")
+        assert temp_db._async_pool is not None
+
+        # Create some test data to ensure connections are used
+        signal = Signal(
+            signal_id="pool_test_signal",
+            symbol="POOL",
+            signal_type="BUY",
+            strength=0.8,
+            timestamp=datetime.now(UTC),
+            indicators={"rsi": 30.0},
+            confidence=0.9,
+        )
+
+        result = await temp_db.async_create_signal(signal)
+        assert result is True
+
+        # Test proper cleanup
+        await temp_db.async_close_all()
+
+        # Verify pool was closed
+        assert temp_db._async_pool is None
+
+        # Verify no warnings about event loop being closed
+        # (This would be caught by pytest warnings if it occurred)
 
 
 if __name__ == "__main__":

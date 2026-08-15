@@ -68,8 +68,39 @@ class SimpleConnectionPool:
         async with self._lock:
             self._pool.append(conn)
 
+    async def close(self) -> None:
+        """
+        Close the connection pool and wait for all connections to be returned.
+        This method should be called during application shutdown to ensure
+        proper cleanup of all database connections.
+        """
+        # First, wait for all connections to be returned to the pool
+        # by checking if the pool size matches the total connections created
+        max_wait_time = 30.0  # 30 seconds timeout
+        wait_interval = 0.1   # 100ms between checks
+        elapsed_time = 0.0
+
+        while elapsed_time < max_wait_time:
+            async with self._lock:
+                if len(self._pool) == self._connections_created:
+                    break  # All connections are back in the pool
+
+            await asyncio.sleep(wait_interval)
+            elapsed_time += wait_interval
+
+        # Close all connections in the pool
+        async with self._lock:
+            while self._pool:
+                conn = self._pool.popleft()
+                try:
+                    await conn.close()
+                except Exception as e:
+                    logger.warning(f"Error closing connection: {e}")
+            self._connections_created = 0
+            logger.info("Async database connection pool closed properly")
+
     async def close_all(self) -> None:
-        """Close all connections in the pool."""
+        """Close all connections in the pool (immediate, may lose active connections)."""
         async with self._lock:
             while self._pool:
                 conn = self._pool.popleft()
