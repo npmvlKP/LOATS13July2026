@@ -255,16 +255,20 @@ class TestGlobalRateLimiters:
         """Test getting order rate limiter."""
         limiter = get_order_rate_limiter()
         assert isinstance(limiter, AsyncRateLimiter)
-        # Order rate limiter uses max_ops=50 for order operations
-        assert limiter.max_ops == 50
+        # Order rate limiter uses max_ops from settings
+        from loats.config import get_settings
+        settings = get_settings()
+        assert limiter.max_ops == settings.max_ops
         assert limiter.window_size == 1.0
 
     def test_get_smart_order_rate_limiter(self) -> None:
         """Test getting smart order rate limiter."""
         limiter = get_smart_order_rate_limiter()
         assert isinstance(limiter, AsyncRateLimiter)
-        # Smart order rate limiter uses max_ops=50 (configured in rate_limiter.py)
-        assert limiter.max_ops == 50
+        # Smart order rate limiter uses max_ops from settings
+        from loats.config import get_settings
+        settings = get_settings()
+        assert limiter.max_ops == settings.max_ops
         assert limiter.window_size == 1.0
 
     def test_rate_limiter_singleton_behavior(self) -> None:
@@ -282,11 +286,13 @@ class TestGlobalRateLimiters:
         # Order and smart order limiters should be different instances (different singletons)
         assert limiter1 is not smart_limiter1
 
-        # All should have default max_ops=50
-        assert limiter1.max_ops == 50
-        assert limiter2.max_ops == 50
-        assert smart_limiter1.max_ops == 50
-        assert smart_limiter2.max_ops == 50
+        # All should have default max_ops from settings
+        from loats.config import get_settings
+        settings = get_settings()
+        assert limiter1.max_ops == settings.max_ops
+        assert limiter2.max_ops == settings.max_ops
+        assert smart_limiter1.max_ops == settings.max_ops
+        assert smart_limiter2.max_ops == settings.max_ops
 
 
 class TestRateLimiterConcurrency:
@@ -519,10 +525,13 @@ class TestRateLimiterConcurrencyBurst:
                     failed.append(error)
 
         # Assertions for rate limiting behavior
+        from loats.config import get_settings
+        settings = get_settings()
+        expected_successful = settings.max_ops
         assert (
-            len(successful) == 50
-        ), f"Expected exactly 50 successful calls, got {len(successful)}"
-        assert len(failed) == 50, f"Expected exactly 50 failed calls, got {len(failed)}"
+            len(successful) == expected_successful
+        ), f"Expected exactly {expected_successful} successful calls, got {len(successful)}"
+        assert len(failed) == num_calls - expected_successful, f"Expected exactly {num_calls - expected_successful} failed calls, got {len(failed)}"
 
         # Verify all failures are RateLimitExceededError
         for failure in failed:

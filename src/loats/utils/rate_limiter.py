@@ -357,7 +357,7 @@ def get_order_rate_limiter(
 ) -> AsyncRateLimiter:
     """Return a shared ``AsyncRateLimiter`` for order‑rate limiting.
 
-    * No ``max_ops`` → return the *process‑wide* default singleton (50 ops/sec).
+    * No ``max_ops`` → return the *process‑wide* default singleton (from settings.max_ops).
     * ``max_ops`` supplied → return a stable instance cached per ``(max_ops,
       window_size)`` pair.
     """
@@ -367,7 +367,7 @@ def get_order_rate_limiter(
             global _order_rate_limiter_instance
             if _order_rate_limiter_instance is None:
                 _order_rate_limiter_instance = AsyncRateLimiter(
-                    max_ops=50, window_size=window_size
+                    max_ops=None, window_size=window_size
                 )
             return _order_rate_limiter_instance
 
@@ -399,7 +399,7 @@ def get_smart_order_rate_limiter(
             global _smart_order_rate_limiter_instance
             if _smart_order_rate_limiter_instance is None:
                 _smart_order_rate_limiter_instance = AsyncRateLimiter(
-                    max_ops=50, window_size=window_size
+                    max_ops=None, window_size=window_size
                 )
             return _smart_order_rate_limiter_instance
 
@@ -422,7 +422,7 @@ def get_sync_order_rate_limiter(
 ) -> SyncRateLimiter:
     """Return a shared ``SyncRateLimiter`` for synchronous order‑rate limiting.
 
-    * No ``max_ops`` → return the *process‑wide* default singleton (50 ops/sec).
+    * No ``max_ops`` → return the *process‑wide* default singleton (from settings.max_ops).
     * ``max_ops`` supplied → return a stable instance cached per ``(max_ops,
       window_size)`` pair.
     """
@@ -432,7 +432,7 @@ def get_sync_order_rate_limiter(
             global _sync_order_rate_limiter
             if _sync_order_rate_limiter is None:
                 _sync_order_rate_limiter = SyncRateLimiter(
-                    max_ops=50, window_size=window_size
+                    max_ops=None, window_size=window_size
                 )
             return _sync_order_rate_limiter
 
@@ -464,7 +464,7 @@ def get_sync_smart_order_rate_limiter(
             global _sync_smart_order_rate_limiter
             if _sync_smart_order_rate_limiter is None:
                 _sync_smart_order_rate_limiter = SyncRateLimiter(
-                    max_ops=50, window_size=window_size
+                    max_ops=None, window_size=window_size
                 )
             return _sync_smart_order_rate_limiter
 

@@ -89,8 +89,10 @@ class TestRateLimiterFactoryRegression:
         # Get the rate limiter through the factory
         limiter = get_smart_order_rate_limiter()
 
-        # Verify it's the singleton with expected max_ops
-        assert limiter.max_ops == 50
+        # Verify it's the singleton with expected max_ops (from settings)
+        from loats.config import get_settings
+        settings = get_settings()
+        assert limiter.max_ops == settings.max_ops
         assert limiter.window_size == 1.0
 
         # Test the factory pattern with a burst of calls
