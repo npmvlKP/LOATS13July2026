@@ -1,7 +1,9 @@
-import pytest
 from unittest.mock import AsyncMock, patch
+
+import pytest
+
 from loats.alerts import AlertSystem
-from loats.models import Order, OrderType, OrderStatus, TransactionType
+from loats.models import Order, OrderStatus, OrderType, TransactionType
 
 
 @pytest.mark.asyncio

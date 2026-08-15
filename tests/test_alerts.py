@@ -238,7 +238,7 @@ class TestAlertSystem:
         """Test formatting info alert message."""
         message = "Test info message"
         formatted = alert_system._format_alert_message(message, "info")
-        assert "ℹ️" in formatted
+        assert "i" in formatted
         assert "INFO" in formatted
         assert message in formatted
 

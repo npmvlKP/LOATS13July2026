@@ -25,8 +25,8 @@ from loats.models import (
     Signal,
     SignalType,
 )
-from loats.orchestrator import TradingOrchestrator, get_cycle_stats
 from loats.openalgo import KillSwitchError
+from loats.orchestrator import TradingOrchestrator, get_cycle_stats
 
 
 @pytest.fixture

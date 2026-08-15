@@ -149,7 +149,7 @@ class StrikeSelectionEngine:
                 else:
                     best_idx = left
 
-        # Edge cases: price below all strikes or above all strikes – return only nearest strike
+        # Edge cases: price below all strikes or above all strikes - return only nearest strike
         if right == -1 or left >= len(strikes):
             return [strikes[best_idx]][:max_strikes]
 

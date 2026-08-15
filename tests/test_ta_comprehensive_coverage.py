@@ -5,7 +5,7 @@ and edge cases.
 """
 
 from datetime import UTC, datetime, timedelta
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pandas as pd
@@ -13,17 +13,17 @@ import pytest
 
 from loats.models import HistoricalData, TAIndicator
 from loats.ta import (
+    NJIT_SUPPORTS_CACHE,
+    NJIT_SUPPORTS_FASTMATH,
+    NUMBA_AVAILABLE,
     TechnicalAnalysis,
+    _supertrend_njit_decorator,
     calculate_atr,
     calculate_cmf,
     calculate_macd,
     calculate_rsi,
     calculate_supertrend,
     calculate_vwap,
-    NUMBA_AVAILABLE,
-    NJIT_SUPPORTS_CACHE,
-    NJIT_SUPPORTS_FASTMATH,
-    _supertrend_njit_decorator,
 )
 
 

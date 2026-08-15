@@ -205,8 +205,8 @@ def reset_rate_limiters_before_each_test() -> None:
     """Reset rate limiter singletons before each test to ensure isolation."""
     from loats.utils.rate_limiter import (
         _order_rate_limiter_instance,
-        _smart_order_rate_limiter_instance,
         _rate_limiter_lock,
+        _smart_order_rate_limiter_instance,
         _smart_rate_limiter_lock,
     )
 

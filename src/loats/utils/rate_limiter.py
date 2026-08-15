@@ -39,14 +39,14 @@ class RateLimiter:
             self.window_size = interval
         # Keep 'interval' attribute for backward compatibility with tests
         self.interval: float = self.window_size
-        # Initialize sliding‑window state
+        # Initialize sliding-window state
         self.timestamps: deque[float] = deque()
         self.lock: asyncio.Lock = asyncio.Lock()
 
     async def acquire(self) -> bool:
         """Acquire token for operation.
 
-        Implements sliding‑window rate limiting. Expired timestamps are removed
+        Implements sliding-window rate limiting. Expired timestamps are removed
         before checking the current token count so that a burst of calls within
         the configured window correctly exhaust the limit. This matches the
         expectations of the test suite where 50 rapid ``acquire`` calls should
@@ -315,9 +315,9 @@ class RateLimitExceededError(Exception):
         super().__init__(self.message)
 
 
-# Singleton infrastructure – recreated after accidental removal.
-# Two independent locks protect the default singleton and the custom‑parameter
-# cache. They are lightweight and guarantee thread‑safe lazy initialisation.
+# Singleton infrastructure - recreated after accidental removal.
+# Two independent locks protect the default singleton and the custom-parameter
+# cache. They are lightweight and guarantee thread-safe lazy initialisation.
 _default_lock = threading.Lock()
 _custom_lock = threading.Lock()
 
@@ -337,12 +337,12 @@ _custom_smart_order_rate_limiters: dict[tuple[int, float], AsyncRateLimiter] = {
 _sync_custom_order_rate_limiters: dict[tuple[int, float], SyncRateLimiter] = {}
 _sync_custom_smart_order_rate_limiters: dict[tuple[int, float], SyncRateLimiter] = {}
 
-# Backward‑compatible names expected by existing test suite and modules.
+# Backward-compatible names expected by existing test suite and modules.
 # These aliases act as the true singleton storage accessed by the test fixtures.
 # They are distinct from the internal "default" variables used elsewhere.
 _order_rate_limiter_instance: AsyncRateLimiter | None = None
 _smart_order_rate_limiter_instance: AsyncRateLimiter | None = None
-# Separate locks guard each singleton to avoid cross‑contamination.
+# Separate locks guard each singleton to avoid cross-contamination.
 _rate_limiter_lock = _default_lock
 _smart_rate_limiter_lock = threading.Lock()
 
@@ -351,18 +351,18 @@ _sync_rate_limiter_lock = threading.Lock()
 _sync_smart_rate_limiter_lock = threading.Lock()
 
 
-# Public factory functions – used throughout the codebase and tests.
+# Public factory functions - used throughout the codebase and tests.
 def get_order_rate_limiter(
     max_ops: int | None = None, window_size: float = 1.0
 ) -> AsyncRateLimiter:
-    """Return a shared ``AsyncRateLimiter`` for order‑rate limiting.
+    """Return a shared ``AsyncRateLimiter`` for order-rate limiting.
 
-    * No ``max_ops`` → return the *process‑wide* default singleton (from settings.max_ops).
+    * No ``max_ops`` -> return the *process-wide* default singleton (from settings.max_ops).
     * ``max_ops`` supplied → return a stable instance cached per ``(max_ops,
       window_size)`` pair.
     """
     if max_ops is None:
-        # Default singleton – use backward‑compatible alias and its lock
+        # Default singleton - use backward-compatible alias and its lock
         with _rate_limiter_lock:
             global _order_rate_limiter_instance
             if _order_rate_limiter_instance is None:
@@ -376,7 +376,7 @@ def get_order_rate_limiter(
         if _order_rate_limiter_instance is not None:
             return _order_rate_limiter_instance
 
-    # Custom parameters – use cache keyed by (max_ops, window_size)
+    # Custom parameters - use cache keyed by (max_ops, window_size)
     key = (max_ops, window_size)
     with _custom_lock:
         if key not in _custom_order_rate_limiters:
@@ -389,12 +389,12 @@ def get_order_rate_limiter(
 def get_smart_order_rate_limiter(
     max_ops: int | None = None, window_size: float = 1.0
 ) -> AsyncRateLimiter:
-    """Return a shared ``AsyncRateLimiter`` for smart‑order limiting.
+    """Return a shared ``AsyncRateLimiter`` for smart-order limiting.
 
     Mirrors :func:`get_order_rate_limiter` but uses a distinct default singleton.
     """
     if max_ops is None:
-        # Default singleton – use backward‑compatible alias and its lock
+        # Default singleton - use backward-compatible alias and its lock
         with _smart_rate_limiter_lock:
             global _smart_order_rate_limiter_instance
             if _smart_order_rate_limiter_instance is None:
@@ -420,14 +420,14 @@ def get_smart_order_rate_limiter(
 def get_sync_order_rate_limiter(
     max_ops: int | None = None, window_size: float = 1.0
 ) -> SyncRateLimiter:
-    """Return a shared ``SyncRateLimiter`` for synchronous order‑rate limiting.
+    """Return a shared ``SyncRateLimiter`` for synchronous order-rate limiting.
 
-    * No ``max_ops`` → return the *process‑wide* default singleton (from settings.max_ops).
+    * No ``max_ops`` -> return the *process-wide* default singleton (from settings.max_ops).
     * ``max_ops`` supplied → return a stable instance cached per ``(max_ops,
       window_size)`` pair.
     """
     if max_ops is None:
-        # Default singleton – use synchronous lock
+        # Default singleton - use synchronous lock
         with _sync_rate_limiter_lock:
             global _sync_order_rate_limiter
             if _sync_order_rate_limiter is None:
@@ -441,7 +441,8 @@ def get_sync_order_rate_limiter(
         if _sync_order_rate_limiter is not None:
             return _sync_order_rate_limiter
 
-    # Custom parameters – use cache keyed by (max_ops, window_size)
+    # Custom parameters - use cache keyed by (max_ops, window_size)
+    # Custom parameters - use cache keyed by (max_ops, window_size)
     key = (max_ops, window_size)
     with _custom_lock:
         if key not in _sync_custom_order_rate_limiters:
@@ -454,12 +455,12 @@ def get_sync_order_rate_limiter(
 def get_sync_smart_order_rate_limiter(
     max_ops: int | None = None, window_size: float = 1.0
 ) -> SyncRateLimiter:
-    """Return a shared ``SyncRateLimiter`` for synchronous smart‑order limiting.
+    """Return a shared ``SyncRateLimiter`` for synchronous smart-order limiting.
 
     Mirrors :func:`get_sync_order_rate_limiter` but uses a distinct default singleton.
     """
     if max_ops is None:
-        # Default singleton – use synchronous lock
+        # Default singleton - use synchronous lock
         with _sync_smart_rate_limiter_lock:
             global _sync_smart_order_rate_limiter
             if _sync_smart_order_rate_limiter is None:
@@ -489,7 +490,7 @@ def _reset_singletons_for_testing() -> None:
     """Reset all singleton instances.
 
     Used by the test suite to guarantee a clean environment between tests.
-    Clears both the backward‑compatible alias singletons and the internal default
+    Clears both the backward-compatible alias singletons and the internal default
     singletons. Locks remain unchanged.
     """
     global _order_rate_limiter_instance, _smart_order_rate_limiter_instance
@@ -505,7 +506,7 @@ def _reset_singletons_for_testing() -> None:
     _sync_order_rate_limiter = None
     _sync_smart_order_rate_limiter = None
 
-    # Also clear custom caches to avoid cross‑test contamination.
+    # Also clear custom caches to avoid cross-test contamination.
     _custom_order_rate_limiters.clear()
     _custom_smart_order_rate_limiters.clear()
     _sync_custom_order_rate_limiters.clear()

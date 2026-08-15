@@ -257,6 +257,7 @@ class TestGlobalRateLimiters:
         assert isinstance(limiter, AsyncRateLimiter)
         # Order rate limiter uses max_ops from settings
         from loats.config import get_settings
+
         settings = get_settings()
         assert limiter.max_ops == settings.max_ops
         assert limiter.window_size == 1.0
@@ -267,6 +268,7 @@ class TestGlobalRateLimiters:
         assert isinstance(limiter, AsyncRateLimiter)
         # Smart order rate limiter uses max_ops from settings
         from loats.config import get_settings
+
         settings = get_settings()
         assert limiter.max_ops == settings.max_ops
         assert limiter.window_size == 1.0
@@ -288,6 +290,7 @@ class TestGlobalRateLimiters:
 
         # All should have default max_ops from settings
         from loats.config import get_settings
+
         settings = get_settings()
         assert limiter1.max_ops == settings.max_ops
         assert limiter2.max_ops == settings.max_ops
@@ -472,13 +475,12 @@ class TestRateLimiterConcurrencyBurst:
 
         This test addresses R5-F-01 / F-CONC-3-R - production blocker for order paths.
         """
+        # Reset singleton to ensure clean test
         from loats.utils.rate_limiter import (
             RateLimitExceededError,
+            _reset_singletons_for_testing,
             get_order_rate_limiter,
         )
-
-        # Reset singleton to ensure clean test
-        from loats.utils.rate_limiter import _reset_singletons_for_testing
 
         _reset_singletons_for_testing()
 
@@ -493,9 +495,9 @@ class TestRateLimiterConcurrencyBurst:
             limiter = get_order_rate_limiter()
 
             # Verify we're using the same singleton instance
-            assert (
-                limiter is limiter1
-            ), f"Call {call_id} must use same singleton instance"
+            assert limiter is limiter1, (
+                f"Call {call_id} must use same singleton instance"
+            )
 
             try:
                 acquired = await limiter.acquire()
@@ -526,18 +528,21 @@ class TestRateLimiterConcurrencyBurst:
 
         # Assertions for rate limiting behavior
         from loats.config import get_settings
+
         settings = get_settings()
         expected_successful = settings.max_ops
-        assert (
-            len(successful) == expected_successful
-        ), f"Expected exactly {expected_successful} successful calls, got {len(successful)}"
-        assert len(failed) == num_calls - expected_successful, f"Expected exactly {num_calls - expected_successful} failed calls, got {len(failed)}"
+        assert len(successful) == expected_successful, (
+            f"Expected exactly {expected_successful} successful calls, got {len(successful)}"
+        )
+        assert len(failed) == num_calls - expected_successful, (
+            f"Expected exactly {num_calls - expected_successful} failed calls, got {len(failed)}"
+        )
 
         # Verify all failures are RateLimitExceededError
         for failure in failed:
-            assert isinstance(
-                failure, RateLimitExceededError
-            ), f"All failures must be RateLimitExceededError, got {type(failure)}"
+            assert isinstance(failure, RateLimitExceededError), (
+                f"All failures must be RateLimitExceededError, got {type(failure)}"
+            )
 
         # Verify singleton is still the same instance after burst
         limiter3 = get_order_rate_limiter()
@@ -575,9 +580,9 @@ class TestRateLimiterConcurrencyBurst:
         results = await asyncio.gather(*tasks)
 
         # All tasks must have received the same singleton instance
-        assert all(
-            results
-        ), "All concurrent accesses must return same singleton instance"
+        assert all(results), (
+            "All concurrent accesses must return same singleton instance"
+        )
 
         # Final verification
         final_instance = get_order_rate_limiter()

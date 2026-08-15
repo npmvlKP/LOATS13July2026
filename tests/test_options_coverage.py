@@ -3,11 +3,11 @@ Comprehensive test suite for options module coverage improvement.
 This test suite targets specific lines that are missing coverage in options.py.
 """
 
-import pytest
-from datetime import datetime, UTC
-from unittest.mock import patch, MagicMock
+from datetime import UTC, datetime
+from unittest.mock import MagicMock, patch
 
 import numpy as np
+import pytest
 from scipy.optimize import brentq, newton
 
 from loats.models import Greeks, OptionContract, OptionType
@@ -15,12 +15,12 @@ from loats.options import (
     ExpiredContractError,
     OptionsAnalysis,
     OptionsEngine,
+    analysis,
     calculate_greeks,
+    calculate_historical_var,
     calculate_implied_volatility,
     calculate_var,
-    calculate_historical_var,
     options,
-    analysis,
 )
 
 
