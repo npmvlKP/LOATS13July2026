@@ -4,12 +4,13 @@ This test suite targets specific lines that are missing coverage in scheduler.py
 """
 
 import asyncio
-import pytest
+from datetime import UTC, datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
-from datetime import datetime, timezone, UTC
 
-from loats.scheduler import TradingScheduler, scheduler
+import pytest
+
 from loats.models import Signal, SignalType
+from loats.scheduler import TradingScheduler, scheduler
 
 
 class TestSchedulerCoverage:

@@ -263,7 +263,7 @@ class AlertSystem:
         elif alert_type == "success":
             return f"✅ <b>SUCCESS</b> [{timestamp}]\n\n{message}"
         else:
-            return f"ℹ️ <b>INFO</b> [{timestamp}]\n\n{message}"
+            return f"i <b>INFO</b> [{timestamp}]\n\n{message}"
 
     async def send_signal_alert(self, signal: Signal) -> bool:
         """Send alert trading signal."""
@@ -407,8 +407,8 @@ class AlertSystem:
                 "warning": "⚠️ SYSTEM WARNING",
                 "error": "🚨 SYSTEM ERROR",
                 "success": "✅ SYSTEM UPDATE",
-                "info": "ℹ️ SYSTEM INFO",
-            }.get(alert_type, "ℹ️ SYSTEM ALERT")
+                "info": "i SYSTEM INFO",
+            }.get(alert_type, "i SYSTEM ALERT")
             full_message = f"{header}\n\n{message}"
             return await self.send_alert(full_message, alert_type)
         except Exception as e:
@@ -694,7 +694,7 @@ class AlertSystem:
 
             if not self.kill_switch_active:
                 if update.message:
-                    await update.message.reply_text("ℹ️ Kill switch not active.")
+                    await update.message.reply_text("i Kill switch not active.")
                 return
 
             reason = (
@@ -735,7 +735,7 @@ class AlertSystem:
             orders_data = await self._safe_get_all_orders()
             if not orders_data or not orders_data.get("data"):
                 if update.message:
-                    await update.message.reply_text("ℹ️ No open orders found.")
+                    await update.message.reply_text("i No open orders found.")
                 return
 
             orders = orders_data["data"]
@@ -779,7 +779,7 @@ class AlertSystem:
 
             if not signals:
                 if update.message:
-                    await update.message.reply_text("ℹ️ No recent signals found.")
+                    await update.message.reply_text("i No recent signals found.")
                 return
 
             message = "📈 <b>RECENT SIGNALS</b>\n\n"
@@ -790,7 +790,7 @@ class AlertSystem:
                     SignalType.SELL: "🔴",
                     SignalType.HOLD: "⚪",
                     SignalType.NEUTRAL: "⚪",
-                }.get(signal.signal_type, "ℹ️")
+                }.get(signal.signal_type, "i")
 
                 message += (
                     f"{emoji} <b>{signal.signal_type.value}</b> (Strength: {signal.strength:.2f})\n"
@@ -837,7 +837,7 @@ class AlertSystem:
                 else:
                     if update.message:
                         await update.message.reply_text(
-                            "ℹ️ Didn't understand that. Type /help to see available commands."
+                            "i Didn't understand that. Type /help to see available commands."
                         )
         except Exception as e:
             logger.error(f"Error handling message: {e}")

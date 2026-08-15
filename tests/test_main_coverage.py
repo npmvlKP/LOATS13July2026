@@ -99,7 +99,9 @@ async def test_trading_system_start_success(trading_system):
 @pytest.mark.asyncio
 async def test_trading_system_start_exception(trading_system):
     """Test start exception handling (lines 64-66)."""
-    with (patch("loats.main.alerts.start", side_effect=Exception("Start error")),):
+    with (
+        patch("loats.main.alerts.start", side_effect=Exception("Start error")),
+    ):
         with pytest.raises(Exception, match="Start error"):
             await trading_system.start()
         assert trading_system.running is False

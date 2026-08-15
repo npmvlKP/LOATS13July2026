@@ -6,9 +6,9 @@ This script enforces the policy defined in CONTRIBUTING.md that prohibits
 commit messages from claiming deployment readiness.
 """
 
-import sys
-import os
 import codecs
+import os
+import sys
 
 
 def main():

@@ -4,11 +4,12 @@ This test file serves as a template for adding tests to boost coverage.
 """
 
 import pytest
-from loats.ta import TechnicalAnalysis
+
+from loats.alerts import AlertSystem
 from loats.metrics import MetricsManager
 from loats.options import OptionsEngine
 from loats.scheduler import TradingScheduler
-from loats.alerts import AlertSystem
+from loats.ta import TechnicalAnalysis
 
 
 def test_technical_analysis_initialization():
@@ -39,7 +40,6 @@ def test_alert_system_initialization():
     """Test basic AlertSystem initialization."""
     alert_system = AlertSystem()
     assert alert_system is not None
-
 
 
 if __name__ == "__main__":

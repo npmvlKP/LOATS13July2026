@@ -29,7 +29,8 @@ def check_file_function_size(file_path: Path, max_lines: int) -> list[str]:
                 func_size = end - start + 1
                 if func_size > max_lines:
                     violations.append(
-                        f"{file_path}:{start} Function {node.name} too large ({func_size} lines)"
+                        f"{file_path}:{start} Function {node.name} too large "
+                        f"({func_size} lines)"
                     )
     except Exception as e:
         print(f"Error processing {file_path}: {e}")

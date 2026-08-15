@@ -52,12 +52,12 @@ def test_final_logging_verification():
             if isinstance(handler, logging.StreamHandler)
         ]
 
-        assert (
-            len(file_handlers) == 0
-        ), "No file handlers should be configured in test mode"
-        assert (
-            len(console_handlers) > 0
-        ), "Console handler should be configured in test mode"
+        assert len(file_handlers) == 0, (
+            "No file handlers should be configured in test mode"
+        )
+        assert len(console_handlers) > 0, (
+            "Console handler should be configured in test mode"
+        )
 
     print("Test mode configuration verified")
 
@@ -94,12 +94,12 @@ def test_final_logging_verification():
             if isinstance(handler, logging.StreamHandler)
         ]
 
-        assert (
-            len(file_handlers) > 0
-        ), "File handler should be configured in production mode"
-        assert (
-            len(console_handlers) > 0
-        ), "Console handler should be configured in production mode"
+        assert len(file_handlers) > 0, (
+            "File handler should be configured in production mode"
+        )
+        assert len(console_handlers) > 0, (
+            "Console handler should be configured in production mode"
+        )
 
     print("Production mode configuration verified")
 
@@ -131,9 +131,9 @@ def test_final_logging_verification():
             if isinstance(handler, logging.FileHandler)
         ]
 
-        assert (
-            len(file_handlers) == 0
-        ), "No file handlers should be configured when ENVIRONMENT=test"
+        assert len(file_handlers) == 0, (
+            "No file handlers should be configured when ENVIRONMENT=test"
+        )
 
     print("Environment-based configuration verified")
 

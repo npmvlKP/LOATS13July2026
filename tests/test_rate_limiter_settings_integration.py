@@ -13,16 +13,18 @@ limit of 3 operations per second, violating compliance requirements.
 """
 
 import asyncio
+
 import pytest
 
 from loats.config import get_settings
 from loats.utils.rate_limiter import (
+    _reset_singletons_for_testing,
     get_order_rate_limiter,
     get_smart_order_rate_limiter,
     get_sync_order_rate_limiter,
     get_sync_smart_order_rate_limiter,
-    _reset_singletons_for_testing,
 )
+
 
 class TestRateLimiterSettingsIntegration:
     """Test that rate limiter factories respect settings.max_ops."""
@@ -155,7 +157,9 @@ class TestRateLimiterSettingsIntegration:
             # Verify that all subsequent calls are also rejected
             for _ in range(5):
                 result = await limiter.acquire()
-                assert not result, "All calls should be rejected when rate limiter is full"
+                assert not result, (
+                    "All calls should be rejected when rate limiter is full"
+                )
         else:
             # We got some successful acquires - verify we didn't exceed the limit
             assert successful_acquires >= 1, (
@@ -233,6 +237,7 @@ class TestRateLimiterSettingsIntegration:
             f"settings.max_ops should be {expected_max_ops} for CMP compliance, "
             f"got {settings.max_ops}"
         )
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
