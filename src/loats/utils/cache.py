@@ -51,7 +51,7 @@ class CacheManager:
         self.config = config
         self._cache: TTLCache[str, Any] | None = None
         self._cache_lock = threading.RLock()  # FIX-F-THREAD-1: Use threading.RLock for thread safety
-        self._init_lock = asyncio.Lock()  # Async lock for initialization
+        self._init_lock = threading.RLock()  # FIX-F-THREAD-8: Use threading.RLock instead of asyncio.Lock for thread safety
         self._cache_stats = {
             "hits": 0,
             "misses": 0,
@@ -128,7 +128,7 @@ class CacheManager:
         logger.debug(f"DEBUG SET: Initial check - _initialized={self._initialized}")
         if not self._initialized:
             logger.debug("DEBUG SET: Cache not initialized, initializing...")
-            async with self._init_lock:
+            with self._init_lock:
                 if not self._initialized:
                     await self.initialize()
             logger.debug(
@@ -142,7 +142,7 @@ class CacheManager:
             logger.error(
                 f"Cache not properly initialized: _cache={self._cache}, _initialized={self._initialized}"
             )
-            async with self._init_lock:
+            with self._init_lock:
                 if self._cache is None:
                     await self.initialize()
 
