@@ -3,8 +3,10 @@
 
 import asyncio
 import time
-from src.loats.strike_selection import StrikeSelectionEngine
+
 from src.loats.models import OptionContract, OptionType
+from src.loats.strike_selection import StrikeSelectionEngine
+
 
 async def test_cache_eviction():
     """Test that cache eviction works with TTLCache."""
@@ -18,7 +20,7 @@ async def test_cache_eviction():
             option_type=OptionType.CALL,
             expiry_date="2024-08-24",
             open_interest=1000,
-            delta=0.5
+            delta=0.5,
         ),
         OptionContract(
             symbol="NIFTY24AUG18000PE",
@@ -26,8 +28,8 @@ async def test_cache_eviction():
             option_type=OptionType.PUT,
             expiry_date="2024-08-24",
             open_interest=1000,
-            delta=-0.5
-        )
+            delta=-0.5,
+        ),
     ]
 
     # Test 1: Cache should work normally
@@ -66,6 +68,7 @@ async def test_cache_eviction():
     print("Cache cleared successfully")
 
     print("✅ All cache eviction tests passed!")
+
 
 if __name__ == "__main__":
     asyncio.run(test_cache_eviction())

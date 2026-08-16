@@ -9,9 +9,9 @@ This script validates that:
 4. The dependency is properly declared in project files
 """
 
+import importlib
 import subprocess
 import sys
-import importlib
 
 
 def validate_aiosqlite_import():
@@ -20,7 +20,7 @@ def validate_aiosqlite_import():
     try:
         aiosqlite = importlib.import_module("aiosqlite")
         version = aiosqlite.__version__
-        print(f"   [OK] aiosqlite imported successfully")
+        print("   [OK] aiosqlite imported successfully")
         print(f"   [OK] Version: {version}")
         return True
     except ImportError as e:

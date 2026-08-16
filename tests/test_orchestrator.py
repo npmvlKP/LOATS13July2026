@@ -21,9 +21,6 @@ from loats.models import (
     HistoricalData,
     OptionContract,
     OptionType,
-    QuoteData,
-    Signal,
-    SignalType,
 )
 from loats.openalgo import KillSwitchError
 from loats.orchestrator import TradingOrchestrator, get_cycle_stats
@@ -468,10 +465,12 @@ class TestTradingOrchestrator(unittest.IsolatedAsyncioTestCase):
         """Test that settings are loaded lazily to avoid import-time failures (F6-H-05 #2)."""
         # Verify settings start as None
         from loats.orchestrator import settings
+
         assert settings is None
 
         # Test that orchestrator can be imported without settings
         from loats.orchestrator import TradingOrchestrator
+
         orchestrator = TradingOrchestrator()
 
         # Settings should still be None until actually needed
@@ -499,6 +498,7 @@ class TestTradingOrchestrator(unittest.IsolatedAsyncioTestCase):
                         mock_get_settings.assert_called_once()
                         # Global settings should now be set
                         from loats.orchestrator import settings as global_settings
+
                         assert global_settings is not None
 
     async def test_strong_task_reference(self):
@@ -547,10 +547,14 @@ class TestTradingOrchestrator(unittest.IsolatedAsyncioTestCase):
         now = datetime.now(UTC).timestamp()
         self.orchestrator._last_alert_time = now
 
-        with patch("loats.orchestrator.alerts.send_system_alert", new_callable=AsyncMock) as mock_alert:
+        with patch(
+            "loats.orchestrator.alerts.send_system_alert", new_callable=AsyncMock
+        ) as mock_alert:
             with patch("loats.orchestrator.datetime") as mock_datetime:
                 # Mock current time to be 10 seconds after last alert (should not send)
-                mock_datetime.datetime.now.return_value.timestamp.return_value = now + 10
+                mock_datetime.datetime.now.return_value.timestamp.return_value = (
+                    now + 10
+                )
                 mock_datetime.UTC = UTC
 
                 # Simulate an error in the cycle loop
@@ -567,7 +571,9 @@ class TestTradingOrchestrator(unittest.IsolatedAsyncioTestCase):
                 mock_alert.assert_not_called()
 
                 # Now test with 61 seconds passed (should send)
-                mock_datetime.datetime.now.return_value.timestamp.return_value = now + 61
+                mock_datetime.datetime.now.return_value.timestamp.return_value = (
+                    now + 61
+                )
 
                 try:
                     current_time = now + 61
@@ -628,7 +634,9 @@ class TestTradingOrchestrator(unittest.IsolatedAsyncioTestCase):
                 ) as mock_market:
                     with patch("asyncio.gather") as mock_gather:
                         with patch("asyncio.wait_for") as mock_wait_for:
-                            mock_wait_for.side_effect = lambda coroutine, timeout: coroutine
+                            mock_wait_for.side_effect = lambda coroutine, timeout: (
+                                coroutine
+                            )
 
                             # Execute trading cycle
                             await self.orchestrator._execute_trading_cycle()
@@ -639,9 +647,17 @@ class TestTradingOrchestrator(unittest.IsolatedAsyncioTestCase):
 
                             # Should contain all three tasks: TA, sentiment, and market data
                             assert len(gather_args) == 3
-                            assert any("ta_analysis" in str(task) for task in gather_args)
-                            assert any("sentiment_analysis" in str(task) for task in gather_args)
-                            assert any("market_data_update" in str(task) for task in gather_args)
+                            assert any(
+                                "ta_analysis" in str(task) for task in gather_args
+                            )
+                            assert any(
+                                "sentiment_analysis" in str(task)
+                                for task in gather_args
+                            )
+                            assert any(
+                                "market_data_update" in str(task)
+                                for task in gather_args
+                            )
 
     async def test_cycle_task_completion_callback(self):
         """Test that cycle task completion callback handles exceptions properly."""
@@ -680,6 +696,7 @@ class TestTradingOrchestrator(unittest.IsolatedAsyncioTestCase):
         assert funds_model.utilized_margin == 500.0
         assert funds_model.available_margin == 0.0
         assert funds_model.total_equity == 1500.0
+
     async def test_cycle_time_target(self):
         """Test that cycle time target is enforced."""
         with patch.object(
@@ -762,10 +779,12 @@ class TestTradingOrchestrator(unittest.IsolatedAsyncioTestCase):
         """Test that settings are loaded lazily to avoid import-time failures (F6-H-05 #2)."""
         # Verify settings start as None
         from loats.orchestrator import settings
+
         assert settings is None
 
         # Test that orchestrator can be imported without settings
         from loats.orchestrator import TradingOrchestrator
+
         orchestrator = TradingOrchestrator()
 
         # Settings should still be None until actually needed
@@ -793,6 +812,7 @@ class TestTradingOrchestrator(unittest.IsolatedAsyncioTestCase):
                         mock_get_settings.assert_called_once()
                         # Global settings should now be set
                         from loats.orchestrator import settings as global_settings
+
                         assert global_settings is not None
 
     async def test_strong_task_reference(self):
@@ -841,10 +861,14 @@ class TestTradingOrchestrator(unittest.IsolatedAsyncioTestCase):
         now = datetime.now(UTC).timestamp()
         self.orchestrator._last_alert_time = now
 
-        with patch("loats.orchestrator.alerts.send_system_alert", new_callable=AsyncMock) as mock_alert:
+        with patch(
+            "loats.orchestrator.alerts.send_system_alert", new_callable=AsyncMock
+        ) as mock_alert:
             with patch("loats.orchestrator.datetime") as mock_datetime:
                 # Mock current time to be 10 seconds after last alert (should not send)
-                mock_datetime.datetime.now.return_value.timestamp.return_value = now + 10
+                mock_datetime.datetime.now.return_value.timestamp.return_value = (
+                    now + 10
+                )
                 mock_datetime.UTC = UTC
 
                 # Simulate an error in the cycle loop
@@ -861,7 +885,9 @@ class TestTradingOrchestrator(unittest.IsolatedAsyncioTestCase):
                 mock_alert.assert_not_called()
 
                 # Now test with 61 seconds passed (should send)
-                mock_datetime.datetime.now.return_value.timestamp.return_value = now + 61
+                mock_datetime.datetime.now.return_value.timestamp.return_value = (
+                    now + 61
+                )
 
                 try:
                     current_time = now + 61
@@ -922,7 +948,9 @@ class TestTradingOrchestrator(unittest.IsolatedAsyncioTestCase):
                 ) as mock_market:
                     with patch("asyncio.gather") as mock_gather:
                         with patch("asyncio.wait_for") as mock_wait_for:
-                            mock_wait_for.side_effect = lambda coroutine, timeout: coroutine
+                            mock_wait_for.side_effect = lambda coroutine, timeout: (
+                                coroutine
+                            )
 
                             # Execute trading cycle
                             await self.orchestrator._execute_trading_cycle()
@@ -933,9 +961,17 @@ class TestTradingOrchestrator(unittest.IsolatedAsyncioTestCase):
 
                             # Should contain all three tasks: TA, sentiment, and market data
                             assert len(gather_args) == 3
-                            assert any("ta_analysis" in str(task) for task in gather_args)
-                            assert any("sentiment_analysis" in str(task) for task in gather_args)
-                            assert any("market_data_update" in str(task) for task in gather_args)
+                            assert any(
+                                "ta_analysis" in str(task) for task in gather_args
+                            )
+                            assert any(
+                                "sentiment_analysis" in str(task)
+                                for task in gather_args
+                            )
+                            assert any(
+                                "market_data_update" in str(task)
+                                for task in gather_args
+                            )
 
     async def test_cycle_task_completion_callback(self):
         """Test that cycle task completion callback handles exceptions properly."""

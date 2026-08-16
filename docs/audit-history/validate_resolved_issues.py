@@ -9,7 +9,6 @@ This script validates that all the resolved issues mentioned in the task are pro
 - NEW-M4: negative t clamping fix (ExpiredContractError raised)
 """
 
-import os
 import re
 import sys
 from pathlib import Path

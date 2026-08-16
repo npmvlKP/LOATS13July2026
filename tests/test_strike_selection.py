@@ -6,14 +6,12 @@ This test file covers the main functionality of the StrikeSelectionEngine
 to address the 18.3% coverage issue.
 """
 
-import asyncio
 import tempfile
 import unittest
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
-import numpy as np
 import pytest
 
 from loats.database import Database
@@ -150,6 +148,7 @@ class TestStrikeSelectionEngine(unittest.IsolatedAsyncioTestCase):
         assert hasattr(self.engine, "_cache")
         # Cache is now TTLCache for better performance
         from cachetools import TTLCache
+
         assert isinstance(self.engine._cache, TTLCache)
 
     async def test_select_strikes_atm_straddle(self):

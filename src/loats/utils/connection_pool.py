@@ -77,7 +77,7 @@ class SimpleConnectionPool:
         # First, wait for all connections to be returned to the pool
         # by checking if the pool size matches the total connections created
         max_wait_time = 30.0  # 30 seconds timeout
-        wait_interval = 0.1   # 100ms between checks
+        wait_interval = 0.1  # 100ms between checks
         elapsed_time = 0.0
 
         while elapsed_time < max_wait_time:

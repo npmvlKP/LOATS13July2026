@@ -10,9 +10,6 @@ the production factory pattern - repeated calls to get_order_rate_limiter()
 and .acquire() on the result.
 """
 
-import asyncio
-import time
-
 import pytest
 
 from loats.utils.rate_limiter import (

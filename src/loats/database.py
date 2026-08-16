@@ -314,9 +314,15 @@ class Database:
         """)
 
         # Create index for trade_decisions
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_trade_decisions_symbol ON trade_decisions(symbol)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_trade_decisions_status ON trade_decisions(status)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_trade_decisions_timestamp ON trade_decisions(timestamp)")
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_trade_decisions_symbol ON trade_decisions(symbol)"
+        )
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_trade_decisions_status ON trade_decisions(status)"
+        )
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_trade_decisions_timestamp ON trade_decisions(timestamp)"
+        )
 
         # Create indexes performance
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_trades_symbol ON trades(symbol)")
@@ -695,8 +701,12 @@ class Database:
                 # This ensures the dual-write guarantee is tested without production path issues
                 temp_dir = Path(tempfile.gettempdir()) / "loats_test_audit_logs"
                 temp_dir.mkdir(parents=True, exist_ok=True)
-                audit_log_file = temp_dir / f"test_audit_{entity_type}_{entity_id}.jsonl"
-                logger.info(f"Using temporary audit log file for testing: {audit_log_file}")
+                audit_log_file = (
+                    temp_dir / f"test_audit_{entity_type}_{entity_id}.jsonl"
+                )
+                logger.info(
+                    f"Using temporary audit log file for testing: {audit_log_file}"
+                )
 
             # FIX-F-PERM-2: Use more robust file handling with retry logic
             max_retries = 3
@@ -1724,12 +1734,18 @@ class Database:
                 decision.quantity,
                 decision.stop_loss,
                 decision.take_profit,
-                json.dumps(decision.trailing_stop_config) if decision.trailing_stop_config else None,
+                json.dumps(decision.trailing_stop_config)
+                if decision.trailing_stop_config
+                else None,
                 decision.position_size_method,
                 decision.risk_percentage,
                 json.dumps(decision.var_analysis) if decision.var_analysis else None,
-                json.dumps(decision.gating_rules_result) if decision.gating_rules_result else None,
-                json.dumps(decision.source_breakdown) if decision.source_breakdown else None,
+                json.dumps(decision.gating_rules_result)
+                if decision.gating_rules_result
+                else None,
+                json.dumps(decision.source_breakdown)
+                if decision.source_breakdown
+                else None,
                 json.dumps(decision.metadata) if decision.metadata else None,
                 decision.status,
                 now_iso,
@@ -1758,13 +1774,17 @@ class Database:
         """
         conn = self._get_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM trade_decisions WHERE decision_id = ?", (decision_id,))
+        cursor.execute(
+            "SELECT * FROM trade_decisions WHERE decision_id = ?", (decision_id,)
+        )
         row = cursor.fetchone()
         if row is None:
             return None
         return self._row_to_trade_decision(row)
 
-    def get_trade_decisions(self, symbol: str | None = None, status: str | None = None, limit: int = 100) -> list[TradeDecision]:
+    def get_trade_decisions(
+        self, symbol: str | None = None, status: str | None = None, limit: int = 100
+    ) -> list[TradeDecision]:
         """
         Get trade decisions with optional filters.
         Args:
@@ -1794,7 +1814,8 @@ class Database:
             )
         else:
             cursor.execute(
-                "SELECT * FROM trade_decisions ORDER BY timestamp DESC LIMIT ?", (limit,)
+                "SELECT * FROM trade_decisions ORDER BY timestamp DESC LIMIT ?",
+                (limit,),
             )
 
         rows = cursor.fetchall()
@@ -1817,7 +1838,9 @@ class Database:
         cursor = conn.cursor()
 
         # Check if decision exists first
-        cursor.execute("SELECT 1 FROM trade_decisions WHERE decision_id = ?", (decision_id,))
+        cursor.execute(
+            "SELECT 1 FROM trade_decisions WHERE decision_id = ?", (decision_id,)
+        )
         if cursor.fetchone() is None:
             return False
 
@@ -2002,7 +2025,9 @@ class Database:
         # Close async connection pool with proper cleanup
         if hasattr(self, "_async_pool") and self._async_pool:
             try:
-                await self._async_pool.close()  # Use proper close method that waits for connections
+                await (
+                    self._async_pool.close()
+                )  # Use proper close method that waits for connections
                 logger.info("Async database connection pool closed properly")
             except Exception as e:
                 logger.warning(f"Error closing async connection pool: {e}")
@@ -2102,9 +2127,13 @@ class Database:
         """Async wrapper get_trade_decisions() avoid blocking event loop."""
         return await asyncio.to_thread(self.get_trade_decisions, symbol, status, limit)
 
-    async def async_update_trade_decision_status(self, decision_id: str, status: str) -> bool:
+    async def async_update_trade_decision_status(
+        self, decision_id: str, status: str
+    ) -> bool:
         """Async wrapper update_trade_decision_status() avoid blocking event loop."""
-        return await asyncio.to_thread(self.update_trade_decision_status, decision_id, status)
+        return await asyncio.to_thread(
+            self.update_trade_decision_status, decision_id, status
+        )
 
 
 # Module-level singleton Database instance (F-CONC-3).

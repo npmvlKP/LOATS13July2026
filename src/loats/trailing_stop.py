@@ -9,31 +9,35 @@ Implements monotonic trailing stop loss ratchet with SL-M support:
 """
 
 import datetime
-from typing import Any, Dict, Tuple
 from enum import StrEnum
+from typing import Any
 
-
-from .loats_logging import get_logger
-from .models import Trade, Order, OrderType, TransactionType
 from .config import get_settings
+from .loats_logging import get_logger
+from .models import Order, OrderType, Trade, TransactionType
 
 logger = get_logger(__name__)
 settings = get_settings()
 
+
 class TrailingStopType(StrEnum):
     """Trailing stop type enumeration."""
+
     FIXED = "fixed"
     PERCENTAGE = "percentage"
     ATR = "atr"
     VOLATILITY = "volatility"
     RATCHET = "ratchet"
 
+
 class TrailingStopStatus(StrEnum):
     """Trailing stop status enumeration."""
+
     ACTIVE = "active"
     TRIGGERED = "triggered"
     DISABLED = "disabled"
     LOCKED = "locked"
+
 
 class TrailingStopEngine:
     """CMP Strategy Trailing Stop Engine with monotonic ratchet."""
@@ -51,8 +55,8 @@ class TrailingStopEngine:
         trade: Trade,
         initial_price: float,
         stop_type: TrailingStopType = TrailingStopType.PERCENTAGE,
-        parameters: Dict[str, Any] | None = None
-    ) -> Dict[str, Any]:
+        parameters: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """
         Initialize trailing stop for a new trade.
 
@@ -61,7 +65,7 @@ class TrailingStopEngine:
         if parameters is None:
             parameters = {}
 
-        config: Dict[str, Any] = {
+        config: dict[str, Any] = {
             "trade_id": trade.trade_id,
             "symbol": trade.symbol,
             "entry_price": initial_price,
@@ -73,7 +77,7 @@ class TrailingStopEngine:
             "adjustment_count": 0,
             "locked_profit": 0.0,
             "parameters": parameters,
-            "history": []
+            "history": [],
         }
 
         # Set initial trailing stop based on type
@@ -103,9 +107,13 @@ class TrailingStopEngine:
             volatility = parameters.get("volatility", 0.01)  # Default 1% volatility
             multiplier = parameters.get("multiplier", 2.0)
             if trade.transaction_type == TransactionType.BUY:
-                config["trigger_price"] = initial_price - (initial_price * volatility * multiplier)
+                config["trigger_price"] = initial_price - (
+                    initial_price * volatility * multiplier
+                )
             else:
-                config["trigger_price"] = initial_price + (initial_price * volatility * multiplier)
+                config["trigger_price"] = initial_price + (
+                    initial_price * volatility * multiplier
+                )
 
         elif stop_type == TrailingStopType.RATCHET:
             # Ratchet starts with initial percentage stop
@@ -118,22 +126,21 @@ class TrailingStopEngine:
             config["current_ratchet_level"] = 0
 
         # Add initial state to history
-        config["history"].append({
-            "timestamp": config["last_adjustment"],
-            "action": "initialized",
-            "price": initial_price,
-            "trigger_price": config["trigger_price"],
-            "status": str(config["status"])
-        })
+        config["history"].append(
+            {
+                "timestamp": config["last_adjustment"],
+                "action": "initialized",
+                "price": initial_price,
+                "trigger_price": config["trigger_price"],
+                "status": str(config["status"]),
+            }
+        )
 
         return config
 
     def update_trailing_stop(
-        self,
-        config: Dict[str, Any],
-        current_price: float,
-        force_adjust: bool = False
-    ) -> Tuple[Dict[str, Any], bool]:
+        self, config: dict[str, Any], current_price: float, force_adjust: bool = False
+    ) -> tuple[dict[str, Any], bool]:
         """
         Update trailing stop based on current price.
 
@@ -207,13 +214,12 @@ class TrailingStopEngine:
         return config, False
 
     def _update_percentage_trailing(
-        self,
-        config: Dict[str, Any],
-        current_price: float,
-        is_long: bool
-    ) -> Tuple[Dict[str, Any], bool]:
+        self, config: dict[str, Any], current_price: float, is_long: bool
+    ) -> tuple[dict[str, Any], bool]:
         """Update percentage-based trailing stop."""
-        percentage = config["parameters"].get("percentage", self.default_trailing_percentage)
+        percentage = config["parameters"].get(
+            "percentage", self.default_trailing_percentage
+        )
         entry_price = config["entry_price"]
 
         if is_long:
@@ -227,7 +233,9 @@ class TrailingStopEngine:
                 config["adjustment_count"] += 1
 
                 # Calculate locked profit
-                config["locked_profit"] = (config["trigger_price"] - entry_price) * config.get("quantity", 1)
+                config["locked_profit"] = (
+                    config["trigger_price"] - entry_price
+                ) * config.get("quantity", 1)
 
                 self._add_to_history(config, "adjusted", current_price)
                 return config, True
@@ -243,7 +251,9 @@ class TrailingStopEngine:
                 config["adjustment_count"] += 1
 
                 # Calculate locked profit
-                config["locked_profit"] = (entry_price - config["trigger_price"]) * config.get("quantity", 1)
+                config["locked_profit"] = (
+                    entry_price - config["trigger_price"]
+                ) * config.get("quantity", 1)
 
                 self._add_to_history(config, "adjusted", current_price)
                 return config, True
@@ -251,11 +261,8 @@ class TrailingStopEngine:
         return config, False
 
     def _update_atr_trailing(
-        self,
-        config: Dict[str, Any],
-        current_price: float,
-        is_long: bool
-    ) -> Tuple[Dict[str, Any], bool]:
+        self, config: dict[str, Any], current_price: float, is_long: bool
+    ) -> tuple[dict[str, Any], bool]:
         """Update ATR-based trailing stop."""
         atr = config["parameters"].get("atr", 100.0)
         multiplier = config["parameters"].get("multiplier", self.default_atr_multiplier)
@@ -300,11 +307,8 @@ class TrailingStopEngine:
         return config, False
 
     def _update_volatility_trailing(
-        self,
-        config: Dict[str, Any],
-        current_price: float,
-        is_long: bool
-    ) -> Tuple[Dict[str, Any], bool]:
+        self, config: dict[str, Any], current_price: float, is_long: bool
+    ) -> tuple[dict[str, Any], bool]:
         """Update volatility-based trailing stop."""
         volatility = config["parameters"].get("volatility", 0.01)
         multiplier = config["parameters"].get("multiplier", 2.0)
@@ -349,14 +353,13 @@ class TrailingStopEngine:
         return config, False
 
     def _update_ratchet_trailing(
-        self,
-        config: Dict[str, Any],
-        current_price: float,
-        is_long: bool
-    ) -> Tuple[Dict[str, Any], bool]:
+        self, config: dict[str, Any], current_price: float, is_long: bool
+    ) -> tuple[dict[str, Any], bool]:
         """Update ratchet-based trailing stop with discrete levels."""
         entry_price = config["entry_price"]
-        percentage = config["parameters"].get("percentage", self.default_trailing_percentage)
+        percentage = config["parameters"].get(
+            "percentage", self.default_trailing_percentage
+        )
         current_ratchet_level = config.get("current_ratchet_level", 0)
 
         if is_long:
@@ -420,10 +423,7 @@ class TrailingStopEngine:
         return config, False
 
     def _add_to_history(
-        self,
-        config: Dict[str, Any],
-        action: str,
-        current_price: float
+        self, config: dict[str, Any], action: str, current_price: float
     ) -> None:
         """Add entry to trailing stop history with <1ms performance."""
         # Optimized history entry creation for performance
@@ -432,7 +432,7 @@ class TrailingStopEngine:
             "action": action,
             "price": current_price,
             "trigger_price": config["trigger_price"],
-            "status": str(config["status"])
+            "status": str(config["status"]),
         }
 
         # Add additional context for adjustments (only when needed)
@@ -448,11 +448,7 @@ class TrailingStopEngine:
         if len(history) > 100:
             config["history"] = history[-100:]
 
-    def create_sl_m_order(
-        self,
-        trade: Trade,
-        trailing_config: Dict[str, Any]
-    ) -> Order:
+    def create_sl_m_order(self, trade: Trade, trailing_config: dict[str, Any]) -> Order:
         """
         Create SL-M (Stop Loss Market) order for trailing stop.
 
@@ -475,7 +471,7 @@ class TrailingStopEngine:
             order_type=OrderType.SL_M,
             price=trailing_config["trigger_price"],  # Trigger price for SL-M
             trigger_price=trailing_config["trigger_price"],
-            variety=trade.variety if hasattr(trade, 'variety') else "regular",
+            variety=trade.variety if hasattr(trade, "variety") else "regular",
             transaction_type=transaction_type,
             product_type=trade.product_type,
             status="OPEN",
@@ -483,15 +479,13 @@ class TrailingStopEngine:
             stop_loss=None,  # SL-M order doesn't need additional stop loss
             take_profit=None,
             trailing_stop_loss=None,
-            idempotency_key=f"slm_{trade.trade_id}_{datetime.datetime.now(datetime.UTC).timestamp()}"
+            idempotency_key=f"slm_{trade.trade_id}_{datetime.datetime.now(datetime.UTC).timestamp()}",
         )
 
         return sl_m_order
 
     def update_sl_m_order(
-        self,
-        existing_order: Order,
-        new_trigger_price: float
+        self, existing_order: Order, new_trigger_price: float
     ) -> Order:
         """
         Update existing SL-M order with new trigger price.
@@ -506,15 +500,12 @@ class TrailingStopEngine:
             price=new_trigger_price,
             trigger_price=new_trigger_price,
             timestamp=datetime.datetime.now(datetime.UTC),
-            idempotency_key=f"slm_update_{existing_order.order_id}_{datetime.datetime.now(datetime.UTC).timestamp()}"
+            idempotency_key=f"slm_update_{existing_order.order_id}_{datetime.datetime.now(datetime.UTC).timestamp()}",
         )
 
         return updated_order
 
-    def get_trailing_stop_summary(
-        self,
-        config: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    def get_trailing_stop_summary(self, config: dict[str, Any]) -> dict[str, Any]:
         """Get summary of trailing stop configuration."""
         entry_price = config["entry_price"]
         current_price = config["current_price"]
@@ -526,13 +517,17 @@ class TrailingStopEngine:
             max_pnl = (current_price - entry_price) * config.get("quantity", 1)
             drawdown = 0.0
             if current_pnl > 0:
-                drawdown = ((current_price - trigger_price) / (current_price - entry_price)) * 100
+                drawdown = (
+                    (current_price - trigger_price) / (current_price - entry_price)
+                ) * 100
         else:
             current_pnl = (entry_price - current_price) * config.get("quantity", 1)
             max_pnl = (entry_price - current_price) * config.get("quantity", 1)
             drawdown = 0.0
             if current_pnl > 0:
-                drawdown = ((trigger_price - current_price) / (entry_price - current_price)) * 100
+                drawdown = (
+                    (trigger_price - current_price) / (entry_price - current_price)
+                ) * 100
 
         return {
             "trade_id": config["trade_id"],
@@ -542,7 +537,9 @@ class TrailingStopEngine:
             "current_price": current_price,
             "trigger_price": trigger_price,
             "distance_to_trigger": abs(current_price - trigger_price),
-            "distance_percentage": abs((current_price - trigger_price) / current_price * 100),
+            "distance_percentage": abs(
+                (current_price - trigger_price) / current_price * 100
+            ),
             "current_pnl": current_pnl,
             "max_pnl": max_pnl,
             "locked_profit": config.get("locked_profit", 0.0),
@@ -550,13 +547,10 @@ class TrailingStopEngine:
             "adjustment_count": config["adjustment_count"],
             "last_adjustment": config["last_adjustment"],
             "stop_type": str(config["stop_type"]),
-            "history_count": len(config["history"])
+            "history_count": len(config["history"]),
         }
 
-    def disable_trailing_stop(
-        self,
-        config: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    def disable_trailing_stop(self, config: dict[str, Any]) -> dict[str, Any]:
         """Disable trailing stop."""
         if config["status"] == TrailingStopStatus.ACTIVE:
             config["status"] = TrailingStopStatus.DISABLED
@@ -565,10 +559,7 @@ class TrailingStopEngine:
 
         return config
 
-    def enable_trailing_stop(
-        self,
-        config: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    def enable_trailing_stop(self, config: dict[str, Any]) -> dict[str, Any]:
         """Enable trailing stop."""
         if config["status"] == TrailingStopStatus.DISABLED:
             config["status"] = TrailingStopStatus.ACTIVE
@@ -577,10 +568,7 @@ class TrailingStopEngine:
 
         return config
 
-    def lock_trailing_stop(
-        self,
-        config: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    def lock_trailing_stop(self, config: dict[str, Any]) -> dict[str, Any]:
         """Lock trailing stop at current trigger price."""
         if config["status"] == TrailingStopStatus.ACTIVE:
             config["status"] = TrailingStopStatus.LOCKED
@@ -590,6 +578,7 @@ class TrailingStopEngine:
 
         return config
 
+
 # Module-level singleton instance
 trailing_stop_engine = TrailingStopEngine()
 
@@ -597,5 +586,5 @@ __all__ = [
     "TrailingStopEngine",
     "TrailingStopType",
     "TrailingStopStatus",
-    "trailing_stop_engine"
+    "trailing_stop_engine",
 ]

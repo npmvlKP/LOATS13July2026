@@ -4,11 +4,9 @@ This test suite targets specific lines that are missing coverage in options.py.
 """
 
 from datetime import UTC, datetime
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
-import numpy as np
 import pytest
-from scipy.optimize import brentq, newton
 
 from loats.models import Greeks, OptionContract, OptionType
 from loats.options import (

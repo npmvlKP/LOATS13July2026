@@ -54,7 +54,7 @@ async def main():
         print("\nTesting async_update_order_status with nonexistent_order...")
         result = await db.async_update_order_status("nonexistent_order", "COMPLETED")
         print(f"Result: {result}")
-        print(f"Expected: False")
+        print("Expected: False")
 
         # Clean up
         if hasattr(db, "_async_pool") and db._async_pool:

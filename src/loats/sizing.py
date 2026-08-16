@@ -8,27 +8,27 @@ Implements 2% fixed-fraction position sizing with:
 - Volatility-based adjustments
 """
 
-import datetime
-from typing import Any, Dict, List, Optional, Tuple
-from decimal import Decimal
 from enum import StrEnum
+from typing import Any
 
 import numpy as np
-from scipy.stats import norm
 
-from .loats_logging import get_logger
-from .models import FundsData, Trade, Order
 from .config import get_settings
+from .loats_logging import get_logger
+from .models import FundsData, Trade
 
 logger = get_logger(__name__)
 settings = get_settings()
 
+
 class SizingMethod(StrEnum):
     """Position sizing method enumeration."""
+
     FIXED_FRACTION = "fixed_fraction"
     VOLATILITY_BASED = "volatility_based"
     KELLY_CRITERION = "kelly_criterion"
     RISK_PARITY = "risk_parity"
+
 
 class SizingEngine:
     """CMP Strategy Sizing Engine with 2% fixed-fraction risk management."""
@@ -46,8 +46,8 @@ class SizingEngine:
         funds: FundsData,
         entry_price: float,
         stop_loss: float,
-        symbol: str = "NIFTY"
-    ) -> Tuple[int, Dict[str, Any]]:
+        symbol: str = "NIFTY",
+    ) -> tuple[int, dict[str, Any]]:
         """
         Calculate position size using 2% fixed-fraction method.
 
@@ -55,12 +55,19 @@ class SizingEngine:
         Position Size = (Account Size * Risk Percentage) / (Entry Price - Stop Loss)
         """
         if entry_price <= 0 or stop_loss <= 0:
-            return 0, {"reason": "invalid_prices", "entry_price": entry_price, "stop_loss": stop_loss}
+            return 0, {
+                "reason": "invalid_prices",
+                "entry_price": entry_price,
+                "stop_loss": stop_loss,
+            }
 
         # Calculate risk per share
         risk_per_share = abs(entry_price - stop_loss)
         if risk_per_share <= 0:
-            return 0, {"reason": "invalid_risk_per_share", "risk_per_share": risk_per_share}
+            return 0, {
+                "reason": "invalid_risk_per_share",
+                "risk_per_share": risk_per_share,
+            }
 
         # Calculate available capital for risk
         available_capital = funds.available_cash + funds.available_margin
@@ -80,7 +87,9 @@ class SizingEngine:
             position_size = min(int(base_size), self.max_position_size)
 
         # Apply additional constraints
-        position_size = self._apply_sizing_constraints(position_size, entry_price, symbol)
+        position_size = self._apply_sizing_constraints(
+            position_size, entry_price, symbol
+        )
 
         return position_size, {
             "method": "fixed_fraction",
@@ -92,14 +101,11 @@ class SizingEngine:
             "final_size": position_size,
             "symbol": symbol,
             "entry_price": entry_price,
-            "stop_loss": stop_loss
+            "stop_loss": stop_loss,
         }
 
     def _apply_sizing_constraints(
-        self,
-        position_size: int,
-        entry_price: float,
-        symbol: str
+        self, position_size: int, entry_price: float, symbol: str
     ) -> int:
         """Apply additional sizing constraints."""
         # Maximum order value constraint
@@ -124,8 +130,8 @@ class SizingEngine:
         entry_price: float,
         stop_loss: float,
         volatility: float,
-        symbol: str = "NIFTY"
-    ) -> Tuple[int, Dict[str, Any]]:
+        symbol: str = "NIFTY",
+    ) -> tuple[int, dict[str, Any]]:
         """
         Calculate volatility-adjusted position size.
 
@@ -161,7 +167,7 @@ class SizingEngine:
             "normalized_volatility": normalized_volatility,
             "volatility_factor": volatility_factor,
             "base_size": base_size,
-            "adjusted_size": adjusted_size
+            "adjusted_size": adjusted_size,
         }
 
     def calculate_kelly_criterion_size(
@@ -169,8 +175,8 @@ class SizingEngine:
         funds: FundsData,
         win_probability: float,
         win_loss_ratio: float,
-        symbol: str = "NIFTY"
-    ) -> Tuple[int, Dict[str, Any]]:
+        symbol: str = "NIFTY",
+    ) -> tuple[int, dict[str, Any]]:
         """
         Calculate position size using Kelly Criterion.
 
@@ -178,10 +184,16 @@ class SizingEngine:
         where p = win probability, b = win/loss ratio
         """
         if win_probability <= 0 or win_probability >= 1:
-            return 0, {"reason": "invalid_win_probability", "win_probability": win_probability}
+            return 0, {
+                "reason": "invalid_win_probability",
+                "win_probability": win_probability,
+            }
 
         if win_loss_ratio <= 0:
-            return 0, {"reason": "invalid_win_loss_ratio", "win_loss_ratio": win_loss_ratio}
+            return 0, {
+                "reason": "invalid_win_loss_ratio",
+                "win_loss_ratio": win_loss_ratio,
+            }
 
         # Calculate Kelly fraction
         kelly_fraction = win_probability - ((1 - win_probability) / win_loss_ratio)
@@ -200,7 +212,9 @@ class SizingEngine:
         position_size = int(position_value / approximate_price)
 
         # Apply constraints
-        position_size = self._apply_sizing_constraints(position_size, approximate_price, symbol)
+        position_size = self._apply_sizing_constraints(
+            position_size, approximate_price, symbol
+        )
 
         return position_size, {
             "method": "kelly_criterion",
@@ -211,7 +225,7 @@ class SizingEngine:
             "available_capital": available_capital,
             "position_value": position_value,
             "approximate_price": approximate_price,
-            "position_size": position_size
+            "position_size": position_size,
         }
 
     def calculate_margin_aware_size(
@@ -220,8 +234,8 @@ class SizingEngine:
         entry_price: float,
         stop_loss: float,
         margin_requirement: float,
-        symbol: str = "NIFTY"
-    ) -> Tuple[int, Dict[str, Any]]:
+        symbol: str = "NIFTY",
+    ) -> tuple[int, dict[str, Any]]:
         """
         Calculate margin-aware position size.
 
@@ -241,7 +255,9 @@ class SizingEngine:
 
         # Check against available margin
         available_margin = funds.available_margin
-        margin_utilization = total_margin_required / available_margin if available_margin > 0 else 1.0
+        margin_utilization = (
+            total_margin_required / available_margin if available_margin > 0 else 1.0
+        )
 
         # Apply margin constraint
         if margin_utilization > settings.max_margin_utilization:
@@ -262,7 +278,7 @@ class SizingEngine:
             "margin_utilization": margin_utilization,
             "max_margin_utilization": settings.max_margin_utilization,
             "base_size": base_size,
-            "adjusted_size": adjusted_size
+            "adjusted_size": adjusted_size,
         }
 
     def calculate_cost_aware_size(
@@ -271,8 +287,8 @@ class SizingEngine:
         entry_price: float,
         stop_loss: float,
         cost_per_lot: float,
-        symbol: str = "NIFTY"
-    ) -> Tuple[int, Dict[str, Any]]:
+        symbol: str = "NIFTY",
+    ) -> tuple[int, dict[str, Any]]:
         """
         Calculate cost-aware position size.
 
@@ -304,7 +320,7 @@ class SizingEngine:
                 "cost_adjustment": "blocked_by_costs",
                 "total_cost": total_cost,
                 "risk_capital": risk_capital,
-                "net_risk_capital": net_risk_capital
+                "net_risk_capital": net_risk_capital,
             }
 
         # Recalculate position size with net risk capital
@@ -312,7 +328,9 @@ class SizingEngine:
         adjusted_size = int(net_risk_capital / risk_per_share)
 
         # Apply constraints
-        adjusted_size = self._apply_sizing_constraints(adjusted_size, entry_price, symbol)
+        adjusted_size = self._apply_sizing_constraints(
+            adjusted_size, entry_price, symbol
+        )
 
         return adjusted_size, {
             **base_info,
@@ -322,15 +340,15 @@ class SizingEngine:
             "risk_capital": risk_capital,
             "net_risk_capital": net_risk_capital,
             "base_size": base_size,
-            "adjusted_size": adjusted_size
+            "adjusted_size": adjusted_size,
         }
 
     def calculate_portfolio_risk_allocation(
         self,
         funds: FundsData,
-        current_positions: List[Trade],
-        target_risk_per_position: float = 0.02
-    ) -> Dict[str, Any]:
+        current_positions: list[Trade],
+        target_risk_per_position: float = 0.02,
+    ) -> dict[str, Any]:
         """
         Calculate risk allocation across portfolio.
 
@@ -356,7 +374,7 @@ class SizingEngine:
                     "stop_loss": position.stop_loss,
                     "risk_per_unit": risk_per_unit,
                     "position_risk": position_risk,
-                    "risk_percentage": position_risk_percentage
+                    "risk_percentage": position_risk_percentage,
                 }
 
                 current_risk_exposure += position_risk
@@ -373,14 +391,16 @@ class SizingEngine:
             "remaining_risk_budget": remaining_risk_budget,
             "target_risk_per_position": target_risk_per_position,
             "position_risk_breakdown": position_risk_breakdown,
-            "risk_utilization": current_risk_exposure / max_total_risk if max_total_risk > 0 else 0.0
+            "risk_utilization": current_risk_exposure / max_total_risk
+            if max_total_risk > 0
+            else 0.0,
         }
 
     def get_recommended_sizing_method(
         self,
         volatility: float,
-        win_probability: Optional[float] = None,
-        margin_requirement: Optional[float] = None
+        win_probability: float | None = None,
+        margin_requirement: float | None = None,
     ) -> SizingMethod:
         """
         Recommend appropriate sizing method based on market conditions.
@@ -396,11 +416,8 @@ class SizingEngine:
         else:
             return SizingMethod.FIXED_FRACTION
 
+
 # Module-level singleton instance
 sizing_engine = SizingEngine()
 
-__all__ = [
-    "SizingEngine",
-    "SizingMethod",
-    "sizing_engine"
-]
+__all__ = ["SizingEngine", "SizingMethod", "sizing_engine"]

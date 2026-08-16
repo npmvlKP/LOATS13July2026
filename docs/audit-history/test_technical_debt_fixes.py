@@ -4,26 +4,24 @@ Test script to verify the technical debt fixes.
 This tests the resolution of R5-F-07, R5-F-08, R5-F-14, and R5-F-22.
 """
 
-import sys
-import os
-import tempfile
 import shutil
-from datetime import datetime, UTC
+import sys
+import tempfile
+from datetime import UTC, datetime
 from pathlib import Path
 
 # Add the src directory to the Python path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
+from loats.database import Database
 from loats.models import (
     Order,
-    OrderType,
     OrderStatus,
-    TransactionType,
-    ProductType,
+    OrderType,
     OrderVariety,
+    ProductType,
+    TransactionType,
 )
-from loats.database import Database
-from loats.scheduler import TradingScheduler
 
 
 def test_idempotency_key_functionality():

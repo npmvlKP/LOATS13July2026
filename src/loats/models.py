@@ -348,6 +348,7 @@ class VaRResult(BaseModel):
     method: str
     timestamp: datetime
 
+
 class TradeDecision(BaseModel):
     """CMP Trade Decision model for routing to Analyzer."""
 
@@ -405,7 +406,7 @@ class TradeDecision(BaseModel):
             "source_breakdown": self.source_breakdown,
             "metadata": self.metadata,
             "status": self.status,
-            "risk_reward_ratio": self.risk_reward_ratio
+            "risk_reward_ratio": self.risk_reward_ratio,
         }
 
 

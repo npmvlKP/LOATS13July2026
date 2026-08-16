@@ -29,6 +29,7 @@ from .utils.resilience import openalgo_circuit_breaker_retry_async
 logger = get_logger(__name__)
 settings = None
 
+
 async def validate_rss_feed(url: str, timeout: int = 5) -> bool:
     """Validate RSS feed URL with timeout and error handling."""
     try:
@@ -39,7 +40,7 @@ async def validate_rss_feed(url: str, timeout: int = 5) -> bool:
             return False
 
         # Check if URL is HTTP/HTTPS
-        if parsed.scheme not in ['http', 'https']:
+        if parsed.scheme not in ["http", "https"]:
             logger.warning(f"Unsupported RSS feed URL scheme: {parsed.scheme}")
             return False
 
@@ -49,17 +50,19 @@ async def validate_rss_feed(url: str, timeout: int = 5) -> bool:
                 response = await client.get(url, follow_redirects=True)
                 if response.status_code == 200:
                     # Check if content looks like XML/RSS
-                    content_type = response.headers.get('content-type', '').lower()
-                    if 'xml' in content_type or 'rss' in content_type:
+                    content_type = response.headers.get("content-type", "").lower()
+                    if "xml" in content_type or "rss" in content_type:
                         return True
                     # Simple content check for RSS feeds
                     content = response.text.lower()
-                    if any(tag in content for tag in ['<rss', '<feed', '<channel']):
+                    if any(tag in content for tag in ["<rss", "<feed", "<channel"]):
                         return True
                     logger.warning(f"RSS feed URL returned non-RSS content: {url}")
                     return False
                 else:
-                    logger.warning(f"RSS feed URL returned status {response.status_code}: {url}")
+                    logger.warning(
+                        f"RSS feed URL returned status {response.status_code}: {url}"
+                    )
                     return False
             except httpx.ConnectTimeout:
                 logger.warning(f"RSS feed URL connection timeout: {url}")
@@ -68,7 +71,9 @@ async def validate_rss_feed(url: str, timeout: int = 5) -> bool:
                 logger.warning(f"RSS feed URL read timeout: {url}")
                 return False
             except httpx.HTTPStatusError as e:
-                logger.warning(f"RSS feed URL HTTP error {e.response.status_code}: {url}")
+                logger.warning(
+                    f"RSS feed URL HTTP error {e.response.status_code}: {url}"
+                )
                 return False
             except Exception as e:
                 logger.warning(f"RSS feed URL validation error for {url}: {e}")
@@ -183,7 +188,9 @@ class TradingOrchestrator:
             if rules_engine.is_trading_allowed():
                 await self._execute_cmp_strategy()
             else:
-                logger.debug(f"CMP strategy skipped - session: {rules_engine.session_state}")
+                logger.debug(
+                    f"CMP strategy skipped - session: {rules_engine.session_state}"
+                )
 
         except Exception as e:
             logger.error(f"Error in trading cycle execution: {e}")
@@ -499,15 +506,15 @@ class TradingOrchestrator:
                 if available_margin > 0:
                     margin_ratio = funds.utilized_margin / available_margin
                     if margin_ratio > settings.max_margin_utilization:
-                        logger.warning(
-                            f"Margin utilization high: {margin_ratio:.2%}"
-                        )
+                        logger.warning(f"Margin utilization high: {margin_ratio:.2%}")
                         await alerts.send_alert(
                             f"High margin utilization: {margin_ratio:.2%}",
                             "margin_utilization",
                         )
                 else:
-                    logger.warning("Available margin is zero - cannot calculate utilization ratio")
+                    logger.warning(
+                        "Available margin is zero - cannot calculate utilization ratio"
+                    )
 
         except Exception as e:
             logger.error(f"Risk management failed: {e}")
@@ -533,11 +540,15 @@ class TradingOrchestrator:
             all_signals = await db.async_get_latest_signals(symbol, limit=10)
 
             # Filter out only recent signals (last 5 minutes)
-            cutoff_time = datetime.datetime.now(datetime.UTC) - datetime.timedelta(minutes=5)
+            cutoff_time = datetime.datetime.now(datetime.UTC) - datetime.timedelta(
+                minutes=5
+            )
             recent_signals = [s for s in all_signals if s.timestamp >= cutoff_time]
 
             if len(recent_signals) < 3:
-                logger.debug(f"Insufficient signals for CMP strategy: {len(recent_signals)} signals")
+                logger.debug(
+                    f"Insufficient signals for CMP strategy: {len(recent_signals)} signals"
+                )
                 return
 
             # Get historical data for gating rules
@@ -578,28 +589,33 @@ class TradingOrchestrator:
             funds = self._create_funds_model(funds_data["data"])
 
             # Get current positions
-            current_positions = await asyncio.to_thread(
-                db.get_positions, symbol=symbol
-            )
+            current_positions = await asyncio.to_thread(db.get_positions, symbol=symbol)
 
             # Create TradeDecision using CMP strategy
-            decision, creation_result = await trade_decision_engine.create_trade_decision(
+            (
+                decision,
+                creation_result,
+            ) = await trade_decision_engine.create_trade_decision(
                 signals=recent_signals,
                 historical_data=historical_data_objs,
                 current_price=current_price,
                 funds=funds,
-                current_positions=current_positions
+                current_positions=current_positions,
             )
 
             if decision is None:
-                logger.info(f"CMP strategy decision not created: {creation_result['reason']}")
+                logger.info(
+                    f"CMP strategy decision not created: {creation_result['reason']}"
+                )
                 return
 
             # Route TradeDecision to Analyzer
             routing_result = await trade_decision_engine.route_to_analyzer(decision)
 
             if routing_result["status"] == "success":
-                logger.info(f"Successfully created and routed CMP TradeDecision: {decision.decision_id}")
+                logger.info(
+                    f"Successfully created and routed CMP TradeDecision: {decision.decision_id}"
+                )
                 logger.debug(f"TradeDecision details: {decision.to_analyzer_payload()}")
 
                 # Store the decision in database
@@ -616,9 +632,7 @@ class TradingOrchestrator:
                 datetime.datetime.now(datetime.UTC) - start_time
             ).total_seconds()
             if duration > 0.05:  # 50ms budget for CMP strategy
-                logger.warning(
-                    f"CMP strategy exceeded budget: {duration * 1000:.2f}ms"
-                )
+                logger.warning(f"CMP strategy exceeded budget: {duration * 1000:.2f}ms")
 
     async def _execute_strike_selection(
         self, option_chain: list[OptionContract]
@@ -707,11 +721,13 @@ class TradingOrchestrator:
         self.running = False
 
         # Wait for the cycle task to complete with timeout
-        if hasattr(self, '_cycle_task') and self._cycle_task:
+        if hasattr(self, "_cycle_task") and self._cycle_task:
             try:
                 await asyncio.wait_for(self._cycle_task, timeout=5.0)
             except TimeoutError:
-                logger.warning("Orchestrator shutdown timed out - cycle task still running")
+                logger.warning(
+                    "Orchestrator shutdown timed out - cycle task still running"
+                )
                 # Cancel the task if it's still running
                 self._cycle_task.cancel()
             except asyncio.CancelledError:

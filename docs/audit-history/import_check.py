@@ -31,4 +31,4 @@ for m in modules:
 for m, s in results:
     print(f"{m:35s} {s}")
 print()
-print(f"PASS: {sum(1 for _,s in results if s=='OK')}/{len(results)}")
+print(f"PASS: {sum(1 for _, s in results if s == 'OK')}/{len(results)}")

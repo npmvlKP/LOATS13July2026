@@ -9,10 +9,10 @@ This script validates that the packaging issue has been resolved by testing:
 4. Module functionality
 """
 
+import asyncio
+import importlib
 import subprocess
 import sys
-import importlib
-import asyncio
 from pathlib import Path
 
 # Ensure UTF-8 encoding for Windows
@@ -41,17 +41,17 @@ def test_package_import():
     try:
         # Test import of the main module
         loats = importlib.import_module("loats")
-        print(f"✅ Package 'loats' imported successfully")
+        print("✅ Package 'loats' imported successfully")
         print(f"✅ Version: {loats.__version__}")
 
         # Test import of key components
         from loats.main import TradingSystem
 
-        print(f"✅ TradingSystem imported successfully")
+        print("✅ TradingSystem imported successfully")
 
         from loats.config import get_settings
 
-        print(f"✅ get_settings imported successfully")
+        print("✅ get_settings imported successfully")
 
         return True
     except ImportError as e:
@@ -70,14 +70,14 @@ def test_entry_point():
     try:
         from loats.main import cli_main
 
-        print(f"✅ Entry point 'cli_main' is accessible")
+        print("✅ Entry point 'cli_main' is accessible")
 
         # Test that it's a proper function (not a coroutine)
         if asyncio.iscoroutinefunction(cli_main):
-            print(f"❌ Entry point is still a coroutine function")
+            print("❌ Entry point is still a coroutine function")
             return False
         else:
-            print(f"✅ Entry point is a proper synchronous function")
+            print("✅ Entry point is a proper synchronous function")
             return True
 
     except ImportError as e:

@@ -4,12 +4,12 @@ Debug script to check circuit breaker state after GET operations.
 """
 
 import asyncio
+from unittest.mock import patch
+
+from src.loats.openalgo import AsyncOpenAlgoClient
 from src.loats.utils.circuit_breaker import (
     OPENALGO_CIRCUIT_BREAKER,
-    CircuitBreakerOpenError,
 )
-from src.loats.openalgo import AsyncOpenAlgoClient
-from unittest.mock import AsyncMock, patch
 
 
 def debug_get_operations():

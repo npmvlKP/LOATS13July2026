@@ -26,7 +26,6 @@ from loats.utils.circuit_breaker import (
     CircuitBreakerOpenError,
 )
 from loats.utils.rate_limiter import (
-    RateLimitExceededError,
     get_order_rate_limiter,
     get_smart_order_rate_limiter,
 )

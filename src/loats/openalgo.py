@@ -59,9 +59,8 @@ from .models import (
     TransactionType,
 )
 from .utils.cache import cache_manager
-from .utils.circuit_breaker import OPENALGO_CIRCUIT_BREAKER, CircuitBreakerOpenError
+from .utils.circuit_breaker import OPENALGO_CIRCUIT_BREAKER
 from .utils.payload_builder import (
-    build_cancel_order_payload,
     build_modify_order_payload,
     build_place_order_payload,
     build_place_smart_order_payload,

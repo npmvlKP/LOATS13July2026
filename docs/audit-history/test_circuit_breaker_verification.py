@@ -5,13 +5,15 @@ This test verifies that the circuit breaker is properly implemented for both GET
 """
 
 import asyncio
+from unittest.mock import patch
+
+import pytest
+
+from src.loats.openalgo import AsyncOpenAlgoClient
 from src.loats.utils.circuit_breaker import (
     OPENALGO_CIRCUIT_BREAKER,
     CircuitBreakerOpenError,
 )
-from src.loats.openalgo import AsyncOpenAlgoClient
-from unittest.mock import AsyncMock, patch
-import pytest
 
 
 def test_circuit_breaker_post_operations_protected():
@@ -89,9 +91,9 @@ def test_circuit_breaker_thread_safety():
     """Verify that circuit breaker statistics are thread-safe."""
     print("Testing circuit breaker thread safety...")
 
-    from src.loats.utils.circuit_breaker import CircuitBreaker, CircuitBreakerConfig
     import concurrent.futures
-    import time
+
+    from src.loats.utils.circuit_breaker import CircuitBreaker, CircuitBreakerConfig
 
     # Create a circuit breaker with high threshold
     cb = CircuitBreaker(

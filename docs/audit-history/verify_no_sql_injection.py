@@ -33,7 +33,7 @@ def verify_no_sql_injection():
     print("=" * 60)
     print("SQL INJECTION VULNERABILITY VERIFICATION")
     print("=" * 60)
-    print(f"Analyzing file: src/loats/database.py")
+    print("Analyzing file: src/loats/database.py")
     print(f"File size: {len(content)} characters")
     print()
 
@@ -62,7 +62,7 @@ def verify_no_sql_injection():
     # Check for proper parameterized queries
     param_queries = re.findall(r"cursor\.execute\(.*\?.*\)", content)
     secure_queries = len(param_queries)
-    print(f"SECURE QUERIES:")
+    print("SECURE QUERIES:")
     print(f"  Parameterized queries with ? placeholders: {secure_queries} ✅")
 
     # Check for security features

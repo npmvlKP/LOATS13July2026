@@ -4,7 +4,7 @@ Implements calculation Greeks, Black-Scholes model, volatility analysis.
 """
 
 from datetime import UTC, datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import numpy as np
 from scipy.optimize import brentq, newton
@@ -691,11 +691,12 @@ class OptionsAnalysis:
 options = OptionsEngine()
 analysis = OptionsAnalysis()
 
+
 def calculate_parametric_var(
     returns: list[float],
     confidence_level: float = 0.95,
-    mean: Optional[float] = None,
-    std_dev: Optional[float] = None
+    mean: float | None = None,
+    std_dev: float | None = None,
 ) -> float:
     """
     Calculate parametric VaR using normal distribution.
@@ -717,11 +718,12 @@ def calculate_parametric_var(
 
     return float(parametric_var)
 
+
 def calculate_monte_carlo_var(
     prices: list[float],
     confidence_level: float = 0.95,
     simulations: int = 1000,
-    days: int = 1
+    days: int = 1,
 ) -> float:
     """
     Calculate VaR using Monte Carlo simulation.
@@ -732,7 +734,9 @@ def calculate_monte_carlo_var(
         return 0.0
 
     # Calculate historical returns and volatility
-    returns = [(prices[i] - prices[i - 1]) / prices[i - 1] for i in range(1, len(prices))]
+    returns = [
+        (prices[i] - prices[i - 1]) / prices[i - 1] for i in range(1, len(prices))
+    ]
     mean_return = np.mean(returns)
     std_return = np.std(returns)
 
@@ -754,10 +758,11 @@ def calculate_monte_carlo_var(
 
     return float(monte_carlo_var)
 
+
 def calculate_portfolio_var(
     positions: list[Trade],
     confidence_level: float = 0.95,
-    correlation_matrix: Optional[np.ndarray] = None
+    correlation_matrix: np.ndarray | None = None,
 ) -> VaRResult:
     """
     Calculate portfolio VaR considering position correlations.
@@ -772,7 +777,7 @@ def calculate_portfolio_var(
             var_percent=0.0,
             historical_var=0.0,
             method="portfolio",
-            timestamp=datetime.now(UTC)
+            timestamp=datetime.now(UTC),
         )
 
     # Calculate individual position VaRs
@@ -782,7 +787,9 @@ def calculate_portfolio_var(
     for position in positions:
         if position.entry_price is not None and position.current_price is not None:
             # Simple daily return calculation
-            daily_return = (position.current_price - position.entry_price) / position.entry_price
+            daily_return = (
+                position.current_price - position.entry_price
+            ) / position.entry_price
             position_vars.append(daily_return)
             total_portfolio_value += position.current_price * position.quantity
 
@@ -794,7 +801,7 @@ def calculate_portfolio_var(
             var_percent=0.0,
             historical_var=0.0,
             method="portfolio",
-            timestamp=datetime.now(datetime.UTC)
+            timestamp=datetime.now(datetime.UTC),
         )
 
     # Calculate historical VaR
@@ -803,7 +810,9 @@ def calculate_portfolio_var(
     # Calculate parametric VaR
     mean_return = np.mean(position_vars)
     std_return = np.std(position_vars)
-    parametric_var = calculate_parametric_var(position_vars, confidence_level, mean_return, std_return)
+    parametric_var = calculate_parametric_var(
+        position_vars, confidence_level, mean_return, std_return
+    )
 
     # Calculate Monte Carlo VaR
     # For portfolio, we use the average return and std dev
@@ -827,13 +836,14 @@ def calculate_portfolio_var(
         var_percent=float(var_percent),
         historical_var=float(historical_var),
         method="portfolio_comprehensive",
-        timestamp=datetime.now(datetime.UTC)
+        timestamp=datetime.now(datetime.UTC),
     )
+
 
 def calculate_option_portfolio_var(
     option_positions: list[OptionContract],
     underlying_price: float,
-    confidence_level: float = 0.95
+    confidence_level: float = 0.95,
 ) -> VaRResult:
     """
     Calculate VaR for options portfolio using delta-gamma approximation.
@@ -848,7 +858,7 @@ def calculate_option_portfolio_var(
             var_percent=0.0,
             historical_var=0.0,
             method="options_delta_gamma",
-            timestamp=datetime.datetime.now(datetime.UTC)
+            timestamp=datetime.datetime.now(datetime.UTC),
         )
 
     # Calculate portfolio Greeks
@@ -871,7 +881,7 @@ def calculate_option_portfolio_var(
             var_percent=0.0,
             historical_var=0.0,
             method="options_delta_gamma",
-            timestamp=datetime.datetime.now(datetime.UTC)
+            timestamp=datetime.datetime.now(datetime.UTC),
         )
 
     # Estimate underlying volatility (simplified)
@@ -885,7 +895,11 @@ def calculate_option_portfolio_var(
     delta_var = portfolio_delta * underlying_price * underlying_volatility * z_score
 
     # Gamma component (convexity adjustment)
-    gamma_var = 0.5 * portfolio_gamma * (underlying_price * underlying_volatility * z_score) ** 2
+    gamma_var = (
+        0.5
+        * portfolio_gamma
+        * (underlying_price * underlying_volatility * z_score) ** 2
+    )
 
     # Total VaR
     total_var = abs(delta_var + gamma_var)
@@ -898,48 +912,57 @@ def calculate_option_portfolio_var(
         var_percent=float(var_percent),
         historical_var=float(delta_var),  # Store delta component as historical
         method="options_delta_gamma",
-        timestamp=datetime.now(UTC)
+        timestamp=datetime.now(UTC),
     )
+
 
 def calculate_comprehensive_var_analysis(
     trades: list[Trade],
     option_contracts: list[OptionContract],
     historical_prices: list[float],
-    confidence_levels: list[float] = [0.95, 0.99]
-) -> Dict[str, Any]:
+    confidence_levels: list[float] | None = None,
+) -> dict[str, Any]:
     """
     Perform comprehensive VaR analysis across multiple methods and confidence levels.
 
     Returns detailed analysis with multiple VaR calculations.
     """
-    analysis_results: Dict[str, Any] = {
+    # Set default confidence levels if not provided
+    if confidence_levels is None:
+        confidence_levels = [0.95, 0.99]
+
+    analysis_results: dict[str, Any] = {
         "timestamp": datetime.now(datetime.UTC),
         "confidence_levels": confidence_levels,
         "portfolio_analysis": {},
         "options_analysis": {},
-        "historical_analysis": {}
+        "historical_analysis": {},
     }
 
     # Portfolio VaR analysis
     for confidence_level in confidence_levels:
         portfolio_var = calculate_portfolio_var(trades, confidence_level)
-        analysis_results["portfolio_analysis"][f"var_{int(confidence_level*100)}"] = {
+        analysis_results["portfolio_analysis"][f"var_{int(confidence_level * 100)}"] = {
             "var_value": portfolio_var.var_value,
             "var_percent": portfolio_var.var_percent,
             "historical_var": portfolio_var.historical_var,
-            "method": portfolio_var.method
+            "method": portfolio_var.method,
         }
 
     # Options VaR analysis
     if option_contracts:
         underlying_price = historical_prices[-1] if historical_prices else 18000.0
         for confidence_level in confidence_levels:
-            options_var = calculate_option_portfolio_var(option_contracts, underlying_price, confidence_level)
-            analysis_results["options_analysis"][f"var_{int(confidence_level*100)}"] = {
+            options_var = calculate_option_portfolio_var(
+                option_contracts, underlying_price, confidence_level
+            )
+            analysis_results["options_analysis"][
+                f"var_{int(confidence_level * 100)}"
+            ] = {
                 "var_value": options_var.var_value,
                 "var_percent": options_var.var_percent,
                 "historical_var": options_var.historical_var,
-                "method": options_var.method
+                "method": options_var.method,
             }
 
     # Historical VaR analysis
@@ -947,18 +970,24 @@ def calculate_comprehensive_var_analysis(
         historical_var = calculate_historical_var(historical_prices, confidence_level)
         monte_carlo_var = calculate_monte_carlo_var(historical_prices, confidence_level)
         parametric_var = calculate_parametric_var(
-            [(historical_prices[i] - historical_prices[i-1]) / historical_prices[i-1]
-             for i in range(1, len(historical_prices))],
-            confidence_level
+            [
+                (historical_prices[i] - historical_prices[i - 1])
+                / historical_prices[i - 1]
+                for i in range(1, len(historical_prices))
+            ],
+            confidence_level,
         )
 
-        analysis_results["historical_analysis"][f"var_{int(confidence_level*100)}"] = {
+        analysis_results["historical_analysis"][
+            f"var_{int(confidence_level * 100)}"
+        ] = {
             "historical_var": historical_var,
             "monte_carlo_var": monte_carlo_var,
-            "parametric_var": parametric_var
+            "parametric_var": parametric_var,
         }
 
     return analysis_results
+
 
 __all__ = [
     "ExpiredContractError",
