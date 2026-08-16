@@ -348,6 +348,66 @@ class VaRResult(BaseModel):
     method: str
     timestamp: datetime
 
+class TradeDecision(BaseModel):
+    """CMP Trade Decision model for routing to Analyzer."""
+
+    decision_id: str = Field(
+        default_factory=lambda: (
+            f"decision_{datetime.now(UTC).strftime('%Y%m%d%H%M%S%f')}_{uuid4().hex[:8]}"
+        )
+    )
+
+    symbol: str
+    decision_type: SignalType  # BUY, SELL, HOLD, NEUTRAL
+    composite_strength: float = Field(ge=0, le=1)
+    timestamp: datetime
+    entry_price: float = Field(gt=0)
+    quantity: int = Field(gt=0)
+    stop_loss: float = Field(gt=0)
+    take_profit: float | None = Field(default=None, gt=0)
+    trailing_stop_config: dict[str, Any] = Field(default_factory=dict)
+    position_size_method: str = "fixed_fraction"
+    risk_percentage: float = Field(ge=0, le=1)
+    var_analysis: dict[str, Any] = Field(default_factory=dict)
+    gating_rules_result: dict[str, Any] = Field(default_factory=dict)
+    source_breakdown: dict[str, Any] = Field(default_factory=dict)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    status: str = "PENDING"
+
+    @property
+    def risk_reward_ratio(self) -> float:
+        """Calculate risk-reward ratio."""
+        if self.take_profit is None or self.stop_loss is None:
+            return 0.0
+
+        risk = abs(self.entry_price - self.stop_loss)
+        reward = abs(self.take_profit - self.entry_price)
+
+        return reward / risk if risk > 0 else 0.0
+
+    def to_analyzer_payload(self) -> dict[str, Any]:
+        """Convert to Analyzer-compatible payload."""
+        return {
+            "decision_id": self.decision_id,
+            "symbol": self.symbol,
+            "decision_type": str(self.decision_type),
+            "composite_strength": self.composite_strength,
+            "timestamp": self.timestamp.isoformat(),
+            "entry_price": self.entry_price,
+            "quantity": self.quantity,
+            "stop_loss": self.stop_loss,
+            "take_profit": self.take_profit,
+            "trailing_stop_config": self.trailing_stop_config,
+            "position_size_method": self.position_size_method,
+            "risk_percentage": self.risk_percentage,
+            "var_analysis": self.var_analysis,
+            "gating_rules_result": self.gating_rules_result,
+            "source_breakdown": self.source_breakdown,
+            "metadata": self.metadata,
+            "status": self.status,
+            "risk_reward_ratio": self.risk_reward_ratio
+        }
+
 
 class SentimentAnalysisResult(BaseModel):
     """Sentiment analysis result model."""

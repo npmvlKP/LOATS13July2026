@@ -13,13 +13,18 @@ from .config import get_settings
 from .database import db
 from .loats_logging import get_logger
 from .metrics import record_cycle_time, track_job
-from .models import HistoricalData, OptionContract, QuoteData, Signal
+from .models import HistoricalData, OptionContract, QuoteData, Signal, TradeDecision
 from .openalgo import KillSwitchError, async_client
 from .options import analysis, options
+from .rules import rules_engine
 from .scheduler import scheduler
 from .sentiment import sentiment
+from .strength import strength_engine
+from .sizing import sizing_engine
 from .strike_selection import select_strikes
 from .ta import technical_analysis
+from .trade_decision import trade_decision_engine
+from .trailing_stop import trailing_stop_engine
 from .utils.circuit_breaker import OPENALGO_CIRCUIT_BREAKER
 from .utils.resilience import openalgo_circuit_breaker_retry_async
 
@@ -116,6 +121,12 @@ class TradingOrchestrator:
             # Execute sequential operations
             await self._execute_signal_generation()
             await self._execute_risk_management()
+
+            # Execute CMP strategy (only if trading is allowed in current session)
+            if rules_engine.is_trading_allowed():
+                await self._execute_cmp_strategy()
+            else:
+                logger.debug(f"CMP strategy skipped - session: {rules_engine.session_state}")
 
         except Exception as e:
             logger.error(f"Error in trading cycle execution: {e}")
@@ -433,6 +444,104 @@ class TradingOrchestrator:
             if duration > 0.01:  # 10ms budget for risk management
                 logger.warning(
                     f"Risk management exceeded budget: {duration * 1000:.2f}ms"
+                )
+
+    async def _execute_cmp_strategy(self) -> None:
+        """Execute CMP strategy with TradeDecision creation and Analyzer routing."""
+        start_time = datetime.datetime.now(datetime.UTC)
+
+        try:
+            symbol = settings.default_symbol
+
+            # Get all available signals for CMP strategy (≥3 sources required)
+            all_signals = await db.async_get_latest_signals(symbol, limit=10)
+
+            # Filter out only recent signals (last 5 minutes)
+            cutoff_time = datetime.datetime.now(datetime.UTC) - datetime.timedelta(minutes=5)
+            recent_signals = [s for s in all_signals if s.timestamp >= cutoff_time]
+
+            if len(recent_signals) < 3:
+                logger.debug(f"Insufficient signals for CMP strategy: {len(recent_signals)} signals")
+                return
+
+            # Get historical data for gating rules
+            history_data = await self._safe_get_history(symbol, "5min")
+            if not history_data:
+                logger.warning("No historical data available for CMP strategy")
+                return
+
+            historical_data_objs = []
+            for item in history_data.get("data", []):
+                historical_data_objs.append(
+                    HistoricalData(
+                        symbol=symbol,
+                        timestamp=datetime.datetime.fromisoformat(item["timestamp"]),
+                        open=item["open"],
+                        high=item["high"],
+                        low=item["low"],
+                        close=item["close"],
+                        volume=item["volume"],
+                        interval="5min",
+                    )
+                )
+
+            # Get current price and funds
+            quotes = await self._safe_get_quotes([symbol])
+            if not quotes:
+                logger.warning("No quote data available for CMP strategy")
+                return
+
+            quote_data = quotes.get("data", {}).get(symbol, {})
+            current_price = quote_data.get("last_price", 0)
+
+            funds_data = await self._safe_get_funds()
+            if not funds_data or not funds_data.get("data"):
+                logger.warning("No funds data available for CMP strategy")
+                return
+
+            funds = self._create_funds_model(funds_data["data"])
+
+            # Get current positions
+            current_positions = await asyncio.to_thread(
+                db.get_positions, symbol=symbol
+            )
+
+            # Create TradeDecision using CMP strategy
+            decision, creation_result = await trade_decision_engine.create_trade_decision(
+                signals=recent_signals,
+                historical_data=historical_data_objs,
+                current_price=current_price,
+                funds=funds,
+                current_positions=current_positions
+            )
+
+            if decision is None:
+                logger.info(f"CMP strategy decision not created: {creation_result['reason']}")
+                return
+
+            # Route TradeDecision to Analyzer
+            routing_result = await trade_decision_engine.route_to_analyzer(decision)
+
+            if routing_result["status"] == "success":
+                logger.info(f"Successfully created and routed CMP TradeDecision: {decision.decision_id}")
+                logger.debug(f"TradeDecision details: {decision.to_analyzer_payload()}")
+
+                # Store the decision in database
+                await db.async_create_trade_decision(decision)
+            else:
+                logger.warning(f"Failed to route CMP TradeDecision: {routing_result}")
+
+        except Exception as e:
+            logger.error(f"CMP strategy execution failed: {e}")
+            raise
+
+        finally:
+            duration = (
+                datetime.datetime.now(datetime.UTC) - start_time
+            ).total_seconds()
+            if duration > 0.05:  # 50ms budget for CMP strategy
+                logger.warning(
+                    f"CMP strategy exceeded budget: {duration * 1000:.2f}ms"
                 )
 
     async def _execute_strike_selection(

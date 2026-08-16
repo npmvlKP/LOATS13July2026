@@ -26,6 +26,7 @@ from .models import (
     QuoteData,
     Signal,
     Trade,
+    TradeDecision,
 )
 
 # Note: aiosqlite is imported locally in async methods where needed
@@ -283,6 +284,39 @@ class Database:
                 timestamp_ms INTEGER NOT NULL DEFAULT 0
             )
         """)
+
+        # Create trade_decisions table for CMP strategy
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS trade_decisions (
+                decision_id TEXT PRIMARY KEY,
+                symbol TEXT NOT NULL,
+                decision_type TEXT NOT NULL,
+                composite_strength REAL NOT NULL,
+                timestamp TEXT NOT NULL,
+                entry_price REAL NOT NULL,
+                quantity INTEGER NOT NULL,
+                stop_loss REAL NOT NULL,
+                take_profit REAL,
+                trailing_stop_config TEXT,
+                position_size_method TEXT NOT NULL,
+                risk_percentage REAL NOT NULL,
+                var_analysis TEXT,
+                gating_rules_result TEXT,
+                source_breakdown TEXT,
+                metadata TEXT,
+                status TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                created_at_ms INTEGER NOT NULL DEFAULT 0,
+                updated_at_ms INTEGER NOT NULL DEFAULT 0,
+                timestamp_ms INTEGER NOT NULL DEFAULT 0
+            )
+        """)
+
+        # Create index for trade_decisions
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_trade_decisions_symbol ON trade_decisions(symbol)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_trade_decisions_status ON trade_decisions(status)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_trade_decisions_timestamp ON trade_decisions(timestamp)")
 
         # Create indexes performance
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_trades_symbol ON trades(symbol)")
@@ -1641,6 +1675,198 @@ class Database:
         )
 
     # -------------------------------------------------------------------------
+    # TradeDecision CRUD methods for CMP strategy
+    # -------------------------------------------------------------------------
+
+    def create_trade_decision(self, decision: TradeDecision) -> bool:
+        """
+        Create new trade decision record.
+        Args:
+            decision: TradeDecision model instance
+        Returns:
+            True successful
+        """
+        now = datetime.now(UTC)
+        now_iso = now.isoformat()
+        now_ms = int(now.timestamp() * 1000)
+        ts_ms = int(decision.timestamp.timestamp() * 1000)
+
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO trade_decisions
+            (decision_id, symbol, decision_type, composite_strength, timestamp,
+             entry_price, quantity, stop_loss, take_profit, trailing_stop_config,
+             position_size_method, risk_percentage, var_analysis, gating_rules_result,
+             source_breakdown, metadata, status, created_at, updated_at,
+             created_at_ms, updated_at_ms, timestamp_ms)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                decision.decision_id,
+                decision.symbol,
+                decision.decision_type.value,
+                decision.composite_strength,
+                decision.timestamp.isoformat(),
+                decision.entry_price,
+                decision.quantity,
+                decision.stop_loss,
+                decision.take_profit,
+                json.dumps(decision.trailing_stop_config) if decision.trailing_stop_config else None,
+                decision.position_size_method,
+                decision.risk_percentage,
+                json.dumps(decision.var_analysis) if decision.var_analysis else None,
+                json.dumps(decision.gating_rules_result) if decision.gating_rules_result else None,
+                json.dumps(decision.source_breakdown) if decision.source_breakdown else None,
+                json.dumps(decision.metadata) if decision.metadata else None,
+                decision.status,
+                now_iso,
+                now_iso,
+                now_ms,
+                now_ms,
+                ts_ms,
+            ),
+        )
+        conn.commit()
+        self._log_audit(
+            action="CREATE",
+            entity_type="trade_decision",
+            entity_id=decision.decision_id,
+            new_state=self._model_to_dict(decision),
+        )
+        return True
+
+    def get_trade_decision(self, decision_id: str) -> TradeDecision | None:
+        """
+        Retrieve trade decision ID.
+        Args:
+            decision_id: Trade decision identifier
+        Returns:
+            TradeDecision model None not found
+        """
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM trade_decisions WHERE decision_id = ?", (decision_id,))
+        row = cursor.fetchone()
+        if row is None:
+            return None
+        return self._row_to_trade_decision(row)
+
+    def get_trade_decisions(self, symbol: str | None = None, status: str | None = None, limit: int = 100) -> list[TradeDecision]:
+        """
+        Get trade decisions with optional filters.
+        Args:
+            symbol: Optional symbol filter
+            status: Optional status filter
+            limit: Maximum number decisions return
+        Returns:
+            List TradeDecision models
+        """
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        if symbol and status:
+            cursor.execute(
+                "SELECT * FROM trade_decisions WHERE symbol = ? AND status = ? ORDER BY timestamp DESC LIMIT ?",
+                (symbol, status, limit),
+            )
+        elif symbol:
+            cursor.execute(
+                "SELECT * FROM trade_decisions WHERE symbol = ? ORDER BY timestamp DESC LIMIT ?",
+                (symbol, limit),
+            )
+        elif status:
+            cursor.execute(
+                "SELECT * FROM trade_decisions WHERE status = ? ORDER BY timestamp DESC LIMIT ?",
+                (status, limit),
+            )
+        else:
+            cursor.execute(
+                "SELECT * FROM trade_decisions ORDER BY timestamp DESC LIMIT ?", (limit,)
+            )
+
+        rows = cursor.fetchall()
+        return [self._row_to_trade_decision(row) for row in rows]
+
+    def update_trade_decision_status(self, decision_id: str, status: str) -> bool:
+        """
+        Update status trade decision.
+        Args:
+            decision_id: Trade decision identifier
+            status: New status value
+        Returns:
+            True if decision was found and updated, False if decision doesn't exist
+        """
+        now = datetime.now(UTC)
+        now_iso = now.isoformat()
+        now_ms = int(now.timestamp() * 1000)
+
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        # Check if decision exists first
+        cursor.execute("SELECT 1 FROM trade_decisions WHERE decision_id = ?", (decision_id,))
+        if cursor.fetchone() is None:
+            return False
+
+        # Get previous state audit
+        previous = self.get_trade_decision(decision_id)
+        previous_state = self._model_to_dict(previous) if previous else None
+
+        # Update the decision
+        cursor.execute(
+            "UPDATE trade_decisions SET status = ?, updated_at = ?, updated_at_ms = ? WHERE decision_id = ?",
+            (status, now_iso, now_ms, decision_id),
+        )
+        conn.commit()
+
+        # Log audit
+        updated_decision = self.get_trade_decision(decision_id)
+        if updated_decision:
+            self._log_audit(
+                action="UPDATE",
+                entity_type="trade_decision",
+                entity_id=decision_id,
+                previous_state=previous_state,
+                new_state=self._model_to_dict(updated_decision),
+            )
+
+        return True
+
+    def _row_to_trade_decision(self, row: Any) -> TradeDecision:
+        """Convert database row TradeDecision model."""
+        from .models import SignalType
+
+        # Use stored timestamps available
+        timestamp = None
+        if len(row) > 21 and row[21]:
+            timestamp_ms = row[21]
+            timestamp = datetime.fromtimestamp(timestamp_ms / 1000, tz=UTC)
+        else:
+            timestamp = datetime.fromisoformat(row[4])
+
+        return TradeDecision(
+            decision_id=row[0],
+            symbol=row[1],
+            decision_type=SignalType(row[2]),
+            composite_strength=row[3],
+            timestamp=timestamp,
+            entry_price=row[5],
+            quantity=row[6],
+            stop_loss=row[7],
+            take_profit=row[8],
+            trailing_stop_config=json.loads(row[9]) if row[9] else {},
+            position_size_method=row[10],
+            risk_percentage=row[11],
+            var_analysis=json.loads(row[12]) if row[12] else {},
+            gating_rules_result=json.loads(row[13]) if row[13] else {},
+            source_breakdown=json.loads(row[14]) if row[14] else {},
+            metadata=json.loads(row[15]) if row[15] else {},
+            status=row[16],
+        )
+
+    # -------------------------------------------------------------------------
     # Audit log methods
     # -------------------------------------------------------------------------
 
@@ -1842,6 +2068,32 @@ class Database:
     async def async_update_order_status(self, order_id: str, status: str) -> bool:
         """Async wrapper update_order_status() avoid blocking event loop."""
         return await asyncio.to_thread(self.update_order_status, order_id, status)
+
+    async def async_create_trade_decision(self, decision: TradeDecision) -> bool:
+        """Async wrapper create_trade_decision() avoid blocking event loop."""
+        return await asyncio.to_thread(self.create_trade_decision, decision)
+
+    async def async_get_latest_signals(
+        self, symbol: str, limit: int = 10, scan_type: str | None = None
+    ) -> list[Signal]:
+        """Async wrapper get_latest_signals() avoid blocking event loop."""
+        return await asyncio.to_thread(
+            self.get_latest_signals, symbol, limit, scan_type
+        )
+
+    async def async_get_trade_decision(self, decision_id: str) -> TradeDecision | None:
+        """Async wrapper get_trade_decision() avoid blocking event loop."""
+        return await asyncio.to_thread(self.get_trade_decision, decision_id)
+
+    async def async_get_trade_decisions(
+        self, symbol: str | None = None, status: str | None = None, limit: int = 100
+    ) -> list[TradeDecision]:
+        """Async wrapper get_trade_decisions() avoid blocking event loop."""
+        return await asyncio.to_thread(self.get_trade_decisions, symbol, status, limit)
+
+    async def async_update_trade_decision_status(self, decision_id: str, status: str) -> bool:
+        """Async wrapper update_trade_decision_status() avoid blocking event loop."""
+        return await asyncio.to_thread(self.update_trade_decision_status, decision_id, status)
 
 
 # Module-level singleton Database instance (F-CONC-3).
