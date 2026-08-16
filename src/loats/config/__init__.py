@@ -15,8 +15,8 @@ from .settings import Settings, get_settings
 # opposite — a silent type/runtime divergence.
 #
 # Use one of the following instead:
-#   * ``from loats.config import get_settings`` — the lru_cached accessor
+#   * ``from loats.config import get_settings`` - the lru_cached accessor
 #     used throughout ``src/loats`` (lazy, single shared instance).
-#   * ``from loats import settings`` — the top-level lazy accessor, which is
+#   * ``from loats import settings`` - the top-level lazy accessor, which is
 #     not shadowed because there is no ``loats/settings.py`` submodule.
 __all__ = ["Settings", "get_settings"]

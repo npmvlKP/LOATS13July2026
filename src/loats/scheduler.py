@@ -40,7 +40,7 @@ logger = get_logger(__name__)
 # 2027-2028 = projected per calendarlabs.com; re-verify against the
 # official NSE circular (published ~Dec) before each trading year.
 _NSE_HOLIDAY_TUPLES: tuple[tuple[int, int, int], ...] = (
-    # 2026 — official NSE / NSE Indices calendar
+    # 2026 - official NSE / NSE Indices calendar
     (2026, 1, 15),
     (2026, 1, 26),
     (2026, 3, 3),
@@ -57,7 +57,7 @@ _NSE_HOLIDAY_TUPLES: tuple[tuple[int, int, int], ...] = (
     (2026, 11, 10),
     (2026, 11, 24),
     (2026, 12, 25),
-    # 2027 — projected (verify vs official NSE circular)
+    # 2027 - projected (verify vs official NSE circular)
     (2027, 1, 26),
     (2027, 3, 6),
     (2027, 3, 10),
@@ -76,7 +76,7 @@ _NSE_HOLIDAY_TUPLES: tuple[tuple[int, int, int], ...] = (
     (2027, 10, 29),
     (2027, 11, 14),
     (2027, 12, 25),
-    # 2028 — projected (verify vs official NSE circular; Good Friday corrected)
+    # 2028 - projected (verify vs official NSE circular; Good Friday corrected)
     (2028, 1, 26),
     (2028, 2, 23),
     (2028, 2, 27),
