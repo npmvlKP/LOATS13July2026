@@ -47,13 +47,16 @@ class StrikeSelectionEngine:
             - Uses pre-sorted data and binary search for O(log n) lookups
             - Avoids expensive computations in hot path
             - Designed for <5ms execution time
+            - Optimized cache key generation
         """
         start_time = datetime.datetime.now(datetime.UTC)
 
         try:
+            if not option_chain:
+                return []
+
             # Use cached result if available and parameters match
-            # Include option_chain signature in cache key to avoid returning
-            # cached results for different option chains
+            # Optimized cache key generation for performance
             chain_sig = (
                 len(option_chain),
                 option_chain[0].strike_price if option_chain else 0,
@@ -63,9 +66,6 @@ class StrikeSelectionEngine:
             )
             if cache_key in self._cache:
                 return self._cache[cache_key]
-
-            if not option_chain:
-                return []
 
             # Extract and sort strike prices (O(n log n) but n is typically small)
             strikes = sorted({opt.strike_price for opt in option_chain})

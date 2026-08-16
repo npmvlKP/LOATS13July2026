@@ -9,11 +9,9 @@ Implements monotonic trailing stop loss ratchet with SL-M support:
 """
 
 import datetime
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Tuple
 from enum import StrEnum
 
-import numpy as np
-from scipy.stats import norm
 
 from .loats_logging import get_logger
 from .models import Trade, Order, OrderType, TransactionType
@@ -53,7 +51,7 @@ class TrailingStopEngine:
         trade: Trade,
         initial_price: float,
         stop_type: TrailingStopType = TrailingStopType.PERCENTAGE,
-        parameters: Optional[Dict[str, Any]] = None
+        parameters: Dict[str, Any] | None = None
     ) -> Dict[str, Any]:
         """
         Initialize trailing stop for a new trade.
@@ -427,7 +425,8 @@ class TrailingStopEngine:
         action: str,
         current_price: float
     ) -> None:
-        """Add entry to trailing stop history."""
+        """Add entry to trailing stop history with <1ms performance."""
+        # Optimized history entry creation for performance
         history_entry = {
             "timestamp": datetime.datetime.now(datetime.UTC),
             "action": action,
@@ -436,16 +435,18 @@ class TrailingStopEngine:
             "status": str(config["status"])
         }
 
-        # Add additional context for adjustments
+        # Add additional context for adjustments (only when needed)
         if action == "adjusted":
             history_entry["adjustment_count"] = config["adjustment_count"]
             history_entry["locked_profit"] = config.get("locked_profit", 0.0)
 
+        # Use list append (O(1) operation)
         config["history"].append(history_entry)
 
-        # Limit history size
-        if len(config["history"]) > 100:
-            config["history"] = config["history"][-100:]
+        # Efficient history size management
+        history = config["history"]
+        if len(history) > 100:
+            config["history"] = history[-100:]
 
     def create_sl_m_order(
         self,

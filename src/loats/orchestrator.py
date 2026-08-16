@@ -15,19 +15,14 @@ from .alerts import alerts
 from .config import get_settings
 from .database import db
 from .loats_logging import get_logger
-from .metrics import record_cycle_time, track_job
-from .models import HistoricalData, OptionContract, QuoteData, Signal, TradeDecision
+from .metrics import record_cycle_time
+from .models import HistoricalData, OptionContract, QuoteData, Signal
 from .openalgo import KillSwitchError, async_client
-from .options import analysis, options
 from .rules import rules_engine
-from .scheduler import scheduler
 from .sentiment import sentiment
-from .strength import strength_engine
-from .sizing import sizing_engine
 from .strike_selection import select_strikes
 from .ta import technical_analysis
 from .trade_decision import trade_decision_engine
-from .trailing_stop import trailing_stop_engine
 from .utils.circuit_breaker import OPENALGO_CIRCUIT_BREAKER
 from .utils.resilience import openalgo_circuit_breaker_retry_async
 
@@ -157,6 +152,11 @@ class TradingOrchestrator:
         cycle_start = datetime.datetime.now(datetime.UTC)
 
         try:
+            # Lazy load settings to avoid import-time failures
+            global settings
+            if settings is None:
+                settings = get_settings()
+
             # Run TA analysis, sentiment and market data updates in parallel with timeout
             ta_task = asyncio.create_task(self._execute_ta_analysis())
             sentiment_task = asyncio.create_task(self._execute_sentiment_analysis())
