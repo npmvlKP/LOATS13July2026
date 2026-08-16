@@ -5,24 +5,22 @@ This tests the R5-F-07 technical debt item resolution.
 """
 
 import sys
-import os
 import tempfile
-import shutil
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from pathlib import Path
 
 # Add the src directory to the Python path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
+from loats.database import Database
 from loats.models import (
     Order,
-    OrderType,
     OrderStatus,
-    TransactionType,
-    ProductType,
+    OrderType,
     OrderVariety,
+    ProductType,
+    TransactionType,
 )
-from loats.database import Database
 
 
 def test_idempotency_key_functionality():

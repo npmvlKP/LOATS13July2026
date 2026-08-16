@@ -2,13 +2,14 @@
 Test to demonstrate the threading issue with asyncio.Lock in cache initialization.
 This test shows that asyncio.Lock is not thread-safe when accessed from multiple threads.
 """
+
 import asyncio
-import threading
 from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
 from loats.utils.cache import CacheConfig, CacheManager
+
 
 class TestCacheThreadingIssue:
     """Tests to demonstrate threading issues with asyncio.Lock."""
@@ -41,8 +42,8 @@ class TestCacheThreadingIssue:
                 result = loop.run_until_complete(init_cache())
                 return f"thread_{thread_id}_success_{result}"
             except Exception as e:
-                errors.append(f"thread_{thread_id}_error_{str(e)}")
-                return f"thread_{thread_id}_error_{str(e)}"
+                errors.append(f"thread_{thread_id}_error_{e!s}")
+                return f"thread_{thread_id}_error_{e!s}"
             finally:
                 loop.close()
 

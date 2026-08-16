@@ -2,23 +2,24 @@
 Performance Analyzer for LOATS13July2026.
 Implements comprehensive latency measurement and CMP P1/P5 validation.
 """
+
 import asyncio
-import time
 import statistics
+import time
 from collections import deque
-from datetime import datetime, UTC, timedelta
-from typing import Any, Callable, Coroutine, Deque, Dict, List, Optional, Tuple
+from collections.abc import Callable, Coroutine
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
-import aiosqlite
 import numpy as np
-import pandas as pd
 
-from .loats_logging import get_logger
 from .database import Database
-from .models import HistoricalData, Signal, Trade, TradeDecision, SignalType
-from .ta import calculate_supertrend, TechnicalAnalysis
+from .loats_logging import get_logger
+from .models import HistoricalData, Signal, SignalType
+from .ta import TechnicalAnalysis
 
 logger = get_logger(__name__)
+
 
 class LatencyMeasurement:
     """Single latency measurement with metadata."""
@@ -29,7 +30,7 @@ class LatencyMeasurement:
         start_time: float,
         end_time: float,
         success: bool,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
     ):
         self.operation = operation
         self.start_time = start_time
@@ -39,7 +40,7 @@ class LatencyMeasurement:
         self.metadata = metadata or {}
         self.timestamp = datetime.now(UTC)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
             "operation": self.operation,
@@ -51,13 +52,14 @@ class LatencyMeasurement:
             "timestamp": self.timestamp.isoformat(),
         }
 
+
 class PerformanceAnalyzer:
     """Comprehensive performance analyzer for LOATS13July2026."""
 
     def __init__(self, max_history: int = 1000):
         self.max_history = max_history
-        self.latency_history: Deque[LatencyMeasurement] = deque(maxlen=max_history)
-        self.operation_stats: Dict[str, List[float]] = {}
+        self.latency_history: deque[LatencyMeasurement] = deque(maxlen=max_history)
+        self.operation_stats: dict[str, list[float]] = {}
         self.lock = asyncio.Lock()
 
     async def measure_latency(
@@ -66,7 +68,7 @@ class PerformanceAnalyzer:
         func: Callable[..., Coroutine[Any, Any, Any]],
         *args,
         **kwargs,
-    ) -> Tuple[Any, LatencyMeasurement]:
+    ) -> tuple[Any, LatencyMeasurement]:
         """Measure latency of an async function."""
         start_time = time.perf_counter()
         metadata = kwargs.pop("_metadata", {})
@@ -104,7 +106,7 @@ class PerformanceAnalyzer:
         func: Callable[..., Any],
         *args,
         **kwargs,
-    ) -> Tuple[Any, LatencyMeasurement]:
+    ) -> tuple[Any, LatencyMeasurement]:
         """Measure latency of a sync function."""
         start_time = time.perf_counter()
         metadata = kwargs.pop("_metadata", {})
@@ -136,7 +138,7 @@ class PerformanceAnalyzer:
 
         return result, measurement
 
-    def get_statistics(self, operation: Optional[str] = None) -> Dict[str, Any]:
+    def get_statistics(self, operation: str | None = None) -> dict[str, Any]:
         """Get statistics for a specific operation or all operations."""
         if operation:
             durations = self.operation_stats.get(operation, [])
@@ -163,7 +165,9 @@ class PerformanceAnalyzer:
                         "max": max(durations),
                         "mean": statistics.mean(durations),
                         "median": statistics.median(durations),
-                        "std_dev": statistics.stdev(durations) if len(durations) > 1 else 0,
+                        "std_dev": statistics.stdev(durations)
+                        if len(durations) > 1
+                        else 0,
                         "p95": np.percentile(durations, 95),
                         "p99": np.percentile(durations, 99),
                     }
@@ -175,7 +179,7 @@ class PerformanceAnalyzer:
         self,
         p1_threshold: float = 0.001,  # 1ms for P1
         p5_threshold: float = 0.005,  # 5ms for P5
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Validate CMP P1/P5 latency gates."""
         stats = self.get_statistics()
 
@@ -199,7 +203,7 @@ class PerformanceAnalyzer:
 
         return validation_results
 
-    def get_recent_measurements(self, limit: int = 100) -> List[Dict[str, Any]]:
+    def get_recent_measurements(self, limit: int = 100) -> list[dict[str, Any]]:
         """Get recent latency measurements."""
         return [m.to_dict() for m in list(self.latency_history)[:limit]]
 
@@ -208,6 +212,7 @@ class PerformanceAnalyzer:
         self.latency_history.clear()
         self.operation_stats.clear()
 
+
 class DatabasePerformanceAnalyzer:
     """Specialized analyzer for database operations."""
 
@@ -215,7 +220,9 @@ class DatabasePerformanceAnalyzer:
         self.db = db
         self.analyzer = PerformanceAnalyzer()
 
-    async def measure_database_operations(self, iterations: int = 100) -> Dict[str, Any]:
+    async def measure_database_operations(
+        self, iterations: int = 100
+    ) -> dict[str, Any]:
         """Measure comprehensive database operation latencies."""
         results = {}
 
@@ -287,43 +294,43 @@ class DatabasePerformanceAnalyzer:
             await self.analyzer.measure_latency(
                 f"async_create_signal_{i}",
                 test_async_create_signal,
-                _metadata={"iteration": i, "operation_type": "async_write"}
+                _metadata={"iteration": i, "operation_type": "async_write"},
             )
 
             await self.analyzer.measure_latency(
                 f"async_store_historical_{i}",
                 test_async_store_historical,
-                _metadata={"iteration": i, "operation_type": "async_write"}
+                _metadata={"iteration": i, "operation_type": "async_write"},
             )
 
             await self.analyzer.measure_latency(
                 f"async_get_signals_{i}",
                 test_async_get_signals,
-                _metadata={"iteration": i, "operation_type": "async_read"}
+                _metadata={"iteration": i, "operation_type": "async_read"},
             )
 
             # Sync operations
             await self.analyzer.measure_sync_latency(
                 f"sync_create_signal_{i}",
                 test_sync_create_signal,
-                _metadata={"iteration": i, "operation_type": "sync_write"}
+                _metadata={"iteration": i, "operation_type": "sync_write"},
             )
 
             await self.analyzer.measure_sync_latency(
                 f"sync_store_historical_{i}",
                 test_sync_store_historical,
-                _metadata={"iteration": i, "operation_type": "sync_write"}
+                _metadata={"iteration": i, "operation_type": "sync_write"},
             )
 
             await self.analyzer.measure_sync_latency(
                 f"sync_get_signals_{i}",
                 test_sync_get_signals,
-                _metadata={"iteration": i, "operation_type": "sync_read"}
+                _metadata={"iteration": i, "operation_type": "sync_read"},
             )
 
         return self.analyzer.get_statistics()
 
-    async def measure_analyze_round_trip(self, data_size: int = 1000) -> Dict[str, Any]:
+    async def measure_analyze_round_trip(self, data_size: int = 1000) -> dict[str, Any]:
         """Measure ANALYZE round-trip latency with realistic data."""
         # Generate test data
         test_data = self._generate_test_data(data_size)
@@ -332,9 +339,7 @@ class DatabasePerformanceAnalyzer:
         ta = TechnicalAnalysis()
 
         async def measure_ta_calculation():
-            indicators = await asyncio.to_thread(
-                ta.calculate_indicators, test_data
-            )
+            indicators = await asyncio.to_thread(ta.calculate_indicators, test_data)
             return len(indicators)
 
         # Measure database operations
@@ -347,15 +352,11 @@ class DatabasePerformanceAnalyzer:
 
         # Run measurements
         ta_result, ta_measurement = await self.analyzer.measure_latency(
-            "ta_calculation",
-            measure_ta_calculation,
-            _metadata={"data_size": data_size}
+            "ta_calculation", measure_ta_calculation, _metadata={"data_size": data_size}
         )
 
         db_result, db_measurement = await self.analyzer.measure_latency(
-            "db_operations",
-            measure_db_operations,
-            _metadata={"data_size": data_size}
+            "db_operations", measure_db_operations, _metadata={"data_size": data_size}
         )
 
         # Calculate round-trip
@@ -374,7 +375,7 @@ class DatabasePerformanceAnalyzer:
             "db_result": db_result,
         }
 
-    def _generate_test_data(self, size: int) -> List[HistoricalData]:
+    def _generate_test_data(self, size: int) -> list[HistoricalData]:
         """Generate test historical data."""
         base_time = datetime.now(UTC)
         data = []
@@ -397,10 +398,12 @@ class DatabasePerformanceAnalyzer:
 
         return data
 
+
 # Global performance analyzer instance
 performance_analyzer = PerformanceAnalyzer()
 
-async def run_comprehensive_analysis(db: Database) -> Dict[str, Any]:
+
+async def run_comprehensive_analysis(db: Database) -> dict[str, Any]:
     """Run comprehensive performance analysis."""
     logger.info("Starting comprehensive performance analysis")
 
@@ -408,16 +411,24 @@ async def run_comprehensive_analysis(db: Database) -> Dict[str, Any]:
     db_performance_analyzer = DatabasePerformanceAnalyzer(db)
 
     # Database operations analysis
-    db_results = await db_performance_analyzer.measure_database_operations(iterations=50)
+    db_results = await db_performance_analyzer.measure_database_operations(
+        iterations=50
+    )
     logger.info(f"Database analysis complete: {len(db_results)} operations measured")
 
     # ANALYZE round-trip analysis
-    analyze_results = await db_performance_analyzer.measure_analyze_round_trip(data_size=500)
-    logger.info(f"ANALYZE round-trip complete: {analyze_results['round_trip']['duration']:.4f}s")
+    analyze_results = await db_performance_analyzer.measure_analyze_round_trip(
+        data_size=500
+    )
+    logger.info(
+        f"ANALYZE round-trip complete: {analyze_results['round_trip']['duration']:.4f}s"
+    )
 
     # CMP latency validation
     validation_results = performance_analyzer.validate_cmp_latency_gates()
-    logger.info(f"CMP validation complete: {len(validation_results)} operations validated")
+    logger.info(
+        f"CMP validation complete: {len(validation_results)} operations validated"
+    )
 
     return {
         "database_operations": db_results,
@@ -426,7 +437,8 @@ async def run_comprehensive_analysis(db: Database) -> Dict[str, Any]:
         "timestamp": datetime.now(UTC).isoformat(),
     }
 
-async def run_latency_benchmark(db: Database) -> Dict[str, Any]:
+
+async def run_latency_benchmark(db: Database) -> dict[str, Any]:
     """Run focused latency benchmark for CMP P1/P5 validation."""
     logger.info("Starting CMP P1/P5 latency benchmark")
 
@@ -478,13 +490,13 @@ async def run_latency_benchmark(db: Database) -> Dict[str, Any]:
         await performance_analyzer.measure_latency(
             f"signal_round_trip_{i}",
             test_signal_round_trip,
-            _metadata={"iteration": i, "test_type": "signal"}
+            _metadata={"iteration": i, "test_type": "signal"},
         )
 
         await performance_analyzer.measure_latency(
             f"historical_processing_{i}",
             test_historical_processing,
-            _metadata={"iteration": i, "test_type": "historical"}
+            _metadata={"iteration": i, "test_type": "historical"},
         )
 
     # Get statistics
@@ -502,6 +514,7 @@ async def run_latency_benchmark(db: Database) -> Dict[str, Any]:
         "iterations": iterations,
         "timestamp": datetime.now(UTC).isoformat(),
     }
+
 
 # Module-level exports
 analyzer = performance_analyzer

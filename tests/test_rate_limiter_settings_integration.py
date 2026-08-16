@@ -12,8 +12,6 @@ This caused the rate limiters to allow 50 operations per second instead of the C
 limit of 3 operations per second, violating compliance requirements.
 """
 
-import asyncio
-
 import pytest
 
 from loats.config import get_settings

@@ -2,7 +2,7 @@
 Lightweight caching utilities for LOATS13July2026 LITE edition.
 Implements simple in-memory caching optimized for minimal resource usage.
 """
-import asyncio
+
 import hashlib
 import json
 import threading
@@ -17,6 +17,7 @@ from ..loats_logging import get_logger
 logger = get_logger(__name__)
 
 T = TypeVar("T")
+
 
 class CacheConfig:
     """Configuration for cache operations (LITE edition - in-memory only)."""
@@ -41,6 +42,7 @@ class CacheConfig:
         self.max_size = max_size
         self.cache_type = cache_type
 
+
 class CacheManager:
     """Cache manager for LOATS13July2026 LITE edition.
     Uses in-memory caching only.
@@ -50,7 +52,9 @@ class CacheManager:
         """Initialize cache manager with in-memory cache."""
         self.config = config
         self._cache: TTLCache[str, Any] | None = None
-        self._cache_lock = threading.RLock()  # FIX-F-THREAD-1: Use threading.RLock for thread safety
+        self._cache_lock = (
+            threading.RLock()
+        )  # FIX-F-THREAD-1: Use threading.RLock for thread safety
         self._init_lock = threading.RLock()  # FIX-F-THREAD-8: Use threading.RLock instead of asyncio.Lock for thread safety
         self._cache_stats = {
             "hits": 0,
@@ -334,6 +338,7 @@ class CacheManager:
             logger.error(f"Cache stats failed: {e}")
             return {"enabled": False, "error": str(e)}
 
+
 # Global cache manager instance (LITE edition - in-memory only)
 cache_config = CacheConfig(
     ttl_seconds=300,  # 5 minutes default TTL
@@ -344,13 +349,16 @@ cache_config = CacheConfig(
 
 cache_manager = CacheManager(cache_config)
 
+
 async def initialize_cache() -> None:
     """Initialize the lightweight global cache manager."""
     await cache_manager.initialize()
 
+
 async def close_cache() -> None:
     """Close the lightweight global cache manager."""
     await cache_manager.close()
+
 
 def _hash_text(text: str) -> str:
     """Return deterministic SHA-256 digest for cache keys.
@@ -359,6 +367,7 @@ def _hash_text(text: str) -> str:
     different cache keys across processes, defeating shared caches.
     """
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
 
 def model_to_cache_key(model: BaseModel) -> str:
     """Convert BaseModel to cache key."""
@@ -369,6 +378,7 @@ def model_to_cache_key(model: BaseModel) -> str:
             f"{_hash_text(model.model_dump_json())}"
         )
     return f"{model.__class__.__name__}:{_hash_text(model.model_dump_json())}"
+
 
 def dict_to_cache_key(data: dict[str, Any]) -> str:
     """Convert dict to cache key."""

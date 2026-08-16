@@ -128,7 +128,9 @@ class AsyncRateLimiter:
     a maximum number of operations within a sliding time window.
     """
 
-    def __init__(self, max_ops: int | None = None, window_size: float = 1.0, clock=None):
+    def __init__(
+        self, max_ops: int | None = None, window_size: float = 1.0, clock=None
+    ):
         """Initialize async rate limiter.
 
         Args:
@@ -489,7 +491,9 @@ def get_sync_smart_order_rate_limiter(
 # ---------------------------------------------------------------------------
 # Testing utilities
 # ---------------------------------------------------------------------------
-def create_test_rate_limiter(max_ops: int = 5, window_size: float = 1.0, clock=None) -> AsyncRateLimiter:
+def create_test_rate_limiter(
+    max_ops: int = 5, window_size: float = 1.0, clock=None
+) -> AsyncRateLimiter:
     """Create a test rate limiter with optional clock injection.
 
     Args:
@@ -501,6 +505,7 @@ def create_test_rate_limiter(max_ops: int = 5, window_size: float = 1.0, clock=N
         AsyncRateLimiter instance with injected clock
     """
     return AsyncRateLimiter(max_ops=max_ops, window_size=window_size, clock=clock)
+
 
 def _reset_singletons_for_testing() -> None:
     """Reset all singleton instances.

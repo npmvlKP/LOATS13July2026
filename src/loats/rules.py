@@ -8,33 +8,37 @@ Implements the core gating rules for the CMP trading strategy:
 """
 
 import datetime
-from typing import Any, Dict, List, Optional, Tuple
 from enum import StrEnum
+from typing import Any
 
 import numpy as np
 import pandas as pd
-from scipy.stats import norm
 
-from .loats_logging import get_logger
-from .models import HistoricalData, Signal, SignalType, Trade, VaRResult
 from .config import get_settings
+from .loats_logging import get_logger
+from .models import HistoricalData, Signal, SignalType, Trade
 
 logger = get_logger(__name__)
 settings = get_settings()
 
+
 class RuleType(StrEnum):
     """Rule type enumeration."""
+
     GATING = "GATING"
     RISK = "RISK"
     POSITION = "POSITION"
     SESSION = "SESSION"
 
+
 class TradingSession(StrEnum):
     """Trading session enumeration."""
+
     PRE_OPEN = "PRE_OPEN"
     REGULAR = "REGULAR"
     POST_CLOSE = "POST_CLOSE"
     AFTER_HOURS = "AFTER_HOURS"
+
 
 class CMPRulesEngine:
     """CMP Strategy Rules Engine with comprehensive gating logic."""
@@ -45,7 +49,9 @@ class CMPRulesEngine:
         self.session_state = TradingSession.PRE_OPEN
         self.last_session_update = datetime.datetime.now(datetime.UTC)
 
-    def get_current_session(self, current_time: Optional[datetime.datetime] = None) -> TradingSession:
+    def get_current_session(
+        self, current_time: datetime.datetime | None = None
+    ) -> TradingSession:
         """
         Determine current trading session based on Indian market hours.
 
@@ -64,7 +70,9 @@ class CMPRulesEngine:
         # Determine session
         if ist_time.hour == 9 and ist_time.minute < 15:
             return TradingSession.PRE_OPEN
-        elif (ist_time.hour == 9 and ist_time.minute >= 15) or (ist_time.hour >= 10 and ist_time.hour < 15):
+        elif (ist_time.hour == 9 and ist_time.minute >= 15) or (
+            ist_time.hour >= 10 and ist_time.hour < 15
+        ):
             return TradingSession.REGULAR
         elif ist_time.hour == 15 and ist_time.minute < 30:
             return TradingSession.REGULAR
@@ -79,7 +87,9 @@ class CMPRulesEngine:
         """Update current trading session state."""
         current_session = self.get_current_session()
         if current_session != self.session_state:
-            logger.info(f"Session transition: {self.session_state} -> {current_session}")
+            logger.info(
+                f"Session transition: {self.session_state} -> {current_session}"
+            )
             self.session_state = current_session
             self.last_session_update = datetime.datetime.now(datetime.UTC)
 
@@ -88,7 +98,9 @@ class CMPRulesEngine:
         self.update_session_state()
         return self.session_state == TradingSession.REGULAR
 
-    def calculate_iv_rank(self, historical_data: List[HistoricalData], window: int = 30) -> float:
+    def calculate_iv_rank(
+        self, historical_data: list[HistoricalData], window: int = 30
+    ) -> float:
         """
         Calculate IV Rank (Implied Volatility Rank).
 
@@ -99,15 +111,23 @@ class CMPRulesEngine:
 
         # Extract closing prices and calculate returns
         closes = [h.close for h in historical_data[-window:]]
-        returns = [(closes[i] - closes[i-1]) / closes[i-1] for i in range(1, len(closes))]
+        returns = [
+            (closes[i] - closes[i - 1]) / closes[i - 1] for i in range(1, len(closes))
+        ]
 
         # Calculate historical volatility (annualized)
         std_dev = np.std(returns) * np.sqrt(252)
-        iv_rank = (std_dev - min(returns)) / (max(returns) - min(returns)) if (max(returns) - min(returns)) != 0 else 0.5
+        iv_rank = (
+            (std_dev - min(returns)) / (max(returns) - min(returns))
+            if (max(returns) - min(returns)) != 0
+            else 0.5
+        )
 
         return float(np.clip(iv_rank * 100, 0, 100))  # Scale to 0-100
 
-    def calculate_adx(self, historical_data: List[HistoricalData], period: int = 14) -> float:
+    def calculate_adx(
+        self, historical_data: list[HistoricalData], period: int = 14
+    ) -> float:
         """
         Calculate Average Directional Index (ADX).
 
@@ -117,36 +137,41 @@ class CMPRulesEngine:
             return 25.0  # Default neutral value
 
         # Convert to DataFrame for calculation
-        df = pd.DataFrame({
-            'high': [h.high for h in historical_data],
-            'low': [h.low for h in historical_data],
-            'close': [h.close for h in historical_data]
-        })
+        df = pd.DataFrame(
+            {
+                "high": [h.high for h in historical_data],
+                "low": [h.low for h in historical_data],
+                "close": [h.close for h in historical_data],
+            }
+        )
 
         # Calculate +DM, -DM, and TR
-        df['+DM'] = df['high'].diff()
-        df['-DM'] = -df['low'].diff()
-        df['+DM'][df['+DM'] < 0] = 0
-        df['-DM'][df['-DM'] < 0] = 0
+        df["+DM"] = df["high"].diff()
+        df["-DM"] = -df["low"].diff()
+        df["+DM"][df["+DM"] < 0] = 0
+        df["-DM"][df["-DM"] < 0] = 0
 
-        df['TR'] = pd.concat([
-            df['high'] - df['low'],
-            abs(df['high'] - df['close'].shift()),
-            abs(df['low'] - df['close'].shift())
-        ], axis=1).max(axis=1)
+        df["TR"] = pd.concat(
+            [
+                df["high"] - df["low"],
+                abs(df["high"] - df["close"].shift()),
+                abs(df["low"] - df["close"].shift()),
+            ],
+            axis=1,
+        ).max(axis=1)
 
         # Calculate smoothed values
-        df['+DM_smooth'] = df['+DM'].rolling(window=period).mean()
-        df['-DM_smooth'] = df['-DM'].rolling(window=period).mean()
-        df['TR_smooth'] = df['TR'].rolling(window=period).mean()
+        df["+DM_smooth"] = df["+DM"].rolling(window=period).mean()
+        df["-DM_smooth"] = df["-DM"].rolling(window=period).mean()
+        df["TR_smooth"] = df["TR"].rolling(window=period).mean()
 
         # Calculate +DI and -DI
-        df['+DI'] = 100 * (df['+DM_smooth'] / df['TR_smooth'])
-        df['-DI'] = 100 * (df['-DM_smooth'] / df['TR_smooth'])
+        df["+DI"] = 100 * (df["+DM_smooth"] / df["TR_smooth"])
+        df["-DI"] = 100 * (df["-DM_smooth"] / df["TR_smooth"])
 
         # Calculate DX and ADX
-        df['DX'] = 100 * abs(df['+DI'] - df['-DI']) / (df['+DI'] + df['-DI'])
-        adx = df['DX'].rolling(window=period).mean().iloc[-1]
+        df["DX"] = 100 * abs(df["+DI"] - df["-DI"]) / (df["+DI"] + df["-DI"])
+        adx = df["DX"].rolling(window=period).mean().iloc[-1]
 
         return float(adx) if not pd.isna(adx) else 25.0
 
@@ -163,9 +188,9 @@ class CMPRulesEngine:
     def apply_gating_rules(
         self,
         signal: Signal,
-        historical_data: List[HistoricalData],
-        current_price: float
-    ) -> Tuple[bool, Dict[str, Any]]:
+        historical_data: list[HistoricalData],
+        current_price: float,
+    ) -> tuple[bool, dict[str, Any]]:
         """
         Apply CMP gating rules to determine if signal should be executed.
 
@@ -176,7 +201,10 @@ class CMPRulesEngine:
         - Signal strength must be sufficient
         """
         if not self.is_trading_allowed():
-            return False, {"reason": "trading_not_allowed", "session": str(self.session_state)}
+            return False, {
+                "reason": "trading_not_allowed",
+                "session": str(self.session_state),
+            }
 
         # Calculate indicators
         iv_rank = self.calculate_iv_rank(historical_data)
@@ -195,7 +223,7 @@ class CMPRulesEngine:
                     "iv_rank": iv_rank,
                     "adx": adx,
                     "vix": vix,
-                    "reason": "gating_passed"
+                    "reason": "gating_passed",
                 }
             else:
                 return False, {
@@ -205,7 +233,7 @@ class CMPRulesEngine:
                     "reason": "gating_failed",
                     "iv_pass": iv_pass,
                     "adx_pass": adx_pass,
-                    "vix_pass": vix_pass
+                    "vix_pass": vix_pass,
                 }
 
         elif signal.signal_type == SignalType.BUY:
@@ -219,7 +247,7 @@ class CMPRulesEngine:
                     "iv_rank": iv_rank,
                     "adx": adx,
                     "vix": vix,
-                    "reason": "gating_passed"
+                    "reason": "gating_passed",
                 }
             else:
                 return False, {
@@ -229,7 +257,7 @@ class CMPRulesEngine:
                     "reason": "gating_failed",
                     "iv_pass": iv_pass,
                     "adx_pass": adx_pass,
-                    "vix_pass": vix_pass
+                    "vix_pass": vix_pass,
                 }
 
         else:
@@ -238,10 +266,12 @@ class CMPRulesEngine:
                 "iv_rank": iv_rank,
                 "adx": adx,
                 "vix": vix,
-                "reason": "neutral_signal"
+                "reason": "neutral_signal",
             }
 
-    def check_position_limits(self, symbol: str, current_positions: List[Trade]) -> Tuple[bool, Dict[str, Any]]:
+    def check_position_limits(
+        self, symbol: str, current_positions: list[Trade]
+    ) -> tuple[bool, dict[str, Any]]:
         """
         Check position limits according to CMP Rule 11.
 
@@ -251,7 +281,9 @@ class CMPRulesEngine:
         - 1000 for other symbols (existing limit)
         """
         symbol = symbol.upper()
-        current_quantity = sum(t.quantity for t in current_positions if t.symbol == symbol)
+        current_quantity = sum(
+            t.quantity for t in current_positions if t.symbol == symbol
+        )
 
         if symbol == "NIFTY":
             max_allowed = 5 * settings.nifty_lot_size  # 5 lots * 25 = 125
@@ -264,16 +296,18 @@ class CMPRulesEngine:
             return False, {
                 "current_quantity": current_quantity,
                 "max_allowed": max_allowed,
-                "reason": "position_limit_exceeded"
+                "reason": "position_limit_exceeded",
             }
 
         return True, {
             "current_quantity": current_quantity,
             "max_allowed": max_allowed,
-            "reason": "position_limit_ok"
+            "reason": "position_limit_ok",
         }
 
-    def check_circuit_breakers(self, symbol: str, recent_trades: List[Trade]) -> Tuple[bool, Dict[str, Any]]:
+    def check_circuit_breakers(
+        self, symbol: str, recent_trades: list[Trade]
+    ) -> tuple[bool, dict[str, Any]]:
         """
         Check per-source circuit breakers.
 
@@ -306,19 +340,21 @@ class CMPRulesEngine:
                         return False, {
                             "source": source,
                             "reason": "consecutive_losses_circuit_breaker",
-                            "consecutive_losses": consecutive_losses
+                            "consecutive_losses": consecutive_losses,
                         }
                 else:
                     consecutive_losses = 0
 
             # Check for 5 losing trades in last 10
-            losing_trades = sum(1 for t in trades[-10:] if t.pnl is not None and t.pnl < 0)
+            losing_trades = sum(
+                1 for t in trades[-10:] if t.pnl is not None and t.pnl < 0
+            )
             if losing_trades >= 5:
                 return False, {
                     "source": source,
                     "reason": "loss_ratio_circuit_breaker",
                     "losing_trades": losing_trades,
-                    "total_trades": len(trades[-10:])
+                    "total_trades": len(trades[-10:]),
                 }
 
         return True, {"reason": "circuit_breakers_ok"}
@@ -336,12 +372,8 @@ class CMPRulesEngine:
         """Get current modification counter value."""
         return self.modification_counter
 
+
 # Module-level singleton instance
 rules_engine = CMPRulesEngine()
 
-__all__ = [
-    "CMPRulesEngine",
-    "RuleType",
-    "TradingSession",
-    "rules_engine"
-]
+__all__ = ["CMPRulesEngine", "RuleType", "TradingSession", "rules_engine"]

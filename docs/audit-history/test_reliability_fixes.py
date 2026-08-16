@@ -7,24 +7,22 @@ Tests the three main issues:
 3. R5-F-14: JSONL audit write atomicity
 """
 
-import asyncio
 import json
-import os
-import tempfile
-import unittest
-from pathlib import Path
-from unittest.mock import patch, MagicMock
 
 # Import the modules we need to test
 import sys
+import tempfile
+import unittest
+from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 sys.path.insert(0, "src")
 
 from loats.database import Database
-from loats.scheduler import TradingScheduler
+from loats.models import Signal
 from loats.openalgo import AsyncOpenAlgoClient
+from loats.scheduler import TradingScheduler
 from loats.utils.circuit_breaker import OPENALGO_CIRCUIT_BREAKER
-from loats.models import Signal, Trade, Order
 
 
 class TestReliabilityFixes(unittest.IsolatedAsyncioTestCase):
@@ -291,7 +289,7 @@ class TestReliabilityFixes(unittest.IsolatedAsyncioTestCase):
                 symbol="ASYNC",
                 signal_type="BUY" if i % 2 == 0 else "SELL",
                 strength=0.6 + i * 0.1,
-                timestamp=f"2024-01-15T1{i+5:02d}:30:00Z",
+                timestamp=f"2024-01-15T1{i + 5:02d}:30:00Z",
                 indicators={"async_indicator": 0.4 + i * 0.1},
                 confidence=0.6 + i * 0.1,
                 metadata={"test": f"async_comprehensive_{i}", "scan_type": "async"},

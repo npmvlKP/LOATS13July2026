@@ -13,7 +13,6 @@ from .loats_logging import logger
 from .metrics import metrics
 from .orchestrator import start_orchestrator, stop_orchestrator
 from .scheduler import scheduler
-from .strike_selection import strike_selector
 from .utils.cache import close_cache, initialize_cache
 
 # Module-level exports for testing (F-CONC-3)

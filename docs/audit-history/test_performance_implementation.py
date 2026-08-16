@@ -9,18 +9,17 @@ to verify they meet the performance targets:
 """
 
 import asyncio
-from datetime import datetime, timezone, UTC
 import sys
 import time
+from datetime import UTC, datetime
 from pathlib import Path
 
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from loats.strike_selection import select_strikes, strike_selector
-from loats.orchestrator import orchestrator, get_cycle_stats
 from loats.models import OptionContract, OptionType
-from loats.metrics import record_cycle_time
+from loats.orchestrator import orchestrator
+from loats.strike_selection import select_strikes
 
 
 def create_test_option_chain() -> list[OptionContract]:
@@ -98,10 +97,10 @@ async def test_strike_selection_performance() -> bool:
 
             if elapsed > 5.0:  # 5ms target
                 failures += 1
-                print(f"  Iteration {i+1}: {elapsed:.3f}ms ❌ (exceeded 5ms target)")
+                print(f"  Iteration {i + 1}: {elapsed:.3f}ms ❌ (exceeded 5ms target)")
 
         except Exception as e:
-            print(f"  Iteration {i+1}: ERROR - {e}")
+            print(f"  Iteration {i + 1}: ERROR - {e}")
             failures += 1
 
     avg_time = total_time / iterations
@@ -111,7 +110,7 @@ async def test_strike_selection_performance() -> bool:
     print(f"  Minimum: {min_time:.3f}ms")
     print(f"  Maximum: {max_time:.3f}ms")
     print(f"  Failures: {failures}/{iterations}")
-    print(f"  Success Rate: {(iterations - failures)/iterations*100:.1f}%")
+    print(f"  Success Rate: {(iterations - failures) / iterations * 100:.1f}%")
 
     # Performance target: <5ms average and <10% failures
     success = avg_time <= 5.0 and (failures / iterations) <= 0.1
@@ -137,12 +136,12 @@ def test_module_imports() -> bool:
     print("\nTesting Module Imports...")
 
     try:
-        from loats.strike_selection import StrikeSelectionEngine, select_strikes
         from loats.orchestrator import (
             TradingOrchestrator,
-            start_orchestrator,
             get_cycle_stats,
+            start_orchestrator,
         )
+        from loats.strike_selection import StrikeSelectionEngine, select_strikes
 
         print("  ✅ strike_selection module imported successfully")
         print("  ✅ orchestrator module imported successfully")

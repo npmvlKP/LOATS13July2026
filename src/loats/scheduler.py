@@ -27,7 +27,6 @@ from .sentiment import sentiment
 from .ta import technical_analysis
 from .utils.circuit_breaker import (
     OPENALGO_CIRCUIT_BREAKER,
-    CircuitBreakerOpenError,
 )
 from .utils.resilience import openalgo_circuit_breaker_retry_async
 

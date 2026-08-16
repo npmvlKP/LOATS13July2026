@@ -7,7 +7,6 @@ This test file covers all payload building functions to address the 14.8% covera
 
 import unittest
 from enum import Enum
-from unittest.mock import patch
 
 from loats.models import (
     OrderType,

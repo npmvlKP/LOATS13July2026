@@ -9,8 +9,6 @@ import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 
-import pytest
-
 from loats.utils.circuit_breaker import (
     CircuitBreaker,
     CircuitBreakerConfig,

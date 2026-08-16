@@ -6,8 +6,6 @@ This script enforces the policy defined in CONTRIBUTING.md that prohibits
 commit messages from claiming deployment readiness.
 """
 
-import codecs
-import os
 import sys
 
 

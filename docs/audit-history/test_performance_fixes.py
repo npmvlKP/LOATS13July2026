@@ -8,12 +8,11 @@ This test verifies that:
 """
 
 import asyncio
-import time
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
-from src.loats.utils.cache import CacheManager, CacheConfig
-from src.loats.utils.resilience import circuit_breaker_retry_async
+from src.loats.utils.cache import CacheConfig, CacheManager
 from src.loats.utils.circuit_breaker import CircuitBreaker, CircuitBreakerConfig
+from src.loats.utils.resilience import circuit_breaker_retry_async
 from src.loats.utils.retry import RetryConfig
 
 

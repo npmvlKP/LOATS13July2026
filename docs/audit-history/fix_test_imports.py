@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Fix all test imports from src.loats to loats."""
 
-import os
 import re
 from pathlib import Path
 

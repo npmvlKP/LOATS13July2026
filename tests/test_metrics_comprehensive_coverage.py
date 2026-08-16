@@ -4,20 +4,12 @@ Focuses on missing coverage areas including error handling, direct methods,
 and HTTP server functionality.
 """
 
-import json
 import threading
 import time
-from unittest.mock import MagicMock, patch
-
-import pytest
 
 from loats.metrics import (
     MetricsManager,
-    get_metrics_summary,
-    set_circuit_breaker_status,
-    set_kill_switch_status,
     start_metrics_server,
-    track_job,
 )
 
 

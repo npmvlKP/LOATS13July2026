@@ -10,29 +10,32 @@ Implements TradeDecision creation and routing to Analyzer:
 
 import asyncio
 import datetime
-from typing import Any, Dict, List, Optional, Tuple
 from enum import StrEnum
+from typing import Any
 
-from .loats_logging import get_logger
-from .models import Signal, SignalType, Trade, TradeDecision, FundsData
-from .rules import rules_engine, TradingSession
-from .strength import strength_engine
-from .sizing import sizing_engine
-from .trailing_stop import trailing_stop_engine, TrailingStopType
-from .options import calculate_portfolio_var
 from .config import get_settings
+from .loats_logging import get_logger
+from .models import FundsData, Signal, SignalType, Trade, TradeDecision, TransactionType
+from .options import calculate_portfolio_var
+from .rules import rules_engine
+from .sizing import sizing_engine
+from .strength import strength_engine
+from .trailing_stop import TrailingStopType, trailing_stop_engine
 
 logger = get_logger(__name__)
 settings = get_settings()
 
+
 class DecisionStatus(StrEnum):
     """Trade decision status enumeration."""
+
     PENDING = "PENDING"
     APPROVED = "APPROVED"
     REJECTED = "REJECTED"
     EXECUTED = "EXECUTED"
     CANCELLED = "CANCELLED"
     EXPIRED = "EXPIRED"
+
 
 class TradeDecisionEngine:
     """CMP Trade Decision Engine with Analyzer routing."""
@@ -45,12 +48,12 @@ class TradeDecisionEngine:
 
     async def create_trade_decision(
         self,
-        signals: List[Signal],
-        historical_data: List[Any],
+        signals: list[Signal],
+        historical_data: list[Any],
         current_price: float,
         funds: FundsData,
-        current_positions: List[Trade]
-    ) -> Tuple[Optional[TradeDecision], Dict[str, Any]]:
+        current_positions: list[Trade],
+    ) -> tuple[TradeDecision | None, dict[str, Any]]:
         """
         Create TradeDecision from signals using full CMP workflow.
 
@@ -74,11 +77,13 @@ class TradeDecisionEngine:
                 "reason": "signal_validation_failed",
                 "details": validation_result[1],
                 "symbol": symbol,
-                "timestamp": timestamp
+                "timestamp": timestamp,
             }
 
         # Step 2: Calculate composite strength
-        composite_strength, strength_details = strength_engine.calculate_composite_strength(signals)
+        composite_strength, strength_details = (
+            strength_engine.calculate_composite_strength(signals)
+        )
         if composite_strength <= 0.5:  # Minimum strength threshold
             return None, {
                 "status": "rejected",
@@ -86,7 +91,7 @@ class TradeDecisionEngine:
                 "composite_strength": composite_strength,
                 "strength_details": strength_details,
                 "symbol": symbol,
-                "timestamp": timestamp
+                "timestamp": timestamp,
             }
 
         # Determine decision type from strongest signal
@@ -104,18 +109,20 @@ class TradeDecisionEngine:
                 "reason": "gating_rules_failed",
                 "gating_result": gating_result,
                 "symbol": symbol,
-                "timestamp": timestamp
+                "timestamp": timestamp,
             }
 
         # Step 4: Check position limits (CMP Rule 11)
-        position_check, position_result = rules_engine.check_position_limits(symbol, current_positions)
+        position_check, position_result = rules_engine.check_position_limits(
+            symbol, current_positions
+        )
         if not position_check:
             return None, {
                 "status": "rejected",
                 "reason": "position_limit_exceeded",
                 "position_result": position_result,
                 "symbol": symbol,
-                "timestamp": timestamp
+                "timestamp": timestamp,
             }
 
         # Step 5: Calculate position size (2% fixed-fraction)
@@ -130,7 +137,7 @@ class TradeDecisionEngine:
                 "reason": "invalid_position_size",
                 "sizing_details": sizing_details,
                 "symbol": symbol,
-                "timestamp": timestamp
+                "timestamp": timestamp,
             }
 
         # Step 6: Set up trailing stop
@@ -140,17 +147,19 @@ class TradeDecisionEngine:
                 symbol=symbol,
                 quantity=position_size,
                 entry_price=current_price,
-                transaction_type=TransactionType.BUY if decision_type == SignalType.BUY else TransactionType.SELL
+                transaction_type=TransactionType.BUY
+                if decision_type == SignalType.BUY
+                else TransactionType.SELL,
             ),
             current_price,
             TrailingStopType.PERCENTAGE,
-            {"percentage": 0.01}  # 1% trailing stop
+            {"percentage": 0.01},  # 1% trailing stop
         )
 
         # Step 7: Calculate VaR
         var_analysis = calculate_portfolio_var(
             [trade for trade in current_positions if trade.symbol == symbol],
-            confidence_level=0.95
+            confidence_level=0.95,
         )
 
         # Create TradeDecision
@@ -162,14 +171,16 @@ class TradeDecisionEngine:
             entry_price=current_price,
             quantity=position_size,
             stop_loss=stop_loss,
-            take_profit=self._calculate_take_profit(current_price, decision_type, position_size),
+            take_profit=self._calculate_take_profit(
+                current_price, decision_type, position_size
+            ),
             trailing_stop_config=trailing_config,
             position_size_method="fixed_fraction",
             risk_percentage=0.02,  # 2% risk
             var_analysis={
                 "var_value": var_analysis.var_value,
                 "var_percent": var_analysis.var_percent,
-                "method": var_analysis.method
+                "method": var_analysis.method,
             },
             gating_rules_result=gating_result,
             source_breakdown=strength_engine.get_source_strength_breakdown(signals),
@@ -177,9 +188,9 @@ class TradeDecisionEngine:
                 "sizing_details": sizing_details,
                 "strength_details": strength_details,
                 "validation_result": validation_result[1],
-                "session": str(rules_engine.session_state)
+                "session": str(rules_engine.session_state),
             },
-            status="PENDING"
+            status="PENDING",
         )
 
         return trade_decision, {
@@ -188,13 +199,11 @@ class TradeDecisionEngine:
             "decision_type": str(decision_type),
             "composite_strength": composite_strength,
             "position_size": position_size,
-            "timestamp": timestamp
+            "timestamp": timestamp,
         }
 
     def _calculate_stop_loss(
-        self,
-        current_price: float,
-        decision_type: SignalType
+        self, current_price: float, decision_type: SignalType
     ) -> float:
         """Calculate stop loss based on decision type."""
         if decision_type == SignalType.BUY:
@@ -205,11 +214,8 @@ class TradeDecisionEngine:
             return current_price * 1.01  # 1% above
 
     def _calculate_take_profit(
-        self,
-        current_price: float,
-        decision_type: SignalType,
-        position_size: int
-    ) -> Optional[float]:
+        self, current_price: float, decision_type: SignalType, position_size: int
+    ) -> float | None:
         """Calculate take profit based on decision type."""
         if decision_type == SignalType.BUY:
             # For BUY decisions: take profit above current price
@@ -218,10 +224,7 @@ class TradeDecisionEngine:
             # For SELL decisions: take profit below current price
             return current_price * 0.98  # 2% below
 
-    async def route_to_analyzer(
-        self,
-        trade_decision: TradeDecision
-    ) -> Dict[str, Any]:
+    async def route_to_analyzer(self, trade_decision: TradeDecision) -> dict[str, Any]:
         """
         Route TradeDecision to Analyzer.
 
@@ -232,7 +235,7 @@ class TradeDecisionEngine:
             return {
                 "status": "disabled",
                 "reason": "analyzer_routing_disabled",
-                "decision_id": trade_decision.decision_id
+                "decision_id": trade_decision.decision_id,
             }
 
         try:
@@ -242,7 +245,9 @@ class TradeDecisionEngine:
             # In production: await analyzer_client.send_decision(payload)
             # For simulation, we'll just log and return success
 
-            logger.info(f"Routing TradeDecision to Analyzer: {trade_decision.decision_id}")
+            logger.info(
+                f"Routing TradeDecision to Analyzer: {trade_decision.decision_id}"
+            )
             logger.debug(f"Analyzer payload: {payload}")
 
             # Simulate processing delay
@@ -256,8 +261,8 @@ class TradeDecisionEngine:
                     "decision_id": trade_decision.decision_id,
                     "symbol": trade_decision.symbol,
                     "status": "QUEUED_FOR_ANALYSIS",
-                    "timestamp": datetime.datetime.now(datetime.UTC).isoformat()
-                }
+                    "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
+                },
             }
 
         except Exception as e:
@@ -266,7 +271,7 @@ class TradeDecisionEngine:
                 "status": "error",
                 "decision_id": trade_decision.decision_id,
                 "error": str(e),
-                "timestamp": datetime.datetime.now(datetime.UTC).isoformat()
+                "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
             }
 
     async def process_decision_queue(self) -> None:
@@ -277,9 +282,13 @@ class TradeDecisionEngine:
                 routing_result = await self.route_to_analyzer(decision)
 
                 if routing_result["status"] == "success":
-                    logger.info(f"Successfully routed decision {decision.decision_id} to Analyzer")
+                    logger.info(
+                        f"Successfully routed decision {decision.decision_id} to Analyzer"
+                    )
                 else:
-                    logger.warning(f"Failed to route decision {decision.decision_id}: {routing_result}")
+                    logger.warning(
+                        f"Failed to route decision {decision.decision_id}: {routing_result}"
+                    )
 
                 self.decision_queue.task_done()
 
@@ -287,10 +296,7 @@ class TradeDecisionEngine:
                 logger.error(f"Error processing decision queue: {e}")
                 await asyncio.sleep(1.0)
 
-    async def enqueue_decision(
-        self,
-        trade_decision: TradeDecision
-    ) -> Dict[str, Any]:
+    async def enqueue_decision(self, trade_decision: TradeDecision) -> dict[str, Any]:
         """Add TradeDecision to processing queue."""
         try:
             await self.decision_queue.put(trade_decision)
@@ -298,7 +304,7 @@ class TradeDecisionEngine:
                 "status": "queued",
                 "decision_id": trade_decision.decision_id,
                 "queue_size": self.decision_queue.qsize(),
-                "timestamp": datetime.datetime.now(datetime.UTC).isoformat()
+                "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
             }
         except Exception as e:
             logger.error(f"Failed to enqueue decision: {e}")
@@ -306,18 +312,22 @@ class TradeDecisionEngine:
                 "status": "error",
                 "decision_id": trade_decision.decision_id,
                 "error": str(e),
-                "timestamp": datetime.datetime.now(datetime.UTC).isoformat()
+                "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
             }
 
     async def start_decision_processor(self) -> None:
         """Start the decision processing task."""
-        if not hasattr(self, '_processor_task') or self._processor_task is None or self._processor_task.done():
+        if (
+            not hasattr(self, "_processor_task")
+            or self._processor_task is None
+            or self._processor_task.done()
+        ):
             self._processor_task = asyncio.create_task(self.process_decision_queue())
             logger.info("Started TradeDecision processor")
 
     async def stop_decision_processor(self) -> None:
         """Stop the decision processing task."""
-        if hasattr(self, '_processor_task') and self._processor_task:
+        if hasattr(self, "_processor_task") and self._processor_task:
             self._processor_task.cancel()
             try:
                 await self._processor_task
@@ -337,12 +347,12 @@ class TradeDecisionEngine:
 
     async def create_and_route_decision(
         self,
-        signals: List[Signal],
-        historical_data: List[Any],
+        signals: list[Signal],
+        historical_data: list[Any],
         current_price: float,
         funds: FundsData,
-        current_positions: List[Trade]
-    ) -> Dict[str, Any]:
+        current_positions: list[Trade],
+    ) -> dict[str, Any]:
         """
         Complete workflow: create decision and route to Analyzer.
 
@@ -357,7 +367,7 @@ class TradeDecisionEngine:
             return {
                 **creation_result,
                 "routing_status": "skipped",
-                "reason": "decision_not_created"
+                "reason": "decision_not_created",
             }
 
         # Route to Analyzer
@@ -369,13 +379,10 @@ class TradeDecisionEngine:
             "decision_id": decision.decision_id,
             "symbol": decision.symbol,
             "status": "completed",
-            "timestamp": datetime.datetime.now(datetime.UTC).isoformat()
+            "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
         }
 
-    async def get_decision_status(
-        self,
-        decision_id: str
-    ) -> Dict[str, Any]:
+    async def get_decision_status(self, decision_id: str) -> dict[str, Any]:
         """Get status of a TradeDecision."""
         # In production, this would query the Analyzer or database
         # For simulation, we return a mock status
@@ -385,7 +392,7 @@ class TradeDecisionEngine:
             "status": "PROCESSED",
             "analyzer_status": "ANALYZED",
             "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
-            "notes": "This is a simulated response - in production would query actual Analyzer"
+            "notes": "This is a simulated response - in production would query actual Analyzer",
         }
 
     def increment_modification_counter(self) -> int:
@@ -400,11 +407,8 @@ class TradeDecisionEngine:
         """Reset rule 7 modification counter."""
         rules_engine.reset_modification_counter()
 
+
 # Module-level singleton instance
 trade_decision_engine = TradeDecisionEngine()
 
-__all__ = [
-    "TradeDecisionEngine",
-    "DecisionStatus",
-    "trade_decision_engine"
-]
+__all__ = ["TradeDecisionEngine", "DecisionStatus", "trade_decision_engine"]

@@ -25,7 +25,6 @@ from .openalgo import async_client
 from .utils.circuit_breaker import (
     OPENALGO_CIRCUIT_BREAKER,
     TELEGRAM_CIRCUIT_BREAKER,
-    CircuitBreakerOpenError,
 )
 from .utils.resilience import (
     openalgo_circuit_breaker_retry_async,
@@ -40,11 +39,12 @@ settings = get_settings()
 
 class AlertSystem:
     """Alert system using Telegram bot notifications kill switch.
-    `AlertSystem` accepts an optional ``Database` instance constructor.
-    When omitted, shared module-level `db` singleton (so original ``AlertSystem()` call-site continues work unchanged).
-    active database reference exposed :attr:`db` property, which **looked dynamically** access time test-time
-    patches `src.loats.alerts.db` continue honored when explicit instance not injected. The
-    eliminates per-command `Database()` instantiation previously caused connection / file-handle churn Windows (NEW-M5).
+
+    `AlertSystem` accepts an optional ``Database`` instance constructor.
+    When omitted, shared module-level `db` singleton (so original ``AlertSystem()`` call-site continues work unchanged).
+    Active database reference exposed via :attr:`db` property, which **looked dynamically** at access time.
+    Test-time patches to `src.loats.alerts.db` continue to be honored when explicit instance not injected.
+    This eliminates per-command `Database()` instantiation that previously caused connection / file-handle churn on Windows (NEW-M5).
     """
 
     def __init__(self, database: Database | None = None) -> None:

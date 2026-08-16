@@ -6,7 +6,6 @@ Tests the newly implemented performance modules.
 
 import asyncio
 import sys
-import time
 from pathlib import Path
 
 # Add src to path for imports
@@ -18,13 +17,13 @@ def test_imports():
     print("Testing Module Imports...")
 
     try:
-        from loats.strike_selection import StrikeSelectionEngine, select_strikes
+        from loats.metrics import record_cycle_time
         from loats.orchestrator import (
             TradingOrchestrator,
-            start_orchestrator,
             get_cycle_stats,
+            start_orchestrator,
         )
-        from loats.metrics import record_cycle_time
+        from loats.strike_selection import StrikeSelectionEngine, select_strikes
 
         print("PASS: strike_selection module imported successfully")
         print("PASS: orchestrator module imported successfully")
@@ -65,7 +64,7 @@ async def test_orchestrator():
     print("\nTesting Orchestrator Module...")
 
     try:
-        from loats.orchestrator import TradingOrchestrator, start_orchestrator
+        from loats.orchestrator import TradingOrchestrator
 
         # Test instantiation
         orchestrator = TradingOrchestrator()
@@ -133,14 +132,14 @@ async def main():
     )
 
     if overall_success:
-        print(f"\nSUCCESS: Performance targets are now measurable and achievable!")
-        print(f"INFO: Use 'get_cycle_stats()' to monitor real-time performance")
-        print(f"\nREADME Latency Claims Verification:")
-        print(f"  [PASS] Strike Selection Module: Implemented (<5ms target)")
-        print(f"  [PASS] Orchestrator Module: Implemented (<100ms cycle target)")
-        print(f"  [PASS] Performance metrics: Integrated with monitoring")
+        print("\nSUCCESS: Performance targets are now measurable and achievable!")
+        print("INFO: Use 'get_cycle_stats()' to monitor real-time performance")
+        print("\nREADME Latency Claims Verification:")
+        print("  [PASS] Strike Selection Module: Implemented (<5ms target)")
+        print("  [PASS] Orchestrator Module: Implemented (<100ms cycle target)")
+        print("  [PASS] Performance metrics: Integrated with monitoring")
     else:
-        print(f"\nWARNING: Some performance issues detected. Check logs for details.")
+        print("\nWARNING: Some performance issues detected. Check logs for details.")
 
     return 0 if overall_success else 1
 

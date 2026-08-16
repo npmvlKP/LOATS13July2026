@@ -1,5 +1,3 @@
-import functools
-import time
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest

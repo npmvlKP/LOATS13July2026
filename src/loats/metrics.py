@@ -6,8 +6,8 @@ Implements simple in-memory metrics tracking without external dependencies.
 import functools
 import threading
 import time
-from collections.abc import Callable, Coroutine
-from typing import Any, Optional, TypeVar, cast
+from collections.abc import Callable
+from typing import Any, TypeVar, cast
 
 from .loats_logging import get_logger
 
