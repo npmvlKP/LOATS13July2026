@@ -682,36 +682,47 @@ class Database:
             # Ensure parent directory exists (FIX-F-PERM-1: Handle directory creation)
             self.audit_log_path.parent.mkdir(parents=True, exist_ok=True)
 
-            # FIX-F-PERM-3: Skip audit logging if running in test environment
-            # This prevents permission issues in pytest temp directories
+            # FIX-F-PERM-3: Use temporary audit log path in test environment
+            # This ensures JSONL-first dual-write guarantee is exercised in tests
             import os
+            import tempfile
 
+            # Use temporary audit log file during tests to avoid permission issues
+            # while still exercising the dual-write logic
+            audit_log_file = self.audit_log_path
             if os.environ.get("PYTEST_CURRENT_TEST"):
-                # Skip JSONL audit logging in test environment to avoid permission issues
-                logger.warning("Skipping JSONL audit log write in test environment")
-            else:
-                # FIX-F-PERM-2: Use more robust file handling with retry logic
-                max_retries = 3
-                retry_delay = 0.1  # seconds
+                # Create a temporary file in the system temp directory for testing
+                # This ensures the dual-write guarantee is tested without production path issues
+                temp_dir = Path(tempfile.gettempdir()) / "loats_test_audit_logs"
+                temp_dir.mkdir(parents=True, exist_ok=True)
+                audit_log_file = temp_dir / f"test_audit_{entity_type}_{entity_id}.jsonl"
+                logger.info(f"Using temporary audit log file for testing: {audit_log_file}")
 
-                for attempt in range(max_retries):
-                    try:
-                        # Use append mode with explicit error handling for file operations
-                        with Path(self.audit_log_path).open("a", encoding="utf-8") as f:
-                            f.write(self._canonical_serialize(entry_data) + "\n")
-                        break  # Success, exit retry loop
-                    except PermissionError as e:
-                        if attempt == max_retries - 1:
-                            # Last attempt failed, raise the error
-                            raise RuntimeError(
-                                f"Failed to write audit log entry to JSONL file after {max_retries} attempts: {e}. "
-                                "Database commit aborted to maintain consistency."
-                            ) from e
-                        # Wait and retry
-                        import time
+            # FIX-F-PERM-2: Use more robust file handling with retry logic
+            max_retries = 3
+            retry_delay = 0.1  # seconds
 
-                        time.sleep(retry_delay)
-                        retry_delay *= 2  # Exponential backoff
+            for attempt in range(max_retries):
+                try:
+                    # Ensure parent directory exists (FIX-F-PERM-1: Handle directory creation)
+                    audit_log_file.parent.mkdir(parents=True, exist_ok=True)
+
+                    # Use append mode with explicit error handling for file operations
+                    with Path(audit_log_file).open("a", encoding="utf-8") as f:
+                        f.write(self._canonical_serialize(entry_data) + "\n")
+                    break  # Success, exit retry loop
+                except PermissionError as e:
+                    if attempt == max_retries - 1:
+                        # Last attempt failed, raise the error
+                        raise RuntimeError(
+                            f"Failed to write audit log entry to JSONL file after {max_retries} attempts: {e}. "
+                            "Database commit aborted to maintain consistency."
+                        ) from e
+                    # Wait and retry
+                    import time
+
+                    time.sleep(retry_delay)
+                    retry_delay *= 2  # Exponential backoff
         except OSError as e:
             # If JSONL write fails, raise before DB commit to maintain consistency
             raise RuntimeError(

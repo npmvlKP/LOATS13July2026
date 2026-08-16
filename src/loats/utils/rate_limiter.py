@@ -128,12 +128,13 @@ class AsyncRateLimiter:
     a maximum number of operations within a sliding time window.
     """
 
-    def __init__(self, max_ops: int | None = None, window_size: float = 1.0):
+    def __init__(self, max_ops: int | None = None, window_size: float = 1.0, clock=None):
         """Initialize async rate limiter.
 
         Args:
             max_ops: Maximum operations per window (default: from settings)
             window_size: Time window in seconds (default: 1.0)
+            clock: Optional clock function for testing (default: time.monotonic)
         """
         settings = get_settings()
         self.max_ops: int = max_ops if max_ops is not None else settings.max_ops
@@ -141,6 +142,8 @@ class AsyncRateLimiter:
         self.timestamps: deque[float] = deque()
         self.lock: asyncio.Lock = asyncio.Lock()
         self.get_wait_time = self._get_wait_time
+        # Use injected clock or default to time.monotonic for production
+        self._clock = clock or time.monotonic
 
     async def acquire(self) -> bool:
         """Acquire token for operation.
@@ -152,7 +155,7 @@ class AsyncRateLimiter:
             True if token acquired successfully, False if rate limit exceeded
         """
         async with self.lock:
-            current_time: float = time.monotonic()
+            current_time: float = self._clock()
 
             # Remove timestamps older than window_size
             # Use > to ensure we maintain strict max_ops limit in any window
@@ -177,7 +180,7 @@ class AsyncRateLimiter:
             Returns 0.0 if a token is immediately available.
         """
         async with self.lock:
-            current_time: float = time.monotonic()
+            current_time: float = self._clock()
 
             # Remove timestamps older than window_size
             # Use > to ensure we maintain strict max_ops limit in any window
@@ -486,6 +489,19 @@ def get_sync_smart_order_rate_limiter(
 # ---------------------------------------------------------------------------
 # Testing utilities
 # ---------------------------------------------------------------------------
+def create_test_rate_limiter(max_ops: int = 5, window_size: float = 1.0, clock=None) -> AsyncRateLimiter:
+    """Create a test rate limiter with optional clock injection.
+
+    Args:
+        max_ops: Maximum operations per window
+        window_size: Time window in seconds
+        clock: Optional clock function for deterministic testing
+
+    Returns:
+        AsyncRateLimiter instance with injected clock
+    """
+    return AsyncRateLimiter(max_ops=max_ops, window_size=window_size, clock=clock)
+
 def _reset_singletons_for_testing() -> None:
     """Reset all singleton instances.
 
