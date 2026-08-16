@@ -2,7 +2,6 @@
 Lightweight caching utilities for LOATS13July2026 LITE edition.
 Implements simple in-memory caching optimized for minimal resource usage.
 """
-
 import asyncio
 import hashlib
 import json
@@ -18,8 +17,6 @@ from ..loats_logging import get_logger
 logger = get_logger(__name__)
 
 T = TypeVar("T")
-
-
 
 class CacheConfig:
     """Configuration for cache operations (LITE edition - in-memory only)."""
@@ -44,7 +41,6 @@ class CacheConfig:
         self.max_size = max_size
         self.cache_type = cache_type
 
-
 class CacheManager:
     """Cache manager for LOATS13July2026 LITE edition.
     Uses in-memory caching only.
@@ -54,7 +50,7 @@ class CacheManager:
         """Initialize cache manager with in-memory cache."""
         self.config = config
         self._cache: TTLCache[str, Any] | None = None
-        self._cache_lock = asyncio.Lock()  # Use asyncio.Lock for async operations
+        self._cache_lock = threading.RLock()  # FIX-F-THREAD-1: Use threading.RLock for thread safety
         self._init_lock = asyncio.Lock()  # Async lock for initialization
         self._cache_stats = {
             "hits": 0,
@@ -109,8 +105,8 @@ class CacheManager:
 
         try:
             if self._cache:
-                # Get from in-memory cache
-                async with self._cache_lock:
+                # FIX-F-THREAD-2: Use threading.RLock for cross-thread safety
+                with self._cache_lock:
                     result = self._cache.get(cache_key)
                     if result is not None:
                         self._cache_stats["hits"] += 1
@@ -167,9 +163,8 @@ class CacheManager:
             cache_key = self._get_cache_key(key)
             logger.debug(f"Setting cache key: {cache_key}, value: {value_str}")
 
-            # Use in-memory cache
-            logger.debug("DEBUG: Taking in-memory cache branch")
-            async with self._cache_lock:
+            # FIX-F-THREAD-3: Use threading.RLock for cross-thread safety
+            with self._cache_lock:
                 self._cache[cache_key] = value_str
                 self._cache_stats["sets"] += 1
                 cache_size = len(self._cache)
@@ -218,8 +213,8 @@ class CacheManager:
         cached_value = None
 
         if self._cache is not None:
-            # Get from in-memory cache
-            async with self._cache_lock:
+            # FIX-F-THREAD-4: Use threading.RLock for cross-thread safety
+            with self._cache_lock:
                 result = self._cache.get(cache_key)
                 if result is not None:
                     self._cache_stats["hits"] += 1
@@ -257,8 +252,8 @@ class CacheManager:
 
         try:
             if self._cache:
-                # Delete from in-memory cache
-                async with self._cache_lock:
+                # FIX-F-THREAD-5: Use threading.RLock for cross-thread safety
+                with self._cache_lock:
                     if cache_key in self._cache:
                         del self._cache[cache_key]
                         self._cache_stats["deletes"] += 1
@@ -277,8 +272,8 @@ class CacheManager:
 
         try:
             if self._cache:
-                # Clear in-memory cache
-                async with self._cache_lock:
+                # FIX-F-THREAD-6: Use threading.RLock for cross-thread safety
+                with self._cache_lock:
                     if pattern == "*":
                         # Clear all cache
                         count = len(self._cache)
@@ -317,7 +312,9 @@ class CacheManager:
         try:
             current_size = 0
             if self._cache:
-                current_size = len(self._cache)
+                # FIX-F-THREAD-7: Use threading.RLock for cross-thread safety
+                with self._cache_lock:
+                    current_size = len(self._cache)
 
             return {
                 "enabled": True,
@@ -337,7 +334,6 @@ class CacheManager:
             logger.error(f"Cache stats failed: {e}")
             return {"enabled": False, "error": str(e)}
 
-
 # Global cache manager instance (LITE edition - in-memory only)
 cache_config = CacheConfig(
     ttl_seconds=300,  # 5 minutes default TTL
@@ -348,16 +344,13 @@ cache_config = CacheConfig(
 
 cache_manager = CacheManager(cache_config)
 
-
 async def initialize_cache() -> None:
     """Initialize the lightweight global cache manager."""
     await cache_manager.initialize()
 
-
 async def close_cache() -> None:
     """Close the lightweight global cache manager."""
     await cache_manager.close()
-
 
 def _hash_text(text: str) -> str:
     """Return deterministic SHA-256 digest for cache keys.
@@ -366,7 +359,6 @@ def _hash_text(text: str) -> str:
     different cache keys across processes, defeating shared caches.
     """
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
-
 
 def model_to_cache_key(model: BaseModel) -> str:
     """Convert BaseModel to cache key."""
@@ -377,7 +369,6 @@ def model_to_cache_key(model: BaseModel) -> str:
             f"{_hash_text(model.model_dump_json())}"
         )
     return f"{model.__class__.__name__}:{_hash_text(model.model_dump_json())}"
-
 
 def dict_to_cache_key(data: dict[str, Any]) -> str:
     """Convert dict to cache key."""
