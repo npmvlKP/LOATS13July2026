@@ -400,7 +400,7 @@ class OpenAlgoClient:
         When the circuit is open, this method fails fast with CircuitBreakerOpenError.
         """
         _check_kill_switch()
-        # Use higher rate limits for order operations (50 ops per second)
+        # Use configured rate limits for order operations
         if not get_sync_order_rate_limiter().acquire():
             logger.warning("Rate limit exceeded order placement")
             raise RateLimitExceededError("Rate limit exceeded")
@@ -454,7 +454,7 @@ class OpenAlgoClient:
         When the circuit is open, this method fails fast with CircuitBreakerOpenError.
         """
         _check_kill_switch()
-        # Use higher rate limits for smart order operations (50 ops per second)
+        # Use configured rate limits for smart order operations
         if not get_sync_smart_order_rate_limiter().acquire():
             logger.warning("Rate limit exceeded smart order placement")
             raise RateLimitExceededError("Rate limit exceeded")
@@ -795,7 +795,7 @@ class AsyncOpenAlgoClient:
         When the circuit is open, this method fails fast with CircuitBreakerOpenError.
         """
         await _async_check_kill_switch()
-        # Use higher rate limits for order operations (50 ops per second)
+        # Use configured rate limits for order operations
         if not await get_order_rate_limiter().acquire():
             logger.warning("Rate limit exceeded order placement")
             raise RateLimitExceededError("Rate limit exceeded")
@@ -872,7 +872,7 @@ class AsyncOpenAlgoClient:
         When the circuit is open, this method fails fast with CircuitBreakerOpenError.
         """
         await _async_check_kill_switch()
-        # Use higher rate limits for smart order operations (50 ops per second)
+        # Use configured rate limits for smart order operations
         if not await get_smart_order_rate_limiter().acquire():
             logger.warning("Rate limit exceeded smart order placement")
             raise RateLimitExceededError("Rate limit exceeded")
