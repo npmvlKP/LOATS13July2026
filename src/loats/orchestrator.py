@@ -29,7 +29,7 @@ from .utils.circuit_breaker import OPENALGO_CIRCUIT_BREAKER
 from .utils.resilience import openalgo_circuit_breaker_retry_async
 
 logger = get_logger(__name__)
-settings = get_settings()
+settings = None
 
 
 class TradingOrchestrator:
@@ -44,6 +44,8 @@ class TradingOrchestrator:
         self.avg_cycle_time = 0.0
         self.total_cycle_time = 0.0
         self._shutdown_event = asyncio.Event()
+        self._cycle_task = None
+        self._last_alert_time = 0
 
     async def initialize(self) -> None:
         """Initialize the orchestrator."""
@@ -63,7 +65,8 @@ class TradingOrchestrator:
 
         await self.initialize()
         logger.info("Starting TradingOrchestrator cycle")
-        asyncio.create_task(self._run_cycle_loop())
+        self._cycle_task = asyncio.create_task(self._run_cycle_loop())
+        self._cycle_task.add_done_callback(self._handle_cycle_task_completion)
 
     async def _run_cycle_loop(self) -> None:
         """Main trading cycle loop with <100ms target."""
@@ -80,7 +83,11 @@ class TradingOrchestrator:
                 continue
             except Exception as e:
                 logger.error(f"Trading cycle error: {e}")
-                await alerts.send_system_alert(f"Trading cycle error: {e}", "error")
+                # Add alert backoff to prevent alert floods
+                current_time = datetime.datetime.now(datetime.UTC).timestamp()
+                if current_time - self._last_alert_time > 60:  # Max 1 alert per minute
+                    await alerts.send_system_alert(f"Trading cycle error: {e}", "error")
+                    self._last_alert_time = current_time
 
             # Calculate and record cycle time
             cycle_duration = (
@@ -96,25 +103,23 @@ class TradingOrchestrator:
     async def _execute_trading_cycle(self) -> None:
         """Execute a complete trading cycle with parallel execution."""
         cycle_start = datetime.datetime.now(datetime.UTC)
-        self.cycle_count += 1
 
         try:
-            # Execute TA analysis first to ensure any errors are raised immediately
-            await self._execute_ta_analysis()
-
-            # Run sentiment and market data updates in parallel with timeout
+            # Run TA analysis, sentiment and market data updates in parallel with timeout
+            ta_task = asyncio.create_task(self._execute_ta_analysis())
             sentiment_task = asyncio.create_task(self._execute_sentiment_analysis())
             market_data_task = asyncio.create_task(self._execute_market_data_update())
+
             try:
                 await asyncio.wait_for(
-                    asyncio.gather(sentiment_task, market_data_task),
+                    asyncio.gather(ta_task, sentiment_task, market_data_task),
                     timeout=0.08,
                 )
             except TimeoutError:
                 logger.warning(
                     "Trading cycle tasks timed out - continuing with partial results"
                 )
-                for task in [sentiment_task, market_data_task]:
+                for task in [ta_task, sentiment_task, market_data_task]:
                     if not task.done():
                         task.cancel()
 
@@ -402,6 +407,11 @@ class TradingOrchestrator:
         start_time = datetime.datetime.now(datetime.UTC)
 
         try:
+            # Lazy load settings to avoid import-time failures
+            global settings
+            if settings is None:
+                settings = get_settings()
+
             # Check circuit breaker status
             cb_status = OPENALGO_CIRCUIT_BREAKER.get_status()
             if cb_status["state"] == "open":
@@ -418,20 +428,22 @@ class TradingOrchestrator:
                     f"Position limit exceeded: {positions.quantity}", "position_limit"
                 )
 
-            # Check margin utilization
+            # Check margin utilization with zero division guard
             funds = await asyncio.to_thread(db.get_latest_funds)
-            if (
-                funds
-                and funds.utilized_margin / funds.available_margin
-                > settings.max_margin_utilization
-            ):
-                logger.warning(
-                    f"Margin utilization high: {funds.utilized_margin / funds.available_margin:.2%}"
-                )
-                await alerts.send_alert(
-                    f"High margin utilization: {funds.utilized_margin / funds.available_margin:.2%}",
-                    "margin_utilization",
-                )
+            if funds:
+                available_margin = funds.available_margin
+                if available_margin > 0:
+                    margin_ratio = funds.utilized_margin / available_margin
+                    if margin_ratio > settings.max_margin_utilization:
+                        logger.warning(
+                            f"Margin utilization high: {margin_ratio:.2%}"
+                        )
+                        await alerts.send_alert(
+                            f"High margin utilization: {margin_ratio:.2%}",
+                            "margin_utilization",
+                        )
+                else:
+                    logger.warning("Available margin is zero - cannot calculate utilization ratio")
 
         except Exception as e:
             logger.error(f"Risk management failed: {e}")
@@ -630,11 +642,16 @@ class TradingOrchestrator:
         self._shutdown_event.set()
         self.running = False
 
-        # Wait for current cycle to complete
-        try:
-            await asyncio.wait_for(self._shutdown_event.wait(), timeout=5.0)
-        except TimeoutError:
-            logger.warning("Orchestrator shutdown timed out")
+        # Wait for the cycle task to complete with timeout
+        if hasattr(self, '_cycle_task') and self._cycle_task:
+            try:
+                await asyncio.wait_for(self._cycle_task, timeout=5.0)
+            except TimeoutError:
+                logger.warning("Orchestrator shutdown timed out - cycle task still running")
+                # Cancel the task if it's still running
+                self._cycle_task.cancel()
+            except asyncio.CancelledError:
+                pass
 
         logger.info("TradingOrchestrator shutdown complete")
 
@@ -701,10 +718,11 @@ class TradingOrchestrator:
         """Create funds model from raw data."""
         from .models import FundsData
 
+        available_margin = funds_data.get("available_margin", 0)
         return FundsData(
             available_cash=funds_data["available_cash"],
             utilized_margin=funds_data["utilized_margin"],
-            available_margin=funds_data["available_margin"],
+            available_margin=available_margin,
             total_equity=funds_data["total_equity"],
             timestamp=datetime.datetime.now(datetime.UTC),
         )
@@ -718,6 +736,14 @@ class TradingOrchestrator:
             "max_cycle_time_ms": self.max_cycle_time * 1000,
             "target_compliance": "pass" if self.avg_cycle_time <= 0.1 else "fail",
         }
+
+    def _handle_cycle_task_completion(self, task: asyncio.Task) -> None:
+        """Handle completion of the cycle task."""
+        try:
+            task.result()  # This will re-raise any exception that occurred in the task
+        except Exception as e:
+            logger.error(f"Cycle task completed with exception: {e}")
+            self.running = False
 
 
 # Module-level singleton instance
