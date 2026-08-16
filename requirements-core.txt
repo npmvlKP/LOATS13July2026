@@ -18,11 +18,4 @@ APScheduler>=3.10
 cachetools>=5.3.0
 cryptography>=50.0.0
 aiosqlite>=0.21.0
-pytest
-pytest-asyncio
-pytest-cov
-ruff
-mypy
-bandit
-pip-audit
-pre-commit
+ta>=0.11.0
