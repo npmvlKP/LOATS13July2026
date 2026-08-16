@@ -4,16 +4,14 @@ High-performance strike selection engine that meets the <5ms latency target.
 Implements optimized strike selection algorithms for options trading.
 """
 
-import asyncio
 import datetime
 from typing import Any
 
 import numpy as np
-from scipy.stats import norm
+from cachetools import TTLCache
 
 from .loats_logging import get_logger
 from .models import OptionContract, OptionType
-from .options import options
 
 logger = get_logger(__name__)
 
@@ -23,7 +21,7 @@ class StrikeSelectionEngine:
 
     def __init__(self) -> None:
         """Initialize StrikeSelectionEngine."""
-        self._cache: dict[str, list[float]] = {}
+        self._cache: TTLCache[str, list[float]] = TTLCache(maxsize=1000, ttl=300)
 
     async def select_strikes(
         self,
@@ -149,7 +147,8 @@ class StrikeSelectionEngine:
                 else:
                     best_idx = left
 
-        # Edge cases: price below all strikes or above all strikes - return only nearest strike
+        # Edge cases: price below all strikes or above all strikes
+        # Return nearest strike
         if right == -1 or left >= len(strikes):
             return [strikes[best_idx]][:max_strikes]
 
@@ -197,7 +196,8 @@ class StrikeSelectionEngine:
             if len(selected) >= max_strikes:
                 break
             if opt.strike_price not in selected:
-                # Simple heuristic: prefer strikes with delta close to 0.5 for calls, -0.5 for puts
+                # Simple heuristic: prefer strikes with delta close to 0.5 for calls
+                # and -0.5 for puts
                 if (
                     opt.option_type == OptionType.CALL
                     and opt.delta is not None

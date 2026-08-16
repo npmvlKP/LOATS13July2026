@@ -42,11 +42,11 @@ COPY pyproject.toml .
 # Using pure Python alternatives for Windows compatibility
 RUN pip install --no-cache-dir -r requirements-core.txt
 
-# Install the package in editable mode with dev dependencies
-RUN pip install --no-cache-dir -e ".[dev]"
-
 # Copy project source
 COPY src/ ./src/
+
+# Install the package in production mode (not editable)
+RUN pip install --no-cache-dir .
 
 # Copy scripts (health checks, etc.)
 COPY quick_health_check.py verify_project_health.py ./

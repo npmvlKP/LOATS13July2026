@@ -82,14 +82,6 @@ target-version = "py312"
 exclude = [
     "*.env",
     ".ruff_cache",
-    "domain_check.py",
-    "verify_sql_injection.py",
-    "final_validation.py",
-    "verify_project_health.py",
-    "import_check.py",
-    "minimal_test.py",
-    "quick_health_check.py",
-    "verify_no_sql_injection.py",
 ]
 extend-exclude = []
 
@@ -99,8 +91,6 @@ max-complexity = 20
 [tool.ruff.lint]
 select = ["E", "F", "W", "C90", "I", "N", "UP", "B", "A", "C4", "DTZ", "EXE", "FA", "ICN", "INP", "PIE", "T20", "PTH", "PGH", "RUF"]
 ignore = [
-    "F401",
-    "F541",
     "E402",
     "I001",
     "PTH123",
@@ -123,14 +113,9 @@ ignore = [
     "PIE790",
     "PGH003",
     "T201",
-    "E402",
-    "I001",
-    "PTH123",
     "UP015",
     "B007",
     "PTH110",
-    "F401",
-    "F541",
 ]
 
 [tool.ruff.lint.per-file-ignores]
@@ -143,20 +128,20 @@ ignore = [
 python_version = "3.12"
 warn_return_any = true
 warn_unused_configs = true
-disallow_untyped_defs = false
+disallow_untyped_defs = true
 disallow_incomplete_defs = true
 check_untyped_defs = true
 disallow_untyped_decorators = true
 no_implicit_optional = true
 warn_redundant_casts = true
-warn_unused_ignores = false
+warn_unused_ignores = true
 warn_no_return = true
-warn_unreachable = false
-ignore_missing_imports = true
+warn_unreachable = true
+ignore_missing_imports = false
 strict_equality = true
-disallow_any_generics = false
+disallow_any_generics = true
 disallow_subclassing_any = true
-disallow_untyped_calls = false
+disallow_untyped_calls = true
 explicit_package_bases = true
 exclude = ["tests/", "scripts/"]
 namespace_packages = true

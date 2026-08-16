@@ -96,6 +96,12 @@ qg_*.txt
 task_progress.md
 *_audit.md
 
+# Junk files
+$null
+[100%]
+0.21.0
+pytest_final*.log
+
 # Node.js modules
 node_modules/
 
