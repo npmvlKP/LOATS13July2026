@@ -28,7 +28,7 @@ async def test_is_market_open_logic(scheduler):
 
 @pytest.mark.asyncio
 async def test_is_market_open_holiday_republic_day(scheduler):
-    # 2026-01-26 is Republic Day (Monday) — market must be closed.
+    # 2026-01-26 is Republic Day (Monday) - market must be closed.
     republic_day = datetime.datetime(2026, 1, 26, 10, 0)
     with patch("loats.scheduler.datetime.datetime") as mock_dt:
         mock_dt.now.return_value = republic_day

@@ -19,14 +19,6 @@ logger = get_logger(__name__)
 
 T = TypeVar("T")
 
-# Import Redis as optional dependency
-try:
-    import redis.asyncio as redis
-
-    REDIS_AVAILABLE = True
-except ImportError:
-    REDIS_AVAILABLE = False
-    logger.warning("Redis not available, using in-memory cache only")
 
 
 class CacheConfig:

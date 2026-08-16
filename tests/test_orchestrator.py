@@ -101,7 +101,7 @@ class TestTradingOrchestrator(unittest.IsolatedAsyncioTestCase):
         with patch(
             "loats.orchestrator.alerts.is_kill_switch_active", return_value=True
         ):
-            with pytest.raises(KillSwitchError, match=""):
+            with pytest.raises(KillSwitchError, match="Kill switch active"):
                 await self.orchestrator._check_kill_switch()
 
     async def test_execute_ta_analysis(self):
