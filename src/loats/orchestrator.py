@@ -7,6 +7,9 @@ Coordinates all trading operations with strict latency guarantees.
 import asyncio
 import datetime
 from typing import Any
+from urllib.parse import urlparse
+
+import httpx
 
 from .alerts import alerts
 from .config import get_settings
@@ -30,6 +33,55 @@ from .utils.resilience import openalgo_circuit_breaker_retry_async
 
 logger = get_logger(__name__)
 settings = None
+
+async def validate_rss_feed(url: str, timeout: int = 5) -> bool:
+    """Validate RSS feed URL with timeout and error handling."""
+    try:
+        # Basic URL validation
+        parsed = urlparse(url)
+        if not all([parsed.scheme, parsed.netloc]):
+            logger.warning(f"Invalid RSS feed URL format: {url}")
+            return False
+
+        # Check if URL is HTTP/HTTPS
+        if parsed.scheme not in ['http', 'https']:
+            logger.warning(f"Unsupported RSS feed URL scheme: {parsed.scheme}")
+            return False
+
+        # Try to fetch the feed with timeout
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            try:
+                response = await client.get(url, follow_redirects=True)
+                if response.status_code == 200:
+                    # Check if content looks like XML/RSS
+                    content_type = response.headers.get('content-type', '').lower()
+                    if 'xml' in content_type or 'rss' in content_type:
+                        return True
+                    # Simple content check for RSS feeds
+                    content = response.text.lower()
+                    if any(tag in content for tag in ['<rss', '<feed', '<channel']):
+                        return True
+                    logger.warning(f"RSS feed URL returned non-RSS content: {url}")
+                    return False
+                else:
+                    logger.warning(f"RSS feed URL returned status {response.status_code}: {url}")
+                    return False
+            except httpx.ConnectTimeout:
+                logger.warning(f"RSS feed URL connection timeout: {url}")
+                return False
+            except httpx.ReadTimeout:
+                logger.warning(f"RSS feed URL read timeout: {url}")
+                return False
+            except httpx.HTTPStatusError as e:
+                logger.warning(f"RSS feed URL HTTP error {e.response.status_code}: {url}")
+                return False
+            except Exception as e:
+                logger.warning(f"RSS feed URL validation error for {url}: {e}")
+                return False
+
+    except Exception as e:
+        logger.error(f"Unexpected error validating RSS feed {url}: {e}")
+        return False
 
 
 class TradingOrchestrator:
@@ -226,8 +278,20 @@ class TradingOrchestrator:
                 "https://www.bloombergquint.com/markets-feed",
             ]
 
-            # Call the async sentiment analysis function directly
-            result = await sentiment.analyze_symbol_sentiment(symbol, rss_feeds)
+            # Validate RSS feeds and filter out invalid ones
+            valid_feeds = []
+            for feed_url in rss_feeds:
+                if await validate_rss_feed(feed_url):
+                    valid_feeds.append(feed_url)
+                else:
+                    logger.warning(f"Skipping invalid RSS feed: {feed_url}")
+
+            if not valid_feeds:
+                logger.warning("No valid RSS feeds available for sentiment analysis")
+                return
+
+            # Call the async sentiment analysis function directly with validated feeds
+            result = await sentiment.analyze_symbol_sentiment(symbol, valid_feeds)
 
             # Generate sentiment signal
             if result.sentiment_score > 0:
