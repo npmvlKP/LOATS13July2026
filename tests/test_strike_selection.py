@@ -148,7 +148,9 @@ class TestStrikeSelectionEngine(unittest.IsolatedAsyncioTestCase):
         """Test engine initialization."""
         assert self.engine is not None
         assert hasattr(self.engine, "_cache")
-        assert isinstance(self.engine._cache, dict)
+        # Cache is now TTLCache for better performance
+        from cachetools import TTLCache
+        assert isinstance(self.engine._cache, TTLCache)
 
     async def test_select_strikes_atm_straddle(self):
         """Test ATM straddle strike selection."""
