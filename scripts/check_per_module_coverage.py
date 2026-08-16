@@ -103,9 +103,9 @@ def main():
         )
         print("Per-module coverage gates: FAILED (warnings detected)")
 
-        # Exit with warning code (0 for now, as this is informational)
-        # In CI, this should be handled as a warning, not a failure
-        sys.exit(0)
+        # Exit with non-zero code to indicate failure
+        # This ensures CI/CD pipelines treat coverage warnings as failures
+        sys.exit(1)
     else:
         print("\nAll modules meet or exceed the 80% coverage threshold!")
         print(f"Aggregate coverage: {coverage_data['totals']['percent_covered']:.1f}%")
