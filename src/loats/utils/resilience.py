@@ -87,9 +87,9 @@ def circuit_breaker_retry_sync(
 
                     # Check if exception is excluded from retry
                     if isinstance(e, circuit_breaker.config.excluded_exceptions):
-                        logger.debug(
-                            f"Circuit breaker '{circuit_breaker.name}': excluded exception {type(e).__name__}"
-                        )
+                        exc_name = type(e).__name__
+                        msg = f"Circuit '{circuit_breaker.name}': excluded {exc_name}"
+                        logger.debug(msg)
                         raise e
 
                     # Check if exception is retryable
@@ -100,7 +100,7 @@ def circuit_breaker_retry_sync(
                     # Check if we have more attempts
                     if attempt >= cfg.max_attempts:
                         logger.warning(
-                            f"Max retry attempts ({cfg.max_attempts}) reached for {func.__name__}"
+                            f"Max attempts ({cfg.max_attempts}) for {func.__name__}"
                         )
                         raise e
 
@@ -179,9 +179,9 @@ def circuit_breaker_retry_async(
 
                     # Check if exception is excluded from retry
                     if isinstance(e, circuit_breaker.config.excluded_exceptions):
-                        logger.debug(
-                            f"Circuit breaker '{circuit_breaker.name}': excluded exception {type(e).__name__}"
-                        )
+                        exc_name = type(e).__name__
+                        msg = f"Circuit '{circuit_breaker.name}': excluded {exc_name}"
+                        logger.debug(msg)
                         raise
 
                     # Check if exception is retryable
@@ -192,7 +192,7 @@ def circuit_breaker_retry_async(
                     # Check if we have more attempts
                     if attempt >= cfg.max_attempts:
                         logger.warning(
-                            f"Max retry attempts ({cfg.max_attempts}) reached for {func.__name__}"
+                            f"Max attempts ({cfg.max_attempts}) for {func.__name__}"
                         )
                         raise
 

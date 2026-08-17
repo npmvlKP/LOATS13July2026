@@ -397,7 +397,7 @@ class TradeDecisionEngine:
             "analyzer_status": "ANALYZED",
             "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
             "notes": (
-                "This is a simulated response - in production would query actual Analyzer"
+                "Simulated response - production would query actual Analyzer"
             ),
         }
 

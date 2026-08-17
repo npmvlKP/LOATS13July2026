@@ -54,8 +54,11 @@ class RateLimiter:
         """
         async with self.lock:
             now: float = time.monotonic()
-            # Discard timestamps older than the window
-            while self.timestamps and now - self.timestamps[0] > self.window_size:
+            # Discard timestamps that are *outside* the window (>= window size)
+            # Using >= ensures tokens that have exactly expired are removed,
+            # preventing edge‑case off‑by‑one errors when a token expires
+            # during a sleep that matches the window size.
+            while self.timestamps and now - self.timestamps[0] >= self.window_size:
                 self.timestamps.popleft()
             if len(self.timestamps) < self.max_ops:
                 self.timestamps.append(now)
@@ -71,12 +74,11 @@ class RateLimiter:
         """
         async with self.lock:
             current_time: float = time.monotonic()
-
-            # Remove timestamps older than window_size
-            # Use > to ensure we maintain strict max_ops limit in any window
-            while (
-                self.timestamps and current_time - self.timestamps[0] > self.window_size
-            ):
+            
+            # Remove timestamps that are outside the window (>= window size)
+            # This mirrors the logic in ``acquire`` for consistency.
+            while (self.timestamps and 
+                   current_time - self.timestamps[0] >= self.window_size):
                 self.timestamps.popleft()
 
             # Check if we can acquire immediately
@@ -89,6 +91,7 @@ class RateLimiter:
                 time_until_oldest_expires = (
                     oldest_timestamp + self.window_size - current_time
                 )
+                # Ensure we don't return negative values due to timing issues
                 return max(0.0, time_until_oldest_expires)
             else:
                 return 0.0
@@ -109,12 +112,10 @@ class RateLimiter:
                 time_until_oldest_expires = (
                     oldest_timestamp + self.window_size - current_time
                 )
-                # Sleep until the oldest token expires, with a small buffer to account for scheduling delays
-                # Use max(0.001, ...) to ensure we always sleep at least a tiny amount
-                sleep_time = max(0.001, time_until_oldest_expires)
-                # Add a small buffer (5% of window_size) to ensure we wake up slightly before expiration
-                # This prevents race conditions where we wake up just after expiration
-                buffer = self.window_size * 0.05
+                # Sleep until the oldest token expires, with a small buffer
+                # to account for scheduling delays. Use max(0.001, ...) to
+                # ensure we always sleep at least a tiny amount.
+                buffer = self.window_size * 0.05  # 5% buffer
                 sleep_time = max(0.001, time_until_oldest_expires - buffer)
             else:
                 sleep_time = 0.05
@@ -143,7 +144,6 @@ class AsyncRateLimiter:
         self.window_size: float = window_size
         self.timestamps: deque[float] = deque()
         self.lock: asyncio.Lock = asyncio.Lock()
-        self.get_wait_time = self._get_wait_time
         # Use injected clock or default to time.monotonic for production
         self._clock = clock or time.monotonic
 
@@ -159,22 +159,23 @@ class AsyncRateLimiter:
         async with self.lock:
             current_time: float = self._clock()
 
-            # Remove timestamps older than window_size
-            # Use > to ensure we maintain strict max_ops limit in any window
-            while (
-                self.timestamps and current_time - self.timestamps[0] > self.window_size
-            ):
+            # Remove timestamps that are outside the window (>= window size)
+            # Using >= ensures tokens that have exactly expired are removed,
+            # preventing off-by-one errors when a token expires during sleep.
+            while (self.timestamps and 
+                   current_time - self.timestamps[0] >= self.window_size):
                 self.timestamps.popleft()
 
             # Check if we can acquire a token
-            # We can acquire if we have fewer than max_ops operations in the current window
+            # We can acquire if we have fewer than max_ops operations in the
+            # current window
             if len(self.timestamps) < self.max_ops:
                 self.timestamps.append(current_time)
                 return True
             else:
                 return False
 
-    async def _get_wait_time(self) -> float:
+    async def get_wait_time(self) -> float:
         """Get estimated wait time until next token is available.
 
         Returns:
@@ -184,13 +185,11 @@ class AsyncRateLimiter:
         async with self.lock:
             current_time: float = self._clock()
 
-            # Remove timestamps older than window_size
-            # Use > to ensure we maintain strict max_ops limit in any window
-            # Capture current_time again after cleanup to ensure accurate window calculation
-            cleanup_time = current_time
-            while (
-                self.timestamps and cleanup_time - self.timestamps[0] > self.window_size
-            ):
+            # Remove timestamps that are outside the window (>= window size)
+            # Using >= ensures tokens that have exactly expired are removed,
+            # preventing off-by-one errors when a token expires during sleep.
+            while (self.timestamps and 
+                   current_time - self.timestamps[0] >= self.window_size):
                 self.timestamps.popleft()
 
             # Check if we can acquire immediately
@@ -203,6 +202,7 @@ class AsyncRateLimiter:
                 time_until_oldest_expires = (
                     oldest_timestamp + self.window_size - current_time
                 )
+                # Ensure we don't return negative values due to timing issues
                 return max(0.0, time_until_oldest_expires)
             else:
                 return 0.0
@@ -223,8 +223,8 @@ class AsyncRateLimiter:
                 time_until_oldest_expires = (
                     oldest_timestamp + self.window_size - current_time
                 )
-                # Sleep until the oldest token expires, with a small buffer to account for scheduling delays
-                # Use max(0.001, ...) to ensure we always sleep at least a tiny amount
+                # Sleep until the oldest token expires, with a small buffer
+                # to account for scheduling delays.
                 buffer = self.window_size * 0.05  # 5% buffer
                 sleep_time = max(0.001, time_until_oldest_expires - buffer)
             else:
@@ -278,15 +278,16 @@ class SyncRateLimiter:
         with self.lock:
             current_time: float = time.monotonic()
 
-            # Remove timestamps older than window_size
-            # Use > to ensure we maintain strict max_ops limit in any window
-            while (
-                self.timestamps and current_time - self.timestamps[0] > self.window_size
-            ):
+            # Remove timestamps that are outside the window (>= window size)
+            # Using >= ensures tokens that have exactly expired are removed,
+            # preventing off-by-one errors when a token expires during sleep.
+            while (self.timestamps and 
+                   current_time - self.timestamps[0] >= self.window_size):
                 self.timestamps.popleft()
 
             # Check if we can acquire a token
-            # We can acquire if we have fewer than max_ops operations in the current window
+            # We can acquire if we have fewer than max_ops operations in the
+            # current window
             if len(self.timestamps) < self.max_ops:
                 self.timestamps.append(current_time)
                 return True
@@ -362,9 +363,10 @@ def get_order_rate_limiter(
 ) -> AsyncRateLimiter:
     """Return a shared ``AsyncRateLimiter`` for order-rate limiting.
 
-    * No ``max_ops`` -> return the *process-wide* default singleton (from settings.max_ops).
-    * ``max_ops`` supplied → return a stable instance cached per ``(max_ops,
-      window_size)`` pair.
+    * No ``max_ops`` -> return the process-wide default singleton
+      (from settings.max_ops).
+    * ``max_ops`` supplied → return a stable instance cached per
+      ``(max_ops, window_size)`` pair.
     """
     if max_ops is None:
         # Default singleton - use backward-compatible alias and its lock
@@ -427,9 +429,10 @@ def get_sync_order_rate_limiter(
 ) -> SyncRateLimiter:
     """Return a shared ``SyncRateLimiter`` for synchronous order-rate limiting.
 
-    * No ``max_ops`` -> return the *process-wide* default singleton (from settings.max_ops).
-    * ``max_ops`` supplied → return a stable instance cached per ``(max_ops,
-      window_size)`` pair.
+    * No ``max_ops`` -> return the process-wide default singleton
+      (from settings.max_ops).
+    * ``max_ops`` supplied → return a stable instance cached per
+      ``(max_ops, window_size)`` pair.
     """
     if max_ops is None:
         # Default singleton - use synchronous lock
@@ -446,7 +449,6 @@ def get_sync_order_rate_limiter(
         if _sync_order_rate_limiter is not None:
             return _sync_order_rate_limiter
 
-    # Custom parameters - use cache keyed by (max_ops, window_size)
     # Custom parameters - use cache keyed by (max_ops, window_size)
     key = (max_ops, window_size)
     with _custom_lock:

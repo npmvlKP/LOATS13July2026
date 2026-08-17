@@ -82,8 +82,8 @@ class CircuitBreaker:
 
     States:
         - CLOSED: Normal operation, all requests pass through
-        - OPEN: Circuit is tripped, requests fail immediately with CircuitBreakerOpenError
-        - HALF_OPEN: After timeout, allows a limited number of requests to test recovery
+        - OPEN: Circuit is tripped, requests fail immediately
+        - HALF_OPEN: After timeout, allows limited requests to test recovery
     """
 
     def __init__(
@@ -215,9 +215,8 @@ class CircuitBreaker:
         except Exception as e:
             # Check if exception should be excluded from failure count
             if isinstance(e, self.config.excluded_exceptions):
-                logger.debug(
-                    f"Circuit breaker '{self.name}': excluded exception {type(e).__name__}"
-                )
+                exc_name = type(e).__name__
+                logger.debug(f"Circuit '{self.name}': excluded {exc_name}")
                 raise
 
             self._record_failure()
@@ -257,9 +256,8 @@ class CircuitBreaker:
         except Exception as e:
             # Check if exception should be excluded from failure count
             if isinstance(e, self.config.excluded_exceptions):
-                logger.debug(
-                    f"Circuit breaker '{self.name}': excluded exception {type(e).__name__}"
-                )
+                exc_name = type(e).__name__
+                logger.debug(f"Circuit '{self.name}': excluded {exc_name}")
                 raise
 
             self._record_failure()
@@ -272,9 +270,7 @@ class CircuitBreaker:
             self._opened_at = None
             self._half_open_at = None
             self._stats = CircuitBreakerStats()
-            logger.info(
-                f"Circuit breaker '{self.name}' manually reset to CLOSED and stats reset"
-            )
+            logger.info(f"Circuit breaker '{self.name}' manually reset to CLOSED")
 
     def get_status(self) -> dict[str, Any]:
         """Get circuit breaker status for monitoring/alerting."""

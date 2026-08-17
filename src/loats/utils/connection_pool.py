@@ -1,6 +1,6 @@
 """
 Simple connection pool implementation for aiosqlite.
-This provides basic connection pooling functionality since aiosqlite doesn't have built-in pooling.
+Provides basic connection pooling since aiosqlite lacks built-in pooling.
 """
 
 import asyncio
@@ -45,7 +45,7 @@ class SimpleConnectionPool:
             if self._pool:
                 conn = self._pool.popleft()
                 logger.debug(
-                    f"Reusing connection from pool, remaining in pool: {len(self._pool)}"
+                    f"Reusing connection, remaining in pool: {len(self._pool)}"
                 )
                 try:
                     # Test the connection
@@ -100,7 +100,7 @@ class SimpleConnectionPool:
             logger.info("Async database connection pool closed properly")
 
     async def close_all(self) -> None:
-        """Close all connections in the pool (immediate, may lose active connections)."""
+        """Close all connections (immediate, may lose active connections)."""
         async with self._lock:
             while self._pool:
                 conn = self._pool.popleft()
