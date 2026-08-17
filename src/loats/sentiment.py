@@ -103,7 +103,8 @@ class SentimentAnalyzer:
         rss_urls: list[str],
         max_items: int = 20,
     ) -> SentimentAnalysisResult:
-        """Analyze sentiment specific symbol across multiple RSS feeds asynchronously."""
+        """Analyze sentiment for a specific symbol across multiple RSS feeds
+        asynchronously."""
         # Create cache key based on symbol and RSS URLs
         urls_digest = hashlib.sha256(
             "\n".join(sorted(rss_urls)).encode("utf-8")

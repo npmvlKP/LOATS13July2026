@@ -41,17 +41,22 @@ class AlertSystem:
     """Alert system using Telegram bot notifications kill switch.
 
     `AlertSystem` accepts an optional ``Database`` instance constructor.
-    When omitted, shared module-level `db` singleton (so original ``AlertSystem()`` call-site continues work unchanged).
-    Active database reference exposed via :attr:`db` property, which **looked dynamically** at access time.
-    Test-time patches to `src.loats.alerts.db` continue to be honored when explicit instance not injected.
-    This eliminates per-command `Database()` instantiation that previously caused connection / file-handle churn on Windows (NEW-M5).
+    When omitted, shared module-level `db` singleton (so original
+    ``AlertSystem()`` call-site continues work unchanged).
+    Active database reference exposed via :attr:`db` property, which
+    **looked dynamically** at access time.
+    Test-time patches to `src.loats.alerts.db` continue to be honored
+    when explicit instance not injected.
+    This eliminates per-command `Database()` instantiation that
+    previously caused connection / file-handle churn on Windows (NEW-M5).
     """
 
     def __init__(self, database: Database | None = None) -> None:
         """Initialize AlertSystem.
         Args:
-            database: Optional `Database` instance. When ``None`` (the default), module-level `db` singleton
-            resolved attribute-access time callers pass explicit fixture (preferred for proper dependency injection).
+            database: Optional `Database` instance. When ``None`` (the default),
+            module-level `db` singleton resolved attribute-access time callers
+            pass explicit fixture (preferred for proper dependency injection).
         """
         self._explicit_db: Database | None = database
         self.bot: Bot | None = None
@@ -72,9 +77,10 @@ class AlertSystem:
         """
         if self._explicit_db is not None:
             return self._explicit_db
-        # Late import to support test-time patching. This allows `patch("src.loats.alerts.db")`
-        # to continue working when no explicit database instance is injected.
-        # The import happens at access time rather than module load time.
+        # Late import to support test-time patching. This allows
+        # `patch("src.loats.alerts.db")` to continue working when no
+        # explicit database instance is injected. The import happens at
+        # access time rather than module load time.
         from src.loats.alerts import db as module_db
 
         return module_db
@@ -124,9 +130,10 @@ class AlertSystem:
     async def start(self) -> None:
         """Start Telegram bot non-blocking mode.
         Uses v20+ lifecycle: `initialize()` → ``start()`` → ``updater.start_polling()``.
-        Starts polling background, allowing other async tasks (like scheduler) run concurrently.
-        FIX-F-CONC-2: Original implementation blocking ``start_polling()``. Now uses ``start_polling()``
-        separate task avoid blocking event loop.
+        Starts polling background, allowing other async tasks (like scheduler)
+        run concurrently. FIX-F-CONC-2: Original implementation blocking
+        ``start_polling()``. Now uses ``start_polling()`` separate task avoid
+        blocking event loop.
         """
         if not self.application:
             return
@@ -294,7 +301,8 @@ class AlertSystem:
                 f"<b>Type:</b> {signal.signal_type.value}\n"
                 f"<b>Strength:</b> {signal.strength:.2f}\n"
                 f"<b>Confidence:</b> {signal.confidence:.2f}\n"
-                f"<b>Timestamp:</b> {signal.timestamp.strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+                f"<b>Timestamp:</b> "
+                f"{signal.timestamp.strftime('%Y-%m-%d %H:%M:%S')}\n\n"
                 f"<b>Indicators:</b>\n{indicators}\n\n"
                 f"<b>Metadata:</b>\n{metadata}"
             )
@@ -367,12 +375,15 @@ class AlertSystem:
                 alert_type = "info"
                 emoji = "🔄"
 
+            transaction_type_str = (
+                trade.transaction_type.value if trade.transaction_type else "N/A"
+            )
             message = (
                 f"{emoji} <b>TRADE {action.upper()}</b> {emoji}\n\n"
                 f"<b>Trade ID:</b> {html.escape(trade.trade_id)}\n"
                 f"<b>Symbol:</b> {html.escape(trade.symbol)}\n"
                 f"<b>Strategy:</b> {html.escape(trade.strategy or '')}\n"
-                f"<b>Type:</b> {html.escape(trade.transaction_type.value if trade.transaction_type else 'N/A')}\n"
+                f"<b>Type:</b> {html.escape(transaction_type_str)}\n"
                 f"<b>Quantity:</b> {trade.quantity}\n"
                 f"<b>Entry Price:</b> {trade.entry_price:.2f}\n"
                 f"<b>Status:</b> {trade.status}\n"
@@ -382,7 +393,10 @@ class AlertSystem:
             if trade.exit_price:
                 message += f"\n<b>Exit Price:</b> {trade.exit_price:.2f}"
             if trade.exit_time:
-                message += f"\n<b>Exit Time:</b> {trade.exit_time.strftime('%Y-%m-%d %H:%M:%S')}"
+                message += (
+                    f"\n<b>Exit Time:</b> "
+                    f"{trade.exit_time.strftime('%Y-%m-%d %H:%M:%S')}"
+                )
             if trade.pnl is not None:
                 pnl_color = "green" if trade.pnl > 0 else "red"
                 message += (
@@ -453,7 +467,8 @@ class AlertSystem:
                     f"<b>Quantity:</b> {pos['quantity']}\n"
                     f"<b>Avg Price:</b> {pos['average_price']:.2f}\n"
                     f"<b>Last Price:</b> {pos['last_price']:.2f}\n"
-                    f"<b>PnL:</b> <span color='{pnl_color}'>{pos.get('pnl', 0):.2f}</span>\n"
+                    f"<b>PnL:</b> "
+                    f"<span color='{pnl_color}'>{pos.get('pnl', 0):.2f}</span>\n"
                     f"<b>Product:</b> {product_type}\n\n"
                 )
 
@@ -533,7 +548,8 @@ class AlertSystem:
             message = (
                 f"🚨 <b>KILL SWITCH ACTIVATED</b> 🚨\n\n"
                 f"<b>Reason:</b> {escaped_reason}\n"
-                f"<b>Timestamp:</b> {datetime.now(UTC).strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+                f"<b>Timestamp:</b> "
+                f"{datetime.now(UTC).strftime('%Y-%m-%d %H:%M:%S')}\n\n"
                 "All open orders cancelled. No new orders placed."
             )
 
@@ -558,7 +574,8 @@ class AlertSystem:
             message = (
                 f"✅ <b>KILL SWITCH DEACTIVATED</b> ✅\n\n"
                 f"<b>Reason:</b> {escaped_reason}\n"
-                f"<b>Timestamp:</b> {datetime.now(UTC).strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+                f"<b>Timestamp:</b> "
+                f"{datetime.now(UTC).strftime('%Y-%m-%d %H:%M:%S')}\n\n"
                 "Trading activities now resume."
             )
 
@@ -641,10 +658,10 @@ class AlertSystem:
         try:
             # Check admin authorization
             if not self._is_authorized_admin(update):
-                logger.warning(
-                    f"Unauthorized kill switch attempt user: "
-                    f"{update.effective_user.id if update.effective_user else 'unknown'}"
+                user_id = (
+                    update.effective_user.id if update.effective_user else "unknown"
                 )
+                logger.warning("Unauthorized kill switch attempt user: %s", user_id)
                 if update.message:
                     await update.message.reply_text(
                         "Unauthorized: You are not authorized to issue this command. "
@@ -681,10 +698,10 @@ class AlertSystem:
         try:
             # Check admin authorization
             if not self._is_authorized_admin(update):
-                logger.warning(
-                    f"Unauthorized resume attempt user: "
-                    f"{update.effective_user.id if update.effective_user else 'unknown'}"
+                user_id = (
+                    update.effective_user.id if update.effective_user else "unknown"
                 )
+                logger.warning("Unauthorized resume attempt user: %s", user_id)
                 if update.message:
                     await update.message.reply_text(
                         "Unauthorized: You are not authorized to issue this command. "
@@ -793,7 +810,8 @@ class AlertSystem:
                 }.get(signal.signal_type, "i")
 
                 message += (
-                    f"{emoji} <b>{signal.signal_type.value}</b> (Strength: {signal.strength:.2f})\n"
+                    f"{emoji} <b>{signal.signal_type.value}</b> "
+                    f"(Strength: {signal.strength:.2f})\n"
                     f"<b>Time:</b> {signal.timestamp.strftime('%H:%M:%S')}\n"
                     f"<b>Indicators:</b> {len(signal.indicators)}\n\n"
                 )
@@ -837,7 +855,8 @@ class AlertSystem:
                 else:
                     if update.message:
                         await update.message.reply_text(
-                            "i Didn't understand that. Type /help to see available commands."
+                            "i Didn't understand that. "
+                            "Type /help to see available commands."
                         )
         except Exception as e:
             logger.error(f"Error handling message: {e}")

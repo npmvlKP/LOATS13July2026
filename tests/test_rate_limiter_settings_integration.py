@@ -155,9 +155,9 @@ class TestRateLimiterSettingsIntegration:
             # Verify that all subsequent calls are also rejected
             for _ in range(5):
                 result = await limiter.acquire()
-                assert not result, (
-                    "All calls should be rejected when rate limiter is full"
-                )
+                assert (
+                    not result
+                ), "All calls should be rejected when rate limiter is full"
         else:
             # We got some successful acquires - verify we didn't exceed the limit
             assert successful_acquires >= 1, (
@@ -183,14 +183,14 @@ class TestRateLimiterSettingsIntegration:
 
         # All instances should be the same singleton
         for i, limiter in enumerate(limiters[1:], 1):
-            assert limiter is limiters[0], (
-                f"Factory call {i} should return same singleton as call 0"
-            )
+            assert (
+                limiter is limiters[0]
+            ), f"Factory call {i} should return same singleton as call 0"
 
         # The singleton should have the correct max_ops
-        assert limiters[0].max_ops == expected_max_ops, (
-            f"Singleton should have max_ops={expected_max_ops}, got {limiters[0].max_ops}"
-        )
+        assert (
+            limiters[0].max_ops == expected_max_ops
+        ), f"Singleton should have max_ops={expected_max_ops}, got {limiters[0].max_ops}"
 
     @pytest.mark.asyncio
     async def test_custom_max_ops_still_works(self) -> None:
@@ -205,9 +205,9 @@ class TestRateLimiterSettingsIntegration:
         limiter = get_order_rate_limiter(max_ops=custom_max_ops)
 
         # Verify it uses the custom value
-        assert limiter.max_ops == custom_max_ops, (
-            f"Custom max_ops should be {custom_max_ops}, got {limiter.max_ops}"
-        )
+        assert (
+            limiter.max_ops == custom_max_ops
+        ), f"Custom max_ops should be {custom_max_ops}, got {limiter.max_ops}"
 
         # Verify it actually enforces the custom limit
         successful_acquires = 0

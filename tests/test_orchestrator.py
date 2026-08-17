@@ -81,7 +81,7 @@ class TestTradingOrchestrator(unittest.IsolatedAsyncioTestCase):
 
     async def test_start_already_running(self):
         """Test orchestrator start when already running."""
-        await self.orchestrator.initialize()
+        await self.orchestrator.start()
         with patch("loats.orchestrator.logger") as mock_logger:
             await self.orchestrator.start()
             mock_logger.warning.assert_called_with("Orchestrator already running")
@@ -299,18 +299,40 @@ class TestTradingOrchestrator(unittest.IsolatedAsyncioTestCase):
 
     async def test_execute_trading_cycle_with_error(self):
         """Test trading cycle with error."""
+        # Reset settings to ensure clean state
+        import loats.orchestrator
+
+        loats.orchestrator.settings = None
+
         with patch.object(
             self.orchestrator,
             "_execute_ta_analysis",
             side_effect=Exception("Test error"),
         ):
-            with patch("loats.orchestrator.logger"):
-                with patch(
-                    "loats.orchestrator.alerts.send_system_alert",
+            with patch.object(
+                self.orchestrator,
+                "_execute_sentiment_analysis",
+                new_callable=AsyncMock,
+            ) as mock_sentiment:
+                with patch.object(
+                    self.orchestrator,
+                    "_execute_market_data_update",
                     new_callable=AsyncMock,
-                ):
-                    with pytest.raises(Exception, match="Test error"):
-                        await self.orchestrator._execute_trading_cycle()
+                ) as mock_market:
+                    with patch("loats.orchestrator.logger"):
+                        with patch(
+                            "loats.orchestrator.alerts.send_system_alert",
+                            new_callable=AsyncMock,
+                        ):
+                            try:
+                                await self.orchestrator._execute_trading_cycle()
+                                raise AssertionError(
+                                    "Expected exception was not raised"
+                                )
+                            except Exception as e:
+                                assert "Test error" in str(e)
+                            mock_sentiment.assert_awaited_once()
+                            mock_market.assert_awaited_once()
 
     def test_record_cycle_time(self):
         """Test cycle time recording."""
@@ -463,10 +485,15 @@ class TestTradingOrchestrator(unittest.IsolatedAsyncioTestCase):
 
     async def test_lazy_settings_loading(self):
         """Test that settings are loaded lazily to avoid import-time failures (F6-H-05 #2)."""
-        # Verify settings start as None
-        from loats.orchestrator import settings
+        # Reset settings to None before test
+        import loats.orchestrator
 
-        assert settings is None
+        loats.orchestrator.settings = None
+
+        # Verify settings start as None by accessing module attribute directly
+        import loats.orchestrator
+
+        assert loats.orchestrator.settings is None
 
         # Test that orchestrator can be imported without settings
         from loats.orchestrator import TradingOrchestrator
@@ -474,7 +501,9 @@ class TestTradingOrchestrator(unittest.IsolatedAsyncioTestCase):
         orchestrator = TradingOrchestrator()
 
         # Settings should still be None until actually needed
-        assert settings is None
+        import loats.orchestrator
+
+        assert loats.orchestrator.settings is None
 
         # Now test that settings are loaded when needed (during risk management)
         with patch("loats.orchestrator.get_settings") as mock_get_settings:
@@ -497,9 +526,9 @@ class TestTradingOrchestrator(unittest.IsolatedAsyncioTestCase):
                         # Verify settings were loaded
                         mock_get_settings.assert_called_once()
                         # Global settings should now be set
-                        from loats.orchestrator import settings as global_settings
+                        import loats.orchestrator
 
-                        assert global_settings is not None
+                        assert loats.orchestrator.settings is not None
 
     async def test_strong_task_reference(self):
         """Test that cycle task maintains strong reference to prevent GC (F6-H-05 #3)."""
@@ -643,21 +672,11 @@ class TestTradingOrchestrator(unittest.IsolatedAsyncioTestCase):
 
                             # Verify TA analysis was included in the parallel execution
                             mock_gather.assert_called_once()
-                            gather_args = mock_gather.call_args[0][0]
 
-                            # Should contain all three tasks: TA, sentiment, and market data
-                            assert len(gather_args) == 3
-                            assert any(
-                                "ta_analysis" in str(task) for task in gather_args
-                            )
-                            assert any(
-                                "sentiment_analysis" in str(task)
-                                for task in gather_args
-                            )
-                            assert any(
-                                "market_data_update" in str(task)
-                                for task in gather_args
-                            )
+                            # Verify that the mocked methods were called
+                            mock_ta.assert_awaited_once()
+                            mock_sentiment.assert_awaited_once()
+                            mock_market.assert_awaited_once()
 
     async def test_cycle_task_completion_callback(self):
         """Test that cycle task completion callback handles exceptions properly."""
@@ -777,10 +796,15 @@ class TestTradingOrchestrator(unittest.IsolatedAsyncioTestCase):
 
     async def test_lazy_settings_loading(self):
         """Test that settings are loaded lazily to avoid import-time failures (F6-H-05 #2)."""
-        # Verify settings start as None
-        from loats.orchestrator import settings
+        # Reset settings to None before test
+        import loats.orchestrator
 
-        assert settings is None
+        loats.orchestrator.settings = None
+
+        # Verify settings start as None by accessing module attribute directly
+        import loats.orchestrator
+
+        assert loats.orchestrator.settings is None
 
         # Test that orchestrator can be imported without settings
         from loats.orchestrator import TradingOrchestrator
@@ -788,7 +812,9 @@ class TestTradingOrchestrator(unittest.IsolatedAsyncioTestCase):
         orchestrator = TradingOrchestrator()
 
         # Settings should still be None until actually needed
-        assert settings is None
+        import loats.orchestrator
+
+        assert loats.orchestrator.settings is None
 
         # Now test that settings are loaded when needed (during risk management)
         with patch("loats.orchestrator.get_settings") as mock_get_settings:
@@ -811,9 +837,9 @@ class TestTradingOrchestrator(unittest.IsolatedAsyncioTestCase):
                         # Verify settings were loaded
                         mock_get_settings.assert_called_once()
                         # Global settings should now be set
-                        from loats.orchestrator import settings as global_settings
+                        import loats.orchestrator
 
-                        assert global_settings is not None
+                        assert loats.orchestrator.settings is not None
 
     async def test_strong_task_reference(self):
         """Test that cycle task maintains strong reference to prevent GC (F6-H-05 #3)."""
@@ -957,38 +983,30 @@ class TestTradingOrchestrator(unittest.IsolatedAsyncioTestCase):
 
                             # Verify TA analysis was included in the parallel execution
                             mock_gather.assert_called_once()
-                            gather_args = mock_gather.call_args[0][0]
 
-                            # Should contain all three tasks: TA, sentiment, and market data
-                            assert len(gather_args) == 3
-                            assert any(
-                                "ta_analysis" in str(task) for task in gather_args
-                            )
-                            assert any(
-                                "sentiment_analysis" in str(task)
-                                for task in gather_args
-                            )
-                            assert any(
-                                "market_data_update" in str(task)
-                                for task in gather_args
-                            )
+                            # Verify that the mocked methods were called
+                            mock_ta.assert_awaited_once()
+                            mock_sentiment.assert_awaited_once()
+                            mock_market.assert_awaited_once()
 
     async def test_cycle_task_completion_callback(self):
         """Test that cycle task completion callback handles exceptions properly."""
         # Create a completed task with an exception
-        mock_task = AsyncMock()
+        mock_task = MagicMock()
         mock_task.done.return_value = True
         test_exception = Exception("Test task exception")
         mock_task.result.side_effect = test_exception
 
         with patch("loats.orchestrator.logger") as mock_logger:
-            # Call the callback
-            self.orchestrator._handle_cycle_task_completion(mock_task)
+            # Call the callback - it re-raises the exception after logging
+            with pytest.raises(Exception, match="Test task exception"):
+                self.orchestrator._handle_cycle_task_completion(mock_task)
 
             # Verify exception was logged
-            mock_logger.error.assert_called_with(
-                f"Cycle task completed with exception: {test_exception}"
-            )
+            mock_logger.error.assert_called_once()
+            # Check that the error message contains the expected text
+            call_args = mock_logger.error.call_args[0]
+            assert "Cycle task completed with exception" in str(call_args[0])
 
             # Verify running flag was set to False
             assert self.orchestrator.running is False

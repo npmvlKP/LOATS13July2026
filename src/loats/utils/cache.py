@@ -55,7 +55,9 @@ class CacheManager:
         self._cache_lock = (
             threading.RLock()
         )  # FIX-F-THREAD-1: Use threading.RLock for thread safety
-        self._init_lock = threading.RLock()  # FIX-F-THREAD-8: Use threading.RLock instead of asyncio.Lock for thread safety
+        self._init_lock = (
+            threading.RLock()
+        )  # FIX-F-THREAD-8: Use threading.RLock instead of asyncio.Lock for thread safety
         self._cache_stats = {
             "hits": 0,
             "misses": 0,

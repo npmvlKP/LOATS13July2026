@@ -20,10 +20,10 @@ logger = get_logger(__name__)
 
 
 class ExpiredContractError(ValueError):
-    """Raised when attempting to calculate Greeks for an expired option contract.
+    """Raised when calculating Greeks for an expired option contract.
 
     M6: Replaces silent clamping of negative time-to-expiry values.
-    Expired contracts must be handled explicitly rather than producing misleading Greeks.
+    Expired contracts must be handled explicitly, not producing misleading Greeks.
     """
 
     def __init__(
@@ -201,7 +201,8 @@ class OptionsEngine:
         # M6: Validate time to expiry - raise error for expired contracts
         if t <= 0:
             raise ExpiredContractError(
-                f"Cannot calculate implied volatility for expired contract (t={t:.6f} years)",
+                f"Cannot calculate implied volatility for "
+                f"expired contract (t={t:.6f} years)",
                 time_to_expiry=t,
             )
 
@@ -277,7 +278,8 @@ class OptionsEngine:
         # M6: Validate time to expiry - raise error for expired contracts
         if t <= 0:
             raise ExpiredContractError(
-                f"Cannot calculate Black-Scholes for expired contract (t={t:.6f} years)",
+                f"Cannot calculate Black-Scholes for "
+                f"expired contract (t={t:.6f} years)",
                 time_to_expiry=t,
             )
 
@@ -448,7 +450,8 @@ def calculate_implied_volatility(
     # M6: Validate time to expiry - raise error for expired contracts
     if t <= 0:
         raise ExpiredContractError(
-            f"Cannot calculate implied volatility for expired contract (t={t:.6f} years)",
+            f"Cannot calculate implied volatility for "
+            f"expired contract (t={t:.6f} years)",
             time_to_expiry=t,
         )
 

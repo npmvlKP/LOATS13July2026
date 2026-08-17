@@ -78,7 +78,7 @@ class QuoteData(BaseModel):
         if not isinstance(data, dict):
             return data
         close_raw = data.get("close")
-        # Only compute change_percent if it's not explicitly provided (including explicit 0)
+        # Only compute change_percent if not explicitly provided (including 0)
         if (
             "change_percent" not in data
             and isinstance(close_raw, (int, float))

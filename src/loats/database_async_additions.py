@@ -8,13 +8,10 @@ import json
 from datetime import UTC, datetime
 from typing import Any
 
-# Import aiosqlite for async database operations
-try:
-    import aiosqlite
+# Check for aiosqlite availability without importing
+import importlib.util
 
-    AIOSQLITE_AVAILABLE = True
-except ImportError:
-    AIOSQLITE_AVAILABLE = False
+AIOSQLITE_AVAILABLE = importlib.util.find_spec("aiosqlite") is not None
 
 from .database import Database
 from .models import (
@@ -49,7 +46,8 @@ async def _async_create_signal(self: Database, signal: Signal) -> bool:
                 """
                 INSERT INTO signals
                 (signal_id, symbol, signal_type, strength, timestamp,
-                 indicators, metadata, confidence, created_at, created_at_ms, timestamp_ms)
+                 indicators, metadata, confidence, created_at, created_at_ms,
+                 timestamp_ms)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
@@ -198,7 +196,8 @@ async def _async_store_position(self: Database, position: Position) -> bool:
                 """
                 INSERT OR REPLACE INTO positions
                 (symbol, quantity, average_price, last_price, pnl, product_type,
-                 buy_quantity, sell_quantity, timestamp, created_at, created_at_ms, timestamp_ms)
+                 buy_quantity, sell_quantity, timestamp, created_at, created_at_ms,
+                 timestamp_ms)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
@@ -418,7 +417,8 @@ async def _async_update_order_status(
 
             # Update the order
             await cursor.execute(
-                "UPDATE orders SET status = ?, updated_at = ?, updated_at_ms = ? WHERE order_id = ?",
+                "UPDATE orders SET status = ?, updated_at = ?, "
+                "updated_at_ms = ? WHERE order_id = ?",
                 (status, now_iso, now_ms, order_id),
             )
         await conn.commit()

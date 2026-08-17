@@ -391,9 +391,9 @@ class SizingEngine:
             "remaining_risk_budget": remaining_risk_budget,
             "target_risk_per_position": target_risk_per_position,
             "position_risk_breakdown": position_risk_breakdown,
-            "risk_utilization": current_risk_exposure / max_total_risk
-            if max_total_risk > 0
-            else 0.0,
+            "risk_utilization": (
+                current_risk_exposure / max_total_risk if max_total_risk > 0 else 0.0
+            ),
         }
 
     def get_recommended_sizing_method(

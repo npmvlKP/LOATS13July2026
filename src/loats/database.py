@@ -315,33 +315,38 @@ class Database:
 
         # Create index for trade_decisions
         cursor.execute(
-            "CREATE INDEX IF NOT EXISTS idx_trade_decisions_symbol ON trade_decisions(symbol)"
+            "CREATE INDEX IF NOT EXISTS "
+            "idx_trade_decisions_symbol ON trade_decisions(symbol)"
         )
         cursor.execute(
-            "CREATE INDEX IF NOT EXISTS idx_trade_decisions_status ON trade_decisions(status)"
+            "CREATE INDEX IF NOT EXISTS "
+            "idx_trade_decisions_status ON trade_decisions(status)"
         )
         cursor.execute(
-            "CREATE INDEX IF NOT EXISTS idx_trade_decisions_timestamp ON trade_decisions(timestamp)"
+            "CREATE INDEX IF NOT EXISTS "
+            "idx_trade_decisions_timestamp ON trade_decisions(timestamp)"
         )
 
         # Create indexes performance
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_trades_symbol ON trades(symbol)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_trades_status ON trades(status)")
         cursor.execute(
-            "CREATE INDEX IF NOT EXISTS idx_signals_symbol ON signals(symbol)"
+            "CREATE INDEX IF NOT EXISTS " "idx_signals_symbol ON signals(symbol)"
         )
         cursor.execute(
-            "CREATE INDEX IF NOT EXISTS idx_signals_timestamp ON signals(timestamp)"
+            "CREATE INDEX IF NOT EXISTS " "idx_signals_timestamp ON signals(timestamp)"
         )
         cursor.execute(
-            "CREATE INDEX IF NOT EXISTS idx_historical_symbol ON historical_data(symbol)"
+            "CREATE INDEX IF NOT EXISTS "
+            "idx_historical_symbol ON historical_data(symbol)"
         )
         cursor.execute(
-            "CREATE INDEX IF NOT EXISTS idx_historical_timestamp ON historical_data(timestamp)"
+            "CREATE INDEX IF NOT EXISTS "
+            "idx_historical_timestamp ON historical_data(timestamp)"
         )
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_quotes_symbol ON quotes(symbol)")
         cursor.execute(
-            "CREATE INDEX IF NOT EXISTS idx_quotes_timestamp ON quotes(timestamp)"
+            "CREATE INDEX IF NOT EXISTS " "idx_quotes_timestamp ON quotes(timestamp)"
         )
         conn.commit()
 
@@ -409,7 +414,8 @@ class Database:
                 if column_name not in existing_columns:
                     logger.info(f"Adding column {column_name} to table {table_name}")
                     cursor.execute(
-                        f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_def}"
+                        f"ALTER TABLE {table_name} "
+                        f"ADD COLUMN {column_name} {column_def}"
                     )
 
         conn.commit()
@@ -677,7 +683,8 @@ class Database:
         # Re-serialize fully populated model (including hash)
         entry_data = self._model_to_dict(entry)
 
-        # FIX-F-DATA-2: Use canonical serialization for JSONL storage to ensure hash consistency
+        # FIX-F-DATA-2: Use canonical serialization for JSONL storage
+        # to ensure hash consistency
         # This ensures the stored data matches exactly what was hashed
         # canonical_entry_data = json.loads(self._canonical_serialize(entry_data))
 
@@ -697,8 +704,9 @@ class Database:
             # while still exercising the dual-write logic
             audit_log_file = self.audit_log_path
             if os.environ.get("PYTEST_CURRENT_TEST"):
-                # Create a temporary file in the system temp directory for testing
-                # This ensures the dual-write guarantee is tested without production path issues
+                # Create a temporary file in the system temp directory for testing.
+                # This ensures the dual-write guarantee is tested without
+                # production path issues.
                 temp_dir = Path(tempfile.gettempdir()) / "loats_test_audit_logs"
                 temp_dir.mkdir(parents=True, exist_ok=True)
                 audit_log_file = (
@@ -714,10 +722,12 @@ class Database:
 
             for attempt in range(max_retries):
                 try:
-                    # Ensure parent directory exists (FIX-F-PERM-1: Handle directory creation)
+                    # Ensure parent directory exists
+                    # (FIX-F-PERM-1: Handle directory creation)
                     audit_log_file.parent.mkdir(parents=True, exist_ok=True)
 
-                    # Use append mode with explicit error handling for file operations
+                    # Use append mode with explicit error handling
+                    # for file operations
                     with Path(audit_log_file).open("a", encoding="utf-8") as f:
                         f.write(self._canonical_serialize(entry_data) + "\n")
                     break  # Success, exit retry loop
@@ -725,7 +735,8 @@ class Database:
                     if attempt == max_retries - 1:
                         # Last attempt failed, raise the error
                         raise RuntimeError(
-                            f"Failed to write audit log entry to JSONL file after {max_retries} attempts: {e}. "
+                            f"Failed to write audit log entry to JSONL file "
+                            f"after {max_retries} attempts: {e}. "
                             "Database commit aborted to maintain consistency."
                         ) from e
                     # Wait and retry
@@ -990,7 +1001,9 @@ class Database:
         cursor = conn.cursor()
         if symbol:
             cursor.execute(
-                "SELECT * FROM trades WHERE status = 'OPEN' AND symbol = ? ORDER BY entry_time DESC",
+                "SELECT * FROM trades "
+                "WHERE status = 'OPEN' AND symbol = ? "
+                "ORDER BY entry_time DESC",
                 (symbol,),
             )
         else:
@@ -1234,7 +1247,8 @@ class Database:
             SELECT symbol, timestamp, open, high, low, close, volume,
                    interval, timestamp_ms
             FROM historical_data
-            WHERE symbol = ? AND interval = ? AND timestamp_ms >= ? AND timestamp_ms <= ?
+            WHERE symbol = ? AND interval = ?
+            AND timestamp_ms >= ? AND timestamp_ms <= ?
             ORDER BY timestamp_ms ASC
             """,
             (symbol, interval, start_ms, end_ms),
@@ -1371,7 +1385,8 @@ class Database:
             """
             INSERT OR REPLACE INTO positions
             (symbol, quantity, average_price, last_price, pnl, product_type,
-             buy_quantity, sell_quantity, timestamp, created_at, created_at_ms, timestamp_ms)
+             buy_quantity, sell_quantity, timestamp, created_at, created_at_ms,
+             timestamp_ms)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
@@ -1415,7 +1430,8 @@ class Database:
         row = cursor.fetchone()
         if row is None:
             return None
-        # Note: Position model models.py NOT timestamp field. Adding cause validation error not constructor.
+        # Note: Position model in models.py does NOT have timestamp field.
+        # Adding timestamp would cause validation error in constructor.
         return Position(
             symbol=row[0],
             quantity=row[1],
@@ -1618,7 +1634,9 @@ class Database:
 
         # Update the order
         cursor.execute(
-            "UPDATE orders SET status = ?, updated_at = ?, updated_at_ms = ? WHERE order_id = ?",
+            "UPDATE orders "
+            "SET status = ?, updated_at = ?, updated_at_ms = ? "
+            "WHERE order_id = ?",
             (status, now_iso, now_ms, order_id),
         )
         conn.commit()
@@ -1636,21 +1654,29 @@ class Database:
         cursor = conn.cursor()
         if symbol:
             cursor.execute(
-                "SELECT order_id, symbol, quantity, order_type, price, trigger_price, "
-                "variety, transaction_type, product_type, status, timestamp, "
-                "filled_quantity, average_price, stop_loss, take_profit, trailing_stop_loss, "
-                "created_at, updated_at, created_at_ms, updated_at_ms, timestamp_ms "
-                "FROM orders WHERE status = 'OPEN' AND symbol = ? ORDER BY timestamp DESC",
+                """
+                SELECT order_id, symbol, quantity, order_type, price, trigger_price,
+                       variety, transaction_type, product_type, status, timestamp,
+                       filled_quantity, average_price, stop_loss, take_profit,
+                       trailing_stop_loss, created_at, updated_at, created_at_ms,
+                       updated_at_ms, timestamp_ms
+                FROM orders
+                WHERE status = 'OPEN' AND symbol = ?
+                ORDER BY timestamp DESC
+                """,
                 (symbol,),
             )
         else:
-            cursor.execute(
-                "SELECT order_id, symbol, quantity, order_type, price, trigger_price, "
-                "variety, transaction_type, product_type, status, timestamp, "
-                "filled_quantity, average_price, stop_loss, take_profit, trailing_stop_loss, "
-                "created_at, updated_at, created_at_ms, updated_at_ms, timestamp_ms "
-                "FROM orders WHERE status = 'OPEN' ORDER BY timestamp DESC"
-            )
+            cursor.execute("""
+                SELECT order_id, symbol, quantity, order_type, price, trigger_price,
+                       variety, transaction_type, product_type, status, timestamp,
+                       filled_quantity, average_price, stop_loss, take_profit,
+                       trailing_stop_loss, created_at, updated_at, created_at_ms,
+                       updated_at_ms, timestamp_ms
+                FROM orders
+                WHERE status = 'OPEN'
+                ORDER BY timestamp DESC
+                """)
         rows = cursor.fetchall()
         return [self._row_to_order(row) for row in rows]
 
@@ -1734,18 +1760,24 @@ class Database:
                 decision.quantity,
                 decision.stop_loss,
                 decision.take_profit,
-                json.dumps(decision.trailing_stop_config)
-                if decision.trailing_stop_config
-                else None,
+                (
+                    json.dumps(decision.trailing_stop_config)
+                    if decision.trailing_stop_config
+                    else None
+                ),
                 decision.position_size_method,
                 decision.risk_percentage,
                 json.dumps(decision.var_analysis) if decision.var_analysis else None,
-                json.dumps(decision.gating_rules_result)
-                if decision.gating_rules_result
-                else None,
-                json.dumps(decision.source_breakdown)
-                if decision.source_breakdown
-                else None,
+                (
+                    json.dumps(decision.gating_rules_result)
+                    if decision.gating_rules_result
+                    else None
+                ),
+                (
+                    json.dumps(decision.source_breakdown)
+                    if decision.source_breakdown
+                    else None
+                ),
                 json.dumps(decision.metadata) if decision.metadata else None,
                 decision.status,
                 now_iso,
@@ -1799,22 +1831,37 @@ class Database:
 
         if symbol and status:
             cursor.execute(
-                "SELECT * FROM trade_decisions WHERE symbol = ? AND status = ? ORDER BY timestamp DESC LIMIT ?",
+                """
+                SELECT * FROM trade_decisions
+                WHERE symbol = ? AND status = ?
+                ORDER BY timestamp DESC LIMIT ?
+                """,
                 (symbol, status, limit),
             )
         elif symbol:
             cursor.execute(
-                "SELECT * FROM trade_decisions WHERE symbol = ? ORDER BY timestamp DESC LIMIT ?",
+                """
+                SELECT * FROM trade_decisions
+                WHERE symbol = ?
+                ORDER BY timestamp DESC LIMIT ?
+                """,
                 (symbol, limit),
             )
         elif status:
             cursor.execute(
-                "SELECT * FROM trade_decisions WHERE status = ? ORDER BY timestamp DESC LIMIT ?",
+                """
+                SELECT * FROM trade_decisions
+                WHERE status = ?
+                ORDER BY timestamp DESC LIMIT ?
+                """,
                 (status, limit),
             )
         else:
             cursor.execute(
-                "SELECT * FROM trade_decisions ORDER BY timestamp DESC LIMIT ?",
+                """
+                SELECT * FROM trade_decisions
+                ORDER BY timestamp DESC LIMIT ?
+                """,
                 (limit,),
             )
 
@@ -1850,7 +1897,11 @@ class Database:
 
         # Update the decision
         cursor.execute(
-            "UPDATE trade_decisions SET status = ?, updated_at = ?, updated_at_ms = ? WHERE decision_id = ?",
+            """
+            UPDATE trade_decisions
+            SET status = ?, updated_at = ?, updated_at_ms = ?
+            WHERE decision_id = ?
+            """,
             (status, now_iso, now_ms, decision_id),
         )
         conn.commit()
@@ -1919,12 +1970,20 @@ class Database:
         cursor = conn.cursor()
         if entity_type:
             cursor.execute(
-                "SELECT * FROM audit_log WHERE entity_type = ? ORDER BY timestamp DESC LIMIT ?",
+                """
+                SELECT * FROM audit_log
+                WHERE entity_type = ?
+                ORDER BY timestamp DESC LIMIT ?
+                """,
                 (entity_type, limit),
             )
         else:
             cursor.execute(
-                "SELECT * FROM audit_log ORDER BY timestamp DESC LIMIT ?", (limit,)
+                """
+                SELECT * FROM audit_log
+                ORDER BY timestamp DESC LIMIT ?
+                """,
+                (limit,),
             )
         rows = cursor.fetchall()
         return [self._row_to_audit_entry(row) for row in rows]
@@ -2012,7 +2071,8 @@ class Database:
 
         logger.info(f"Closed {closed_count} database connections")
 
-        # Additional cleanup: ensure thread-local storage reset prevents potential issues thread reuse
+        # Additional cleanup: ensure thread-local storage reset prevents
+        # potential issues with thread reuse
         if hasattr(self._thread_local, "__dict__"):
             self._thread_local.__dict__.clear()
 
@@ -2041,21 +2101,22 @@ class Database:
         """Async wrapper initialize() avoid blocking event loop."""
         await asyncio.to_thread(self.initialize)
         # Initialize async connection pool
-        try:
-            import aiosqlite
+        import importlib.util
 
-            from .utils.connection_pool import SimpleConnectionPool
+        if importlib.util.find_spec("aiosqlite") is not None:
+            try:
+                from .utils.connection_pool import SimpleConnectionPool
 
-            self._async_pool = SimpleConnectionPool(
-                str(self.db_path), maxsize=10, timeout=30.0
-            )
-            logger.info("Async database connection pool initialized")
-        except ImportError:
+                self._async_pool = SimpleConnectionPool(
+                    str(self.db_path), maxsize=10, timeout=30.0
+                )
+                logger.info("Async database connection pool initialized")
+            except Exception as e:
+                logger.error(f"Failed to initialize async connection pool: {e}")
+        else:
             logger.warning(
                 "aiosqlite not available, using asyncio.to_thread for async operations"
             )
-        except Exception as e:
-            logger.error(f"Failed to initialize async connection pool: {e}")
 
     async def async_cleanup(self) -> None:
         """Async wrapper cleanup() avoid blocking event loop."""
