@@ -1,4 +1,7 @@
-"""Scheduler module LOATS13July2026. Implements APScheduler scan scheduling retry circuit breaker patterns."""
+"""Scheduler module LOATS13July2026.
+
+Implements APScheduler scan scheduling retry circuit breaker patterns.
+"""
 
 import asyncio
 import datetime
@@ -223,8 +226,8 @@ class TradingScheduler:
                 logger.info("Trading scheduler shutdown complete")
 
                 # FIX-R5-F-02: Close scheduler's database connection pool to prevent leaks
-                # The scheduler uses the shared module-level db singleton, but we need to ensure
-                # proper cleanup of any async resources during shutdown
+                # The scheduler uses the shared module-level db singleton, but we need
+                # to ensure proper cleanup of any async resources during shutdown
                 if hasattr(self, "db") and self.db:
                     try:
                         await self.db.async_close_all()
@@ -326,7 +329,8 @@ class TradingScheduler:
             missing_fields = [f for f in required_fields if f not in quote_data]
             if missing_fields:
                 logger.warning(
-                    f"Skipping signal generation, missing quote fields: {missing_fields}"
+                    "Skipping signal generation, "
+                    f"missing quote fields: {missing_fields}"
                 )
                 return
             current_price = quote_data.get("last_price", 0)
@@ -521,7 +525,8 @@ class TradingScheduler:
             missing_fields = [f for f in required_fields if f not in quote_data]
             if missing_fields:
                 logger.warning(
-                    f"Skipping signal generation, missing quote fields: {missing_fields}"
+                    "Skipping signal generation, "
+                    f"missing quote fields: {missing_fields}"
                 )
                 return
 

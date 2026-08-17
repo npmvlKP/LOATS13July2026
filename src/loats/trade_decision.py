@@ -147,9 +147,11 @@ class TradeDecisionEngine:
                 symbol=symbol,
                 quantity=position_size,
                 entry_price=current_price,
-                transaction_type=TransactionType.BUY
-                if decision_type == SignalType.BUY
-                else TransactionType.SELL,
+                transaction_type=(
+                    TransactionType.BUY
+                    if decision_type == SignalType.BUY
+                    else TransactionType.SELL
+                ),
             ),
             current_price,
             TrailingStopType.PERCENTAGE,
@@ -283,11 +285,13 @@ class TradeDecisionEngine:
 
                 if routing_result["status"] == "success":
                     logger.info(
-                        f"Successfully routed decision {decision.decision_id} to Analyzer"
+                        f"Successfully routed decision {decision.decision_id} "
+                        f"to Analyzer"
                     )
                 else:
                     logger.warning(
-                        f"Failed to route decision {decision.decision_id}: {routing_result}"
+                        f"Failed to route decision {decision.decision_id}: "
+                        f"{routing_result}"
                     )
 
                 self.decision_queue.task_done()
@@ -392,7 +396,9 @@ class TradeDecisionEngine:
             "status": "PROCESSED",
             "analyzer_status": "ANALYZED",
             "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
-            "notes": "This is a simulated response - in production would query actual Analyzer",
+            "notes": (
+                "This is a simulated response - in production would query actual Analyzer"
+            ),
         }
 
     def increment_modification_counter(self) -> int:

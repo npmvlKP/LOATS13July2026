@@ -165,9 +165,9 @@ class PerformanceAnalyzer:
                         "max": max(durations),
                         "mean": statistics.mean(durations),
                         "median": statistics.median(durations),
-                        "std_dev": statistics.stdev(durations)
-                        if len(durations) > 1
-                        else 0,
+                        "std_dev": (
+                            statistics.stdev(durations) if len(durations) > 1 else 0
+                        ),
                         "p95": np.percentile(durations, 95),
                         "p99": np.percentile(durations, 99),
                     }

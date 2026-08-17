@@ -278,13 +278,13 @@ class TestGlobalRateLimitersAdditional:
         """Test getting order rate limiter with custom parameters."""
         # Get default limiter
         default_limiter = get_order_rate_limiter()
-        assert default_limiter.max_ops == 50
+        assert default_limiter.max_ops == 3
         assert default_limiter.window_size == 1.0
 
         # Get custom limiter - should return the same singleton instance
-        custom_limiter = get_order_rate_limiter(max_ops=100, window_size=2.0)
+        custom_limiter = get_order_rate_limiter(max_ops=75, window_size=1.5)
         # Since it's a singleton, custom parameters are ignored after first creation
-        assert custom_limiter.max_ops == 50  # Should be the original default
+        assert custom_limiter.max_ops == 3  # Should be the original default
         assert custom_limiter.window_size == 1.0  # Should be the original default
 
         # Should be the same instance (singleton behavior)
@@ -294,13 +294,13 @@ class TestGlobalRateLimitersAdditional:
         """Test getting smart order rate limiter with custom parameters."""
         # Get default limiter
         default_limiter = get_smart_order_rate_limiter()
-        assert default_limiter.max_ops == 50
+        assert default_limiter.max_ops == 3
         assert default_limiter.window_size == 1.0
 
         # Get custom limiter - should return the same singleton instance
         custom_limiter = get_smart_order_rate_limiter(max_ops=75, window_size=1.5)
         # Since it's a singleton, custom parameters are ignored after first creation
-        assert custom_limiter.max_ops == 50  # Should be the original default
+        assert custom_limiter.max_ops == 3  # Should be the original default
         assert custom_limiter.window_size == 1.0  # Should be the original default
 
         # Should be the same instance (singleton behavior)
@@ -321,17 +321,17 @@ class TestGlobalRateLimitersAdditional:
         # Should still be different types of limiters (different singletons)
         assert order_limiter1 is not smart_limiter1
 
-        # All should have default max_ops=50
-        assert order_limiter1.max_ops == 50
-        assert order_limiter2.max_ops == 50
-        assert smart_limiter1.max_ops == 50
-        assert smart_limiter2.max_ops == 50
+        # All should have default max_ops=3
+        assert order_limiter1.max_ops == 3
+        assert order_limiter2.max_ops == 3
+        assert smart_limiter1.max_ops == 3
+        assert smart_limiter2.max_ops == 3
 
-        # Each should have default max_ops=50
-        assert order_limiter1.max_ops == 50
-        assert order_limiter2.max_ops == 50
-        assert smart_limiter1.max_ops == 50
-        assert smart_limiter2.max_ops == 50
+        # Each should have default max_ops=3
+        assert order_limiter1.max_ops == 3
+        assert order_limiter2.max_ops == 3
+        assert smart_limiter1.max_ops == 3
+        assert smart_limiter2.max_ops == 3
 
 
 class TestRateLimiterEdgeCasesAdditional:

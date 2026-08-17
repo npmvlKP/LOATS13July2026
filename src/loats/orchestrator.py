@@ -111,11 +111,12 @@ class TradingOrchestrator:
 
     async def start(self) -> None:
         """Start the trading cycle orchestrator."""
-        if self.running:
+        if hasattr(self, "_cycle_task") and self._cycle_task is not None:
             logger.warning("Orchestrator already running")
             return
 
-        await self.initialize()
+        if not self.running:
+            await self.initialize()
         logger.info("Starting TradingOrchestrator cycle")
         self._cycle_task = asyncio.create_task(self._run_cycle_loop())
         self._cycle_task.add_done_callback(self._handle_cycle_task_completion)
@@ -162,7 +163,8 @@ class TradingOrchestrator:
             if settings is None:
                 settings = get_settings()
 
-            # Run TA analysis, sentiment and market data updates in parallel with timeout
+            # Run TA analysis, sentiment and market data updates in parallel
+            # with timeout
             ta_task = asyncio.create_task(self._execute_ta_analysis())
             sentiment_task = asyncio.create_task(self._execute_sentiment_analysis())
             market_data_task = asyncio.create_task(self._execute_market_data_update())
@@ -202,7 +204,8 @@ class TradingOrchestrator:
             ).total_seconds()
             record_cycle_time(cycle_duration)
             logger.debug(
-                f"Trading cycle {self.cycle_count} completed in {cycle_duration * 1000:.2f}ms"
+                f"Trading cycle {self.cycle_count} completed in "
+                f"{cycle_duration * 1000:.2f}ms"
             )
 
     async def _execute_ta_analysis(self) -> None:
@@ -547,7 +550,8 @@ class TradingOrchestrator:
 
             if len(recent_signals) < 3:
                 logger.debug(
-                    f"Insufficient signals for CMP strategy: {len(recent_signals)} signals"
+                    f"Insufficient signals for CMP strategy: "
+                    f"{len(recent_signals)} signals"
                 )
                 return
 
@@ -614,7 +618,8 @@ class TradingOrchestrator:
 
             if routing_result["status"] == "success":
                 logger.info(
-                    f"Successfully created and routed CMP TradeDecision: {decision.decision_id}"
+                    f"Successfully created and routed CMP TradeDecision: "
+                    f"{decision.decision_id}"
                 )
                 logger.debug(f"TradeDecision details: {decision.to_analyzer_payload()}")
 
@@ -820,10 +825,14 @@ class TradingOrchestrator:
     def _handle_cycle_task_completion(self, task: asyncio.Task) -> None:
         """Handle completion of the cycle task."""
         try:
-            task.result()  # This will re-raise any exception that occurred in the task
+            # Check if task is done and get result (this will re-raise any exception)
+            if task.done():
+                task.result()
         except Exception as e:
             logger.error(f"Cycle task completed with exception: {e}")
             self.running = False
+            # Re-raise the exception to ensure it's properly handled
+            raise
 
 
 # Module-level singleton instance

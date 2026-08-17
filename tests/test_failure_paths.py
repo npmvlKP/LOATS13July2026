@@ -551,7 +551,7 @@ class TestRateLimiterFailurePaths:
         limiter = get_order_rate_limiter()
 
         # Consume all available tokens
-        for _ in range(50):  # max_ops=50 for order rate limiter
+        for _ in range(3):  # max_ops=3 for order rate limiter
             result = await limiter.acquire()
             assert result is True
 
@@ -565,7 +565,7 @@ class TestRateLimiterFailurePaths:
         limiter = get_smart_order_rate_limiter()
 
         # Consume all available tokens
-        for _ in range(50):  # max_ops=50 for smart order rate limiter
+        for _ in range(3):  # max_ops=3 for smart order rate limiter
             result = await limiter.acquire()
             assert result is True
 

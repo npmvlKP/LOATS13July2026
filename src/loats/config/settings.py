@@ -46,7 +46,10 @@ class Settings(BaseSettings):
     default_symbol: str = Field("NIFTY", description="Default trading symbol")
     default_timeframe: str = Field(
         "1min",
-        description="Default candlestick timeframe for technical analysis (e.g., '1min', '5min', '15min')",
+        description=(
+            "Default candlestick timeframe for technical analysis "
+            "(e.g., '1min', '5min', '15min')"
+        ),
     )
     sentiment_threshold: float = Field(
         0.05, description="Sentiment threshold for signal generation"
@@ -71,7 +74,8 @@ class Settings(BaseSettings):
     telegram_chat_id: str = Field("", description="Telegram chat ID")
     telegram_admin_ids: list[str] = Field(
         default_factory=list,
-        description="List of Telegram user IDs authorized to issue /kill and /resume commands",
+        description="List of Telegram user IDs authorized to issue "
+        "/kill and /resume commands",
     )
     # Trading Configuration
     nifty_lot_size: int = Field(25, description="NIFTY lot size")
@@ -172,7 +176,8 @@ class Settings(BaseSettings):
         pass
 
 
-# Global settings instance with lazy initialization to avoid import-time validation errors
+# Global settings instance with lazy initialization
+# to avoid import-time validation errors
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
     """
