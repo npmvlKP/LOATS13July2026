@@ -55,9 +55,8 @@ class CacheManager:
         self._cache_lock = (
             threading.RLock()
         )  # FIX-F-THREAD-1: Use threading.RLock for thread safety
-        self._init_lock = (
-            threading.RLock()
-        )  # FIX-F-THREAD-8: Use threading.RLock instead of asyncio.Lock for thread safety
+        # FIX-F-THREAD-8: Use threading.RLock for thread safety
+        self._init_lock = threading.RLock()
         self._cache_stats = {
             "hits": 0,
             "misses": 0,
@@ -85,7 +84,8 @@ class CacheManager:
 
             self._initialized = True
             logger.info(
-                f"Cache initialized (type={self._cache_type}, max_size={self.config.max_size}, ttl={self.config.ttl_seconds}s)"
+                f"Cache initialized (type={self._cache_type}, "
+                f"max_size={self.config.max_size}, ttl={self.config.ttl_seconds}s)"
             )
         except Exception as e:
             logger.error(f"Cache initialization failed: {e}")
@@ -138,7 +138,8 @@ class CacheManager:
                 if not self._initialized:
                     await self.initialize()
             logger.debug(
-                f"DEBUG SET: After init - _initialized={self._initialized}, _cache={self._cache is not None}"
+                f"DEBUG SET: After init - _initialized={self._initialized}, "
+                f"_cache={self._cache is not None}"
             )
 
         # After initialization, check if we have a valid cache backend
@@ -146,7 +147,8 @@ class CacheManager:
         if self._cache is None:
             # This should not happen, but if it does, try to initialize again
             logger.error(
-                f"Cache not properly initialized: _cache={self._cache}, _initialized={self._initialized}"
+                f"Cache not properly initialized: _cache={self._cache}, "
+                f"_initialized={self._initialized}"
             )
             with self._init_lock:
                 if self._cache is None:

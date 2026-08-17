@@ -117,7 +117,7 @@ def retry_sync(
                     # Check if we have more attempts
                     if attempt >= cfg.max_attempts:
                         logger.warning(
-                            f"Max retry attempts ({cfg.max_attempts}) reached for {func.__name__}"
+                            f"Max attempts ({cfg.max_attempts}) for {func.__name__}"
                         )
                         raise
 
@@ -187,7 +187,7 @@ def retry_async(
                     # Check if we have more attempts
                     if attempt >= cfg.max_attempts:
                         logger.warning(
-                            f"Max retry attempts ({cfg.max_attempts}) reached for {func.__name__}"
+                            f"Max attempts ({cfg.max_attempts}) for {func.__name__}"
                         )
                         raise
 
