@@ -86,20 +86,23 @@ def main():
     ):
         status = "[PASS]" if percent_covered >= threshold else "[WARN]"
         print(
-            f"{status} {module_name}.py: {percent_covered:.1f}% ({missing_lines} statements missed)"
+            f"{status} {module_name}.py: {percent_covered:.1f}%"
+            f" ({missing_lines} statements missed)"
         )
 
     print("\n" + "=" * 60)
 
     if warnings:
         print(
-            f"\nWARNING: {len(warnings)} module(s) below {threshold}% coverage threshold:"
+            f"\nWARNING: {len(warnings)} module(s) below "
+            f"{threshold}% coverage threshold:"
         )
         for warning in warnings:
             print(f"  {warning}")
 
         print(
-            f"\nAggregate coverage: {coverage_data['totals']['percent_covered']:.1f}% (passes gate)"
+            f"\nAggregate coverage: {coverage_data['totals']['percent_covered']:.1f}%"
+            " (passes gate)"
         )
         print("Per-module coverage gates: FAILED (warnings detected)")
 

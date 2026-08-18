@@ -46,7 +46,7 @@ RUN pip install --no-cache-dir -r requirements-core.txt
 COPY src/ ./src/
 
 # Install the package in production mode (not editable)
-RUN pip install --no-cache-dir .
+RUN pip install --no-cache-dir --no-deps .
 
 # Copy scripts (health checks, etc.)
 COPY quick_health_check.py verify_project_health.py ./

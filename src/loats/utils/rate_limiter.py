@@ -56,7 +56,7 @@ class RateLimiter:
             now: float = time.monotonic()
             # Discard timestamps that are *outside* the window (>= window size)
             # Using >= ensures tokens that have exactly expired are removed,
-            # preventing edge‑case off‑by‑one errors when a token expires
+            # preventing edge-case off-by-one errors when a token expires
             # during a sleep that matches the window size.
             while self.timestamps and now - self.timestamps[0] >= self.window_size:
                 self.timestamps.popleft()
@@ -74,10 +74,10 @@ class RateLimiter:
         """
         async with self.lock:
             current_time: float = time.monotonic()
-            
+
             # Remove timestamps that are outside the window (>= window size)
             # This mirrors the logic in ``acquire`` for consistency.
-            while (self.timestamps and 
+            while (self.timestamps and
                    current_time - self.timestamps[0] >= self.window_size):
                 self.timestamps.popleft()
 
@@ -162,7 +162,7 @@ class AsyncRateLimiter:
             # Remove timestamps that are outside the window (>= window size)
             # Using >= ensures tokens that have exactly expired are removed,
             # preventing off-by-one errors when a token expires during sleep.
-            while (self.timestamps and 
+            while (self.timestamps and
                    current_time - self.timestamps[0] >= self.window_size):
                 self.timestamps.popleft()
 
@@ -188,7 +188,7 @@ class AsyncRateLimiter:
             # Remove timestamps that are outside the window (>= window size)
             # Using >= ensures tokens that have exactly expired are removed,
             # preventing off-by-one errors when a token expires during sleep.
-            while (self.timestamps and 
+            while (self.timestamps and
                    current_time - self.timestamps[0] >= self.window_size):
                 self.timestamps.popleft()
 
@@ -281,7 +281,7 @@ class SyncRateLimiter:
             # Remove timestamps that are outside the window (>= window size)
             # Using >= ensures tokens that have exactly expired are removed,
             # preventing off-by-one errors when a token expires during sleep.
-            while (self.timestamps and 
+            while (self.timestamps and
                    current_time - self.timestamps[0] >= self.window_size):
                 self.timestamps.popleft()
 
