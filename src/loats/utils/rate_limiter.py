@@ -77,8 +77,10 @@ class RateLimiter:
 
             # Remove timestamps that are outside the window (>= window size)
             # This mirrors the logic in ``acquire`` for consistency.
-            while (self.timestamps and
-                   current_time - self.timestamps[0] >= self.window_size):
+            while (
+                self.timestamps
+                and current_time - self.timestamps[0] >= self.window_size
+            ):
                 self.timestamps.popleft()
 
             # Check if we can acquire immediately
@@ -162,8 +164,10 @@ class AsyncRateLimiter:
             # Remove timestamps that are outside the window (>= window size)
             # Using >= ensures tokens that have exactly expired are removed,
             # preventing off-by-one errors when a token expires during sleep.
-            while (self.timestamps and
-                   current_time - self.timestamps[0] >= self.window_size):
+            while (
+                self.timestamps
+                and current_time - self.timestamps[0] >= self.window_size
+            ):
                 self.timestamps.popleft()
 
             # Check if we can acquire a token
@@ -188,8 +192,10 @@ class AsyncRateLimiter:
             # Remove timestamps that are outside the window (>= window size)
             # Using >= ensures tokens that have exactly expired are removed,
             # preventing off-by-one errors when a token expires during sleep.
-            while (self.timestamps and
-                   current_time - self.timestamps[0] >= self.window_size):
+            while (
+                self.timestamps
+                and current_time - self.timestamps[0] >= self.window_size
+            ):
                 self.timestamps.popleft()
 
             # Check if we can acquire immediately
@@ -281,8 +287,10 @@ class SyncRateLimiter:
             # Remove timestamps that are outside the window (>= window size)
             # Using >= ensures tokens that have exactly expired are removed,
             # preventing off-by-one errors when a token expires during sleep.
-            while (self.timestamps and
-                   current_time - self.timestamps[0] >= self.window_size):
+            while (
+                self.timestamps
+                and current_time - self.timestamps[0] >= self.window_size
+            ):
                 self.timestamps.popleft()
 
             # Check if we can acquire a token
