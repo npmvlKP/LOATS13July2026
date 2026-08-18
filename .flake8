@@ -1,20 +1,11 @@
 [flake8]
 ignore =
-    F401,
-    F541,
     E231,
     E225,
     E303,
-    C901,
-    F811,
-    F841,
-    E402,
-    E501,
-    W503,
     E203,
     E226,
 max-line-length = 88
-
 exclude =
     .git,
     __pycache__,
@@ -22,4 +13,6 @@ exclude =
     build,
     dist,
     Lib,
-    Lib/site-packages
+    Lib/site-packages,
+    tests/,
+    scripts/
