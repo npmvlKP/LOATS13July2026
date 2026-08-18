@@ -183,6 +183,12 @@ async def test_alert_system_start_success(mock_settings):
         mock_create_task.assert_called()
         assert alert_system._running is True
 
+    # The patched create_task never scheduled the start_polling()
+    # coroutine; close it to avoid "coroutine was never awaited"
+    # RuntimeWarning (F6-L-04 class defect).
+    polling_coro = mock_create_task.call_args[0][0]
+    polling_coro.close()
+
 
 @pytest.mark.asyncio
 async def test_alert_system_start_no_updater(mock_settings):

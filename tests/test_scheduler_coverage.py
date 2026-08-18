@@ -173,7 +173,7 @@ class TestSchedulerCoverage:
         """Test _ta_scan_task with kill switch active (lines 282-283)."""
         # Mock kill switch to be active
         with patch("loats.scheduler.alerts.is_kill_switch_active", return_value=True):
-            with pytest.raises(Exception):  # KillSwitchError
+            with pytest.raises(Exception, match="Kill switch active"):
                 await scheduler_instance._ta_scan_task()
 
     @pytest.mark.asyncio
@@ -200,12 +200,8 @@ class TestSchedulerCoverage:
     async def test_run_sentiment_scan_task(self, scheduler_instance):
         """Test run_sentiment_scan method (lines 346, 348-349)."""
 
-        # Mock the _sentiment_scan_task method
-        async def mock_scan_coro():
-            return None
-
-        mock_scan_task = AsyncMock(side_effect=mock_scan_coro)
-        scheduler_instance._sentiment_scan_task = mock_scan_task
+        # Mock the _sentiment_scan_task method with a lambda that returns None
+        scheduler_instance._sentiment_scan_task = lambda: None
 
         # Mock asyncio.create_task to return a proper awaitable task
         with patch("asyncio.create_task") as mock_create_task:
@@ -225,28 +221,20 @@ class TestSchedulerCoverage:
                 # The task should have been stored and then removed (due to try/finally)
                 # So we just verify the create_task was called
 
-                # Ensure the mock_scan_task was awaited
-                if mock_scan_task.await_count == 0:
-                    await mock_scan_task()
-
     @pytest.mark.asyncio
     async def test_sentiment_scan_task_with_kill_switch(self, scheduler_instance):
         """Test _sentiment_scan_task with kill switch active (lines 365-368)."""
         # Mock kill switch to be active
         with patch("loats.scheduler.alerts.is_kill_switch_active", return_value=True):
-            with pytest.raises(Exception):  # KillSwitchError
+            with pytest.raises(Exception, match="Kill switch active"):
                 await scheduler_instance._sentiment_scan_task()
 
     @pytest.mark.asyncio
     async def test_run_signal_generation_task(self, scheduler_instance):
         """Test run_signal_generation method (lines 396-399)."""
 
-        # Mock the _signal_generation_task method
-        async def mock_scan_coro():
-            return None
-
-        mock_scan_task = AsyncMock(side_effect=mock_scan_coro)
-        scheduler_instance._signal_generation_task = mock_scan_task
+        # Mock the _signal_generation_task method with a lambda that returns None
+        scheduler_instance._signal_generation_task = lambda: None
 
         # Mock asyncio.create_task to return a proper awaitable task
         with patch("asyncio.create_task") as mock_create_task:
@@ -266,28 +254,20 @@ class TestSchedulerCoverage:
                 # The task should have been stored and then removed (due to try/finally)
                 # So we just verify the create_task was called
 
-                # Ensure the mock_scan_task was awaited
-                if mock_scan_task.await_count == 0:
-                    await mock_scan_task()
-
     @pytest.mark.asyncio
     async def test_signal_generation_task_with_kill_switch(self, scheduler_instance):
         """Test _signal_generation_task with kill switch active (lines 420-424)."""
         # Mock kill switch to be active
         with patch("loats.scheduler.alerts.is_kill_switch_active", return_value=True):
-            with pytest.raises(Exception):  # KillSwitchError
+            with pytest.raises(Exception, match="Kill switch active"):
                 await scheduler_instance._signal_generation_task()
 
     @pytest.mark.asyncio
     async def test_check_market_status_task(self, scheduler_instance):
         """Test check_market_status method (lines 438-441)."""
 
-        # Mock the _market_status_check_task method
-        async def mock_scan_coro():
-            return None
-
-        mock_scan_task = AsyncMock(side_effect=mock_scan_coro)
-        scheduler_instance._market_status_check_task = mock_scan_task
+        # Mock the _market_status_check_task method with a lambda that returns None
+        scheduler_instance._market_status_check_task = lambda: None
 
         # Mock asyncio.create_task to return a proper awaitable task
         with patch("asyncio.create_task") as mock_create_task:
@@ -306,10 +286,6 @@ class TestSchedulerCoverage:
                 assert mock_create_task.called
                 # The task should have been stored and then removed (due to try/finally)
                 # So we just verify the create_task was called
-
-                # Ensure the mock_scan_task was awaited
-                if mock_scan_task.await_count == 0:
-                    await mock_scan_task()
 
     @pytest.mark.asyncio
     async def test_market_status_check_task_market_closed(self, scheduler_instance):
@@ -357,12 +333,8 @@ class TestSchedulerCoverage:
     async def test_run_data_cleanup_task(self, scheduler_instance):
         """Test run_data_cleanup method (lines 486-487)."""
 
-        # Mock the _data_cleanup_task method
-        async def mock_scan_coro():
-            return None
-
-        mock_scan_task = AsyncMock(side_effect=mock_scan_coro)
-        scheduler_instance._data_cleanup_task = mock_scan_task
+        # Mock the _data_cleanup_task method with a lambda that returns None
+        scheduler_instance._data_cleanup_task = lambda: None
 
         # Mock asyncio.create_task to return a proper awaitable task
         with patch("asyncio.create_task") as mock_create_task:
@@ -381,10 +353,6 @@ class TestSchedulerCoverage:
                 assert mock_create_task.called
                 # The task should have been stored and then removed (due to try/finally)
                 # So we just verify the create_task was called
-
-                # Ensure the mock_scan_task was awaited
-                if mock_scan_task.await_count == 0:
-                    await mock_scan_task()
 
     @pytest.mark.asyncio
     async def test_data_cleanup_task(self, scheduler_instance):
@@ -504,7 +472,7 @@ class TestSchedulerCoverage:
         # Test with kill switch active
         with patch("loats.scheduler.alerts.is_kill_switch_active", return_value=True):
             with patch("loats.scheduler.logger") as mock_logger:
-                with pytest.raises(Exception):  # KillSwitchError
+                with pytest.raises(Exception, match="Kill switch active"):
                     scheduler_instance._check_kill_switch()
                 mock_logger.error.assert_called_once_with(
                     "Kill switch active trading operations blocked"
