@@ -47,9 +47,15 @@ def test_package_import():
         # Test import of key components
         from loats.main import TradingSystem
 
+        # Use the imports to verify they work
+        _ = TradingSystem
+
         print("✅ TradingSystem imported successfully")
 
         from loats.config import get_settings
+
+        # Use the import to verify it works
+        _ = get_settings
 
         print("✅ get_settings imported successfully")
 

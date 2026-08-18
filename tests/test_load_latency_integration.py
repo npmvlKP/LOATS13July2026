@@ -181,7 +181,7 @@ class TestLoadLatencyIntegration:
                     )
                     await test_db.async_create_signal(signal)
                     signals_created += 1
-            except Exception as e:
+            except Exception:
                 errors += 1
 
             end_time = time.time()
@@ -275,7 +275,7 @@ class TestLoadLatencyIntegration:
 
             # Calculate indicators
             supertrend, direction = calculate_supertrend(df)
-            rsi = calculate_rsi(df, period=14)
+            # rsi = calculate_rsi(df, period=14)  # Unused variable
 
             end_time = time.time()
             latency = end_time - start_time
@@ -329,7 +329,7 @@ class TestLoadLatencyIntegration:
                         reads += 1
                     else:
                         errors += 1
-            except Exception as e:
+            except Exception:
                 errors += 1
 
             end_time = time.time()

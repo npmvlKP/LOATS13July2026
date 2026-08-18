@@ -4,6 +4,7 @@ import asyncio
 import threading
 import time
 from collections import deque
+from collections.abc import Callable
 
 from ..config import get_settings
 from ..loats_logging import get_logger
@@ -132,7 +133,10 @@ class AsyncRateLimiter:
     """
 
     def __init__(
-        self, max_ops: int | None = None, window_size: float = 1.0, clock=None
+        self,
+        max_ops: int | None = None,
+        window_size: float = 1.0,
+        clock: Callable[[], float] | None = None,
     ):
         """Initialize async rate limiter.
 
@@ -147,7 +151,7 @@ class AsyncRateLimiter:
         self.timestamps: deque[float] = deque()
         self.lock: asyncio.Lock = asyncio.Lock()
         # Use injected clock or default to time.monotonic for production
-        self._clock = clock or time.monotonic
+        self._clock: Callable[[], float] = clock or time.monotonic
 
     async def acquire(self) -> bool:
         """Acquire token for operation.
@@ -502,7 +506,9 @@ def get_sync_smart_order_rate_limiter(
 # Testing utilities
 # ---------------------------------------------------------------------------
 def create_test_rate_limiter(
-    max_ops: int = 5, window_size: float = 1.0, clock=None
+    max_ops: int = 5,
+    window_size: float = 1.0,
+    clock: Callable[[], float] | None = None,
 ) -> AsyncRateLimiter:
     """Create a test rate limiter with optional clock injection.
 

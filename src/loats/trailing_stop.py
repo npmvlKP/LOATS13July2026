@@ -14,7 +14,15 @@ from typing import Any
 
 from .config import get_settings
 from .loats_logging import get_logger
-from .models import Order, OrderType, Trade, TransactionType
+from .models import (
+    Order,
+    OrderType,
+    Trade,
+    TransactionType,
+    OrderVariety,
+    OrderStatus,
+    ProductType,
+)
 
 logger = get_logger(__name__)
 settings = get_settings()
@@ -149,9 +157,6 @@ class TrailingStopEngine:
         if config["status"] != TrailingStopStatus.ACTIVE:
             return config, False
 
-        trade_id = config["trade_id"]
-        symbol = config["symbol"]
-        entry_price = config["entry_price"]
         stop_type = config["stop_type"]
         transaction_type = config.get("transaction_type", "BUY")
 
@@ -266,7 +271,6 @@ class TrailingStopEngine:
         """Update ATR-based trailing stop."""
         atr = config["parameters"].get("atr", 100.0)
         multiplier = config["parameters"].get("multiplier", self.default_atr_multiplier)
-        entry_price = config["entry_price"]
 
         if is_long:
             # For long positions: stop moves up as price increases
@@ -312,7 +316,6 @@ class TrailingStopEngine:
         """Update volatility-based trailing stop."""
         volatility = config["parameters"].get("volatility", 0.01)
         multiplier = config["parameters"].get("multiplier", 2.0)
-        entry_price = config["entry_price"]
 
         if is_long:
             # For long positions: stop moves up as price increases
@@ -465,21 +468,28 @@ class TrailingStopEngine:
             transaction_type = TransactionType.BUY
 
         sl_m_order = Order(
-            order_id=f"slm_{trade.trade_id}_{datetime.datetime.now(datetime.UTC).strftime('%Y%m%d%H%M%S')}",
+            order_id=(
+                f"slm_{trade.trade_id}_"
+                f"{datetime.datetime.now(datetime.UTC).strftime('%Y%m%d%H%M%S')}"
+            ),
             symbol=trade.symbol,
             quantity=trade.quantity,
+            filled_quantity=0,
             order_type=OrderType.SL_M,
             price=trailing_config["trigger_price"],  # Trigger price for SL-M
             trigger_price=trailing_config["trigger_price"],
-            variety=trade.variety if hasattr(trade, "variety") else "regular",
+            variety=OrderVariety.REGULAR,
             transaction_type=transaction_type,
-            product_type=trade.product_type,
-            status="OPEN",
+            product_type=trade.product_type or ProductType.MIS,
+            status=OrderStatus.OPEN,
             timestamp=datetime.datetime.now(datetime.UTC),
             stop_loss=None,  # SL-M order doesn't need additional stop loss
             take_profit=None,
             trailing_stop_loss=None,
-            idempotency_key=f"slm_{trade.trade_id}_{datetime.datetime.now(datetime.UTC).timestamp()}",
+            idempotency_key=(
+                f"slm_{trade.trade_id}_"
+                f"{datetime.datetime.now(datetime.UTC).timestamp()}"
+            ),
         )
 
         return sl_m_order
@@ -500,7 +510,10 @@ class TrailingStopEngine:
             price=new_trigger_price,
             trigger_price=new_trigger_price,
             timestamp=datetime.datetime.now(datetime.UTC),
-            idempotency_key=f"slm_update_{existing_order.order_id}_{datetime.datetime.now(datetime.UTC).timestamp()}",
+            idempotency_key=(
+                f"slm_update_{existing_order.order_id}_"
+                f"{datetime.datetime.now(datetime.UTC).timestamp()}"
+            ),
         )
 
         return updated_order
