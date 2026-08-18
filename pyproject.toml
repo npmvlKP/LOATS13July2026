@@ -122,7 +122,8 @@ ignore = [
 "tests/*" = ["S101", "DTZ001", "DTZ005", "BLE001", "SLF001", "PLC0415", "T201", "ANN001", "ANN201", "ANN202", "PT001", "PT011", "PT012", "ARG001", "PTH123", "PLR0915", "E501", "B017"]
 "quick_health_check.py" = ["INP001", "T201"]
 "setup_project.py" = ["INP001", "T201"]
-"scripts/*" = ["INP001", "T201"]
+"scripts/*" = ["INP001", "T201", "E501"]
+"scripts/identify_low_coverage.py" = ["E501"]
 
 [tool.mypy]
 python_version = "3.12"

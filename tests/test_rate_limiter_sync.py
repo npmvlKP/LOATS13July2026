@@ -6,7 +6,6 @@ Tests SyncRateLimiter class and synchronous factory functions.
 import time
 import threading
 
-import pytest
 
 from loats.config import get_settings
 from loats.loats_logging import get_logger

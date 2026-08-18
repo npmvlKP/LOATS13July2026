@@ -102,17 +102,17 @@ jobs:
             pytest-report.xml
           retention-days: 30
 
-  docker:
-    name: Docker Build
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-    steps:
-      - uses: actions/checkout@v4
-      - name: Build Test
-        run: |
-          docker build -t loats13july2026:test .
-          docker run --rm --name loats-health-test loats13july2026:test python -c "import sys;print('Health Check Passed')" || exit 1
-          docker stop loats-health-test || true
+   docker:
+     name: Docker Build
+     runs-on: ubuntu-latest
+     if: github.event_name == 'pull_request'
+     steps:
+       - uses: actions/checkout@v4
+       - name: Build Test
+         run: |
+           docker build -t loats13july2026:test .
+           docker run --rm --name loats-health-test loats13july2026:test python -c "import sys;print('Health Check Passed')" || exit 1
+           docker stop loats-health-test || true
 
   status:
     name: Final Status
