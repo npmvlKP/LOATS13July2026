@@ -96,8 +96,8 @@ class TradingOrchestrator:
         self.avg_cycle_time = 0.0
         self.total_cycle_time = 0.0
         self._shutdown_event = asyncio.Event()
-        self._cycle_task = None
-        self._last_alert_time = 0
+        self._cycle_task: asyncio.Task[None] | None = None
+        self._last_alert_time = 0.0
 
     async def initialize(self) -> None:
         """Initialize the orchestrator."""
@@ -213,6 +213,11 @@ class TradingOrchestrator:
         start_time = datetime.datetime.now(datetime.UTC)
 
         try:
+            # Lazy load settings to avoid import-time failures
+            global settings
+            if settings is None:
+                settings = get_settings()
+
             symbol = settings.default_symbol
             timeframe = settings.default_timeframe
 
@@ -281,6 +286,11 @@ class TradingOrchestrator:
         start_time = datetime.datetime.now(datetime.UTC)
 
         try:
+            # Lazy load settings to avoid import-time failures
+            global settings
+            if settings is None:
+                settings = get_settings()
+
             symbol = settings.default_symbol
             rss_feeds = [
                 "https://economictimes.indiatimes.com/markets/rssfeeds/1977021501.cms",
@@ -347,6 +357,11 @@ class TradingOrchestrator:
         start_time = datetime.datetime.now(datetime.UTC)
 
         try:
+            # Lazy load settings to avoid import-time failures
+            global settings
+            if settings is None:
+                settings = get_settings()
+
             symbol = settings.default_symbol
 
             # Get quotes and store
@@ -398,6 +413,11 @@ class TradingOrchestrator:
         start_time = datetime.datetime.now(datetime.UTC)
 
         try:
+            # Lazy load settings to avoid import-time failures
+            global settings
+            if settings is None:
+                settings = get_settings()
+
             symbol = settings.default_symbol
 
             # Get latest signals
@@ -537,6 +557,11 @@ class TradingOrchestrator:
         start_time = datetime.datetime.now(datetime.UTC)
 
         try:
+            # Lazy load settings to avoid import-time failures
+            global settings
+            if settings is None:
+                settings = get_settings()
+
             symbol = settings.default_symbol
 
             # Get all available signals for CMP strategy (≥3 sources required)
@@ -593,7 +618,32 @@ class TradingOrchestrator:
             funds = self._create_funds_model(funds_data["data"])
 
             # Get current positions
-            current_positions = await asyncio.to_thread(db.get_positions, symbol=symbol)
+            current_positions = await asyncio.to_thread(db.get_position, symbol=symbol)
+
+            # Convert Position to list of Trades for TradeDecisionEngine
+            current_trades = []
+            if current_positions:
+                # Create a Trade object from the Position
+                from .models import Trade, TransactionType
+
+                transaction_type = (
+                    TransactionType.BUY
+                    if current_positions.quantity > 0
+                    else TransactionType.SELL
+                )
+
+                trade = Trade(
+                    trade_id=f"temp_{symbol}_trade",
+                    symbol=symbol,
+                    quantity=current_positions.quantity,
+                    entry_price=current_positions.average_price,
+                    transaction_type=transaction_type,
+                    product_type=current_positions.product_type,
+                    status="OPEN",
+                    entry_time=datetime.datetime.now(datetime.UTC),
+                    metadata={"source": "position_conversion"}
+                )
+                current_trades.append(trade)
 
             # Create TradeDecision using CMP strategy
             (
@@ -604,7 +654,7 @@ class TradingOrchestrator:
                 historical_data=historical_data_objs,
                 current_price=current_price,
                 funds=funds,
-                current_positions=current_positions,
+                current_positions=current_trades,
             )
 
             if decision is None:
@@ -822,7 +872,7 @@ class TradingOrchestrator:
             "target_compliance": "pass" if self.avg_cycle_time <= 0.1 else "fail",
         }
 
-    def _handle_cycle_task_completion(self, task: asyncio.Task) -> None:
+    def _handle_cycle_task_completion(self, task: asyncio.Task[None]) -> None:
         """Handle completion of the cycle task."""
         try:
             # Check if task is done and get result (this will re-raise any exception)

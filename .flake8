@@ -5,6 +5,7 @@ ignore =
     E303,
     E203,
     E226,
+    W503,
 max-line-length = 88
 exclude =
     .git,

@@ -224,7 +224,6 @@ class DatabasePerformanceAnalyzer:
         self, iterations: int = 100
     ) -> dict[str, Any]:
         """Measure comprehensive database operation latencies."""
-        results = {}
 
         # Test async operations
         async def test_async_create_signal():
@@ -441,9 +440,6 @@ async def run_comprehensive_analysis(db: Database) -> dict[str, Any]:
 async def run_latency_benchmark(db: Database) -> dict[str, Any]:
     """Run focused latency benchmark for CMP P1/P5 validation."""
     logger.info("Starting CMP P1/P5 latency benchmark")
-
-    # Focus on critical path operations
-    results = {}
 
     # Test 1: Signal creation and retrieval
     async def test_signal_round_trip():

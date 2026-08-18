@@ -1,0 +1,357 @@
+E501 Line too long (100 > 88)
+ --> docs\audit-history\final_circuit_breaker_verification.py:4:89
+  |
+2 | """
+3 | Final comprehensive verification test for circuit breaker functionality.
+4 | This test verifies that the circuit breaker is properly implemented for both GET and POST operations
+  |                                                                                         ^^^^^^^^^^^^
+5 | according to the current architecture.
+6 | """
+  |
+
+E501 Line too long (113 > 88)
+  --> docs\audit-history\final_circuit_breaker_verification.py:22:89
+   |
+21 | def test_circuit_breaker_post_operations_protected():
+22 |     """Verify that POST operations (place_order, modify_order, cancel_order) are protected by circuit breaker."""
+   |                                                                                         ^^^^^^^^^^^^^^^^^^^^^^^^^
+23 |     print("Testing POST operations circuit breaker protection...")
+   |
+
+E501 Line too long (93 > 88)
+  --> docs\audit-history\final_circuit_breaker_verification.py:56:89
+   |
+55 | def test_circuit_breaker_get_operations_with_retry_protected():
+56 |     """Verify that GET operations are protected by circuit breaker with retry composition."""
+   |                                                                                         ^^^^^
+57 |     print("Testing GET operations circuit breaker protection with retry...")
+   |
+
+E501 Line too long (100 > 88)
+   --> docs\audit-history\final_circuit_breaker_verification.py:131:89
+    |
+130 | def test_circuit_breaker_architecture_consistency():
+131 |     """Verify that the circuit breaker architecture is consistent across GET and POST operations."""
+    |                                                                                         ^^^^^^^^^^^^
+132 |     print("Testing circuit breaker architecture consistency...")
+    |
+
+E501 Line too long (90 > 88)
+  --> docs\audit-history\quick_health_check.py:14:89
+   |
+13 | def check_python_version():
+14 |     """Check Python version (redundant check removed - handled by project requirements)"""
+   |                                                                                         ^^
+15 |     # Version check removed - project requires Python 3.12+ via pyproject.toml
+16 |     # This is enforced by pip/installation, no need to check at runtime
+   |
+
+E501 Line too long (90 > 88)
+  --> docs\audit-history\quick_health_check.py:30:89
+   |
+28 |     if missing_vars:
+29 |         print(
+30 |             f"[WARN] Missing environment variables: {missing_vars} (ok for local testing)"
+   |                                                                                         ^^
+31 |         )
+32 |         # Only fail if we're in a container (indicated by presence of some container-specific env vars)
+   |
+
+E501 Line too long (103 > 88)
+  --> docs\audit-history\quick_health_check.py:32:89
+   |
+30 |             f"[WARN] Missing environment variables: {missing_vars} (ok for local testing)"
+31 |         )
+32 |         # Only fail if we're in a container (indicated by presence of some container-specific env vars)
+   |                                                                                         ^^^^^^^^^^^^^^^
+33 |         if any(
+34 |             var in os.environ
+   |
+
+E501 Line too long (93 > 88)
+   --> docs\audit-history\simple_performance_test.py:139:89
+    |
+137 |     )
+138 |     print(
+139 |         f"\nOverall Result: {'ALL TESTS PASSED' if overall_success else 'SOME TESTS FAILED'}"
+    |                                                                                         ^^^^^
+140 |     )
+    |
+
+E501 Line too long (95 > 88)
+   --> docs\audit-history\test_audit_log_fix.py:185:88
+    |
+183 |         db.close()
+184 |         print(
+185 |             "\n✅ All tests passed! Audit log dual-write consistency fix is working correctly."
+    |                                                                                         ^^^^^^^
+186 |         )
+    |
+
+E501 Line too long (101 > 88)
+ --> docs\audit-history\test_circuit_breaker_verification.py:4:89
+  |
+2 | """
+3 | Comprehensive verification test for circuit breaker functionality.
+4 | This test verifies that the circuit breaker is properly implemented for both GET and POST operations.
+  |                                                                                         ^^^^^^^^^^^^^
+5 | """
+  |
+
+E501 Line too long (113 > 88)
+  --> docs\audit-history\test_circuit_breaker_verification.py:20:89
+   |
+19 | def test_circuit_breaker_post_operations_protected():
+20 |     """Verify that POST operations (place_order, modify_order, cancel_order) are protected by circuit breaker."""
+   |                                                                                         ^^^^^^^^^^^^^^^^^^^^^^^^^
+21 |     print("Testing POST operations circuit breaker protection...")
+   |
+
+E501 Line too long (90 > 88)
+  --> docs\audit-history\test_idempotency_fix.py:76:89
+   |
+74 |             return False
+75 |
+76 |         # Try to store a different order with a different idempotency key - should succeed
+   |                                                                                         ^^
+77 |         order2 = Order(
+78 |             order_id="test_order_2",
+   |
+
+E501 Line too long (100 > 88)
+   --> docs\audit-history\test_idempotency_fix.py:102:89
+    |
+100 |             return False
+101 |
+102 |         # Try to store an order without an idempotency key - should succeed (backward compatibility)
+    |                                                                                         ^^^^^^^^^^^^
+103 |         order3 = Order(
+104 |             order_id="test_order_3",
+    |
+
+E501 Line too long (95 > 88)
+   --> docs\audit-history\test_idempotency_fix.py:120:88
+    |
+118 |             result4 = db.store_order(order3)
+119 |             print(
+120 |                 "✅ Order without idempotency key stored successfully (backward compatibility)"
+    |                                                                                         ^^^^^^^
+121 |             )
+122 |             assert result4 is True
+    |
+
+E501 Line too long (107 > 88)
+   --> docs\audit-history\test_idempotency_fix.py:225:89
+    |
+223 |     if idempotency_result and audit_result:
+224 |         print(
+225 |             "\nALL TESTS PASSED! Technical debt items R5-F-07 and R5-F-14 have been successfully resolved."
+    |                                                                                         ^^^^^^^^^^^^^^^^^^^
+226 |         )
+227 |         sys.exit(0)
+    |
+
+E501 Line too long (120 > 88)
+  --> docs\audit-history\test_idempotency_quick.py:51:89
+   |
+49 |     )
+50 |     print(
+51 |         "[OK] Payload digest works correctly: same payloads have same digest, different payloads have different digests"
+   |                                                                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+52 |     )
+   |
+
+E501 Line too long (117 > 88)
+  --> docs\audit-history\test_idempotency_verification.py:52:89
+   |
+50 |     )
+51 |     print(
+52 |         "✓ Payload digest works correctly: same payloads have same digest, different payloads have different digests"
+   |                                                                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+53 |     )
+   |
+
+E501 Line too long (97 > 88)
+  --> docs\audit-history\test_metrics_endpoint.py:39:89
+   |
+37 |             body = response.read()
+38 |             print(
+39 |                 f"Response body (first 500 chars): {body[:500].decode('utf-8', errors='ignore')}"
+   |                                                                                         ^^^^^^^^^
+40 |             )
+   |
+
+E501 Line too long (90 > 88)
+  --> docs\audit-history\test_technical_debt_fixes.py:78:89
+   |
+76 |             return False
+77 |
+78 |         # Try to store a different order with a different idempotency key - should succeed
+   |                                                                                         ^^
+79 |         order2 = Order(
+80 |             order_id="test_order_2",
+   |
+
+E501 Line too long (89 > 88)
+  --> docs\audit-history\test_technical_debt_fixes.py:97:89
+   |
+95 |             result3 = db.store_order(order2)
+96 |             print(
+97 |                 "[OK] Different order with different idempotency key stored successfully"
+   |                                                                                         ^
+98 |             )
+99 |             assert result3 is True
+   |
+
+E501 Line too long (100 > 88)
+   --> docs\audit-history\test_technical_debt_fixes.py:104:89
+    |
+102 |             return False
+103 |
+104 |         # Try to store an order without an idempotency key - should succeed (backward compatibility)
+    |                                                                                         ^^^^^^^^^^^^
+105 |         order3 = Order(
+106 |             order_id="test_order_3",
+    |
+
+E501 Line too long (97 > 88)
+   --> docs\audit-history\test_technical_debt_fixes.py:122:89
+    |
+120 |             result4 = db.store_order(order3)
+121 |             print(
+122 |                 "[OK] Order without idempotency key stored successfully (backward compatibility)"
+    |                                                                                         ^^^^^^^^^
+123 |             )
+124 |             assert result4 is True
+    |
+
+E501 Line too long (92 > 88)
+   --> docs\audit-history\test_technical_debt_fixes.py:303:89
+    |
+301 |     print("TEST RESULTS:")
+302 |     print(
+303 |         f"   Idempotency Key Test (R5-F-07): {'PASSED' if idempotency_result else 'FAILED'}"
+    |                                                                                         ^^^^
+304 |     )
+305 |     print(
+    |
+
+E501 Line too long (91 > 88)
+   --> docs\audit-history\test_technical_debt_fixes.py:317:89
+    |
+315 |     if idempotency_result and holiday_result and audit_result and deps_result:
+316 |         print(
+317 |             "\nALL TESTS PASSED! All technical debt items have been successfully resolved."
+    |                                                                                         ^^^
+318 |         )
+319 |         sys.exit(0)
+    |
+
+E501 Line too long (98 > 88)
+ --> docs\audit-history\validate_resolved_issues.py:5:89
+  |
+3 | Validation script for resolved issues NEW-M1 to NEW-M4.
+4 |
+5 | This script validates that all the resolved issues mentioned in the task are properly implemented:
+  |                                                                                         ^^^^^^^^^^
+6 | - NEW-M1: HTML injection fix (html.escape() applied)
+7 | - NEW-M2: .env.example synced with Settings
+  |
+
+E501 Line too long (102 > 88)
+  --> docs\audit-history\validate_resolved_issues.py:72:89
+   |
+70 |     # Check that all settings fields are represented in .env.example
+71 |     # Extract field names from settings.py
+72 |     field_pattern = r"(\w+)\s*:\s*(?:SecretStr|str|int|float|Decimal|Path|list|Literal)\s*=\s*Field\("
+   |                                                                                         ^^^^^^^^^^^^^^
+73 |     fields = re.findall(field_pattern, settings_content)
+   |
+
+E501 Line too long (90 > 88)
+   --> docs\audit-history\validate_resolved_issues.py:182:89
+    |
+181 |     print(
+182 |         "NEW-M4: negative t clamping fix validated - ExpiredContractError properly raised"
+    |                                                                                         ^^
+183 |     )
+184 |     return True
+    |
+
+E501 Line too long (100 > 88)
+   --> docs\audit-history\validate_resolved_issues.py:218:89
+    |
+216 |     all_passed = all(results)
+217 |     print(
+218 |         f"\nOverall Result: {'ALL VALIDATIONS PASSED' if all_passed else 'SOME VALIDATIONS FAILED'}"
+    |                                                                                         ^^^^^^^^^^^^
+219 |     )
+    |
+
+E501 Line too long (96 > 88)
+ --> docs\audit-history\verify_no_sql_injection.py:4:89
+  |
+2 | """
+3 | SQL Injection Verification Script
+4 | This script verifies that no SQL injection vulnerabilities exist in the database implementation.
+  |                                                                                         ^^^^^^^^
+5 | Run this script to confirm the forensic analysis findings.
+6 | """
+  |
+
+E501 Line too long (93 > 88)
+  --> docs\audit-history\verify_no_sql_injection.py:90:89
+   |
+88 |         print("RESULT: ❌ POTENTIAL SQL INJECTION VULNERABILITIES FOUND")
+89 |         print(
+90 |             "The database implementation may have security issues that need to be addressed."
+   |                                                                                         ^^^^^
+91 |         )
+92 |         return False
+   |
+
+E501 Line too long (95 > 88)
+  --> reports\ai-generated\fix_assertions.py:38:89
+   |
+36 |     # test_send_signal_alert_html_injection_prevention
+37 |     (
+38 |         'assert "<script>" in sent_message\n        assert "<b>indicator</b>" in sent_message',
+   |                                                                                         ^^^^^^^
+39 |         'assert "<script>" in sent_message\n        assert "<b>indicator</b>" in sent_message',
+40 |     ),
+   |
+
+E501 Line too long (95 > 88)
+  --> reports\ai-generated\fix_assertions.py:39:89
+   |
+37 |     (
+38 |         'assert "<script>" in sent_message\n        assert "<b>indicator</b>" in sent_message',
+39 |         'assert "<script>" in sent_message\n        assert "<b>indicator</b>" in sent_message',
+   |                                                                                         ^^^^^^^
+40 |     ),
+41 | ]
+   |
+
+E501 Line too long (95 > 88)
+  --> reports\ai-generated\fix_html_test_assertions.py:49:89
+   |
+47 |     # Input: <script> and <b>indicator</b> escape to <script> and <b>indicator</b>
+48 |     (
+49 |         'assert "<script>" in sent_message\n        assert "<b>indicator</b>" in sent_message',
+   |                                                                                         ^^^^^^^
+50 |         'assert "<script>" in sent_message\n        assert "<b>indicator</b>" in sent_message',
+51 |     ),
+   |
+
+E501 Line too long (95 > 88)
+  --> reports\ai-generated\fix_html_test_assertions.py:50:89
+   |
+48 |     (
+49 |         'assert "<script>" in sent_message\n        assert "<b>indicator</b>" in sent_message',
+50 |         'assert "<script>" in sent_message\n        assert "<b>indicator</b>" in sent_message',
+   |                                                                                         ^^^^^^^
+51 |     ),
+52 | ]
+   |
+
+Found 34 errors.

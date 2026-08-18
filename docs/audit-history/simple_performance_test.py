@@ -25,6 +25,14 @@ def test_imports():
         )
         from loats.strike_selection import StrikeSelectionEngine, select_strikes
 
+        # Use the imports to verify they work
+        _ = record_cycle_time
+        _ = TradingOrchestrator
+        _ = get_cycle_stats
+        _ = start_orchestrator
+        _ = StrikeSelectionEngine
+        _ = select_strikes
+
         print("PASS: strike_selection module imported successfully")
         print("PASS: orchestrator module imported successfully")
         print("PASS: metrics functions available")

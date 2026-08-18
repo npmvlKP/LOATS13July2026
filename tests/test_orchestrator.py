@@ -457,30 +457,30 @@ class TestTradingOrchestrator(unittest.IsolatedAsyncioTestCase):
 
         with patch.object(
             self.orchestrator, "_execute_ta_analysis", new_callable=AsyncMock
-        ) as mock_ta:
+        ):
             with patch.object(
                 self.orchestrator, "_execute_sentiment_analysis", new_callable=AsyncMock
-            ) as mock_sentiment:
+            ):
                 with patch.object(
                     self.orchestrator,
                     "_execute_market_data_update",
                     new_callable=AsyncMock,
-                ) as mock_market:
+                ):
                     with patch.object(
                         self.orchestrator,
                         "_execute_signal_generation",
                         new_callable=AsyncMock,
-                    ) as mock_signal:
+                    ):
                         with patch.object(
                             self.orchestrator,
                             "_execute_risk_management",
                             new_callable=AsyncMock,
-                        ) as mock_risk:
+                        ):
                             with patch.object(
                                 self.orchestrator,
                                 "_execute_cmp_strategy",
                                 new_callable=AsyncMock,
-                            ) as mock_cmp:
+                            ):
                                 # Execute one trading cycle via _run_cycle_loop logic
                                 # Manually call the cycle execution and record cycle time
                                 await self.orchestrator._execute_trading_cycle()

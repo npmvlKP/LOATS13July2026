@@ -2170,14 +2170,6 @@ class Database:
         """Async wrapper create_trade_decision() avoid blocking event loop."""
         return await asyncio.to_thread(self.create_trade_decision, decision)
 
-    async def async_get_latest_signals(
-        self, symbol: str, limit: int = 10, scan_type: str | None = None
-    ) -> list[Signal]:
-        """Async wrapper get_latest_signals() avoid blocking event loop."""
-        return await asyncio.to_thread(
-            self.get_latest_signals, symbol, limit, scan_type
-        )
-
     async def async_get_trade_decision(self, decision_id: str) -> TradeDecision | None:
         """Async wrapper get_trade_decision() avoid blocking event loop."""
         return await asyncio.to_thread(self.get_trade_decision, decision_id)

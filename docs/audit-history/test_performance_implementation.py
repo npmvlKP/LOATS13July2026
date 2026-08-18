@@ -143,6 +143,13 @@ def test_module_imports() -> bool:
         )
         from loats.strike_selection import StrikeSelectionEngine, select_strikes
 
+        # Use the imports to verify they work
+        _ = TradingOrchestrator
+        _ = get_cycle_stats
+        _ = start_orchestrator
+        _ = StrikeSelectionEngine
+        _ = select_strikes
+
         print("  ✅ strike_selection module imported successfully")
         print("  ✅ orchestrator module imported successfully")
         print("  ✅ All performance modules available")

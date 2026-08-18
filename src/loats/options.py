@@ -819,13 +819,9 @@ def calculate_portfolio_var(
 
     # Calculate Monte Carlo VaR
     # For portfolio, we use the average return and std dev
-    avg_return = np.mean(position_vars)
-    std_dev = np.std(position_vars)
     current_prices = [p.current_price for p in positions if p.current_price is not None]
     if len(current_prices) >= 2:
-        monte_carlo_var = calculate_monte_carlo_var(current_prices, confidence_level)
-    else:
-        monte_carlo_var = parametric_var
+        calculate_monte_carlo_var(current_prices, confidence_level)
 
     # Use parametric VaR as primary (most reliable for normal markets)
     primary_var = parametric_var

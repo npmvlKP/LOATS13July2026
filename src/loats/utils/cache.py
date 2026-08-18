@@ -335,8 +335,10 @@ class CacheManager:
                 "sets": self._cache_stats["sets"],
                 "deletes": self._cache_stats["deletes"],
                 "evictions": self._cache_stats["evictions"],
-                "hit_rate": self._cache_stats["hits"]
-                / (self._cache_stats["hits"] + self._cache_stats["misses"] + 1e-6),
+                "hit_rate": (
+                    self._cache_stats["hits"]
+                    / (self._cache_stats["hits"] + self._cache_stats["misses"] + 1e-6)
+                ),
             }
         except Exception as e:
             logger.error(f"Cache stats failed: {e}")
