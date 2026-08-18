@@ -396,9 +396,7 @@ class TradeDecisionEngine:
             "status": "PROCESSED",
             "analyzer_status": "ANALYZED",
             "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
-            "notes": (
-                "Simulated response - production would query actual Analyzer"
-            ),
+            "notes": ("Simulated response - production would query actual Analyzer"),
         }
 
     def increment_modification_counter(self) -> int:

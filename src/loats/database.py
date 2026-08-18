@@ -331,10 +331,10 @@ class Database:
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_trades_symbol ON trades(symbol)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_trades_status ON trades(status)")
         cursor.execute(
-            "CREATE INDEX IF NOT EXISTS " "idx_signals_symbol ON signals(symbol)"
+            "CREATE INDEX IF NOT EXISTS idx_signals_symbol ON signals(symbol)"
         )
         cursor.execute(
-            "CREATE INDEX IF NOT EXISTS " "idx_signals_timestamp ON signals(timestamp)"
+            "CREATE INDEX IF NOT EXISTS idx_signals_timestamp ON signals(timestamp)"
         )
         cursor.execute(
             "CREATE INDEX IF NOT EXISTS "
@@ -346,7 +346,7 @@ class Database:
         )
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_quotes_symbol ON quotes(symbol)")
         cursor.execute(
-            "CREATE INDEX IF NOT EXISTS " "idx_quotes_timestamp ON quotes(timestamp)"
+            "CREATE INDEX IF NOT EXISTS idx_quotes_timestamp ON quotes(timestamp)"
         )
         conn.commit()
 
