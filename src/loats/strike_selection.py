@@ -5,6 +5,7 @@ Implements optimized strike selection algorithms for options trading.
 """
 
 import datetime
+import threading
 from typing import Any
 
 import numpy as np
@@ -22,6 +23,10 @@ class StrikeSelectionEngine:
     def __init__(self) -> None:
         """Initialize StrikeSelectionEngine."""
         self._cache: TTLCache[str, list[float]] = TTLCache(maxsize=1000, ttl=300)
+        self._cache_lock = threading.RLock()  # Add thread-safe cache access
+        self._cache_hits = 0
+        self._cache_misses = 0
+        self._initialized = True
 
     async def select_strikes(
         self,
@@ -64,8 +69,11 @@ class StrikeSelectionEngine:
             cache_key = (
                 f"{underlying_price:.2f}_{strategy}_{width}_{max_strikes}_{chain_sig}"
             )
-            if cache_key in self._cache:
-                return self._cache[cache_key]
+            with self._cache_lock:
+                if cache_key in self._cache:
+                    self._cache_hits += 1
+                    return self._cache[cache_key]
+                self._cache_misses += 1
 
             # Extract and sort strike prices (O(n log n) but n is typically small)
             strikes = sorted({opt.strike_price for opt in option_chain})
@@ -89,7 +97,8 @@ class StrikeSelectionEngine:
                 )
 
             # Cache result for future use
-            self._cache[cache_key] = selected
+            with self._cache_lock:
+                self._cache[cache_key] = selected
             return selected
 
         finally:
@@ -327,7 +336,26 @@ class StrikeSelectionEngine:
 
     def clear_cache(self) -> None:
         """Clear the strike selection cache."""
-        self._cache.clear()
+        with self._cache_lock:
+            self._cache.clear()
+
+    def get_cache_stats(self) -> dict[str, Any]:
+        """Get cache statistics."""
+        with self._cache_lock:
+            hit_rate = self._cache_hits / (self._cache_hits + self._cache_misses + 1e-6)
+            return {
+                "hits": self._cache_hits,
+                "misses": self._cache_misses,
+                "current_size": len(self._cache),
+                "max_size": self._cache.maxsize,
+                "hit_rate": hit_rate,
+            }
+
+    def cleanup(self) -> None:
+        """Clean up resources and clear cache."""
+        with self._cache_lock:
+            self._cache.clear()
+            self._initialized = False
 
 
 # Module-level singleton instance
