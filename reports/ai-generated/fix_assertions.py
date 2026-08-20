@@ -35,8 +35,10 @@ fixes = [
     ),
     # test_send_signal_alert_html_injection_prevention
     (
-        'assert "<script>" in sent_message\n        assert "<b>indicator</b>" in sent_message',
-        'assert "<script>" in sent_message\n        assert "<b>indicator</b>" in sent_message',
+        'assert "<script>" in sent_message\n        assert "<b>indicator</b>" in '
+        'sent_message',
+        'assert "<script>" in sent_message\n        assert "<b>indicator</b>" in '
+        'sent_message',
     ),
 ]
 

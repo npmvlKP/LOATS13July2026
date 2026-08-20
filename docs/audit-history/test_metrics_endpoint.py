@@ -36,7 +36,8 @@ async def test_metrics_endpoint():
 
             body = response.read()
             print(
-                f"Response body (first 500 chars): {body[:500].decode('utf-8', errors='ignore')}"
+                f"Response body (first 500 chars): "
+                f"{body[:500].decode('utf-8', errors='ignore')}"
             )
 
             if response.status == 200:

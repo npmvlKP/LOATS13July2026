@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
 SQL Injection Verification Script
-This script verifies that no SQL injection vulnerabilities exist in the database implementation.
+This script verifies that no SQL injection vulnerabilities exist in the
+database implementation.
 Run this script to confirm the forensic analysis findings.
 """
 
@@ -87,7 +88,8 @@ def verify_no_sql_injection():
     if vulnerabilities_found:
         print("RESULT: ❌ POTENTIAL SQL INJECTION VULNERABILITIES FOUND")
         print(
-            "The database implementation may have security issues that need to be addressed."
+            "The database implementation may have security issues that "
+            "need to be addressed."
         )
         return False
     else:

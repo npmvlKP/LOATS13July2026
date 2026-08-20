@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
 Comprehensive verification test for circuit breaker functionality.
-This test verifies that the circuit breaker is properly implemented for both GET and POST operations.
+This test verifies that the circuit breaker is properly implemented for
+both GET and POST operations.
 """
 
 import asyncio
@@ -17,7 +18,8 @@ from src.loats.utils.circuit_breaker import (
 
 
 def test_circuit_breaker_post_operations_protected():
-    """Verify that POST operations (place_order, modify_order, cancel_order) are protected by circuit breaker."""
+    """Verify that POST operations (place_order, modify_order, cancel_order)
+    are protected by circuit breaker."""
     print("Testing POST operations circuit breaker protection...")
 
     # Reset circuit breaker

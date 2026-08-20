@@ -46,8 +46,10 @@ fixes = [
     # test_send_signal_alert_html_injection_prevention
     # Input: <script> and <b>indicator</b> escape to <script> and <b>indicator</b>
     (
-        'assert "<script>" in sent_message\n        assert "<b>indicator</b>" in sent_message',
-        'assert "<script>" in sent_message\n        assert "<b>indicator</b>" in sent_message',
+        'assert "<script>" in sent_message\n        assert "<b>indicator</b>" in '
+        'sent_message',
+        'assert "<script>" in sent_message\n        assert "<b>indicator</b>" in '
+        'sent_message',
     ),
 ]
 

@@ -102,9 +102,9 @@ def generate_summary(
         "benchmark_validation": {
             "total_operations": benchmark_total,
             "passing_operations": benchmark_passing,
-            "pass_rate": benchmark_passing / benchmark_total
-            if benchmark_total > 0
-            else 0,
+            "pass_rate": (
+                benchmark_passing / benchmark_total if benchmark_total > 0 else 0
+            ),
         },
         "overall_status": "PASS" if passing_ops == total_ops else "PARTIAL",
     }

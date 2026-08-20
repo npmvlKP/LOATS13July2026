@@ -641,7 +641,7 @@ class TradingOrchestrator:
                     product_type=current_positions.product_type,
                     status="OPEN",
                     entry_time=datetime.datetime.now(datetime.UTC),
-                    metadata={"source": "position_conversion"}
+                    metadata={"source": "position_conversion"},
                 )
                 current_trades.append(trade)
 
@@ -752,6 +752,9 @@ class TradingOrchestrator:
         self.cycle_count += 1
         self.avg_cycle_time = self.total_cycle_time / self.cycle_count
         self.max_cycle_time = max(self.max_cycle_time, duration)
+
+        # Call external metrics function
+        record_cycle_time(duration)
 
         # Log cycle time statistics periodically
         if self.cycle_count % 100 == 0:
@@ -866,9 +869,13 @@ class TradingOrchestrator:
         """Get current cycle statistics."""
         return {
             "cycle_count": self.cycle_count,
+            "last_cycle_time": self.last_cycle_time,
             "last_cycle_time_ms": self.last_cycle_time * 1000,
+            "avg_cycle_time": self.avg_cycle_time,
             "avg_cycle_time_ms": self.avg_cycle_time * 1000,
+            "max_cycle_time": self.max_cycle_time,
             "max_cycle_time_ms": self.max_cycle_time * 1000,
+            "total_cycle_time": self.total_cycle_time,
             "target_compliance": "pass" if self.avg_cycle_time <= 0.1 else "fail",
         }
 

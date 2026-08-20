@@ -115,6 +115,14 @@ class StrengthEngine:
                     "reason": "opposition_gate_failed",
                     "opposition_details": opposition_result,
                 }
+        else:
+            opposition_result = {
+                "passed": True,
+                "reason": "opposition_check_skipped",
+                "primary_direction": None,
+                "strong_opposition": 0,
+                "moderate_opposition": 0,
+            }
 
         # Calculate weighted composite strength
         total_strength = 0.0

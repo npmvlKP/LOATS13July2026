@@ -75,7 +75,8 @@ def test_idempotency_key_functionality():
             print(f"[FAIL] Unexpected exception type: {e}")
             return False
 
-        # Try to store a different order with a different idempotency key - should succeed
+        # Try to store a different order with a different idempotency key -
+        # should succeed
         order2 = Order(
             order_id="test_order_2",
             symbol="TCS",
@@ -94,14 +95,16 @@ def test_idempotency_key_functionality():
         try:
             result3 = db.store_order(order2)
             print(
-                "[OK] Different order with different idempotency key stored successfully"
+                "[OK] Different order with different idempotency key "
+                "stored successfully"
             )
             assert result3 is True
         except Exception as e:
             print(f"[FAIL] Failed to store different order: {e}")
             return False
 
-        # Try to store an order without an idempotency key - should succeed (backward compatibility)
+        # Try to store an order without an idempotency key - should succeed
+        # (backward compatibility)
         order3 = Order(
             order_id="test_order_3",
             symbol="INFY",
@@ -119,7 +122,8 @@ def test_idempotency_key_functionality():
         try:
             result4 = db.store_order(order3)
             print(
-                "[OK] Order without idempotency key stored successfully (backward compatibility)"
+                "[OK] Different order with different idempotency key "
+                "stored successfully"
             )
             assert result4 is True
         except Exception as e:
@@ -300,7 +304,17 @@ if __name__ == "__main__":
     print("\n" + "=" * 50)
     print("TEST RESULTS:")
     print(
-        f"   Idempotency Key Test (R5-F-07): {'PASSED' if idempotency_result else 'FAILED'}"
+        f"   Idempotency Key Test (R5-F-07): "
+        f"{'PASSED' if idempotency_result else 'FAILED'}"
+    )
+    print(
+        f"   NSE Holiday Calendar (R5-F-08): {'PASSED' if holiday_result else 'FAILED'}"
+    )
+    print(
+        f"   Audit Log Test (R5-F-14):        {'PASSED' if audit_result else 'FAILED'}"
+    )
+    print(
+        f"   Dependencies Test (R5-F-22):     {'PASSED' if deps_result else 'FAILED'}"
     )
     print(
         f"   NSE Holiday Calendar (R5-F-08): {'PASSED' if holiday_result else 'FAILED'}"
@@ -314,7 +328,8 @@ if __name__ == "__main__":
 
     if idempotency_result and holiday_result and audit_result and deps_result:
         print(
-            "\nALL TESTS PASSED! All technical debt items have been successfully resolved."
+            "\nALL TESTS PASSED! All technical debt items have been "
+            "successfully resolved."
         )
         sys.exit(0)
     else:

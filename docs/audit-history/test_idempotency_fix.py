@@ -73,7 +73,8 @@ def test_idempotency_key_functionality():
             print(f"❌ Unexpected exception type: {e}")
             return False
 
-        # Try to store a different order with a different idempotency key - should succeed
+        # Try to store a different order with a different idempotency key -
+        # should succeed
         order2 = Order(
             order_id="test_order_2",
             symbol="TCS",
@@ -99,7 +100,8 @@ def test_idempotency_key_functionality():
             print(f"❌ Failed to store different order: {e}")
             return False
 
-        # Try to store an order without an idempotency key - should succeed (backward compatibility)
+        # Try to store an order without an idempotency key - should succeed
+        # (backward compatibility)
         order3 = Order(
             order_id="test_order_3",
             symbol="INFY",
@@ -117,7 +119,8 @@ def test_idempotency_key_functionality():
         try:
             result4 = db.store_order(order3)
             print(
-                "✅ Order without idempotency key stored successfully (backward compatibility)"
+                "✅ Order without idempotency key stored successfully "
+                "(backward compatibility)"
             )
             assert result4 is True
         except Exception as e:
@@ -222,7 +225,8 @@ if __name__ == "__main__":
 
     if idempotency_result and audit_result:
         print(
-            "\nALL TESTS PASSED! Technical debt items R5-F-07 and R5-F-14 have been successfully resolved."
+            "\nALL TESTS PASSED! Technical debt items R5-F-07 and R5-F-14 "
+            "have been successfully resolved."
         )
         sys.exit(0)
     else:

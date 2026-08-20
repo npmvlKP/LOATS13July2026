@@ -135,9 +135,8 @@ async def main():
     overall_success = (
         import_success and strike_success and orchestrator_success and metrics_success
     )
-    print(
-        f"\nOverall Result: {'ALL TESTS PASSED' if overall_success else 'SOME TESTS FAILED'}"
-    )
+    result_msg = "ALL TESTS PASSED" if overall_success else "SOME TESTS FAILED"
+    print(f"\nOverall Result: {result_msg}")
 
     if overall_success:
         print("\nSUCCESS: Performance targets are now measurable and achievable!")
