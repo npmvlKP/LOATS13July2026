@@ -42,9 +42,10 @@ class TradeDecisionEngine:
 
     def __init__(self) -> None:
         """Initialize TradeDecisionEngine."""
-        self.decision_queue = asyncio.Queue()
+        self.decision_queue: asyncio.Queue[TradeDecision] = asyncio.Queue()
         self.analyzer_routing_enabled = True
         self.decision_timeout = datetime.timedelta(minutes=5)
+        self._processor_task: asyncio.Task[None] | None = None
 
     async def create_trade_decision(
         self,
@@ -147,6 +148,7 @@ class TradeDecisionEngine:
                 symbol=symbol,
                 quantity=position_size,
                 entry_price=current_price,
+                entry_time=timestamp,
                 transaction_type=(
                     TransactionType.BUY
                     if decision_type == SignalType.BUY

@@ -335,7 +335,7 @@ class CMPRulesEngine:
             return True, {"reason": "insufficient_trade_history"}
 
         # Group trades by source
-        source_trades = {}
+        source_trades: dict[str, list[Any]] = {}
         for trade in recent_trades:
             source = trade.metadata.get("source", "unknown")
             if source not in source_trades:
