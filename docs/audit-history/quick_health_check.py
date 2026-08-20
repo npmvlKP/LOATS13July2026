@@ -11,7 +11,8 @@ from pathlib import Path
 
 
 def check_python_version():
-    """Check Python version (redundant check removed - handled by project requirements)"""
+    """Check Python version (redundant check removed - handled by
+    project requirements)"""
     # Version check removed - project requires Python 3.12+ via pyproject.toml
     # This is enforced by pip/installation, no need to check at runtime
     print("[PASS] Python version check passed (enforced by project requirements)")
@@ -27,9 +28,13 @@ def check_environment():
 
     if missing_vars:
         print(
-            f"[WARN] Missing environment variables: {missing_vars} (ok for local testing)"
+            f"[WARN] Missing environment variables: {missing_vars} "
+            f"(ok for local testing)"
         )
-        # Only fail if we're in a container (indicated by presence of some container-specific env vars)
+        # Only fail if we're in a container (indicated by presence of some
+        # container-specific env vars)
+        # Only fail if we're in a container (indicated by presence of some
+        # container-specific env vars)
         if any(
             var in os.environ
             for var in ["CONTAINER", "DOCKER", "KUBERNETES_SERVICE_HOST"]

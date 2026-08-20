@@ -16,12 +16,12 @@ from .config import get_settings
 from .loats_logging import get_logger
 from .models import (
     Order,
+    OrderStatus,
     OrderType,
+    OrderVariety,
+    ProductType,
     Trade,
     TransactionType,
-    OrderVariety,
-    OrderStatus,
-    ProductType,
 )
 
 logger = get_logger(__name__)

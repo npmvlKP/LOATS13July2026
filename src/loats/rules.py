@@ -48,6 +48,7 @@ class CMPRulesEngine:
         self.modification_counter = 0
         self.session_state = TradingSession.PRE_OPEN
         self.last_session_update = datetime.datetime.now(datetime.UTC)
+        self._vix_level: float | None = None
 
     def get_current_session(
         self, current_time: datetime.datetime | None = None
@@ -105,25 +106,33 @@ class CMPRulesEngine:
         Calculate IV Rank (Implied Volatility Rank).
 
         IV Rank = (Current IV - Min IV) / (Max IV - Min IV)
+
+        Rolling historical volatility (5-bar std of returns, annualized)
+        serves as the IV proxy. The current HV is ranked against the
+        min/max HV observed within the same window, yielding a value on
+        a consistent 0-100 scale.
         """
         if len(historical_data) < window:
-            return 0.5  # Default neutral value
+            return 50.0  # Default neutral value (0-100 scale)
 
         # Extract closing prices and calculate returns
-        closes = [h.close for h in historical_data[-window:]]
-        returns = [
-            (closes[i] - closes[i - 1]) / closes[i - 1] for i in range(1, len(closes))
-        ]
-
-        # Calculate historical volatility (annualized)
-        std_dev = np.std(returns) * np.sqrt(252)
-        iv_rank = (
-            (std_dev - min(returns)) / (max(returns) - min(returns))
-            if (max(returns) - min(returns)) != 0
-            else 0.5
+        closes = pd.Series(
+            [h.close for h in historical_data[-window:]], dtype="float64"
         )
+        returns = closes.pct_change()
 
-        return float(np.clip(iv_rank * 100, 0, 100))  # Scale to 0-100
+        # Rolling 5-bar historical volatility (annualized) as IV proxy
+        hv = returns.rolling(5).std() * float(np.sqrt(252))
+
+        iv_current = hv.iloc[-1]
+        iv_min = hv.min()
+        iv_max = hv.max()
+
+        if pd.isna(iv_current) or iv_max == iv_min:
+            return 50.0  # Neutral when the window has no measurable spread
+
+        iv_rank = (iv_current - iv_min) / (iv_max - iv_min)
+        return float(np.clip(iv_rank * 100.0, 0.0, 100.0))
 
     def calculate_adx(
         self, historical_data: list[HistoricalData], period: int = 14
@@ -148,8 +157,8 @@ class CMPRulesEngine:
         # Calculate +DM, -DM, and TR
         df["+DM"] = df["high"].diff()
         df["-DM"] = -df["low"].diff()
-        df["+DM"][df["+DM"] < 0] = 0
-        df["-DM"][df["-DM"] < 0] = 0
+        df.loc[df["+DM"] < 0, "+DM"] = 0
+        df.loc[df["-DM"] < 0, "-DM"] = 0
 
         df["TR"] = pd.concat(
             [
@@ -177,13 +186,20 @@ class CMPRulesEngine:
 
     def get_vix_level(self) -> float:
         """
-        Get current VIX level (simulated for now).
+        Get current VIX level.
 
-        In production, this would fetch from market data.
-        For testing, we'll use a reasonable default.
+        Returns the most recent VIX value supplied via
+        :meth:`set_vix_level` by market data feeds; falls back to a
+        neutral default when no feed has been attached yet.
         """
-        # TODO: Implement actual VIX data fetching
-        return 18.5  # Default neutral value
+        vix = self._vix_level
+        return float(vix) if vix is not None else 18.5  # Neutral default
+
+    def set_vix_level(self, level: float) -> None:
+        """Update the latest VIX level from market data feeds."""
+        if level <= 0:
+            raise ValueError("VIX level must be positive")
+        self._vix_level = float(level)
 
     def apply_gating_rules(
         self,

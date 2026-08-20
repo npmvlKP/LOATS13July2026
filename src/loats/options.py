@@ -824,6 +824,7 @@ def calculate_portfolio_var(
         calculate_monte_carlo_var(current_prices, confidence_level)
 
     # Use parametric VaR as primary (most reliable for normal markets)
+    # Note: Monte Carlo VaR is calculated but not used as parametric VaR is preferred
     primary_var = parametric_var
     var_value = total_portfolio_value * abs(primary_var)
     var_percent = abs(primary_var) * 100

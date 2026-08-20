@@ -25,6 +25,7 @@ from loats.models import (
 from loats.openalgo import KillSwitchError
 from loats.orchestrator import TradingOrchestrator, get_cycle_stats
 
+
 @pytest.fixture
 def temp_db():
     """Create a temporary database for testing."""
@@ -41,12 +42,14 @@ def temp_db():
         # Clean up
         db.close_all()
 
+
 @pytest.fixture
 def mock_alerts():
     """Create a mock AlertSystem for testing."""
     alerts = MagicMock(spec=AlertSystem)
     alerts.is_kill_switch_active.return_value = False
     return alerts
+
 
 class TestTradingOrchestrator(unittest.IsolatedAsyncioTestCase):
     """Test suite for TradingOrchestrator."""
@@ -78,10 +81,14 @@ class TestTradingOrchestrator(unittest.IsolatedAsyncioTestCase):
 
     async def test_start_already_running(self):
         """Test orchestrator start when already running."""
-        await self.orchestrator.start()
-        with patch("loats.orchestrator.logger") as mock_logger:
+        # Patch _run_cycle_loop: the real loop would launch a real trading
+        # cycle (httpx RSS validation -> external network I/O) that leaks an
+        # abandoned connect_tcp coroutine when the test tears down.
+        with patch.object(self.orchestrator, "_run_cycle_loop", new_callable=AsyncMock):
             await self.orchestrator.start()
-            mock_logger.warning.assert_called_with("Orchestrator already running")
+            with patch("loats.orchestrator.logger") as mock_logger:
+                await self.orchestrator.start()
+                mock_logger.warning.assert_called_with("Orchestrator already running")
 
     async def test_check_kill_switch(self):
         """Test kill switch check."""
@@ -152,20 +159,27 @@ class TestTradingOrchestrator(unittest.IsolatedAsyncioTestCase):
             top_news=[],
         )
 
-        # Mock the async function to return the result directly (not a coroutine)
+        # Mock RSS validation: the real implementation issues httpx network
+        # requests to production feed URLs (unit tests must stay offline).
         with patch(
-            "loats.orchestrator.sentiment.analyze_symbol_sentiment",
-            return_value=mock_result,
+            "loats.orchestrator.validate_rss_feed",
+            new_callable=AsyncMock,
+            return_value=True,
         ):
+            # Mock the async function to return the result directly (not a coroutine)
             with patch(
-                "loats.orchestrator.db.async_create_signal", new_callable=AsyncMock
-            ) as mock_create_signal:
-                mock_create_signal.return_value = True
-                with patch("loats.orchestrator.settings") as mock_settings:
-                    mock_settings.default_symbol = "TEST"
-                    mock_settings.sentiment_threshold = 0.5
-                    await self.orchestrator._execute_sentiment_analysis()
-                    mock_create_signal.assert_called_once()
+                "loats.orchestrator.sentiment.analyze_symbol_sentiment",
+                return_value=mock_result,
+            ):
+                with patch(
+                    "loats.orchestrator.db.async_create_signal", new_callable=AsyncMock
+                ) as mock_create_signal:
+                    mock_create_signal.return_value = True
+                    with patch("loats.orchestrator.settings") as mock_settings:
+                        mock_settings.default_symbol = "TEST"
+                        mock_settings.sentiment_threshold = 0.5
+                        await self.orchestrator._execute_sentiment_analysis()
+                        mock_create_signal.assert_called_once()
 
     async def test_execute_market_data_update(self):
         """Test market data update execution."""
@@ -276,7 +290,9 @@ class TestTradingOrchestrator(unittest.IsolatedAsyncioTestCase):
                                 new_callable=AsyncMock,
                             ) as mock_cmp:
                                 # Mock rules_engine to allow CMP execution
-                                with patch("loats.orchestrator.rules_engine") as mock_rules:
+                                with patch(
+                                    "loats.orchestrator.rules_engine"
+                                ) as mock_rules:
                                     mock_rules.is_trading_allowed.return_value = True
                                     await self.orchestrator._execute_trading_cycle()
 
@@ -502,6 +518,9 @@ class TestTradingOrchestrator(unittest.IsolatedAsyncioTestCase):
         import loats.orchestrator
 
         loats.orchestrator.settings = None
+        # Ensure the module-global is restored even if assertions fail, so
+        # the mocked lazy-init value cannot leak into other test modules.
+        self.addCleanup(setattr, loats.orchestrator, "settings", None)
 
         # Verify settings start as None by accessing module attribute directly
         import loats.orchestrator
@@ -648,8 +667,11 @@ class TestTradingOrchestrator(unittest.IsolatedAsyncioTestCase):
                         with patch("loats.orchestrator.logger") as mock_logger:
                             await self.orchestrator._execute_risk_management()
 
-                            # Should log warning about zero margin
-                            mock_logger.warning.assert_called_with(
+                            # Should log warning about zero margin.
+                            # Use assert_any_call: the finally-block budget
+                            # warning can also fire under slow CI, and
+                            # assert_called_with only checks the last call.
+                            mock_logger.warning.assert_any_call(
                                 "Available margin is zero - cannot calculate utilization ratio"
                             )
 
@@ -738,6 +760,7 @@ class TestTradingOrchestrator(unittest.IsolatedAsyncioTestCase):
         assert funds_model.utilized_margin == 500.0
         assert funds_model.available_margin == 0.0
         assert funds_model.total_equity == 1500.0
+
 
 if __name__ == "__main__":
     # Run the tests

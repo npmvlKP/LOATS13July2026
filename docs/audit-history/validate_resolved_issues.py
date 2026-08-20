@@ -2,7 +2,8 @@
 """
 Validation script for resolved issues NEW-M1 to NEW-M4.
 
-This script validates that all the resolved issues mentioned in the task are properly implemented:
+This script validates that all the resolved issues mentioned in the task
+are properly implemented:
 - NEW-M1: HTML injection fix (html.escape() applied)
 - NEW-M2: .env.example synced with Settings
 - NEW-M3: quantity=1 hardcoded fix (uses contract.quantity)
@@ -69,7 +70,10 @@ def validate_env_example_sync():
 
     # Check that all settings fields are represented in .env.example
     # Extract field names from settings.py
-    field_pattern = r"(\w+)\s*:\s*(?:SecretStr|str|int|float|Decimal|Path|list|Literal)\s*=\s*Field\("
+    field_pattern = (
+        r"(\w+)\s*:\s*(?:SecretStr|str|int|float|Decimal|Path|list|Literal)"
+        r"\s*=\s*Field\("
+    )
     fields = re.findall(field_pattern, settings_content)
 
     # Check that each field has a corresponding entry in .env.example
@@ -179,7 +183,8 @@ def validate_expired_contract_error():
         return False
 
     print(
-        "NEW-M4: negative t clamping fix validated - ExpiredContractError properly raised"
+        "NEW-M4: negative t clamping fix validated - ExpiredContractError "
+        "properly raised"
     )
     return True
 
@@ -214,9 +219,8 @@ def main():
     print(f"NEW-M4 (negative t fix): {'PASS' if results[3] else 'FAIL'}")
 
     all_passed = all(results)
-    print(
-        f"\nOverall Result: {'ALL VALIDATIONS PASSED' if all_passed else 'SOME VALIDATIONS FAILED'}"
-    )
+    result_msg = "ALL VALIDATIONS PASSED" if all_passed else "SOME VALIDATIONS FAILED"
+    print(f"\nOverall Result: {result_msg}")
 
     return 0 if all_passed else 1
 

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
 Final comprehensive verification test for circuit breaker functionality.
-This test verifies that the circuit breaker is properly implemented for both GET and POST operations
-according to the current architecture.
+This test verifies that the circuit breaker is properly implemented for both
+GET and POST operations according to the current architecture.
 """
 
 import asyncio
@@ -19,7 +19,8 @@ from src.loats.utils.resilience import openalgo_circuit_breaker_retry_async
 
 
 def test_circuit_breaker_post_operations_protected():
-    """Verify that POST operations (place_order, modify_order, cancel_order) are protected by circuit breaker."""
+    """Verify that POST operations (place_order, modify_order, cancel_order)
+    are protected by circuit breaker."""
     print("Testing POST operations circuit breaker protection...")
 
     # Reset circuit breaker
@@ -53,7 +54,8 @@ def test_circuit_breaker_post_operations_protected():
 
 
 def test_circuit_breaker_get_operations_with_retry_protected():
-    """Verify that GET operations are protected by circuit breaker with retry composition."""
+    """Verify that GET operations are protected by circuit breaker with
+    retry composition."""
     print("Testing GET operations circuit breaker protection with retry...")
 
     # Reset circuit breaker
@@ -128,7 +130,8 @@ def test_circuit_breaker_thread_safety():
 
 
 def test_circuit_breaker_architecture_consistency():
-    """Verify that the circuit breaker architecture is consistent across GET and POST operations."""
+    """Verify that the circuit breaker architecture is consistent across
+    GET and POST operations."""
     print("Testing circuit breaker architecture consistency...")
 
     # Reset circuit breaker
