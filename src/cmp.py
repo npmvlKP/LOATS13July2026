@@ -9,36 +9,39 @@ Priority Order (P4/P5):
       o ≤25 activity-minute (§11)
 """
 from src.utils import get_orderbook_mins
-from typing import Dict
-from datetime import datetime
+from typing import Dict, Set
+from datetime import datetime, timedelta
 
 class CMP:
     """Controls trade frequency limits."""
 
     _instances: Set[object] = set()
 
-    def __new__(self):
-        if len(self._instances) >= 1:
-            return next(iter(self._instances))
-        self._instances.add(self)
-        return super(CMP, self).__new__(self)
+    def __new__(cls):
+        if len(cls._instances) >= 1:
+            return next(iter(cls._instances))
+        instance = super(CMP, cls).__new__(cls)
+        cls._instances.add(instance)
+        return instance
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return self.__class__.__name__
 
-    def reset(self):
-        print("Calls:", self.__count)
+    def reset(self) -> None:
+        print("Calls:", getattr(self, '__count', 0))
 
-    def validate(self, orders_per_minute: Dict[str, int]) -> bool:
+    def validate(self, orders_per_minute: Dict[str, int] | set) -> bool:
         """
         Validate trading against open-limits.
 
         Parameters:
-            orders_per_minute (Dict[str, int]): Ratio of ^{ OpenLimit → Position }
+            orders_per_minute (Dict[str, int] | set): Ratio of ^{ OpenLimit → Position }
 
         Returns:
             bool: `False` on breach.
         """
+        if isinstance(orders_per_minute, set):
+            return max(orders_per_minute) <= 30
         return max(orders_per_minute.values()) <= 30
 
     def monitor_ratchet(self, current_time: datetime, trades: Dict[str, Dict[str, float]]) -> float:
@@ -53,21 +56,28 @@ class CMP:
         Returns:
         float: SL-ratio to quadrant W (0.5% lower-layer)
         """
-        window = current_time - get_orderbook_mins(hours=2)
+        # The function should check trades within the last 2 hours from current_time
+        # So the window is [current_time - 2 hours, current_time]
+        two_hours_before_current = current_time - timedelta(hours=2)
+
+        # Include trades where timestamp is within the 2-hour window from current_time
         agg = {
             inst: value
             for inst, hist in trades.items()
-            if window.timestamp() <= max(hist.keys())
+            if two_hours_before_current.timestamp() <= max(float(key) for key in hist.keys()) <= current_time.timestamp()
             for value in hist.values()
         }
 
         # Aggregate threshold triggering 0.5% retreat
         agg_avg = sum(agg.values()) / len(agg) if agg else 0
-        return {True: 0.005, False: -0.003}.get(
-            agg_avg > 0.02, 0
-        )
+        if agg_avg > 0.02:
+            return 0.005
+        elif agg_avg < -0.02:
+            return -0.003
+        else:
+            return 0
 
     def session_lifecycle(self, state: str) -> None:
         """Lifecycle boundaries through 3 windows."""
         if state not in {"PRE_OPEN", "REGULAR", "POST_CLOSE"}:
-            raise ValueError(f"Invalid {__name__} phase.")
+            raise ValueError(f"Invalid session state")

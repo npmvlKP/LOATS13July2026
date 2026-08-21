@@ -6,13 +6,135 @@ Implements optimized strike selection algorithms for options trading.
 
 import datetime
 import threading
+import time
 from typing import Any
 
 import numpy as np
-from cachetools import TTLCache
 
 from .loats_logging import get_logger
 from .models import OptionContract, OptionType
+
+class SimpleStrikeCache:
+    """Simple cache implementation for strike selection using threading.Lock.
+
+    Replaces cachetools.TTLCache with a simpler implementation for better control
+    and performance in the strike selection hot path.
+    """
+
+    def __init__(self, maxsize: int = 1000, ttl: int = 300):
+        """Initialize the cache.
+
+        Args:
+            maxsize: Maximum number of items to store
+            ttl: Time-to-live for cache entries in seconds
+        """
+        self.maxsize = maxsize
+        self.ttl = ttl
+        self._cache: dict[str, tuple[list[float], float]] = {}
+        self._lock = threading.Lock()
+        self._access_order: list[str] = []
+
+    def __contains__(self, key: str) -> bool:
+        """Check if key exists in cache (respecting TTL)."""
+        with self._lock:
+            self._cleanup_expired()
+            return key in self._cache
+
+    def __getitem__(self, key: str) -> list[float]:
+        """Get item from cache."""
+        with self._lock:
+            self._cleanup_expired()
+            if key not in self._cache:
+                raise KeyError(key)
+
+            value, timestamp = self._cache[key]
+            # Update access order for LRU eviction
+            if key in self._access_order:
+                self._access_order.remove(key)
+            self._access_order.append(key)
+            return value
+
+    def __setitem__(self, key: str, value: list[float]) -> None:
+        """Set item in cache."""
+        with self._lock:
+            self._cleanup_expired()
+
+            # Add or update item
+            self._cache[key] = (value, time.time())
+
+            # Update access order
+            if key in self._access_order:
+                self._access_order.remove(key)
+            self._access_order.append(key)
+
+            # Enforce maxsize with LRU eviction
+            if len(self._cache) > self.maxsize:
+                oldest_key = self._access_order.pop(0)
+                if oldest_key in self._cache:
+                    del self._cache[oldest_key]
+
+    def __delitem__(self, key: str) -> None:
+        """Delete item from cache."""
+        with self._lock:
+            if key in self._cache:
+                del self._cache[key]
+            if key in self._access_order:
+                self._access_order.remove(key)
+
+    def get(self, key: str, default: list[float] | None = None) -> list[float] | None:
+        """Get item from cache with default."""
+        with self._lock:
+            self._cleanup_expired()
+            if key not in self._cache:
+                return default
+
+            value, timestamp = self._cache[key]
+            # Update access order for LRU eviction
+            if key in self._access_order:
+                self._access_order.remove(key)
+            self._access_order.append(key)
+            return value
+
+    def _cleanup_expired(self) -> None:
+        """Remove expired items from cache."""
+        current_time = time.time()
+        expired_keys = [
+            key for key, (_, timestamp) in self._cache.items()
+            if current_time - timestamp > self.ttl
+        ]
+
+        for key in expired_keys:
+            del self._cache[key]
+            if key in self._access_order:
+                self._access_order.remove(key)
+
+    def clear(self) -> None:
+        """Clear all items from cache."""
+        with self._lock:
+            self._cache.clear()
+            self._access_order.clear()
+
+    def __len__(self) -> int:
+        """Get number of items in cache."""
+        with self._lock:
+            self._cleanup_expired()
+            return len(self._cache)
+
+    def keys(self) -> list[str]:
+        """Get list of keys in cache."""
+        with self._lock:
+            self._cleanup_expired()
+            return list(self._cache.keys())
+
+    @property
+    def maxsize(self) -> int:
+        """Get maximum cache size."""
+        return self._maxsize
+
+    @maxsize.setter
+    def maxsize(self, value: int) -> None:
+        """Set maximum cache size."""
+        self._maxsize = value
 
 logger = get_logger(__name__)
 
@@ -22,8 +144,8 @@ class StrikeSelectionEngine:
 
     def __init__(self) -> None:
         """Initialize StrikeSelectionEngine."""
-        self._cache: TTLCache[str, list[float]] = TTLCache(maxsize=1000, ttl=300)
-        self._cache_lock = threading.RLock()  # Add thread-safe cache access
+        self._cache = SimpleStrikeCache(maxsize=1000, ttl=300)
+        self._cache_lock = threading.Lock()  # Use threading.Lock for better performance
         self._cache_hits = 0
         self._cache_misses = 0
         self._initialized = True
