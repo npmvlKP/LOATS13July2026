@@ -21,7 +21,7 @@ def validate_html_injection_fix():
 
     alerts_file = Path("src/loats/alerts.py")
     if not alerts_file.exists():
-        print("❌ alerts.py not found")
+        print("X alerts.py not found")
         return False
 
     try:
@@ -30,13 +30,13 @@ def validate_html_injection_fix():
         try:
             content = alerts_file.read_text(encoding="latin-1")
         except Exception as e:
-            print(f"❌ Failed to read alerts.py: {e}")
+            print(f"X Failed to read alerts.py: {e}")
             return False
 
     # Check for html.escape() usage
     html_escape_pattern = r"html\.escape\("
     if not re.search(html_escape_pattern, content):
-        print("❌ html.escape() not found in alerts.py")
+        print("X html.escape() not found in alerts.py")
         return False
 
     print("NEW-M1: HTML injection fix validated - html.escape() is properly applied")
@@ -51,11 +51,11 @@ def validate_env_example_sync():
     settings_file = Path("src/loats/config/settings.py")
 
     if not env_example_file.exists():
-        print("❌ .env.example not found")
+        print("X .env.example not found")
         return False
 
     if not settings_file.exists():
-        print("❌ settings.py not found")
+        print("X settings.py not found")
         return False
 
     try:
@@ -109,7 +109,7 @@ def validate_env_example_sync():
             missing_fields.append(env_var)
 
     if missing_fields:
-        print(f"❌ Missing .env.example entries: {missing_fields}")
+        print(f"X Missing .env.example entries: {missing_fields}")
         return False
 
     print("NEW-M2: .env.example synced with Settings validated")
@@ -122,7 +122,7 @@ def validate_quantity_fix():
 
     options_file = Path("src/loats/options.py")
     if not options_file.exists():
-        print("❌ options.py not found")
+        print("X options.py not found")
         return False
 
     try:
@@ -133,13 +133,13 @@ def validate_quantity_fix():
     # Check for contract.quantity usage in calculate_portfolio_greeks
     contract_quantity_pattern = r"contract_quantity\s*=\s*contract\.quantity"
     if not re.search(contract_quantity_pattern, content):
-        print("❌ contract.quantity not found in options.py")
+        print("X contract.quantity not found in options.py")
         return False
 
     # Check that there are no hardcoded quantity=1 assignments
     hardcoded_pattern = r"quantity\s*=\s*1\b"
     if re.search(hardcoded_pattern, content):
-        print("❌ Found hardcoded quantity=1 in options.py")
+        print("X Found hardcoded quantity=1 in options.py")
         return False
 
     print("NEW-M3: quantity=1 hardcoded fix validated - uses contract.quantity")
@@ -152,7 +152,7 @@ def validate_expired_contract_error():
 
     options_file = Path("src/loats/options.py")
     if not options_file.exists():
-        print("❌ options.py not found")
+        print("X options.py not found")
         return False
 
     try:
@@ -163,7 +163,7 @@ def validate_expired_contract_error():
     # Check for ExpiredContractError class definition
     expired_error_pattern = r"class ExpiredContractError\("
     if not re.search(expired_error_pattern, content):
-        print("❌ ExpiredContractError class not found")
+        print("X ExpiredContractError class not found")
         return False
 
     # Check for ExpiredContractError usage in key methods
@@ -179,12 +179,11 @@ def validate_expired_contract_error():
             break
 
     if not found_usage:
-        print("❌ ExpiredContractError not properly used for negative t validation")
+        print("X ExpiredContractError not properly used for negative t validation")
         return False
 
     print(
-        "NEW-M4: negative t clamping fix validated - ExpiredContractError "
-        "properly raised"
+        "NEW-M4: negative t clamping fix validated - ExpiredContractError properly raised"
     )
     return True
 

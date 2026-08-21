@@ -180,7 +180,7 @@ async def test_analyze_symbol_sentiment_with_news_items():
         assert result.positive_count == 1
         assert result.negative_count == 1
         assert result.neutral_count == 1
-        # Average score: (0.8 - 0.6 + 0.05) / 3 = 0.25 / 3 ≈ 0.083
+        # Average score: (0.8 - 0.6 + 0.05) / 3 = 0.25 / 3  0.083
         assert abs(result.sentiment_score - 0.083) < 0.01
         assert result.sentiment_label == "neutral"
 

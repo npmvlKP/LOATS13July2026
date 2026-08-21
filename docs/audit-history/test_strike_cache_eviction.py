@@ -67,7 +67,7 @@ async def test_cache_eviction():
     engine.clear_cache()
     print("Cache cleared successfully")
 
-    print("✅ All cache eviction tests passed!")
+    print("OK All cache eviction tests passed!")
 
 
 if __name__ == "__main__":

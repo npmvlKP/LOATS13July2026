@@ -39,4 +39,4 @@ async def test_html_escaping_final():
         assert "&lt;script&gt;test&lt;/script&gt;" in message
         assert "<script>test</script>" not in message
 
-        print("✅ HTML escaping is working correctly!")
+        print("OK HTML escaping is working correctly!")

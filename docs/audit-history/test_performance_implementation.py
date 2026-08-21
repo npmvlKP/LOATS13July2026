@@ -97,7 +97,7 @@ async def test_strike_selection_performance() -> bool:
 
             if elapsed > 5.0:  # 5ms target
                 failures += 1
-                print(f"  Iteration {i + 1}: {elapsed:.3f}ms ❌ (exceeded 5ms target)")
+                print(f"  Iteration {i + 1}: {elapsed:.3f}ms X (exceeded 5ms target)")
 
         except Exception as e:
             print(f"  Iteration {i + 1}: ERROR - {e}")
@@ -114,7 +114,7 @@ async def test_strike_selection_performance() -> bool:
 
     # Performance target: <5ms average and <10% failures
     success = avg_time <= 5.0 and (failures / iterations) <= 0.1
-    print(f"  Performance Target: {'✅ PASS' if success else '❌ FAIL'}")
+    print(f"  Performance Target: {'OK PASS' if success else 'X FAIL'}")
     return success
 
 
@@ -124,10 +124,10 @@ async def test_orchestrator_initialization() -> bool:
 
     try:
         await orchestrator.initialize()
-        print("  Orchestrator initialized successfully ✅")
+        print("  Orchestrator initialized successfully OK")
         return True
     except Exception as e:
-        print(f"  Orchestrator initialization failed: {e} ❌")
+        print(f"  Orchestrator initialization failed: {e} X")
         return False
 
 
@@ -150,16 +150,16 @@ def test_module_imports() -> bool:
         _ = StrikeSelectionEngine
         _ = select_strikes
 
-        print("  ✅ strike_selection module imported successfully")
-        print("  ✅ orchestrator module imported successfully")
-        print("  ✅ All performance modules available")
+        print("  OK strike_selection module imported successfully")
+        print("  OK orchestrator module imported successfully")
+        print("  OK All performance modules available")
 
         return True
     except ImportError as e:
-        print(f"  ❌ Import error: {e}")
+        print(f"  X Import error: {e}")
         return False
     except Exception as e:
-        print(f"  ❌ Unexpected error: {e}")
+        print(f"  X Unexpected error: {e}")
         return False
 
 

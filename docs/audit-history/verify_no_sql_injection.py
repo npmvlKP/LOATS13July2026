@@ -53,7 +53,7 @@ def verify_no_sql_injection():
     for name, pattern in patterns.items():
         matches = re.findall(pattern, content)
         count = len(matches)
-        status = "❌ VULNERABLE" if count > 0 else "✅ SECURE"
+        status = "X VULNERABLE" if count > 0 else "OK SECURE"
         print(f"  {name}: {count} matches {status}")
         if count > 0:
             vulnerabilities_found = True
@@ -64,7 +64,7 @@ def verify_no_sql_injection():
     param_queries = re.findall(r"cursor\.execute\(.*\?.*\)", content)
     secure_queries = len(param_queries)
     print("SECURE QUERIES:")
-    print(f"  Parameterized queries with ? placeholders: {secure_queries} ✅")
+    print(f"  Parameterized queries with ? placeholders: {secure_queries} OK")
 
     # Check for security features
     print()
@@ -79,21 +79,20 @@ def verify_no_sql_injection():
     }
 
     for name, present in security_features.items():
-        status = "✅ PRESENT" if present else "❌ MISSING"
+        status = "OK PRESENT" if present else "X MISSING"
         print(f"  {name}: {status}")
 
     print()
     print("=" * 60)
 
     if vulnerabilities_found:
-        print("RESULT: ❌ POTENTIAL SQL INJECTION VULNERABILITIES FOUND")
+        print("RESULT: X POTENTIAL SQL INJECTION VULNERABILITIES FOUND")
         print(
-            "The database implementation may have security issues that "
-            "need to be addressed."
+            "The database implementation may have security issues that need to be addressed."
         )
         return False
     else:
-        print("RESULT: ✅ NO SQL INJECTION VULNERABILITIES FOUND")
+        print("RESULT: OK NO SQL INJECTION VULNERABILITIES FOUND")
         print("The database implementation follows security best practices.")
         print("All SQL queries use proper parameterized queries with ? placeholders.")
         return True

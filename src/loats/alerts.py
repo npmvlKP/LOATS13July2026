@@ -129,11 +129,12 @@ class AlertSystem:
 
     async def start(self) -> None:
         """Start Telegram bot non-blocking mode.
-        Uses v20+ lifecycle: `initialize()` → ``start()`` → ``updater.start_polling()``.
-        Starts polling background, allowing other async tasks (like scheduler)
-        run concurrently. FIX-F-CONC-2: Original implementation blocking
-        ``start_polling()``. Now uses ``start_polling()`` separate task avoid
-        blocking event loop.
+        Uses v20+ lifecycle: `initialize()` -> ``start()`` ->
+        ``updater.start_polling()``.
+        Starts polling in background, allowing other async tasks (like scheduler)
+        to run concurrently. FIX-F-CONC-2: Original implementation was blocking
+        ``start_polling()``. Now uses ``start_polling()`` in separate task to avoid
+        blocking the event loop.
         """
         if not self.application:
             return
@@ -165,7 +166,7 @@ class AlertSystem:
 
     async def shutdown(self) -> None:
         """Shutdown Telegram bot gracefully.
-        Uses v20+ shutdown lifecycle: `updater.stop()` → ``application.stop()``.
+        Uses v20+ shutdown lifecycle: `updater.stop()` -> ``application.stop()``.
         FIX-F-CONC-2: Properly cancel polling task avoid resource leaks.
         """
         if not self.application:
@@ -264,11 +265,11 @@ class AlertSystem:
     def _format_alert_message(self, message: str, alert_type: str) -> str:
         timestamp = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S")
         if alert_type == "warning":
-            return f"⚠️ <b>WARNING</b> [{timestamp}]\n\n{message}"
+            return f" <b>WARNING</b> [{timestamp}]\n\n{message}"
         elif alert_type == "error":
-            return f"🚨 <b>ERROR</b> [{timestamp}]\n\n{message}"
+            return f" <b>ERROR</b> [{timestamp}]\n\n{message}"
         elif alert_type == "success":
-            return f"✅ <b>SUCCESS</b> [{timestamp}]\n\n{message}"
+            return f"OK <b>SUCCESS</b> [{timestamp}]\n\n{message}"
         else:
             return f"i <b>INFO</b> [{timestamp}]\n\n{message}"
 
@@ -277,13 +278,13 @@ class AlertSystem:
         try:
             if signal.signal_type == SignalType.BUY:
                 alert_type = "success"
-                emoji = "🟢"
+                emoji = "GREEN"
             elif signal.signal_type == SignalType.SELL:
                 alert_type = "warning"
-                emoji = "🔴"
+                emoji = "RED"
             else:
                 alert_type = "info"
-                emoji = "⚪"
+                emoji = ""
 
             indicators = "\n".join(
                 f"{html.escape(name)}: {value:.4f}"
@@ -317,16 +318,16 @@ class AlertSystem:
         try:
             if action == "filled":
                 alert_type = "success"
-                emoji = "🎯"
+                emoji = ""
             elif action == "cancelled":
                 alert_type = "warning"
-                emoji = "❌"
+                emoji = "X"
             elif action == "rejected":
                 alert_type = "error"
-                emoji = "🚫"
+                emoji = ""
             else:
                 alert_type = "info"
-                emoji = "📝"
+                emoji = "NOTE"
 
             price_str = f"{order.price}" if order.price else "MARKET"
 
@@ -361,19 +362,19 @@ class AlertSystem:
             if action == "closed":
                 if trade.pnl is not None and trade.pnl > 0:
                     alert_type = "success"
-                    emoji = "💰"
+                    emoji = ""
                 elif trade.pnl is not None and trade.pnl < 0:
                     alert_type = "error"
-                    emoji = "💸"
+                    emoji = ""
                 else:
                     alert_type = "info"
-                    emoji = "🔄"
+                    emoji = ""
             elif action == "opened":
                 alert_type = "info"
-                emoji = "📈"
+                emoji = ""
             else:
                 alert_type = "info"
-                emoji = "🔄"
+                emoji = ""
 
             transaction_type_str = (
                 trade.transaction_type.value if trade.transaction_type else "N/A"
@@ -393,10 +394,8 @@ class AlertSystem:
             if trade.exit_price:
                 message += f"\n<b>Exit Price:</b> {trade.exit_price:.2f}"
             if trade.exit_time:
-                message += (
-                    f"\n<b>Exit Time:</b> "
-                    f"{trade.exit_time.strftime('%Y-%m-%d %H:%M:%S')}"
-                )
+                exit_time_str = trade.exit_time.strftime("%Y-%m-%d %H:%M:%S")
+                message += f"\n<b>Exit Time:</b> {exit_time_str}"
             if trade.pnl is not None:
                 pnl_color = "green" if trade.pnl > 0 else "red"
                 message += (
@@ -418,9 +417,9 @@ class AlertSystem:
         """Send system-level alert."""
         try:
             header = {
-                "warning": "⚠️ SYSTEM WARNING",
-                "error": "🚨 SYSTEM ERROR",
-                "success": "✅ SYSTEM UPDATE",
+                "warning": " SYSTEM WARNING",
+                "error": " SYSTEM ERROR",
+                "success": "OK SYSTEM UPDATE",
                 "info": "i SYSTEM INFO",
             }.get(alert_type, "i SYSTEM ALERT")
             full_message = f"{header}\n\n{message}"
@@ -455,7 +454,7 @@ class AlertSystem:
                 return await self.send_system_alert("No open positions found", "info")
 
             positions = position_data["data"]
-            message = "📊 <b>CURRENT POSITIONS</b>\n\n"
+            message = " <b>CURRENT POSITIONS</b>\n\n"
 
             for pos in positions:
                 pnl_color = "green" if pos.get("pnl", 0) >= 0 else "red"
@@ -488,7 +487,7 @@ class AlertSystem:
 
             funds = funds_data["data"]
             message = (
-                f"💵 <b>ACCOUNT FUNDS</b>\n\n"
+                f" <b>ACCOUNT FUNDS</b>\n\n"
                 f"<b>Available Cash:</b> {funds['available_cash']:.2f}\n"
                 f"<b>Utilized Margin:</b> {funds['utilized_margin']:.2f}\n"
                 f"<b>Available Margin:</b> {funds['available_margin']:.2f}\n"
@@ -546,7 +545,7 @@ class AlertSystem:
             # Escape user-supplied reason prevent HTML injection
             escaped_reason = html.escape(reason)
             message = (
-                f"🚨 <b>KILL SWITCH ACTIVATED</b> 🚨\n\n"
+                f" <b>KILL SWITCH ACTIVATED</b> \n\n"
                 f"<b>Reason:</b> {escaped_reason}\n"
                 f"<b>Timestamp:</b> "
                 f"{datetime.now(UTC).strftime('%Y-%m-%d %H:%M:%S')}\n\n"
@@ -572,7 +571,7 @@ class AlertSystem:
             # Escape user-supplied reason prevent HTML injection
             escaped_reason = html.escape(reason)
             message = (
-                f"✅ <b>KILL SWITCH DEACTIVATED</b> ✅\n\n"
+                f"OK <b>KILL SWITCH DEACTIVATED</b> OK\n\n"
                 f"<b>Reason:</b> {escaped_reason}\n"
                 f"<b>Timestamp:</b> "
                 f"{datetime.now(UTC).strftime('%Y-%m-%d %H:%M:%S')}\n\n"
@@ -619,7 +618,7 @@ class AlertSystem:
         """Handle /start command."""
         try:
             message = (
-                "📈 <b>LOATS13July2026 Trading System</b> 📈\n\n"
+                " <b>LOATS13July2026 Trading System</b> \n\n"
                 "Welcome LOATS trading system alert bot!\n\n"
                 "Available commands:\n"
                 "/status Get system status\n"
@@ -639,10 +638,12 @@ class AlertSystem:
         """Handle /status command."""
         try:
             status = (
-                "🟢 ACTIVE" if not self.kill_switch_active else "🔴 KILL SWITCH ACTIVE"
+                "GREEN ACTIVE"
+                if not self.kill_switch_active
+                else "RED KILL SWITCH ACTIVE"
             )
             message = (
-                f"📊 <b>SYSTEM STATUS</b>\n\n"
+                f" <b>SYSTEM STATUS</b>\n\n"
                 f"<b>Status:</b> {status}\n"
                 f"<b>Timestamp:</b> {datetime.now(UTC).strftime('%Y-%m-%d %H:%M:%S')}"
             )
@@ -671,7 +672,7 @@ class AlertSystem:
 
             if self.kill_switch_active:
                 if update.message:
-                    await update.message.reply_text("⚠️ Kill switch already active.")
+                    await update.message.reply_text(" Kill switch already active.")
                 return
 
             reason = (
@@ -684,14 +685,14 @@ class AlertSystem:
             if update.message:
                 if success:
                     await update.message.reply_text(
-                        "🚨 Kill switch activated successfully."
+                        " Kill switch activated successfully."
                     )
                 else:
                     await update.message.reply_text("Failed to activate kill switch.")
         except Exception as e:
             logger.error(f"Error /kill command: {e}")
             if update.message:
-                await update.message.reply_text(f"❌ Error: {e!s}")
+                await update.message.reply_text(f"X Error: {e!s}")
 
     async def _resume(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle /resume command."""
@@ -724,14 +725,14 @@ class AlertSystem:
             if update.message:
                 if success:
                     await update.message.reply_text(
-                        "✅ Kill switch deactivated successfully."
+                        "OK Kill switch deactivated successfully."
                     )
                 else:
                     await update.message.reply_text("Failed to deactivate kill switch.")
         except Exception as e:
             logger.error(f"Error /resume command: {e}")
             if update.message:
-                await update.message.reply_text(f"❌ Error: {e!s}")
+                await update.message.reply_text(f"X Error: {e!s}")
 
     async def _positions(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
@@ -744,7 +745,7 @@ class AlertSystem:
         except Exception as e:
             logger.error(f"Error /positions command: {e}")
             if update.message:
-                await update.message.reply_text(f"❌ Error: {e!s}")
+                await update.message.reply_text(f"X Error: {e!s}")
 
     async def _orders(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle /orders command."""
@@ -756,7 +757,7 @@ class AlertSystem:
                 return
 
             orders = orders_data["data"]
-            message = "📋 <b>OPEN ORDERS</b>\n\n"
+            message = " <b>OPEN ORDERS</b>\n\n"
 
             for order in orders:
                 if order["status"] in ["OPEN", "PENDING"]:
@@ -782,7 +783,7 @@ class AlertSystem:
         except Exception as e:
             logger.error(f"Error /orders command: {e}")
             if update.message:
-                await update.message.reply_text(f"❌ Error: {e!s}")
+                await update.message.reply_text(f"X Error: {e!s}")
 
     async def _signals(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
@@ -799,14 +800,14 @@ class AlertSystem:
                     await update.message.reply_text("i No recent signals found.")
                 return
 
-            message = "📈 <b>RECENT SIGNALS</b>\n\n"
+            message = " <b>RECENT SIGNALS</b>\n\n"
 
             for signal in signals:
                 emoji = {
-                    SignalType.BUY: "🟢",
-                    SignalType.SELL: "🔴",
-                    SignalType.HOLD: "⚪",
-                    SignalType.NEUTRAL: "⚪",
+                    SignalType.BUY: "GREEN",
+                    SignalType.SELL: "RED",
+                    SignalType.HOLD: "",
+                    SignalType.NEUTRAL: "",
                 }.get(signal.signal_type, "i")
 
                 message += (
@@ -821,7 +822,7 @@ class AlertSystem:
         except Exception as e:
             logger.error(f"Error /signals command: {e}")
             if update.message:
-                await update.message.reply_text(f"❌ Error: {e!s}")
+                await update.message.reply_text(f"X Error: {e!s}")
 
     async def _help(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle /help command."""
@@ -830,7 +831,7 @@ class AlertSystem:
         except Exception as e:
             logger.error(f"Error /help command: {e}")
             if update.message:
-                await update.message.reply_text(f"❌ Error: {e!s}")
+                await update.message.reply_text(f"X Error: {e!s}")
 
     async def _handle_message(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
@@ -861,7 +862,7 @@ class AlertSystem:
         except Exception as e:
             logger.error(f"Error handling message: {e}")
             if update.message:
-                await update.message.reply_text(f"❌ Error: {e!s}")
+                await update.message.reply_text(f"X Error: {e!s}")
 
 
 # Export a default instance

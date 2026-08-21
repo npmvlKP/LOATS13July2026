@@ -59,7 +59,7 @@ class TradeDecisionEngine:
         Create TradeDecision from signals using full CMP workflow.
 
         Workflow:
-        1. Validate signals (≥3 sources)
+        1. Validate signals (>=3 sources)
         2. Calculate composite strength with opposition gate
         3. Apply gating rules (IV-rank/ADX/VIX)
         4. Calculate position size (2% fixed-fraction)
@@ -287,13 +287,13 @@ class TradeDecisionEngine:
 
                 if routing_result["status"] == "success":
                     logger.info(
-                        f"Successfully routed decision {decision.decision_id} "
-                        f"to Analyzer"
+                        f"Successfully routed decision "
+                        f"{decision.decision_id} to Analyzer"
                     )
                 else:
                     logger.warning(
-                        f"Failed to route decision {decision.decision_id}: "
-                        f"{routing_result}"
+                        f"Failed to route decision "
+                        f"{decision.decision_id}: {routing_result}"
                     )
 
                 self.decision_queue.task_done()
@@ -417,4 +417,4 @@ class TradeDecisionEngine:
 # Module-level singleton instance
 trade_decision_engine = TradeDecisionEngine()
 
-__all__ = ["TradeDecisionEngine", "DecisionStatus", "trade_decision_engine"]
+__all__ = ["DecisionStatus", "TradeDecisionEngine", "trade_decision_engine"]

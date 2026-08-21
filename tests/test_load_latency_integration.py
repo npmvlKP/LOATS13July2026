@@ -144,23 +144,23 @@ class TestLoadLatencyIntegration:
         print(f"  Total duration: {total_duration:.2f}s")
         print(f"  Overall throughput: {overall_ops:.2f} ops/sec")
         print(
-            f"  Average batch throughput: {statistics.mean([r["ops_per_second"] for r in results]):.2f} ops/sec"
+            f"  Average batch throughput: {statistics.mean([r['ops_per_second'] for r in results]):.2f} ops/sec"
         )
         print(
-            f"  Min batch throughput: {min([r["ops_per_second"] for r in results]):.2f} ops/sec"
+            f"  Min batch throughput: {min([r['ops_per_second'] for r in results]):.2f} ops/sec"
         )
         print(
-            f"  Max batch throughput: {max([r["ops_per_second"] for r in results]):.2f} ops/sec"
+            f"  Max batch throughput: {max([r['ops_per_second'] for r in results]):.2f} ops/sec"
         )
 
         # Assertions for production-grade performance
         assert total_errors == 0, f"Load test failed with {total_errors} errors"
-        assert (
-            total_completed == total_operations
-        ), f"Only {total_completed}/{total_operations} operations completed"
-        assert (
-            overall_ops > 50
-        ), f"Overall throughput {overall_ops:.2f} ops/sec below threshold (expected > 50)"
+        assert total_completed == total_operations, (
+            f"Only {total_completed}/{total_operations} operations completed"
+        )
+        assert overall_ops > 50, (
+            f"Overall throughput {overall_ops:.2f} ops/sec below threshold (expected > 50)"
+        )
 
     @pytest.mark.asyncio
     async def test_high_frequency_signal_generation_load(
@@ -232,15 +232,15 @@ class TestLoadLatencyIntegration:
         print(f"  Overall throughput: {overall_sps:.2f} signals/sec")
 
         # Assertions for high-frequency performance
-        assert (
-            total_errors == 0
-        ), f"High-frequency test failed with {total_errors} errors"
-        assert (
-            total_created == total_signals
-        ), f"Only {total_created}/{total_signals} signals created"
-        assert (
-            overall_sps > 40
-        ), f"Signal generation throughput {overall_sps:.2f} signals/sec below threshold (expected > 40)"
+        assert total_errors == 0, (
+            f"High-frequency test failed with {total_errors} errors"
+        )
+        assert total_created == total_signals, (
+            f"Only {total_created}/{total_signals} signals created"
+        )
+        assert overall_sps > 40, (
+            f"Signal generation throughput {overall_sps:.2f} signals/sec below threshold (expected > 40)"
+        )
 
     @pytest.mark.asyncio
     async def test_historical_data_processing_latency(self) -> None:
@@ -352,17 +352,17 @@ class TestLoadLatencyIntegration:
 
             # Latency should scale roughly linearly with data size
             expected_max_latency = size * 0.01  # 10ms per point max
-            assert (
-                latency < expected_max_latency
-            ), f"Latency {latency:.6f}s exceeds {expected_max_latency:.6f}s for {size} points"
+            assert latency < expected_max_latency, (
+                f"Latency {latency:.6f}s exceeds {expected_max_latency:.6f}s for {size} points"
+            )
 
             # Throughput floor: scale threshold with dataset size to remain
             # robust under full-suite parallel load while still catching
             # pathological regressions (target >100 pts/sec at 1000+ points).
             if size >= 1000:
-                assert (
-                    throughput > 10
-                ), f"Throughput {throughput:.1f} pts/sec too low for {size} points (expected > 10)"
+                assert throughput > 10, (
+                    f"Throughput {throughput:.1f} pts/sec too low for {size} points (expected > 10)"
+                )
 
     @pytest.mark.asyncio
     async def test_cache_performance_under_load(self) -> None:
@@ -438,17 +438,17 @@ class TestLoadLatencyIntegration:
         print(f"  Total duration: {total_duration:.2f}s")
         print(f"  Overall throughput: {overall_ops_per_second:.2f} ops/sec")
         print(
-            f"  Average worker throughput: {statistics.mean([r["ops_per_second"] for r in results]):.2f} ops/sec"
+            f"  Average worker throughput: {statistics.mean([r['ops_per_second'] for r in results]):.2f} ops/sec"
         )
 
         # Assertions for cache performance under load
         assert total_errors == 0, f"Cache load test failed with {total_errors} errors"
-        assert (
-            overall_ops >= total_operations * 0.9
-        ), f"Only {overall_ops}/{total_operations} operations completed"
-        assert (
-            overall_ops_per_second > 1000
-        ), f"Cache throughput {overall_ops_per_second:.2f} ops/sec below threshold (expected > 1000)"
+        assert overall_ops >= total_operations * 0.9, (
+            f"Only {overall_ops}/{total_operations} operations completed"
+        )
+        assert overall_ops_per_second > 1000, (
+            f"Cache throughput {overall_ops_per_second:.2f} ops/sec below threshold (expected > 1000)"
+        )
 
         # Cleanup
         for worker_id in range(num_workers):
@@ -511,12 +511,12 @@ class TestLoadLatencyIntegration:
         print(f"  Test duration: {end_time - start_time:.4f}s")
 
         # Validate that rate limiter enforced the cap
-        assert (
-            result["successes"] <= expected_max_ops
-        ), f"Rate limiter allowed {result['successes']} operations (expected max {expected_max_ops})"
-        assert (
-            result["failures"] > 0
-        ), f"Rate limiter did not reject any operations (expected to reject after {expected_max_ops})"
+        assert result["successes"] <= expected_max_ops, (
+            f"Rate limiter allowed {result['successes']} operations (expected max {expected_max_ops})"
+        )
+        assert result["failures"] > 0, (
+            f"Rate limiter did not reject any operations (expected to reject after {expected_max_ops})"
+        )
 
         # Test 2: Verify rate limiter allows tokens after window expires
         print("\nWaiting for rate limiter window to expire...")
@@ -528,12 +528,12 @@ class TestLoadLatencyIntegration:
         print(f"  Successful acquisitions: {new_result['successes']}")
         print(f"  Failed acquisitions: {new_result['failures']}")
 
-        assert (
-            new_result["successes"] == expected_max_ops
-        ), f"Rate limiter did not recover properly: {new_result['successes']} successes (expected {expected_max_ops})"
-        assert (
-            new_result["failures"] == 0
-        ), f"Rate limiter rejected operations after window expiry: {new_result['failures']} failures"
+        assert new_result["successes"] == expected_max_ops, (
+            f"Rate limiter did not recover properly: {new_result['successes']} successes (expected {expected_max_ops})"
+        )
+        assert new_result["failures"] == 0, (
+            f"Rate limiter rejected operations after window expiry: {new_result['failures']} failures"
+        )
 
         # Test 3: Verify concurrent rate limiting
         create_test_rate_limiter()  # Reset for concurrent test
@@ -579,12 +579,12 @@ class TestLoadLatencyIntegration:
 
         # Under concurrent load, total successes should still respect the cap
         # Allow for small timing variance but should be close to max_ops
-        assert (
-            total_concurrent_successes <= expected_max_ops + 2
-        ), f"Rate limiter failed under concurrent load: {total_concurrent_successes} successes (expected max {expected_max_ops})"
-        assert (
-            total_concurrent_failures > 0
-        ), "Rate limiter did not enforce cap under concurrent load"
+        assert total_concurrent_successes <= expected_max_ops + 2, (
+            f"Rate limiter failed under concurrent load: {total_concurrent_successes} successes (expected max {expected_max_ops})"
+        )
+        assert total_concurrent_failures > 0, (
+            "Rate limiter did not enforce cap under concurrent load"
+        )
 
     @pytest.mark.asyncio
     async def test_end_to_end_trading_cycle_latency(self, test_db: Database) -> None:
@@ -714,25 +714,25 @@ class TestLoadLatencyIntegration:
             print(f"  Total execution time: {total_duration:.2f}s")
             print(f"  Average cycle latency: {avg_total_latency:.4f}s")
             print(
-                f"    - Data fetch: {avg_fetch_latency:.4f}s ({avg_fetch_latency/avg_total_latency*100:.1f}%)"
+                f"    - Data fetch: {avg_fetch_latency:.4f}s ({avg_fetch_latency / avg_total_latency * 100:.1f}%)"
             )
             print(
-                f"    - TA analysis: {avg_ta_latency:.4f}s ({avg_ta_latency/avg_total_latency*100:.1f}%)"
+                f"    - TA analysis: {avg_ta_latency:.4f}s ({avg_ta_latency / avg_total_latency * 100:.1f}%)"
             )
             print(
-                f"    - Signal generation: {avg_signal_latency:.4f}s ({avg_signal_latency/avg_total_latency*100:.1f}%)"
+                f"    - Signal generation: {avg_signal_latency:.4f}s ({avg_signal_latency / avg_total_latency * 100:.1f}%)"
             )
             print(
-                f"  Throughput: {len(successful_cycles)/total_duration:.2f} cycles/sec"
+                f"  Throughput: {len(successful_cycles) / total_duration:.2f} cycles/sec"
             )
 
             # Assertions for production-grade trading cycle performance
-            assert (
-                len(failed_cycles) == 0
-            ), f"Trading cycle test failed with {len(failed_cycles)} failures"
-            assert (
-                avg_total_latency < 2.0
-            ), f"Average cycle latency {avg_total_latency:.4f}s exceeds threshold (expected < 2.0s)"
-            assert (
-                len(successful_cycles) / total_duration > 5
-            ), f"Trading cycle throughput {len(successful_cycles)/total_duration:.2f} cycles/sec below threshold (expected > 5)"
+            assert len(failed_cycles) == 0, (
+                f"Trading cycle test failed with {len(failed_cycles)} failures"
+            )
+            assert avg_total_latency < 2.0, (
+                f"Average cycle latency {avg_total_latency:.4f}s exceeds threshold (expected < 2.0s)"
+            )
+            assert len(successful_cycles) / total_duration > 5, (
+                f"Trading cycle throughput {len(successful_cycles) / total_duration:.2f} cycles/sec below threshold (expected > 5)"
+            )

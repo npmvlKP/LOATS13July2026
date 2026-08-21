@@ -41,9 +41,9 @@ class TestRateLimiterFactoryRegression:
             current_limiter = get_order_rate_limiter()
 
             # Verify it's the same singleton instance
-            assert (
-                current_limiter is limiter
-            ), f"Call {i}: Factory should return singleton"
+            assert current_limiter is limiter, (
+                f"Call {i}: Factory should return singleton"
+            )
 
             # Try to acquire
             result = await current_limiter.acquire()
@@ -65,9 +65,9 @@ class TestRateLimiterFactoryRegression:
         # If we get 0, it means the rate limiter was already full, which is acceptable
         if successful_burst == 0:
             # All calls were rate limited - this means rate limiting is working
-            assert all(
-                not result for result in burst_results
-            ), "All burst calls should be rate limited"
+            assert all(not result for result in burst_results), (
+                "All burst calls should be rate limited"
+            )
         else:
             # We got some successful acquires - verify we didn't exceed the limit
             # Be more flexible with the minimum since rate limiter state persists across tests
@@ -100,9 +100,9 @@ class TestRateLimiterFactoryRegression:
             current_limiter = get_smart_order_rate_limiter()
 
             # Verify it's the same singleton instance
-            assert (
-                current_limiter is limiter
-            ), f"Call {i}: Factory should return singleton"
+            assert current_limiter is limiter, (
+                f"Call {i}: Factory should return singleton"
+            )
 
             # Try to acquire
             result = await current_limiter.acquire()
@@ -122,9 +122,9 @@ class TestRateLimiterFactoryRegression:
         # Should get some successful acquires (unless already fully rate limited)
         if successful_burst == 0:
             # All calls were rate limited - this means rate limiting is working
-            assert all(
-                not result for result in burst_results
-            ), "All burst calls should be rate limited"
+            assert all(not result for result in burst_results), (
+                "All burst calls should be rate limited"
+            )
         else:
             # We got some successful acquires - verify we didn't exceed the limit
             # Be more flexible with the minimum since rate limiter state persists across tests
@@ -150,21 +150,21 @@ class TestRateLimiterFactoryRegression:
         # All order limiters should be the same instance
         order_limiters = [limiter[0] for limiter in limiters]
         for i, limiter in enumerate(order_limiters[1:], 1):
-            assert (
-                limiter is order_limiters[0]
-            ), f"Order rate limiter call {i} should return same singleton as call 0"
+            assert limiter is order_limiters[0], (
+                f"Order rate limiter call {i} should return same singleton as call 0"
+            )
 
         # All smart limiters should be the same instance
         smart_limiters = [limiter[1] for limiter in limiters]
         for i, limiter in enumerate(smart_limiters[1:], 1):
-            assert (
-                limiter is smart_limiters[0]
-            ), f"Smart order rate limiter call {i} should return same singleton as call 0"
+            assert limiter is smart_limiters[0], (
+                f"Smart order rate limiter call {i} should return same singleton as call 0"
+            )
 
         # Order and smart limiters should be different instances
-        assert (
-            order_limiters[0] is not smart_limiters[0]
-        ), "Order and smart order rate limiters should be different singletons"
+        assert order_limiters[0] is not smart_limiters[0], (
+            "Order and smart order rate limiters should be different singletons"
+        )
 
     @pytest.mark.asyncio
     async def test_factory_pattern_rate_enforcement_across_calls(self) -> None:
@@ -199,9 +199,9 @@ class TestRateLimiterFactoryRegression:
         if successful_burst == 0:
             # Rate limiter is already full - this means rate limiting is working
             # All calls should be rejected
-            assert all(
-                not result for result in burst_results
-            ), "All burst calls should be rate limited when full"
+            assert all(not result for result in burst_results), (
+                "All burst calls should be rate limited when full"
+            )
         else:
             # We got some successful acquires - verify we got a reasonable number
             # Be more flexible with the minimum since rate limiter state persists across tests
@@ -229,6 +229,69 @@ class TestRateLimiterFactoryRegression:
         limiter2 = get_order_rate_limiter()
         assert limiter1 is limiter2, "Rate limiter should be a singleton"
         assert limiter1 is limiter, "All limiters should be the same singleton"
+
+    @pytest.mark.asyncio
+    async def test_factory_default_max_ops_from_settings(self) -> None:
+        """
+        Test F6-C-01: Factory functions default max_ops from get_settings().max_ops.
+
+        This test verifies that when factory functions are called without explicit
+        max_ops parameter, they use the value from settings.max_ops.
+
+        Regression test for the issue where factory functions were not explicitly
+        passing get_settings().max_ops to the limiter constructors.
+        """
+        from loats.config import get_settings
+        from loats.utils.rate_limiter import (
+            get_sync_order_rate_limiter,
+            get_sync_smart_order_rate_limiter,
+        )
+
+        settings = get_settings()
+        expected_max_ops = settings.max_ops
+
+        # Test all four factory functions
+        order_limiter = get_order_rate_limiter()
+        smart_limiter = get_smart_order_rate_limiter()
+        sync_order_limiter = get_sync_order_rate_limiter()
+        sync_smart_limiter = get_sync_smart_order_rate_limiter()
+
+        # All limiters should have max_ops equal to settings.max_ops
+        assert order_limiter.max_ops == expected_max_ops, (
+            f"Order rate limiter max_ops should be {expected_max_ops} from settings, "
+            f"got {order_limiter.max_ops}"
+        )
+
+        assert smart_limiter.max_ops == expected_max_ops, (
+            f"Smart order rate limiter max_ops should be {expected_max_ops} from settings, "
+            f"got {smart_limiter.max_ops}"
+        )
+
+        assert sync_order_limiter.max_ops == expected_max_ops, (
+            f"Sync order rate limiter max_ops should be {expected_max_ops} from settings, "
+            f"got {sync_order_limiter.max_ops}"
+        )
+
+        assert sync_smart_limiter.max_ops == expected_max_ops, (
+            f"Sync smart order rate limiter max_ops should be {expected_max_ops} from settings, "
+            f"got {sync_smart_limiter.max_ops}"
+        )
+
+        # Verify that the limiters actually enforce the rate limit
+        # Test with a burst that should exceed the limit
+        burst_size = expected_max_ops + 10
+        successful_acquires = 0
+
+        for _ in range(burst_size):
+            result = await order_limiter.acquire()
+            if result:
+                successful_acquires += 1
+
+        # Should not exceed the max_ops limit
+        assert successful_acquires <= expected_max_ops, (
+            f"Rate limiter should enforce max_ops={expected_max_ops}, "
+            f"but allowed {successful_acquires} successful acquires"
+        )
 
 
 if __name__ == "__main__":

@@ -108,6 +108,7 @@ class TradingOrchestrator:
         self.max_cycle_time = 0.0
         self.avg_cycle_time = 0.0
         self.total_cycle_time = 0.0
+        self._last_alert_time = 0.0
 
     async def start(self) -> None:
         """Start the trading cycle orchestrator."""
@@ -158,13 +159,13 @@ class TradingOrchestrator:
         cycle_start = datetime.datetime.now(datetime.UTC)
 
         try:
-            # Lazy load settings to avoid import-time failures
+            # Lazy load settings to avoid import-time failures (single lazy load site)
             global settings
             if settings is None:
                 settings = get_settings()
 
             # Run TA analysis, sentiment and market data updates in parallel
-            # with timeout
+            # with timeout - TA inside parallel budget
             ta_task = asyncio.create_task(self._execute_ta_analysis())
             sentiment_task = asyncio.create_task(self._execute_sentiment_analysis())
             market_data_task = asyncio.create_task(self._execute_market_data_update())
@@ -207,6 +208,7 @@ class TradingOrchestrator:
                 f"Trading cycle {self.cycle_count} completed in "
                 f"{cycle_duration * 1000:.2f}ms"
             )
+            # Cycle count is incremented in _record_cycle_time (single increment site)
 
     async def _execute_ta_analysis(self) -> None:
         """Execute technical analysis with performance monitoring."""
@@ -526,7 +528,17 @@ class TradingOrchestrator:
             funds = await asyncio.to_thread(db.get_latest_funds)
             if funds:
                 available_margin = funds.available_margin
-                if available_margin > 0:
+                if available_margin == 0:
+                    logger.warning(
+                        "Available margin is zero - cannot calculate utilization ratio"
+                    )
+                    # Add available_margin==0 guard to prevent trading when no margin available
+                    await alerts.send_system_alert(
+                        "Available margin is zero - all trading operations blocked",
+                        "critical"
+                    )
+                    return
+                elif available_margin > 0:
                     margin_ratio = funds.utilized_margin / available_margin
                     if margin_ratio > settings.max_margin_utilization:
                         logger.warning(f"Margin utilization high: {margin_ratio:.2%}")
@@ -534,10 +546,6 @@ class TradingOrchestrator:
                             f"High margin utilization: {margin_ratio:.2%}",
                             "margin_utilization",
                         )
-                else:
-                    logger.warning(
-                        "Available margin is zero - cannot calculate utilization ratio"
-                    )
 
         except Exception as e:
             logger.error(f"Risk management failed: {e}")
@@ -564,7 +572,7 @@ class TradingOrchestrator:
 
             symbol = settings.default_symbol
 
-            # Get all available signals for CMP strategy (≥3 sources required)
+            # Get all available signals for CMP strategy (>=3 sources required)
             all_signals = await db.async_get_latest_signals(symbol, limit=10)
 
             # Filter out only recent signals (last 5 minutes)
@@ -749,6 +757,7 @@ class TradingOrchestrator:
         """Record and track cycle time statistics."""
         self.last_cycle_time = duration
         self.total_cycle_time += duration
+        # Single increment site for cycle count (handles both direct calls and calls from _execute_trading_cycle)
         self.cycle_count += 1
         self.avg_cycle_time = self.total_cycle_time / self.cycle_count
         self.max_cycle_time = max(self.max_cycle_time, duration)

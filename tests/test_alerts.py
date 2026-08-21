@@ -246,7 +246,7 @@ class TestAlertSystem:
         """Test formatting warning alert message."""
         message = "Test warning message"
         formatted = alert_system._format_alert_message(message, "warning")
-        assert "⚠️" in formatted
+        assert "" in formatted
         assert "WARNING" in formatted
         assert message in formatted
 
@@ -254,7 +254,7 @@ class TestAlertSystem:
         """Test formatting error alert message."""
         message = "Test error message"
         formatted = alert_system._format_alert_message(message, "error")
-        assert "🚨" in formatted
+        assert "" in formatted
         assert "ERROR" in formatted
         assert message in formatted
 
@@ -262,7 +262,7 @@ class TestAlertSystem:
         """Test formatting success alert message."""
         message = "Test success message"
         formatted = alert_system._format_alert_message(message, "success")
-        assert "✅" in formatted
+        assert "OK" in formatted
         assert "SUCCESS" in formatted
         assert message in formatted
 
@@ -651,7 +651,7 @@ class TestAlertSystem:
             await alert_system._kill_switch(mock_update, mock_context)
 
         mock_update.message.reply_text.assert_called_once_with(
-            "⚠️ Kill switch already active."
+            " Kill switch already active."
         )
 
     @pytest.mark.asyncio

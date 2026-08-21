@@ -88,7 +88,7 @@ async def test_final_cache():
 
     await cache_ttl.close()
 
-    print("\n✅ All comprehensive cache tests passed!")
+    print("\nOK All comprehensive cache tests passed!")
 
 
 if __name__ == "__main__":

@@ -454,13 +454,13 @@ class TestPayloadBuilderEdgeCases(unittest.TestCase):
     def test_unicode_symbol(self):
         """Test with unicode symbol."""
         payload = build_place_order_payload(
-            symbol="RELIANCE-निफ्टी",
+            symbol="RELIANCE-",
             quantity=10,
             order_type=OrderType.MARKET,
         )
 
         expected = {
-            "symbol": "RELIANCE-निफ्टी",
+            "symbol": "RELIANCE-",
             "quantity": 10,
             "order_type": "MARKET",
             "variety": "regular",

@@ -12,7 +12,7 @@ for n in ast.iter_child_nodes(t):
                 names.append(tgt.id)
 print("db" in names, [n for n in names if n.startswith("db")])
 print(
-    "LC结束语"[:0],
+    "LC"[:0],
     [line.rstrip() for line in src.split(chr(10)) if line.strip().startswith("db")][
         :10
     ],

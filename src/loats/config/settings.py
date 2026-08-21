@@ -74,8 +74,9 @@ class Settings(BaseSettings):
     telegram_chat_id: str = Field("", description="Telegram chat ID")
     telegram_admin_ids: list[str] = Field(
         default_factory=list,
-        description="List of Telegram user IDs authorized to issue "
-        "/kill and /resume commands",
+        description=(
+            "List of Telegram user IDs authorized to issue /kill and /resume commands"
+        ),
     )
     # Trading Configuration
     nifty_lot_size: int = Field(25, description="NIFTY lot size")

@@ -363,7 +363,7 @@ class TestCalculateDelay:
         assert len(set(delays)) > 1
         # Delays should still be reasonable (around base_delay)
         for d in delays:
-            assert 0.5 <= d <= 1.5  # 1.0 ± 0.5 (accounting for factor)
+            assert 0.5 <= d <= 1.5  # 1.0  0.5 (accounting for factor)
 
     def test_minimum_delay_with_jitter(self) -> None:
         """Test minimum delay enforced even with negative jitter."""

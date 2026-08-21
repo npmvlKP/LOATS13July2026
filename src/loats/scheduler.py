@@ -525,7 +525,7 @@ class TradingScheduler:
             missing_fields = [f for f in required_fields if f not in quote_data]
             if missing_fields:
                 logger.warning(
-                    "Skipping signal generation, "
+                    f"Skipping signal generation, "
                     f"missing quote fields: {missing_fields}"
                 )
                 return
