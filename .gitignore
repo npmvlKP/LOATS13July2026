@@ -20,6 +20,10 @@ ENV/
 /loats/
 LOATS13July2026/
 
+# Scripts and docs directories (excluded from ruff)
+scripts/
+docs/
+
 # Python cache and compiled files
 __pycache__/
 *.py[cod]

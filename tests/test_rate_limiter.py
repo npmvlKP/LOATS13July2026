@@ -4,6 +4,7 @@ Tests token bucket and sliding window rate limiting algorithms.
 """
 
 import asyncio
+import itertools
 import time
 
 import pytest
@@ -197,22 +198,40 @@ class TestAsyncRateLimiter:
 
     @pytest.mark.asyncio
     async def test_get_wait_time(self, async_rate_limiter: AsyncRateLimiter) -> None:
-        """Test wait time calculation."""
-        # Fill the window
-        for _ in range(5):
-            await async_rate_limiter.acquire()
+        """Test wait time calculation with injected clock for determinism."""
+        # Create a deterministic clock for testing
+        test_clock = itertools.count(start=1000.0, step=0.1)
 
-        # Wait time should be the time until the oldest timestamp falls out of window
-        wait_time = await async_rate_limiter.get_wait_time()
-        assert wait_time > 0
-        assert wait_time <= 1.0  # Should be <= window size
+        # Replace the limiter's clock with our test clock
+        original_clock = async_rate_limiter._clock
+        async_rate_limiter._clock = lambda: next(test_clock)
 
-        # Wait for the calculated time
-        await asyncio.sleep(wait_time + 0.01)  # Add small buffer
+        try:
+            # Fill the window
+            for _ in range(5):
+                await async_rate_limiter.acquire()
 
-        # Should be able to acquire now
-        result = await async_rate_limiter.acquire()
-        assert result is True
+            # Move clock forward to create a known wait time
+            current_time = async_rate_limiter._clock()
+            oldest_timestamp = async_rate_limiter.timestamps[0]
+            expected_wait_time = oldest_timestamp + async_rate_limiter.window_size - current_time
+
+            # Wait time should be the time until the oldest timestamp falls out of window
+            wait_time = await async_rate_limiter.get_wait_time()
+            assert wait_time > 0
+            assert wait_time <= 1.0  # Should be <= window size
+
+            # Move clock forward by the calculated wait time plus buffer
+            for _ in range(int((wait_time + 0.01) * 10)):  # Convert to 0.1s increments
+                async_rate_limiter._clock()
+
+            # Should be able to acquire now
+            result = await async_rate_limiter.acquire()
+            assert result is True
+
+        finally:
+            # Restore original clock
+            async_rate_limiter._clock = original_clock
 
     @pytest.mark.asyncio
     async def test_wait_for_token_success(
