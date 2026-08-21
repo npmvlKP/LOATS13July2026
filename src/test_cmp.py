@@ -12,10 +12,11 @@ class TestCmp:
 
     def test_uniqueness(self):
         """Test enforces singleton pattern."""
-        assert {True}.issuperset(
-            {CMP().__repr__() == CMP().__repr__()},
-            {CMP().__repr__() == repr(CMP())},
-        )
+        # Test that CMP instances are singletons
+        cmp1 = CMP()
+        cmp2 = CMP()
+        assert cmp1 is cmp2, "CMP should be a singleton"
+        assert cmp1.__repr__() == cmp2.__repr__(), "Singleton instances should have same repr"
 
     @pytest.mark.parametrize("orders_per_minute, expected", [
         ({10}, True),
@@ -35,7 +36,7 @@ class TestCmp:
             instance.session_lifecycle(state)
 
         # Invalid transitions
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="Invalid session state"):
             instance.session_lifecycle("INVALID")
 
     def test_monitor_ratchet(self, instance):

@@ -6,13 +6,136 @@ Implements simple in-memory caching optimized for minimal resource usage.
 import hashlib
 import json
 import threading
+import time
+from collections import abc
 from collections.abc import Callable
 from typing import Any, TypeVar
 
-from cachetools import TTLCache
 from pydantic import BaseModel
 
 from ..loats_logging import get_logger
+
+class SimpleTTLCache:
+    """Simple TTL cache implementation using threading.Lock for better control.
+
+    This replaces cachetools.TTLCache with a simpler, more controllable implementation
+    that uses threading.Lock instead of RLock for better performance in high-contention scenarios.
+    """
+
+    def __init__(self, maxsize: int, ttl: int):
+        """Initialize the cache.
+
+        Args:
+            maxsize: Maximum number of items to store
+            ttl: Time-to-live for cache entries in seconds
+        """
+        self.maxsize = maxsize
+        self.ttl = ttl
+        self._cache: dict[str, tuple[Any, float]] = {}
+        self._lock = threading.Lock()
+        self._access_order: list[str] = []
+
+    def __contains__(self, key: str) -> bool:
+        """Check if key exists in cache (respecting TTL)."""
+        with self._lock:
+            self._cleanup_expired()
+            return key in self._cache
+
+    def __getitem__(self, key: str) -> Any:
+        """Get item from cache."""
+        with self._lock:
+            self._cleanup_expired()
+            if key not in self._cache:
+                raise KeyError(key)
+
+            value, timestamp = self._cache[key]
+            # Update access order for LRU eviction
+            if key in self._access_order:
+                self._access_order.remove(key)
+            self._access_order.append(key)
+            return value
+
+    def __setitem__(self, key: str, value: Any) -> None:
+        """Set item in cache."""
+        with self._lock:
+            self._cleanup_expired()
+
+            # Add or update item
+            self._cache[key] = (value, time.time())
+
+            # Update access order
+            if key in self._access_order:
+                self._access_order.remove(key)
+            self._access_order.append(key)
+
+            # Enforce maxsize with LRU eviction
+            if len(self._cache) > self.maxsize:
+                oldest_key = self._access_order.pop(0)
+                if oldest_key in self._cache:
+                    del self._cache[oldest_key]
+
+    def __delitem__(self, key: str) -> None:
+        """Delete item from cache."""
+        with self._lock:
+            if key in self._cache:
+                del self._cache[key]
+            if key in self._access_order:
+                self._access_order.remove(key)
+
+    def get(self, key: str, default: Any = None) -> Any:
+        """Get item from cache with default."""
+        with self._lock:
+            self._cleanup_expired()
+            if key not in self._cache:
+                return default
+
+            value, timestamp = self._cache[key]
+            # Update access order for LRU eviction
+            if key in self._access_order:
+                self._access_order.remove(key)
+            self._access_order.append(key)
+            return value
+
+    def _cleanup_expired(self) -> None:
+        """Remove expired items from cache."""
+        current_time = time.time()
+        expired_keys = [
+            key for key, (_, timestamp) in self._cache.items()
+            if current_time - timestamp > self.ttl
+        ]
+
+        for key in expired_keys:
+            del self._cache[key]
+            if key in self._access_order:
+                self._access_order.remove(key)
+
+    def clear(self) -> None:
+        """Clear all items from cache."""
+        with self._lock:
+            self._cache.clear()
+            self._access_order.clear()
+
+    def __len__(self) -> int:
+        """Get number of items in cache."""
+        with self._lock:
+            self._cleanup_expired()
+            return len(self._cache)
+
+    def keys(self) -> list[str]:
+        """Get list of keys in cache."""
+        with self._lock:
+            self._cleanup_expired()
+            return list(self._cache.keys())
+
+    @property
+    def maxsize(self) -> int:
+        """Get maximum cache size."""
+        return self._maxsize
+
+    @maxsize.setter
+    def maxsize(self, value: int) -> None:
+        """Set maximum cache size."""
+        self._maxsize = value
 
 logger = get_logger(__name__)
 
@@ -51,12 +174,12 @@ class CacheManager:
     def __init__(self, config: CacheConfig):
         """Initialize cache manager with in-memory cache."""
         self.config = config
-        self._cache: TTLCache[str, Any] | None = None
+        self._cache: SimpleTTLCache[str, Any] | None = None
         self._cache_lock = (
-            threading.RLock()
-        )  # FIX-F-THREAD-1: Use threading.RLock for thread safety
-        # FIX-F-THREAD-8: Use threading.RLock for thread safety
-        self._init_lock = threading.RLock()
+            threading.Lock()
+        )  # FIX-F-THREAD-1: Use threading.Lock for better performance
+        # FIX-F-THREAD-8: Use threading.Lock for better performance
+        self._init_lock = threading.Lock()
         self._cache_stats = {
             "hits": 0,
             "misses": 0,
@@ -73,11 +196,11 @@ class CacheManager:
             logger.debug("DEBUG INIT: Starting initialization")
             # Use in-memory cache only for LITE edition
             logger.debug("DEBUG INIT: Creating in-memory cache")
-            self._cache = TTLCache(
+            self._cache = SimpleTTLCache(
                 maxsize=self.config.max_size,
                 ttl=self.config.ttl_seconds,
             )
-            self._cache_type = "in_memory_ttl"
+            self._cache_type = "in_memory_simple_ttl"
             logger.debug(
                 f"DEBUG INIT: Created cache - _cache={self._cache is not None}"
             )
