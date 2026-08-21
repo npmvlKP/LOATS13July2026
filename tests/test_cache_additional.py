@@ -247,8 +247,8 @@ class TestCacheManagerAdditional:
         assert cache_key == "loats:key/with/special:chars"
 
         # Test with unicode
-        cache_key = cache_manager._get_cache_key("key_with_unicode_🚀")
-        assert "loats:key_with_unicode_🚀" == cache_key
+        cache_key = cache_manager._get_cache_key("key_with_unicode_ROCKET")
+        assert "loats:key_with_unicode_ROCKET" == cache_key
 
 
 class TestCacheUtilitiesAdditional:

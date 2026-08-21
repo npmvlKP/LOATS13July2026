@@ -6,7 +6,7 @@ from pathlib import Path
 with Path(r"tests\test_alerts.py").open(encoding="utf-8") as f:
     content = f.read()
 
-# The ACTUAL replacements - raw HTML → escaped HTML entities
+# The ACTUAL replacements - raw HTML -> escaped HTML entities
 fixes = [
     # test_activate_kill_switch_html_injection_prevention
     (
@@ -35,10 +35,8 @@ fixes = [
     ),
     # test_send_signal_alert_html_injection_prevention
     (
-        'assert "<script>" in sent_message\n        assert "<b>indicator</b>" in '
-        'sent_message',
-        'assert "<script>" in sent_message\n        assert "<b>indicator</b>" in '
-        'sent_message',
+        'assert "<script>" in sent_message\n        assert "<b>indicator</b>" in sent_message',
+        'assert "<script>" in sent_message\n        assert "<b>indicator</b>" in sent_message',
     ),
 ]
 

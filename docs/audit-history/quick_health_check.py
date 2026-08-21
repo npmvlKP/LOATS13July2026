@@ -28,8 +28,7 @@ def check_environment():
 
     if missing_vars:
         print(
-            f"[WARN] Missing environment variables: {missing_vars} "
-            f"(ok for local testing)"
+            f"[WARN] Missing environment variables: {missing_vars} (ok for local testing)"
         )
         # Only fail if we're in a container (indicated by presence of some
         # container-specific env vars)

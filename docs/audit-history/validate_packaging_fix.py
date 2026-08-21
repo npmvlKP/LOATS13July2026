@@ -41,8 +41,8 @@ def test_package_import():
     try:
         # Test import of the main module
         loats = importlib.import_module("loats")
-        print("✅ Package 'loats' imported successfully")
-        print(f"✅ Version: {loats.__version__}")
+        print("OK Package 'loats' imported successfully")
+        print(f"OK Version: {loats.__version__}")
 
         # Test import of key components
         from loats.main import TradingSystem
@@ -50,21 +50,21 @@ def test_package_import():
         # Use the imports to verify they work
         _ = TradingSystem
 
-        print("✅ TradingSystem imported successfully")
+        print("OK TradingSystem imported successfully")
 
         from loats.config import get_settings
 
         # Use the import to verify it works
         _ = get_settings
 
-        print("✅ get_settings imported successfully")
+        print("OK get_settings imported successfully")
 
         return True
     except ImportError as e:
-        print(f"❌ Import failed: {e}")
+        print(f"X Import failed: {e}")
         return False
     except Exception as e:
-        print(f"❌ Unexpected error during import: {e}")
+        print(f"X Unexpected error during import: {e}")
         return False
 
 
@@ -76,21 +76,21 @@ def test_entry_point():
     try:
         from loats.main import cli_main
 
-        print("✅ Entry point 'cli_main' is accessible")
+        print("OK Entry point 'cli_main' is accessible")
 
         # Test that it's a proper function (not a coroutine)
         if asyncio.iscoroutinefunction(cli_main):
-            print("❌ Entry point is still a coroutine function")
+            print("X Entry point is still a coroutine function")
             return False
         else:
-            print("✅ Entry point is a proper synchronous function")
+            print("OK Entry point is a proper synchronous function")
             return True
 
     except ImportError as e:
-        print(f"❌ Entry point import failed: {e}")
+        print(f"X Entry point import failed: {e}")
         return False
     except Exception as e:
-        print(f"❌ Unexpected error testing entry point: {e}")
+        print(f"X Unexpected error testing entry point: {e}")
         return False
 
 
@@ -103,7 +103,7 @@ def test_package_structure():
         import loats
 
         package_path = Path(loats.__file__).parent
-        print(f"✅ Package installed at: {package_path}")
+        print(f"OK Package installed at: {package_path}")
 
         # Check that key modules exist
         expected_modules = [
@@ -118,14 +118,14 @@ def test_package_structure():
         for module in expected_modules:
             module_path = package_path / module
             if module_path.exists() or (module_path.parent / module).exists():
-                print(f"✅ Module {module} exists")
+                print(f"OK Module {module} exists")
             else:
-                print(f"❌ Module {module} missing")
+                print(f"X Module {module} missing")
                 return False
 
         return True
     except Exception as e:
-        print(f"❌ Error checking package structure: {e}")
+        print(f"X Error checking package structure: {e}")
         return False
 
 
@@ -154,10 +154,10 @@ def main():
             all_passed = False
 
     if all_passed:
-        print("\n🎉 All packaging tests PASSED! F-DEP-1 is RESOLVED.")
+        print("\n All packaging tests PASSED! F-DEP-1 is RESOLVED.")
         return 0
     else:
-        print("\n❌ Some packaging tests FAILED! F-DEP-1 is NOT resolved.")
+        print("\nX Some packaging tests FAILED! F-DEP-1 is NOT resolved.")
         return 1
 
 

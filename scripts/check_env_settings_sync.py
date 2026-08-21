@@ -93,16 +93,14 @@ def main() -> int:
     # Report results
     if missing_in_settings:
         print(
-            "\n❌ Environment variables in .env.example without "
-            "corresponding Settings fields:"
+            "\nX Environment variables in .env.example without corresponding Settings fields:"
         )
         for missing in missing_in_settings:
             print(f"  - {missing}")
 
     if missing_in_dotenv:
         print(
-            "\n❌ Settings fields without corresponding environment "
-            "variables in .env.example:"
+            "\nX Settings fields without corresponding environment variables in .env.example:"
         )
         for missing in missing_in_dotenv:
             print(f"  - {missing}")

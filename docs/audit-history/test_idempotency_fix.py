@@ -52,25 +52,25 @@ def test_idempotency_key_functionality():
         # Store the first order - should succeed
         try:
             result1 = db.store_order(order1)
-            print("✅ First order stored successfully")
+            print("OK First order stored successfully")
             assert result1 is True
         except Exception as e:
-            print(f"❌ Failed to store first order: {e}")
+            print(f"X Failed to store first order: {e}")
             return False
 
         # Try to store the same order again with the same idempotency key - should fail
         try:
             db.store_order(order1)
-            print("❌ Duplicate order was allowed - idempotency check failed!")
+            print("X Duplicate order was allowed - idempotency check failed!")
             return False
         except ValueError as e:
             if "Duplicate order detected" in str(e):
-                print("✅ Duplicate order correctly rejected with idempotency key")
+                print("OK Duplicate order correctly rejected with idempotency key")
             else:
-                print(f"❌ Unexpected error: {e}")
+                print(f"X Unexpected error: {e}")
                 return False
         except Exception as e:
-            print(f"❌ Unexpected exception type: {e}")
+            print(f"X Unexpected exception type: {e}")
             return False
 
         # Try to store a different order with a different idempotency key -
@@ -93,11 +93,11 @@ def test_idempotency_key_functionality():
         try:
             result3 = db.store_order(order2)
             print(
-                "✅ Different order with different idempotency key stored successfully"
+                "OK Different order with different idempotency key stored successfully"
             )
             assert result3 is True
         except Exception as e:
-            print(f"❌ Failed to store different order: {e}")
+            print(f"X Failed to store different order: {e}")
             return False
 
         # Try to store an order without an idempotency key - should succeed
@@ -119,12 +119,11 @@ def test_idempotency_key_functionality():
         try:
             result4 = db.store_order(order3)
             print(
-                "✅ Order without idempotency key stored successfully "
-                "(backward compatibility)"
+                "OK Order without idempotency key stored successfully (backward compatibility)"
             )
             assert result4 is True
         except Exception as e:
-            print(f"❌ Failed to store order without idempotency key: {e}")
+            print(f"X Failed to store order without idempotency key: {e}")
             return False
 
         # Verify that the orders were stored correctly
@@ -141,16 +140,16 @@ def test_idempotency_key_functionality():
             assert retrieved_order2.idempotency_key == "unique_key_456"
             assert retrieved_order3.idempotency_key is None
 
-            print("✅ All orders retrieved correctly with proper idempotency keys")
+            print("OK All orders retrieved correctly with proper idempotency keys")
 
         except Exception as e:
-            print(f"❌ Failed to retrieve orders: {e}")
+            print(f"X Failed to retrieve orders: {e}")
             return False
 
         # Clean up
         db.close_all()
 
-        print("\n🎉 All idempotency key tests passed!")
+        print("\n All idempotency key tests passed!")
         return True
 
 
@@ -184,25 +183,25 @@ def test_audit_log_consistency():
             # Store the order
             result = db.store_order(order)
             assert result is True
-            print("✅ Order stored successfully for audit test")
+            print("OK Order stored successfully for audit test")
 
             # Check that audit log was created
             assert audit_path.exists()
             assert audit_path.stat().st_size > 0
-            print("✅ Audit log file created and has content")
+            print("OK Audit log file created and has content")
 
             # Verify audit log integrity
             integrity_result = db.verify_audit_log_integrity()
             assert integrity_result is True
-            print("✅ Audit log integrity verified")
+            print("OK Audit log integrity verified")
 
         except Exception as e:
-            print(f"❌ Audit log test failed: {e}")
+            print(f"X Audit log test failed: {e}")
             return False
         finally:
             db.close_all()
 
-        print("\n🎉 Audit log consistency test passed!")
+        print("\n Audit log consistency test passed!")
         return True
 
 

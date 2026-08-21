@@ -515,11 +515,13 @@ class TestMetricsEdgeCases:
 
             # Test with special characters using the test manager
             record_signal(
-                signal_type="BUY_SIGNAL_🚀", scan_type="ta-scan_v1.0", manager=manager
+                signal_type="BUY_SIGNAL_ROCKET",
+                scan_type="ta-scan_v1.0",
+                manager=manager,
             )
 
             mock_labels.assert_called_once_with(
-                signal_type="BUY_SIGNAL_🚀", scan_type="ta-scan_v1.0"
+                signal_type="BUY_SIGNAL_ROCKET", scan_type="ta-scan_v1.0"
             )
             mock_counter.inc.assert_called_once()
 

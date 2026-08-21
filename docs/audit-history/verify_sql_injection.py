@@ -94,13 +94,13 @@ if __name__ == "__main__":
 
     print("\n" + "=" * 60)
     print("SUMMARY:")
-    print(f"✅ No SQL injection patterns found: {no_injection_patterns}")
-    print(f"✅ Secure database implementation: {secure_implementation}")
+    print(f"OK No SQL injection patterns found: {no_injection_patterns}")
+    print(f"OK Secure database implementation: {secure_implementation}")
 
     if no_injection_patterns and secure_implementation:
-        print("\n🎉 RESULT: No SQL injection vulnerabilities found")
+        print("\n RESULT: No SQL injection vulnerabilities found")
         print("The database implementation follows security best practices")
         sys.exit(0)
     else:
-        print("\n❌ RESULT: Potential security issues detected")
+        print("\nX RESULT: Potential security issues detected")
         sys.exit(1)

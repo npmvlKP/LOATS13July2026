@@ -124,14 +124,14 @@ def test_audit_log_dual_write_consistency():
         print(f"Database audit entries after failure: {db_count_after_failure}")
         print(f"JSONL audit entries after failure: {jsonl_count_after}")
 
-        assert (
-            db_count_after_failure == 0
-        ), f"Expected 0 DB audit entries after failure, got {db_count_after_failure}"
-        assert (
-            jsonl_count_after == 0
-        ), f"Expected 0 JSONL audit entries after failure, got {jsonl_count_after}"
+        assert db_count_after_failure == 0, (
+            f"Expected 0 DB audit entries after failure, got {db_count_after_failure}"
+        )
+        assert jsonl_count_after == 0, (
+            f"Expected 0 JSONL audit entries after failure, got {jsonl_count_after}"
+        )
 
-        print("✓ Dual-write consistency maintained - no partial audit trails created")
+        print("OK Dual-write consistency maintained - no partial audit trails created")
 
         # Test successful write after recovery
         print("\nTesting successful write after recovery...")
@@ -171,19 +171,18 @@ def test_audit_log_dual_write_consistency():
         print(f"Database audit entries after recovery: {db_count_recovery}")
         print(f"JSONL audit entries after recovery: {jsonl_count_recovery}")
 
-        assert (
-            db_count_recovery == 1
-        ), f"Expected 1 DB audit entry after recovery, got {db_count_recovery}"
-        assert (
-            jsonl_count_recovery == 1
-        ), f"Expected 1 JSONL audit entry after recovery, got {jsonl_count_recovery}"
+        assert db_count_recovery == 1, (
+            f"Expected 1 DB audit entry after recovery, got {db_count_recovery}"
+        )
+        assert jsonl_count_recovery == 1, (
+            f"Expected 1 JSONL audit entry after recovery, got {jsonl_count_recovery}"
+        )
 
-        print("✓ Recovery successful - both audit trails created consistently")
+        print("OK Recovery successful - both audit trails created consistently")
 
         db.close()
         print(
-            "\n✅ All tests passed! Audit log dual-write consistency "
-            "fix is working correctly."
+            "\nOK All tests passed! Audit log dual-write consistency fix is working correctly."
         )
 
 

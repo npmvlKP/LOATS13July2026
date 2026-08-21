@@ -2,7 +2,7 @@
 CMP Strategy Strength Engine for LOATS13July2026.
 
 Implements composite strength calculation with:
-- ≥3-source requirement
+- >=3-source requirement
 - Opposition gate logic
 - Source weighting and normalization
 """
@@ -88,7 +88,7 @@ class StrengthEngine:
         Calculate composite strength from multiple signals.
 
         Requirements:
-        - ≥3 sources for valid composite strength
+        - >=3 sources for valid composite strength
         - Opposition gate: no strong opposing signals
         - Source diversity check
         """
@@ -276,7 +276,7 @@ class StrengthEngine:
         Validate that signals meet CMP requirements.
 
         Requirements:
-        - ≥3 unique sources
+        - >=3 unique sources
         - Source diversity
         - No duplicate sources
         """

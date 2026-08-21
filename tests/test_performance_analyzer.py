@@ -219,7 +219,8 @@ class TestPerformanceAnalyzer:
             analyzer.operation_stats["test_op"] = [i * 0.0001 for i in range(10)]
 
         validation = analyzer.validate_cmp_latency_gates(
-            p1_threshold=0.001, p5_threshold=0.005  # 1ms  # 5ms
+            p1_threshold=0.001,
+            p5_threshold=0.005,  # 1ms  # 5ms
         )
 
         assert "test_op" in validation

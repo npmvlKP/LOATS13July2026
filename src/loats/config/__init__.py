@@ -12,7 +12,7 @@ from .settings import Settings, get_settings
 # ``settings`` accessor defined here is therefore permanently shadowed:
 # ``from loats.config import settings`` yields the module, not a ``Settings``
 # instance, while a ``TYPE_CHECKING`` declaration would make mypy believe the
-# opposite — a silent type/runtime divergence.
+# opposite - a silent type/runtime divergence.
 #
 # Use one of the following instead:
 #   * ``from loats.config import get_settings`` - the lru_cached accessor

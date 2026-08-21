@@ -42,7 +42,7 @@ def test_logging_test_mode():
 
     assert len(console_handlers) > 0, "Console handler should be configured"
 
-    print("✓ Test mode logging test passed")
+    print("OK Test mode logging test passed")
 
 
 def test_logging_production_mode():
@@ -75,14 +75,14 @@ def test_logging_production_mode():
             if isinstance(handler, logging.StreamHandler)
         ]
 
-        assert (
-            len(file_handlers) > 0
-        ), "File handler should be configured in production mode"
-        assert (
-            len(console_handlers) > 0
-        ), "Console handler should be configured in production mode"
+        assert len(file_handlers) > 0, (
+            "File handler should be configured in production mode"
+        )
+        assert len(console_handlers) > 0, (
+            "Console handler should be configured in production mode"
+        )
 
-    print("✓ Production mode logging test passed")
+    print("OK Production mode logging test passed")
 
 
 if __name__ == "__main__":

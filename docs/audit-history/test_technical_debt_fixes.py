@@ -95,8 +95,7 @@ def test_idempotency_key_functionality():
         try:
             result3 = db.store_order(order2)
             print(
-                "[OK] Different order with different idempotency key "
-                "stored successfully"
+                "[OK] Different order with different idempotency key stored successfully"
             )
             assert result3 is True
         except Exception as e:
@@ -122,8 +121,7 @@ def test_idempotency_key_functionality():
         try:
             result4 = db.store_order(order3)
             print(
-                "[OK] Different order with different idempotency key "
-                "stored successfully"
+                "[OK] Different order with different idempotency key stored successfully"
             )
             assert result4 is True
         except Exception as e:
@@ -304,8 +302,7 @@ if __name__ == "__main__":
     print("\n" + "=" * 50)
     print("TEST RESULTS:")
     print(
-        f"   Idempotency Key Test (R5-F-07): "
-        f"{'PASSED' if idempotency_result else 'FAILED'}"
+        f"   Idempotency Key Test (R5-F-07): {'PASSED' if idempotency_result else 'FAILED'}"
     )
     print(
         f"   NSE Holiday Calendar (R5-F-08): {'PASSED' if holiday_result else 'FAILED'}"
@@ -328,8 +325,7 @@ if __name__ == "__main__":
 
     if idempotency_result and holiday_result and audit_result and deps_result:
         print(
-            "\nALL TESTS PASSED! All technical debt items have been "
-            "successfully resolved."
+            "\nALL TESTS PASSED! All technical debt items have been successfully resolved."
         )
         sys.exit(0)
     else:

@@ -56,7 +56,7 @@ async def test_redis_cache():
 
     await cache_redis.close()
 
-    print("\n✅ All cache tests completed successfully!")
+    print("\nOK All cache tests completed successfully!")
 
 
 if __name__ == "__main__":

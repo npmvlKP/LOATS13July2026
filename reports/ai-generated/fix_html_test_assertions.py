@@ -9,7 +9,7 @@ with Path(r"g:\.OA\LOATS-13July2026\LOATS13July2026\tests\test_alerts.py").open(
     content = f.read()
 
 # Replacements: raw HTML assertions -> escaped entity assertions
-# html.escape() converts: < → <, > → >
+# html.escape() converts: < -> <, > -> >
 
 fixes = [
     # test_activate_kill_switch_html_injection_prevention
@@ -46,10 +46,8 @@ fixes = [
     # test_send_signal_alert_html_injection_prevention
     # Input: <script> and <b>indicator</b> escape to <script> and <b>indicator</b>
     (
-        'assert "<script>" in sent_message\n        assert "<b>indicator</b>" in '
-        'sent_message',
-        'assert "<script>" in sent_message\n        assert "<b>indicator</b>" in '
-        'sent_message',
+        'assert "<script>" in sent_message\n        assert "<b>indicator</b>" in sent_message',
+        'assert "<script>" in sent_message\n        assert "<b>indicator</b>" in sent_message',
     ),
 ]
 

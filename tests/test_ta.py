@@ -559,7 +559,7 @@ class TestTechnicalAnalysis:
         assert 0 <= strength <= 1
         assert (
             strength == 0.6
-        )  # Should detect moderate high volatility (recent range is 30, avg range is ~16.67, ratio ≈ 1.8)
+        )  # Should detect moderate high volatility (recent range is 30, avg range is ~16.67, ratio  1.8)
 
         # Test with moderate high volatility (recent range > 1.5x average range)
         historical_data = [

@@ -96,7 +96,7 @@ class TestReliabilityFixes(unittest.IsolatedAsyncioTestCase):
             "R5-F-02: Scheduler should call db.async_close_all() during shutdown",
         )
 
-        print("✅ R5-F-02: Scheduler DB cleanup test passed")
+        print("OK R5-F-02: Scheduler DB cleanup test passed")
 
     async def test_r5_f_06_circuit_breaker_post_protection(self):
         """Test R5-F-06: Order POSTs protected by circuit breaker."""
@@ -134,7 +134,7 @@ class TestReliabilityFixes(unittest.IsolatedAsyncioTestCase):
         # Reset circuit breaker for other tests
         OPENALGO_CIRCUIT_BREAKER.reset()
 
-        print("✅ R5-F-06: Circuit breaker POST protection test passed")
+        print("OK R5-F-06: Circuit breaker POST protection test passed")
 
     async def test_r5_f_14_jsonl_audit_write_atomicity(self):
         """Test R5-F-14: JSONL audit write atomicity."""
@@ -212,7 +212,7 @@ class TestReliabilityFixes(unittest.IsolatedAsyncioTestCase):
         # Should have more lines after async call
         self.assertGreater(len(lines_after_async), len(lines))
 
-        print("✅ R5-F-14: JSONL audit write atomicity test passed")
+        print("OK R5-F-14: JSONL audit write atomicity test passed")
 
     async def test_jsonl_write_failure_handling(self):
         """Test that JSONL write failures prevent DB commits."""
@@ -249,7 +249,7 @@ class TestReliabilityFixes(unittest.IsolatedAsyncioTestCase):
             self.assertIn("Failed to write audit log entry to JSONL file", error_msg)
             self.assertIn("Database commit aborted to maintain consistency", error_msg)
 
-        print("✅ JSONL write failure handling test passed")
+        print("OK JSONL write failure handling test passed")
 
     async def test_comprehensive_reliability_scenarios(self):
         """Test comprehensive reliability scenarios."""
@@ -305,7 +305,7 @@ class TestReliabilityFixes(unittest.IsolatedAsyncioTestCase):
         # Should have more lines after async operations
         self.assertGreater(len(final_lines), len(lines))
 
-        print("✅ Comprehensive reliability scenarios test passed")
+        print("OK Comprehensive reliability scenarios test passed")
 
 
 if __name__ == "__main__":

@@ -121,6 +121,8 @@ ignore = [
 "setup_project.py" = ["INP001", "T201"]
 "scripts/*" = ["INP001", "T201", "E501"]
 "scripts/identify_low_coverage.py" = ["E501"]
+"docs/audit-history/*" = ["E501", "T201"]
+"reports/ai-generated/*" = ["E501", "T201"]
 
 [tool.mypy]
 python_version = "3.12"

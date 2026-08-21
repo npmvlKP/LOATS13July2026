@@ -29,7 +29,7 @@ class TestValidateRSSFeed:
             mock_response.status_code = 200
             mock_response.headers = {"content-type": "application/rss+xml"}
             mock_response.text = (
-                '<?xml version="1.0"?>' '<rss version="2.0"><channel></channel></rss>'
+                '<?xml version="1.0"?><rss version="2.0"><channel></channel></rss>'
             )
             mock_client.get.return_value = mock_response
 
@@ -47,8 +47,7 @@ class TestValidateRSSFeed:
             mock_response.status_code = 200
             mock_response.headers = {"content-type": "application/xml"}
             mock_response.text = (
-                '<?xml version="1.0"?>'
-                '<feed xmlns="http://www.w3.org/2005/Atom"></feed>'
+                '<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom"></feed>'
             )
             mock_client.get.return_value = mock_response
 

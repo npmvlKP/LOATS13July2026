@@ -29,8 +29,7 @@ def check_file_function_size(file_path: Path, max_lines: int) -> list[str]:
                 func_size = end - start + 1
                 if func_size > max_lines:
                     violations.append(
-                        f"{file_path}:{start} Function {node.name} too large "
-                        f"({func_size} lines)"
+                        f"{file_path}:{start} Function {node.name} too large ({func_size} lines)"
                     )
     except Exception as e:
         print(f"Error processing {file_path}: {e}")
@@ -41,7 +40,7 @@ def check_function_size(max_lines: int = 200) -> int:
     """Check function sizes across all Python files in the project.
 
     Phase-00: max_lines set to 200 (temporary).
-    Target ≤100 LOC after Phase 01-02 refactoring.
+    Target <=100 LOC after Phase 01-02 refactoring.
 
     Returns:
         Exit code (0 for pass, 1 for fail)
