@@ -514,15 +514,61 @@ class TradingOrchestrator:
                 logger.warning("Circuit breaker open - risk management checks limited")
                 return
 
-            # Check position limits
+            # Check position limits with CMP Rule 11 compliance
             positions = await asyncio.to_thread(
                 db.get_position, symbol=settings.default_symbol
             )
-            if positions and positions.quantity > settings.max_position_size:
-                logger.warning(f"Position limit exceeded: {positions.quantity}")
-                await alerts.send_alert(
-                    f"Position limit exceeded: {positions.quantity}", "position_limit"
+            if positions:
+                # Convert Position to Trade for check_position_limits
+                from .models import Trade, TransactionType
+
+                transaction_type = (
+                    TransactionType.BUY
+                    if positions.quantity > 0
+                    else TransactionType.SELL
                 )
+
+                position_trade = Trade(
+                    trade_id=f"temp_{settings.default_symbol}_trade",
+                    symbol=settings.default_symbol,
+                    quantity=positions.quantity,
+                    entry_price=positions.average_price,
+                    transaction_type=transaction_type,
+                    product_type=positions.product_type,
+                    status="OPEN",
+                    entry_time=datetime.datetime.now(datetime.UTC),
+                    metadata={"source": "position_conversion"},
+                )
+
+                # Check CMP Rule 11 position limits
+                position_check, position_result = rules_engine.check_position_limits(
+                    settings.default_symbol, [position_trade]
+                )
+
+                if not position_check:
+                    logger.warning(
+                        f"CMP Rule 11 position limit exceeded: "
+                        f"{position_result['current_quantity']} / "
+                        f"{position_result['max_allowed']} "
+                        f"for {settings.default_symbol}"
+                    )
+                    await alerts.send_alert(
+                        f"CMP Rule 11 position limit exceeded: "
+                        f"{position_result['current_quantity']} / "
+                        f"{position_result['max_allowed']} "
+                        f"for {settings.default_symbol}",
+                        "position_limit",
+                    )
+
+                # Check generic position size limit
+                if positions.quantity > settings.max_position_size:
+                    logger.warning(
+                        f"Position size limit exceeded: {positions.quantity}"
+                    )
+                    await alerts.send_alert(
+                        f"Position size limit exceeded: {positions.quantity}",
+                        "position_limit",
+                    )
 
             # Check margin utilization with zero division guard
             funds = await asyncio.to_thread(db.get_latest_funds)
@@ -532,10 +578,10 @@ class TradingOrchestrator:
                     logger.warning(
                         "Available margin is zero - cannot calculate utilization ratio"
                     )
-                    # Add available_margin==0 guard to prevent trading when no margin available
+                    # available_margin==0 guard prevents trading
                     await alerts.send_system_alert(
                         "Available margin is zero - all trading operations blocked",
-                        "critical"
+                        "critical",
                     )
                     return
                 elif available_margin > 0:
@@ -757,7 +803,7 @@ class TradingOrchestrator:
         """Record and track cycle time statistics."""
         self.last_cycle_time = duration
         self.total_cycle_time += duration
-        # Single increment site for cycle count (handles both direct calls and calls from _execute_trading_cycle)
+        # Single increment site for cycle count
         self.cycle_count += 1
         self.avg_cycle_time = self.total_cycle_time / self.cycle_count
         self.max_cycle_time = max(self.max_cycle_time, duration)

@@ -79,9 +79,9 @@ class TestDatabaseAsyncAdditions:
             "async_get_trade",
             "_async_log_audit",
         ]:
-            assert hasattr(Database, method_name), (
-                f"Database should have {method_name} method"
-            )
+            assert hasattr(
+                Database, method_name
+            ), f"Database should have {method_name} method"
 
         # Verify that wrapper methods are added
         for method_name in [
@@ -94,9 +94,9 @@ class TestDatabaseAsyncAdditions:
             "async_update_trade",
             "async_update_order_status",
         ]:
-            assert hasattr(Database, method_name), (
-                f"Database should have {method_name} method"
-            )
+            assert hasattr(
+                Database, method_name
+            ), f"Database should have {method_name} method"
 
     async def test_async_create_signal(self, temp_db):
         """Test async signal creation."""

@@ -498,12 +498,30 @@ class OpenAlgoClient:
         trailing_stop_loss: float | None = None,
     ) -> dict[str, Any]:
         """
-        Modify an order with circuit breaker protection.
+        Modify an order with circuit breaker protection and CMP Rule 7 enforcement.
 
-        Note: Circuit breaker is applied without retry to avoid duplicate modifications.
-        When the circuit is open, this method fails fast with CircuitBreakerOpenError.
+        CMP Rule 7: Per-order modification limit ≤25
+
+        Note: Circuit breaker is applied without retry to avoid duplicate
+        modifications. When the circuit is open, this method fails fast
+        with CircuitBreakerOpenError.
         """
         _check_kill_switch()
+
+        # CMP Rule 7: Check modification counter limit
+        from .rules import rules_engine
+
+        if not rules_engine.check_modification_limit(order_id, limit=25):
+            current_modifications = rules_engine.get_modification_count(order_id)
+            logger.warning(
+                f"CMP Rule 7: Modification limit exceeded for order {order_id}: "
+                f"{current_modifications}/25"
+            )
+            raise OpenAlgoError(
+                f"Modification limit exceeded (25 max). "
+                f"Current: {current_modifications}"
+            )
+
         payload = build_modify_order_payload(
             order_id=order_id,
             quantity=quantity,
@@ -517,12 +535,15 @@ class OpenAlgoClient:
 
         # Wrap order modification in circuit breaker without retry
         def _modify_order_impl() -> dict[str, Any]:
-            return self._request(
+            result = self._request(
                 "POST",
                 "modify_order",
                 json=payload,
                 idempotency_key=_get_idempotency_key(f"modify:{order_id}"),
             )
+            # CMP Rule 7: Increment counter on successful modification
+            rules_engine.increment_modification_counter(order_id)
+            return result
 
         return OPENALGO_CIRCUIT_BREAKER.call(_modify_order_impl)
 
@@ -530,8 +551,9 @@ class OpenAlgoClient:
         """
         Cancel an order with circuit breaker protection.
 
-        Note: Circuit breaker is applied without retry to avoid duplicate cancellations.
-        When the circuit is open, this method fails fast with CircuitBreakerOpenError.
+        Note: Circuit breaker is applied without retry to avoid duplicate
+        cancellations. When the circuit is open, this method fails fast
+        with CircuitBreakerOpenError.
         """
         _check_kill_switch()
         payload = {"order_id": order_id}
@@ -937,12 +959,29 @@ class AsyncOpenAlgoClient:
         trailing_stop_loss: float | None = None,
     ) -> dict[str, Any]:
         """
-        Modify an order with circuit breaker protection.
+        Modify an order with circuit breaker protection and CMP Rule 7 enforcement.
 
-        Note: Circuit breaker is applied without retry to avoid duplicate modifications.
-        When the circuit is open, this method fails fast with CircuitBreakerOpenError.
+        CMP Rule 7: Per-order modification limit ≤25
+
+        Note: Circuit breaker is applied without retry to avoid duplicate
+        modifications. When the circuit is open, this method fails fast
+        with CircuitBreakerOpenError.
         """
         await _async_check_kill_switch()
+
+        # CMP Rule 7: Check modification counter limit
+        from .rules import rules_engine
+
+        if not rules_engine.check_modification_limit(order_id, limit=25):
+            current_modifications = rules_engine.get_modification_count(order_id)
+            logger.warning(
+                f"CMP Rule 7: Modification limit exceeded for order {order_id}: "
+                f"{current_modifications}/25"
+            )
+            raise OpenAlgoError(
+                f"Modification limit exceeded (25 max). "
+                f"Current: {current_modifications}"
+            )
 
         # Wrap order modification in circuit breaker without retry
         async def _modify_order_impl() -> dict[str, Any]:
@@ -967,12 +1006,15 @@ class AsyncOpenAlgoClient:
             if trailing_stop_loss is not None:
                 payload["trailing_stop_loss"] = trailing_stop_loss
 
-            return await self._request(
+            result = await self._request(
                 "POST",
                 "modify_order",
                 json=payload,
                 idempotency_key=_get_idempotency_key(f"modify:{order_id}"),
             )
+            # CMP Rule 7: Increment counter on successful modification
+            rules_engine.increment_modification_counter(order_id)
+            return result
 
         return await OPENALGO_CIRCUIT_BREAKER.call_async(_modify_order_impl)
 
@@ -980,8 +1022,9 @@ class AsyncOpenAlgoClient:
         """
         Cancel an order with circuit breaker protection.
 
-        Note: Circuit breaker is applied without retry to avoid duplicate cancellations.
-        When the circuit is open, this method fails fast with CircuitBreakerOpenError.
+        Note: Circuit breaker is applied without retry to avoid duplicate
+        cancellations. When the circuit is open, this method fails fast
+        with CircuitBreakerOpenError.
         """
         await _async_check_kill_switch()
 

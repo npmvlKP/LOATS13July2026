@@ -91,7 +91,14 @@ class Settings(BaseSettings):
 
     # Risk Management
     max_position_per_symbol: int = Field(
-        1000, description="Maximum position per symbol"
+        1000,
+        description="Maximum position per symbol (fallback for non-NIFTY/BANKNIFTY)",
+    )
+    max_nifty_positions: int = Field(
+        5, description="Maximum NIFTY positions (CMP Rule 11: 5 lots)"
+    )
+    max_banknifty_positions: int = Field(
+        3, description="Maximum BANKNIFTY positions (CMP Rule 11: 3 lots)"
     )
     max_total_exposure: Decimal = Field(
         Decimal("1000000.00"), description="Maximum total exposure"
