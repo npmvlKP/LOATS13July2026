@@ -401,17 +401,56 @@ class TradeDecisionEngine:
             "notes": ("Simulated response - production would query actual Analyzer"),
         }
 
-    def increment_modification_counter(self) -> int:
-        """Increment rule 7 modification counter."""
-        return rules_engine.increment_modification_counter()
+    def increment_modification_counter(self, order_id: str | None = None) -> int:
+        """
+              Increment rule 7 modification counter (CMP Rule 7).
 
-    def get_modification_count(self) -> int:
-        """Get current modification counter value."""
-        return rules_engine.get_modification_count()
+              Args:
+                  order_id: If provided, track per-order modifications (CMP Rule 7).
+                           If None, increment legacy global counter (deprecated).
 
-    def reset_modification_counter(self) -> None:
-        """Reset rule 7 modification counter."""
-        rules_engine.reset_modification_counter()
+              Returns:
+                  Current modification count (per-order if order_id provided,
+                  global otherwise)
+        +++++++ REPLACE
+        """
+        return rules_engine.increment_modification_counter(order_id)
+
+    def get_modification_count(self, order_id: str | None = None) -> int:
+        """
+        Get current modification counter value (CMP Rule 7).
+
+        Args:
+            order_id: If provided, get count for specific order.
+                     If None, get legacy global counter (deprecated).
+
+        Returns:
+            Current modification count
+        """
+        return rules_engine.get_modification_count(order_id)
+
+    def check_modification_limit(self, order_id: str, limit: int = 25) -> bool:
+        """
+        Check if order modification limit is within CMP Rule 7 bounds.
+
+        Args:
+            order_id: Order identifier to check
+            limit: Maximum allowed modifications (default: 25 per CMP Rule 7)
+
+        Returns:
+            True if limit not exceeded, False otherwise
+        """
+        return rules_engine.check_modification_limit(order_id, limit)
+
+    def reset_modification_counter(self, order_id: str | None = None) -> None:
+        """
+        Reset rule 7 modification counter (CMP Rule 7).
+
+        Args:
+            order_id: If provided, reset counter for specific order.
+                     If None, reset legacy global counter (deprecated).
+        """
+        rules_engine.reset_modification_counter(order_id)
 
 
 # Module-level singleton instance

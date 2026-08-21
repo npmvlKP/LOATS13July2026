@@ -487,7 +487,8 @@ class TrailingStopEngine:
             take_profit=None,
             trailing_stop_loss=None,
             idempotency_key=(
-                f"slm_{trade.trade_id}_{datetime.datetime.now(datetime.UTC).timestamp()}"
+                f"slm_{trade.trade_id}_"
+                f"{datetime.datetime.now(datetime.UTC).timestamp()}"
             ),
         )
 

@@ -20,6 +20,11 @@ paths = [
     '''gitleaks\.toml''',
     '''\.gitleaks\.toml''',
     '''(.*?)(tests?|spec|test_.*?)\.py$''',
+    '''gitleaks_report\.json''',
+    '''gitleaks_report_new\.json''',
+    '''gitleaks_report_new2\.json''',
+    '''gitleaks_out\.txt''',
+    '''gitleaks_final\.json''',
 ]
 
 # Note: For GitHub Actions, use the security.yml workflow which runs

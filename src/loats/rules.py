@@ -294,7 +294,7 @@ class CMPRulesEngine:
         Limits:
         - 5 lots for NIFTY
         - 3 lots for BANKNIFTY
-        - 1000 for other symbols (existing limit)
+        - max_position_per_symbol for other symbols
         """
         symbol = symbol.upper()
         current_quantity = sum(
@@ -302,9 +302,9 @@ class CMPRulesEngine:
         )
 
         if symbol == "NIFTY":
-            max_allowed = 5 * settings.nifty_lot_size  # 5 lots * 25 = 125
+            max_allowed = settings.max_nifty_positions * settings.nifty_lot_size
         elif symbol == "BANKNIFTY":
-            max_allowed = 3 * settings.nifty_lot_size  # 3 lots * 25 = 75
+            max_allowed = settings.max_banknifty_positions * settings.nifty_lot_size
         else:
             max_allowed = settings.max_position_per_symbol
 
@@ -313,12 +313,16 @@ class CMPRulesEngine:
                 "current_quantity": current_quantity,
                 "max_allowed": max_allowed,
                 "reason": "position_limit_exceeded",
+                "cmp_rule": "CMP Rule 11",
+                "symbol_type": symbol,
             }
 
         return True, {
             "current_quantity": current_quantity,
             "max_allowed": max_allowed,
             "reason": "position_limit_ok",
+            "cmp_rule": "CMP Rule 11",
+            "symbol_type": symbol,
         }
 
     def check_circuit_breakers(
@@ -375,18 +379,81 @@ class CMPRulesEngine:
 
         return True, {"reason": "circuit_breakers_ok"}
 
-    def increment_modification_counter(self) -> int:
-        """Increment rule 7 modification counter."""
-        self.modification_counter += 1
-        return self.modification_counter
+    def increment_modification_counter(self, order_id: str | None = None) -> int:
+        """
+        Increment rule 7 modification counter.
 
-    def reset_modification_counter(self) -> None:
-        """Reset rule 7 modification counter."""
-        self.modification_counter = 0
+        Args:
+            order_id: If provided, track per-order modifications (CMP Rule 7).
+                     If None, increment legacy global counter (deprecated).
 
-    def get_modification_count(self) -> int:
-        """Get current modification counter value."""
-        return self.modification_counter
+        Returns:
+            Current modification count (per-order if order_id provided,
+            global otherwise)
+        """
+        if order_id:
+            # CMP Rule 7: Per-order modification tracking
+            if not hasattr(self, "_order_modification_counters"):
+                self._order_modification_counters: dict[str, int] = {}
+            self._order_modification_counters[order_id] = (
+                self._order_modification_counters.get(order_id, 0) + 1
+            )
+            count = self._order_modification_counters[order_id]
+            return int(count)
+        else:
+            # Legacy global counter (deprecated)
+            self.modification_counter += 1
+            return self.modification_counter
+
+    def check_modification_limit(self, order_id: str, limit: int = 25) -> bool:
+        """
+        Check if order modification limit is within CMP Rule 7 bounds.
+
+        Args:
+            order_id: Order identifier to check
+            limit: Maximum allowed modifications (default: 25 per CMP Rule 7)
+
+        Returns:
+            True if limit not exceeded, False otherwise
+        """
+        if not hasattr(self, "_order_modification_counters"):
+            return True  # No tracking yet, allow modification
+        current_count = self._order_modification_counters.get(order_id, 0)
+        return current_count < limit
+
+    def reset_modification_counter(self, order_id: str | None = None) -> None:
+        """
+        Reset rule 7 modification counter.
+
+        Args:
+            order_id: If provided, reset counter for specific order.
+                     If None, reset legacy global counter (deprecated).
+        """
+        if order_id:
+            # CMP Rule 7: Reset per-order counter
+            if hasattr(self, "_order_modification_counters"):
+                self._order_modification_counters.pop(order_id, None)
+        else:
+            # Legacy global counter reset (deprecated)
+            self.modification_counter = 0
+
+    def get_modification_count(self, order_id: str | None = None) -> int:
+        """
+        Get current modification counter value.
+
+        Args:
+            order_id: If provided, get count for specific order.
+                     If None, get legacy global counter (deprecated).
+
+        Returns:
+            Current modification count
+        """
+        if order_id:
+            if not hasattr(self, "_order_modification_counters"):
+                return 0
+            return self._order_modification_counters.get(order_id, 0)
+        else:
+            return self.modification_counter
 
 
 # Module-level singleton instance

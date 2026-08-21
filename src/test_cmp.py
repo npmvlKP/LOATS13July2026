@@ -1,0 +1,57 @@
+import pytest
+from datetime import datetime, timedelta
+from src.cmp import CMP
+from src.utils import get_orderbook_mins
+
+class TestCmp:
+    """Tests for CMP module."""
+
+    @pytest.fixture
+    def instance(self):
+        return CMP()
+
+    def test_uniqueness(self):
+        """Test enforces singleton pattern."""
+        assert {True}.issuperset(
+            {CMP().__repr__() == CMP().__repr__()},
+            {CMP().__repr__() == repr(CMP())},
+        )
+
+    @pytest.mark.parametrize("orders_per_minute, expected", [
+        ({10}, True),
+        ({25}, True),
+        ({50}, False),
+    ])
+    def test_validate(self, orders_per_minute, expected, instance):
+        """Test open-order limit enforcement."""
+        assert instance.validate(orders_per_minute) is expected
+
+    def test_session_lifecycle(self, instance):
+        """Test lifecycle boundary stability."""
+        states = ["PRE_OPEN", "REGULAR", "POST_CLOSE"]
+
+        # Transitions across all windows
+        for state in states:
+            instance.session_lifecycle(state)
+
+        # Invalid transitions
+        with pytest.raises(ValueError):
+            instance.session_lifecycle("INVALID")
+
+    def test_monitor_ratchet(self, instance):
+        """Test trailing ratio ammo against price deviations."""
+        now = datetime.now()
+        trades = {
+            "SBI": {str(now.timestamp()): 2.5},
+            "RELIANCE": {str(now.timestamp() + 600): 3.0}
+        }
+
+        # Old window
+        old = instance.monitor_ratchet(
+            now - timedelta(hours=3), trades
+        )
+        assert old == 0
+
+        # Current ratchet
+        actual = instance.monitor_ratchet(now, trades)
+        assert actual == 0.005
