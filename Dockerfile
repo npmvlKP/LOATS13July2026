@@ -2,7 +2,8 @@
 # LITE Philosophy: No Docker services, no heavy ML, pure Python
 # This container is for CI/CD and optional local testing only
 
-FROM python:3.12-slim
+# Build stage
+FROM python:3.12-slim as builder
 
 # Prevent Python from writing pyc files and buffering stdout/stderr
 ENV PYTHONDONTWRITEBYTECODE=1
@@ -48,8 +49,27 @@ COPY src/ ./src/
 # Install the package in production mode (not editable)
 RUN pip install --no-cache-dir --no-deps .
 
-# Copy scripts (health checks, etc.)
-COPY quick_health_check.py verify_project_health.py ./
+# Runtime stage
+FROM python:3.12-slim
+
+# Prevent Python from writing pyc files and buffering stdout/stderr
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+ENV PIP_NO_CACHE_DIR=1
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1
+
+# Set timezone to IST for SEBI compliance
+ENV TZ=Asia/Kolkata
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+
+# Set working directory
+WORKDIR /app
+
+# Copy only the necessary files from builder
+COPY --from=builder /usr/local/lib/python3.12/site-packages/ /usr/local/lib/python3.12/site-packages/
+COPY --from=builder /app/src/ /app/src/
+COPY --from=builder /app/quick_health_check.py /app/
+COPY --from=builder /app/verify_project_health.py /app/
 
 # Create non-root user for security
 RUN addgroup --system --gid 1001 loats && \

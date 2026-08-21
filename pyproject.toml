@@ -82,6 +82,8 @@ target-version = "py312"
 exclude = [
     "*.env",
     ".ruff_cache",
+    "scripts/",
+    "docs/",
 ]
 extend-exclude = []
 
@@ -93,6 +95,8 @@ select = ["E", "F", "W", "C90", "I", "N", "UP", "B", "A", "C4", "DTZ", "EXE", "F
 ignore = [
     "E402",
     "I001",
+    "F401",
+    "F541",
     "PTH123",
     "E231",
     "E225",
