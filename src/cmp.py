@@ -7,7 +7,7 @@ Priority Order (P4/P5):
       - <=30 orders open (§7)
       - <=25 activity-minute (§11)
 """
-from src.utils import get_orderbook_mins
+
 from datetime import datetime, timedelta
 
 
@@ -86,4 +86,4 @@ class CMP:
     def session_lifecycle(self, state: str) -> None:
         """Lifecycle boundaries through 3 windows."""
         if state not in {"PRE_OPEN", "REGULAR", "POST_CLOSE"}:
-            raise ValueError(f"Invalid session state")
+            raise ValueError("Invalid session state")

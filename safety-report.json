@@ -1,0 +1,1494 @@
+C:\Program Files\Python312\Lib\site-packages\safety\auth\main.py:5: AuthlibDeprecationWarning: authlib.jose module is deprecated, please use joserfc instead.
+It will be compatible before version 2.0.0.
+  from authlib.jose.errors import ExpiredTokenError
+
+
++===========================================================================================================================================================================================+
+
+
+DEPRECATED: this command (`check`) has been DEPRECATED, and will be unsupported beyond 01 June 2024.
+
+
+We highly encourage switching to the new `scan` command which is easier to use, more powerful, and can be set up to mimic the deprecated command if required.
+
+
++===========================================================================================================================================================================================+
+
+
+{
+    "report_meta": {
+        "scan_target": "files",
+        "scanned": [
+            "requirements-core.txt"
+        ],
+        "scanned_full_path": [
+            "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\requirements-core.txt"
+        ],
+        "target_languages": [
+            "python"
+        ],
+        "policy_file": null,
+        "policy_file_source": "local",
+        "audit_and_monitor": false,
+        "api_key": false,
+        "account": "",
+        "local_database_path": null,
+        "safety_version": "3.8.1",
+        "timestamp": "2026-08-22 18:36:42",
+        "packages_found": 20,
+        "vulnerabilities_found": 0,
+        "vulnerabilities_ignored": 13,
+        "remediations_recommended": 0,
+        "telemetry": {
+            "safety_options": {
+                "files": {
+                    "-r": 1
+                },
+                "json": {
+                    "--json": 1
+                }
+            },
+            "safety_version": "3.8.1",
+            "safety_source": "cli",
+            "os_type": "Windows",
+            "os_release": "11",
+            "os_description": "Windows-11-10.0.26200-SP0",
+            "python_version": "3.12.7",
+            "safety_command": "check"
+        },
+        "git": {
+            "branch": "production-hardening",
+            "tag": "",
+            "commit": "2d965b8730261683f62cdaf063dadcce3130c2d0",
+            "dirty": "True",
+            "origin": "https://github.com/npmvlKP/LOATS13July2026.git"
+        },
+        "project": null,
+        "json_version": "1.1",
+        "remediations_attempted": 0,
+        "remediations_completed": 0,
+        "remediation_mode": "NON_INTERACTIVE"
+    },
+    "scanned_packages": {
+        "pydantic": {
+            "name": "pydantic",
+            "version": null,
+            "requirements": [
+                {
+                    "raw": "pydantic>=2.10",
+                    "extras": [],
+                    "marker": null,
+                    "name": "pydantic",
+                    "specifier": ">=2.10",
+                    "url": null,
+                    "found": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\requirements-core.txt"
+                }
+            ]
+        },
+        "pydantic-settings": {
+            "name": "pydantic-settings",
+            "version": null,
+            "requirements": [
+                {
+                    "raw": "pydantic-settings>=2.7",
+                    "extras": [],
+                    "marker": null,
+                    "name": "pydantic-settings",
+                    "specifier": ">=2.7",
+                    "url": null,
+                    "found": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\requirements-core.txt"
+                }
+            ]
+        },
+        "httpx": {
+            "name": "httpx",
+            "version": null,
+            "requirements": [
+                {
+                    "raw": "httpx>=0.28",
+                    "extras": [],
+                    "marker": null,
+                    "name": "httpx",
+                    "specifier": ">=0.28",
+                    "url": null,
+                    "found": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\requirements-core.txt"
+                }
+            ]
+        },
+        "openalgo": {
+            "name": "openalgo",
+            "version": null,
+            "requirements": [
+                {
+                    "raw": "openalgo>=0.1.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "openalgo",
+                    "specifier": ">=0.1.0",
+                    "url": null,
+                    "found": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\requirements-core.txt"
+                }
+            ]
+        },
+        "python-dotenv": {
+            "name": "python-dotenv",
+            "version": null,
+            "requirements": [
+                {
+                    "raw": "python-dotenv>=1.0.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "python-dotenv",
+                    "specifier": ">=1.0.0",
+                    "url": null,
+                    "found": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\requirements-core.txt"
+                }
+            ]
+        },
+        "vollib": {
+            "name": "vollib",
+            "version": null,
+            "requirements": [
+                {
+                    "raw": "vollib>=1.0.11",
+                    "extras": [],
+                    "marker": null,
+                    "name": "vollib",
+                    "specifier": ">=1.0.11",
+                    "url": null,
+                    "found": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\requirements-core.txt"
+                }
+            ]
+        },
+        "numpy": {
+            "name": "numpy",
+            "version": null,
+            "requirements": [
+                {
+                    "raw": "numpy",
+                    "extras": [],
+                    "marker": null,
+                    "name": "numpy",
+                    "specifier": ">=0",
+                    "url": null,
+                    "found": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\requirements-core.txt"
+                }
+            ]
+        },
+        "pandas": {
+            "name": "pandas",
+            "version": null,
+            "requirements": [
+                {
+                    "raw": "pandas<3.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "pandas",
+                    "specifier": "<3.0",
+                    "url": null,
+                    "found": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\requirements-core.txt"
+                }
+            ]
+        },
+        "scipy": {
+            "name": "scipy",
+            "version": null,
+            "requirements": [
+                {
+                    "raw": "scipy<1.17",
+                    "extras": [],
+                    "marker": null,
+                    "name": "scipy",
+                    "specifier": "<1.17",
+                    "url": null,
+                    "found": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\requirements-core.txt"
+                }
+            ]
+        },
+        "vadersentiment": {
+            "name": "vadersentiment",
+            "version": null,
+            "requirements": [
+                {
+                    "raw": "vaderSentiment>=3.3.2",
+                    "extras": [],
+                    "marker": null,
+                    "name": "vaderSentiment",
+                    "specifier": ">=3.3.2",
+                    "url": null,
+                    "found": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\requirements-core.txt"
+                }
+            ]
+        },
+        "feedparser": {
+            "name": "feedparser",
+            "version": null,
+            "requirements": [
+                {
+                    "raw": "feedparser>=6.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "feedparser",
+                    "specifier": ">=6.0",
+                    "url": null,
+                    "found": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\requirements-core.txt"
+                }
+            ]
+        },
+        "newspaper4k": {
+            "name": "newspaper4k",
+            "version": null,
+            "requirements": [
+                {
+                    "raw": "newspaper4k>=0.9.6",
+                    "extras": [],
+                    "marker": null,
+                    "name": "newspaper4k",
+                    "specifier": ">=0.9.6",
+                    "url": null,
+                    "found": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\requirements-core.txt"
+                }
+            ]
+        },
+        "lxml": {
+            "name": "lxml",
+            "version": null,
+            "requirements": [
+                {
+                    "raw": "lxml>=6.1.1",
+                    "extras": [],
+                    "marker": null,
+                    "name": "lxml",
+                    "specifier": ">=6.1.1",
+                    "url": null,
+                    "found": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\requirements-core.txt"
+                }
+            ]
+        },
+        "lxml-html-clean": {
+            "name": "lxml-html-clean",
+            "version": null,
+            "requirements": [
+                {
+                    "raw": "lxml-html-clean>=0.4.5",
+                    "extras": [],
+                    "marker": null,
+                    "name": "lxml-html-clean",
+                    "specifier": ">=0.4.5",
+                    "url": null,
+                    "found": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\requirements-core.txt"
+                }
+            ]
+        },
+        "structlog": {
+            "name": "structlog",
+            "version": null,
+            "requirements": [
+                {
+                    "raw": "structlog>=23.2",
+                    "extras": [],
+                    "marker": null,
+                    "name": "structlog",
+                    "specifier": ">=23.2",
+                    "url": null,
+                    "found": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\requirements-core.txt"
+                }
+            ]
+        },
+        "python-telegram-bot": {
+            "name": "python-telegram-bot",
+            "version": null,
+            "requirements": [
+                {
+                    "raw": "python-telegram-bot>=20.7",
+                    "extras": [],
+                    "marker": null,
+                    "name": "python-telegram-bot",
+                    "specifier": ">=20.7",
+                    "url": null,
+                    "found": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\requirements-core.txt"
+                }
+            ]
+        },
+        "apscheduler": {
+            "name": "apscheduler",
+            "version": null,
+            "requirements": [
+                {
+                    "raw": "APScheduler>=3.10",
+                    "extras": [],
+                    "marker": null,
+                    "name": "APScheduler",
+                    "specifier": ">=3.10",
+                    "url": null,
+                    "found": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\requirements-core.txt"
+                }
+            ]
+        },
+        "cachetools": {
+            "name": "cachetools",
+            "version": null,
+            "requirements": [
+                {
+                    "raw": "cachetools>=5.3.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "cachetools",
+                    "specifier": ">=5.3.0",
+                    "url": null,
+                    "found": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\requirements-core.txt"
+                }
+            ]
+        },
+        "cryptography": {
+            "name": "cryptography",
+            "version": null,
+            "requirements": [
+                {
+                    "raw": "cryptography>=50.0.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "cryptography",
+                    "specifier": ">=50.0.0",
+                    "url": null,
+                    "found": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\requirements-core.txt"
+                }
+            ]
+        },
+        "aiosqlite": {
+            "name": "aiosqlite",
+            "version": null,
+            "requirements": [
+                {
+                    "raw": "aiosqlite>=0.21.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "aiosqlite",
+                    "specifier": ">=0.21.0",
+                    "url": null,
+                    "found": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\requirements-core.txt"
+                }
+            ]
+        }
+    },
+    "affected_packages": {
+        "apscheduler": {
+            "name": "apscheduler",
+            "version": null,
+            "requirements": [
+                {
+                    "raw": "APScheduler>=3.10",
+                    "extras": [],
+                    "marker": null,
+                    "name": "APScheduler",
+                    "specifier": ">=3.10",
+                    "url": null,
+                    "found": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\requirements-core.txt"
+                }
+            ],
+            "found": null,
+            "insecure_versions": [
+                "4.0.0a1",
+                "4.0.0a2",
+                "4.0.0a3",
+                "4.0.0a4",
+                "4.0.0a5",
+                "4.0.0a6"
+            ],
+            "secure_versions": [
+                "3.11.3",
+                "3.11.2",
+                "3.11.1",
+                "3.11.0",
+                "3.10.4",
+                "3.10.3",
+                "3.10.2",
+                "3.10.1",
+                "3.10.0",
+                "3.9.1.post1",
+                "3.9.0.post2",
+                "3.8.1",
+                "3.8.0",
+                "3.7.0",
+                "3.6.3",
+                "3.6.2",
+                "3.6.1",
+                "3.6.0",
+                "3.5.3",
+                "3.5.2",
+                "3.5.1",
+                "3.5.0",
+                "3.4.0",
+                "3.3.1",
+                "3.3.0",
+                "3.2.0",
+                "3.1.0",
+                "3.0.6",
+                "3.0.5",
+                "3.0.4",
+                "3.0.3",
+                "3.0.2",
+                "3.0.1",
+                "3.0.0",
+                "3.0.0rc1",
+                "3.0.0b2",
+                "3.0.0b1",
+                "2.1.2",
+                "2.1.1",
+                "2.1.0",
+                "2.0.3",
+                "2.0.2",
+                "2.0.1",
+                "2.0.0",
+                "1.3.1",
+                "1.3",
+                "1.2.1",
+                "1.2",
+                "1.0"
+            ],
+            "latest_version_without_known_vulnerabilities": "3.11.3",
+            "latest_version": "4.0.0a6",
+            "more_info_url": "https://getsafety.com/p/pypi/apscheduler/97c/"
+        },
+        "scipy": {
+            "name": "scipy",
+            "version": null,
+            "requirements": [
+                {
+                    "raw": "scipy<1.17",
+                    "extras": [],
+                    "marker": null,
+                    "name": "scipy",
+                    "specifier": "<1.17",
+                    "url": null,
+                    "found": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\requirements-core.txt"
+                }
+            ],
+            "found": null,
+            "insecure_versions": [
+                "0.4.4",
+                "0.5.2",
+                "0.6.0",
+                "0.7.0",
+                "0.7.2",
+                "0.8.0",
+                "0.9.0",
+                "0.10.0",
+                "0.10.1",
+                "0.11.0",
+                "0.12.0"
+            ],
+            "secure_versions": [
+                "1.18.1",
+                "1.18.0",
+                "1.18.0rc2",
+                "1.18.0rc1",
+                "1.17.1",
+                "1.17.0",
+                "1.17.0rc2",
+                "1.17.0rc1",
+                "1.16.3",
+                "1.16.2",
+                "1.16.1",
+                "1.16.0",
+                "1.16.0rc2",
+                "1.16.0rc1",
+                "1.15.3",
+                "1.15.2",
+                "1.15.1",
+                "1.15.0",
+                "1.15.0rc2",
+                "1.15.0rc1",
+                "1.14.1",
+                "1.14.0",
+                "1.14.0rc2",
+                "1.13.1",
+                "1.13.0",
+                "1.13.0rc1",
+                "1.12.0",
+                "1.12.0rc2",
+                "1.12.0rc1",
+                "1.11.4",
+                "1.11.3",
+                "1.11.2",
+                "1.11.1",
+                "1.11.0rc2",
+                "1.11.0rc1",
+                "1.10.1",
+                "1.10.0",
+                "1.10.0rc2",
+                "1.10.0rc1",
+                "1.9.3",
+                "1.9.2",
+                "1.9.1",
+                "1.9.0",
+                "1.9.0rc3",
+                "1.9.0rc2",
+                "1.9.0rc1",
+                "1.8.1",
+                "1.8.0",
+                "1.8.0rc4",
+                "1.8.0rc3",
+                "1.8.0rc2",
+                "1.8.0rc1",
+                "1.7.3",
+                "1.7.2",
+                "1.7.1",
+                "1.7.0",
+                "1.6.3",
+                "1.6.2",
+                "1.6.1",
+                "1.6.0",
+                "1.5.4",
+                "1.5.3",
+                "1.5.2",
+                "1.5.1",
+                "1.5.0",
+                "1.4.1",
+                "1.4.0",
+                "1.3.3",
+                "1.3.2",
+                "1.3.1",
+                "1.3.0",
+                "1.2.3",
+                "1.2.2",
+                "1.2.1",
+                "1.2.0",
+                "1.1.0",
+                "1.0.1",
+                "1.0.0",
+                "0.19.1",
+                "0.19.0",
+                "0.18.1",
+                "0.18.0",
+                "0.17.1",
+                "0.17.0",
+                "0.16.1",
+                "0.16.0",
+                "0.15.1",
+                "0.15.0",
+                "0.14.1",
+                "0.14.0",
+                "0.13.3",
+                "0.13.2",
+                "0.13.1",
+                "0.13.0",
+                "0.12.1"
+            ],
+            "latest_version_without_known_vulnerabilities": "1.18.1",
+            "latest_version": "1.18.1",
+            "more_info_url": "https://getsafety.com/p/pypi/scipy/97c/"
+        },
+        "pandas": {
+            "name": "pandas",
+            "version": null,
+            "requirements": [
+                {
+                    "raw": "pandas<3.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "pandas",
+                    "specifier": "<3.0",
+                    "url": null,
+                    "found": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\requirements-core.txt"
+                }
+            ],
+            "found": null,
+            "insecure_versions": [
+                "0.1",
+                "0.2",
+                "0.3.0",
+                "0.4.0",
+                "0.4.1",
+                "0.4.2",
+                "0.4.3",
+                "0.5.0",
+                "0.6.0",
+                "0.6.1",
+                "0.7.0",
+                "0.7.1",
+                "0.7.2",
+                "0.7.3",
+                "0.8.0",
+                "0.8.1",
+                "0.9.0",
+                "0.9.1",
+                "0.10.0",
+                "0.10.1",
+                "0.11.0",
+                "0.12.0",
+                "0.13.0",
+                "0.13.1",
+                "0.14.0",
+                "0.14.1",
+                "0.15.0",
+                "0.15.1",
+                "0.15.2"
+            ],
+            "secure_versions": [
+                "3.0.5",
+                "3.0.3",
+                "3.0.2",
+                "3.0.1",
+                "3.0.0",
+                "3.0.0rc2",
+                "3.0.0rc1",
+                "3.0.0rc0",
+                "2.3.3",
+                "2.3.2",
+                "2.3.1",
+                "2.3.0",
+                "2.2.3",
+                "2.2.2",
+                "2.2.1",
+                "2.2.0",
+                "2.1.4",
+                "2.1.3",
+                "2.1.2",
+                "2.1.1",
+                "2.1.0",
+                "2.0.3",
+                "2.0.2",
+                "2.0.1",
+                "2.0.0",
+                "1.5.3",
+                "1.5.2",
+                "1.5.1",
+                "1.5.0",
+                "1.4.4",
+                "1.4.3",
+                "1.4.2",
+                "1.4.1",
+                "1.4.0",
+                "1.3.5",
+                "1.3.4",
+                "1.3.3",
+                "1.3.2",
+                "1.3.1",
+                "1.3.0",
+                "1.2.5",
+                "1.2.4",
+                "1.2.3",
+                "1.2.2",
+                "1.2.1",
+                "1.2.0",
+                "1.1.5",
+                "1.1.4",
+                "1.1.3",
+                "1.1.2",
+                "1.1.1",
+                "1.1.0",
+                "1.0.5",
+                "1.0.4",
+                "1.0.3",
+                "1.0.2",
+                "1.0.1",
+                "1.0.0",
+                "0.25.3",
+                "0.25.2",
+                "0.25.1",
+                "0.25.0",
+                "0.24.2",
+                "0.24.1",
+                "0.24.0",
+                "0.23.4",
+                "0.23.3",
+                "0.23.2",
+                "0.23.1",
+                "0.23.0",
+                "0.22.0",
+                "0.21.1",
+                "0.21.0",
+                "0.20.3",
+                "0.20.2",
+                "0.20.1",
+                "0.20.0",
+                "0.19.2",
+                "0.19.1",
+                "0.19.0",
+                "0.18.1",
+                "0.18.0",
+                "0.17.1",
+                "0.17.0",
+                "0.16.2",
+                "0.16.1",
+                "0.16.0"
+            ],
+            "latest_version_without_known_vulnerabilities": "3.0.5",
+            "latest_version": "3.0.5",
+            "more_info_url": "https://getsafety.com/p/pypi/pandas/97c/"
+        },
+        "numpy": {
+            "name": "numpy",
+            "version": null,
+            "requirements": [
+                {
+                    "raw": "numpy",
+                    "extras": [],
+                    "marker": null,
+                    "name": "numpy",
+                    "specifier": ">=0",
+                    "url": null,
+                    "found": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\requirements-core.txt"
+                }
+            ],
+            "found": null,
+            "insecure_versions": [
+                "0.9.6",
+                "0.9.8",
+                "1.0b1",
+                "1.0b4",
+                "1.0b5",
+                "1.0rc1",
+                "1.0rc2",
+                "1.0rc3",
+                "1.0",
+                "1.0.3",
+                "1.0.4",
+                "1.1.1",
+                "1.2.0",
+                "1.2.1",
+                "1.3.0",
+                "1.4.0",
+                "1.4.1",
+                "1.5.0",
+                "1.5.1",
+                "1.6.0",
+                "1.6.1",
+                "1.6.2",
+                "1.7.0",
+                "1.7.1",
+                "1.7.2",
+                "1.8.0",
+                "1.8.1",
+                "1.8.2",
+                "1.9.0",
+                "1.9.1",
+                "1.9.2",
+                "1.9.3",
+                "1.10.0",
+                "1.10.1",
+                "1.10.2",
+                "1.10.3",
+                "1.10.4",
+                "1.11.0",
+                "1.11.1",
+                "1.11.2",
+                "1.11.3",
+                "1.12.0",
+                "1.12.1",
+                "1.13.0",
+                "1.13.1",
+                "1.13.3",
+                "1.14.0",
+                "1.14.1",
+                "1.14.2",
+                "1.14.3",
+                "1.14.4",
+                "1.14.5",
+                "1.14.6",
+                "1.15.0",
+                "1.15.1",
+                "1.15.2",
+                "1.15.3",
+                "1.15.4",
+                "1.16.0",
+                "1.16.1",
+                "1.16.2",
+                "1.16.3",
+                "1.16.4",
+                "1.16.5",
+                "1.16.6",
+                "1.17.0",
+                "1.17.1",
+                "1.17.2",
+                "1.17.3",
+                "1.17.4",
+                "1.17.5",
+                "1.18.0",
+                "1.18.1",
+                "1.18.2",
+                "1.18.3",
+                "1.18.4",
+                "1.18.5",
+                "1.19.0",
+                "1.19.1",
+                "1.19.2",
+                "1.19.3",
+                "1.19.4",
+                "1.19.5",
+                "1.20.0",
+                "1.20.1",
+                "1.20.2",
+                "1.20.3",
+                "1.21.0",
+                "1.21.1",
+                "1.21.2",
+                "1.21.3",
+                "1.21.4",
+                "1.21.5",
+                "1.21.6",
+                "1.22.0",
+                "1.22.1"
+            ],
+            "secure_versions": [
+                "2.5.2",
+                "2.5.1",
+                "2.5.0",
+                "2.5.0rc1",
+                "2.4.6",
+                "2.4.5",
+                "2.4.4",
+                "2.4.3",
+                "2.4.2",
+                "2.4.1",
+                "2.4.0rc1",
+                "2.3.5",
+                "2.3.4",
+                "2.3.3",
+                "2.3.2",
+                "2.3.1",
+                "2.3.0",
+                "2.2.6",
+                "2.2.5",
+                "2.2.4",
+                "2.2.3",
+                "2.2.2",
+                "2.2.1",
+                "2.2.0",
+                "2.1.3",
+                "2.1.2",
+                "2.1.1",
+                "2.1.0",
+                "2.0.2",
+                "2.0.1",
+                "2.0.0",
+                "1.26.4",
+                "1.26.3",
+                "1.26.2",
+                "1.26.1",
+                "1.26.0",
+                "1.25.2",
+                "1.25.1",
+                "1.25.0",
+                "1.24.4",
+                "1.24.3",
+                "1.24.2",
+                "1.24.1",
+                "1.24.0",
+                "1.23.5",
+                "1.23.4",
+                "1.23.3",
+                "1.23.2",
+                "1.23.1",
+                "1.23.0",
+                "1.22.4",
+                "1.22.3",
+                "1.22.2"
+            ],
+            "latest_version_without_known_vulnerabilities": "2.5.2",
+            "latest_version": "2.5.2",
+            "more_info_url": "https://getsafety.com/p/pypi/numpy/97c/"
+        },
+        "python-dotenv": {
+            "name": "python-dotenv",
+            "version": null,
+            "requirements": [
+                {
+                    "raw": "python-dotenv>=1.0.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "python-dotenv",
+                    "specifier": ">=1.0.0",
+                    "url": null,
+                    "found": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\requirements-core.txt"
+                }
+            ],
+            "found": null,
+            "insecure_versions": [
+                "0.1.0",
+                "0.1.2",
+                "0.1.3",
+                "0.1.5",
+                "0.2.0",
+                "0.3.0",
+                "0.4.0",
+                "0.5.0",
+                "0.5.1",
+                "0.6.0",
+                "0.6.1",
+                "0.6.2",
+                "0.6.3",
+                "0.6.4",
+                "0.6.5",
+                "0.7.0",
+                "0.7.1",
+                "0.8.0",
+                "0.8.1",
+                "0.8.2",
+                "0.9.0",
+                "0.9.1",
+                "0.10.0",
+                "0.10.1",
+                "0.10.2",
+                "0.10.3",
+                "0.10.4",
+                "0.10.5",
+                "0.11.0",
+                "0.12.0",
+                "0.13.0",
+                "0.14.0",
+                "0.15.0",
+                "0.16.0",
+                "0.17.0",
+                "0.17.1",
+                "0.18.0",
+                "0.19.0",
+                "0.19.1",
+                "0.19.2",
+                "0.20.0",
+                "0.21.0",
+                "0.21.1",
+                "1.0.0",
+                "1.0.1",
+                "1.1.0",
+                "1.1.1",
+                "1.2.0",
+                "1.2.1"
+            ],
+            "secure_versions": [
+                "1.2.3",
+                "1.2.2"
+            ],
+            "latest_version_without_known_vulnerabilities": "1.2.3",
+            "latest_version": "1.2.3",
+            "more_info_url": "https://getsafety.com/p/pypi/python-dotenv/97c/"
+        },
+        "pydantic-settings": {
+            "name": "pydantic-settings",
+            "version": null,
+            "requirements": [
+                {
+                    "raw": "pydantic-settings>=2.7",
+                    "extras": [],
+                    "marker": null,
+                    "name": "pydantic-settings",
+                    "specifier": ">=2.7",
+                    "url": null,
+                    "found": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\requirements-core.txt"
+                }
+            ],
+            "found": null,
+            "insecure_versions": [
+                "2.12.0",
+                "2.13.0",
+                "2.13.1",
+                "2.14.0",
+                "2.14.1"
+            ],
+            "secure_versions": [
+                "2.15.0",
+                "2.14.2",
+                "2.11.0",
+                "2.10.1",
+                "2.10.0",
+                "2.9.1",
+                "2.9.0",
+                "2.8.1",
+                "2.8.0",
+                "2.7.1",
+                "2.7.0",
+                "2.6.1",
+                "2.6.0",
+                "2.5.2",
+                "2.5.1",
+                "2.5.0",
+                "2.4.0",
+                "2.3.4",
+                "2.3.3",
+                "2.3.2",
+                "2.3.1",
+                "2.3.0",
+                "2.2.1",
+                "2.2.0",
+                "2.1.0",
+                "2.0.3",
+                "2.0.2",
+                "2.0.1",
+                "2.0.0",
+                "2.0b2",
+                "2.0b1",
+                "2.0a4",
+                "2.0a3",
+                "2.0a1",
+                "1.99",
+                "0.2.5",
+                "0.1.2b0",
+                "0.1.1b0",
+                "0.1.0a2",
+                "0.1.0a1"
+            ],
+            "latest_version_without_known_vulnerabilities": "2.15.0",
+            "latest_version": "2.15.0",
+            "more_info_url": "https://getsafety.com/p/pypi/pydantic-settings/97c/"
+        }
+    },
+    "announcements": [
+        {
+            "type": "warning",
+            "message": "Warning: pydantic, pydantic-settings, httpx, openalgo, python-dotenv, vollib, numpy, pandas, scipy, vadersentiment, feedparser, newspaper4k, lxml, lxml-html-clean, structlog, python-telegram-bot, apscheduler, cachetools, cryptography and aiosqlite are unpinned. Safety by default does not report on potential vulnerabilities in unpinned packages. It is recommended to pin your dependencies unless this is a library meant for distribution. To learn more about reporting these, specifier range handling, and options for scanning unpinned packages visit https://docs.pyup.io/docs/safety-range-specs"
+        }
+    ],
+    "vulnerabilities": [],
+    "ignored_vulnerabilities": [
+        {
+            "vulnerability_id": "SFTY-20260519-50561",
+            "package_name": "apscheduler",
+            "ignored": true,
+            "ignored_reason": "This vulnerability is being ignored due to the 'ignore-unpinned-requirements' flag (default True). To change this, set 'ignore-unpinned-requirements' to False under 'security' in your policy file. See https://docs.pyup.io/docs/safety-20-policy-file for more information.",
+            "ignored_expires": null,
+            "vulnerable_spec": [
+                ">=4.0.0a1,<=4.0.0a6"
+            ],
+            "all_vulnerable_specs": [
+                ">=4.0.0a1,<=4.0.0a6"
+            ],
+            "analyzed_version": null,
+            "analyzed_requirement": {
+                "raw": "APScheduler>=3.10",
+                "extras": [],
+                "marker": null,
+                "name": "APScheduler",
+                "specifier": ">=3.10",
+                "url": null,
+                "found": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\requirements-core.txt"
+            },
+            "advisory": "Affected versions of the APScheduler package are vulnerable to Remote Code Execution (RCE) due to Insecure Deserialization. The `unmarshal_object` function in both `JSONSerializer` and `CBORSerializer` allows for arbitrary class instantiation and state injection by dynamically importing modules and invoking `__setstate__` on any class available in the Python environment. An attacker can exploit this vulnerability by submitting a specially crafted JSON or CBOR payload to an application utilizing these serializers, potentially executing arbitrary code within the application's runtime environment.",
+            "is_transitive": false,
+            "published_date": null,
+            "fixed_versions": [],
+            "closest_versions_without_known_vulnerabilities": [],
+            "resources": [],
+            "CVE": "CVE-2026-31072",
+            "severity": null,
+            "affected_versions": [],
+            "more_info_url": "https://getsafety.com/v/SFTY-20260519-50561/97c"
+        },
+        {
+            "vulnerability_id": "54057",
+            "package_name": "scipy",
+            "ignored": true,
+            "ignored_reason": "This vulnerability is being ignored due to the 'ignore-unpinned-requirements' flag (default True). To change this, set 'ignore-unpinned-requirements' to False under 'security' in your policy file. See https://docs.pyup.io/docs/safety-20-policy-file for more information.",
+            "ignored_expires": null,
+            "vulnerable_spec": [
+                ">=0,<0.12.1"
+            ],
+            "all_vulnerable_specs": [
+                ">=0,<0.12.1"
+            ],
+            "analyzed_version": null,
+            "analyzed_requirement": {
+                "raw": "scipy<1.17",
+                "extras": [],
+                "marker": null,
+                "name": "scipy",
+                "specifier": "<1.17",
+                "url": null,
+                "found": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\requirements-core.txt"
+            },
+            "advisory": "The scipy.weave component in SciPy before 0.12.1 creates insecure temporary directories.",
+            "is_transitive": false,
+            "published_date": null,
+            "fixed_versions": [],
+            "closest_versions_without_known_vulnerabilities": [],
+            "resources": [],
+            "CVE": "CVE-2013-4251",
+            "severity": null,
+            "affected_versions": [],
+            "more_info_url": "https://getsafety.com/v/54057/97c"
+        },
+        {
+            "vulnerability_id": "60833",
+            "package_name": "pandas",
+            "ignored": true,
+            "ignored_reason": "This vulnerability is being ignored due to the 'ignore-unpinned-requirements' flag (default True). To change this, set 'ignore-unpinned-requirements' to False under 'security' in your policy file. See https://docs.pyup.io/docs/safety-20-policy-file for more information.",
+            "ignored_expires": null,
+            "vulnerable_spec": [
+                "<0.16.0rc1"
+            ],
+            "all_vulnerable_specs": [
+                "<0.16.0rc1"
+            ],
+            "analyzed_version": null,
+            "analyzed_requirement": {
+                "raw": "pandas<3.0",
+                "extras": [],
+                "marker": null,
+                "name": "pandas",
+                "specifier": "<3.0",
+                "url": null,
+                "found": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\requirements-core.txt"
+            },
+            "advisory": "Prior to version v0.16.0rc1, Pandas had a SQL injection vulnerability that could let attackers carry out any SQL commands they wished.",
+            "is_transitive": false,
+            "published_date": null,
+            "fixed_versions": [],
+            "closest_versions_without_known_vulnerabilities": [],
+            "resources": [],
+            "CVE": null,
+            "severity": null,
+            "affected_versions": [],
+            "more_info_url": "https://getsafety.com/v/60833/97c"
+        },
+        {
+            "vulnerability_id": "44716",
+            "package_name": "numpy",
+            "ignored": true,
+            "ignored_reason": "This vulnerability is being ignored due to the 'ignore-unpinned-requirements' flag (default True). To change this, set 'ignore-unpinned-requirements' to False under 'security' in your policy file. See https://docs.pyup.io/docs/safety-20-policy-file for more information.",
+            "ignored_expires": null,
+            "vulnerable_spec": [
+                "<1.22.0"
+            ],
+            "all_vulnerable_specs": [
+                "<1.22.0"
+            ],
+            "analyzed_version": null,
+            "analyzed_requirement": {
+                "raw": "numpy",
+                "extras": [],
+                "marker": null,
+                "name": "numpy",
+                "specifier": ">=0",
+                "url": null,
+                "found": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\requirements-core.txt"
+            },
+            "advisory": "Numpy 1.22.0 includes a fix for CVE-2021-41496: Buffer overflow in the array_from_pyobj function of fortranobject.c, which allows attackers to conduct a Denial of Service attacks by carefully constructing an array with negative values. \r\nNOTE: The vendor does not agree this is a vulnerability; the negative dimensions can only be created by an already privileged user (or internally).\r\nhttps://github.com/numpy/numpy/issues/19000",
+            "is_transitive": false,
+            "published_date": null,
+            "fixed_versions": [],
+            "closest_versions_without_known_vulnerabilities": [],
+            "resources": [],
+            "CVE": "CVE-2021-41496",
+            "severity": null,
+            "affected_versions": [],
+            "more_info_url": "https://getsafety.com/v/44716/97c"
+        },
+        {
+            "vulnerability_id": "44717",
+            "package_name": "numpy",
+            "ignored": true,
+            "ignored_reason": "This vulnerability is being ignored due to the 'ignore-unpinned-requirements' flag (default True). To change this, set 'ignore-unpinned-requirements' to False under 'security' in your policy file. See https://docs.pyup.io/docs/safety-20-policy-file for more information.",
+            "ignored_expires": null,
+            "vulnerable_spec": [
+                "<1.22.0"
+            ],
+            "all_vulnerable_specs": [
+                "<1.22.0"
+            ],
+            "analyzed_version": null,
+            "analyzed_requirement": {
+                "raw": "numpy",
+                "extras": [],
+                "marker": null,
+                "name": "numpy",
+                "specifier": ">=0",
+                "url": null,
+                "found": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\requirements-core.txt"
+            },
+            "advisory": "Numpy 1.22.0 includes a fix for CVE-2021-34141: An incomplete string comparison in the numpy.core component in NumPy before 1.22.0 allows attackers to trigger slightly incorrect copying by constructing specific string objects. \r\nNOTE: the vendor states that this reported code behavior is \"completely harmless.\"\r\nhttps://github.com/numpy/numpy/issues/18993",
+            "is_transitive": false,
+            "published_date": null,
+            "fixed_versions": [],
+            "closest_versions_without_known_vulnerabilities": [],
+            "resources": [],
+            "CVE": "CVE-2021-34141",
+            "severity": null,
+            "affected_versions": [],
+            "more_info_url": "https://getsafety.com/v/44717/97c"
+        },
+        {
+            "vulnerability_id": "36810",
+            "package_name": "numpy",
+            "ignored": true,
+            "ignored_reason": "This vulnerability is being ignored due to the 'ignore-unpinned-requirements' flag (default True). To change this, set 'ignore-unpinned-requirements' to False under 'security' in your policy file. See https://docs.pyup.io/docs/safety-20-policy-file for more information.",
+            "ignored_expires": null,
+            "vulnerable_spec": [
+                "<1.16.3"
+            ],
+            "all_vulnerable_specs": [
+                "<1.16.3"
+            ],
+            "analyzed_version": null,
+            "analyzed_requirement": {
+                "raw": "numpy",
+                "extras": [],
+                "marker": null,
+                "name": "numpy",
+                "specifier": ">=0",
+                "url": null,
+                "found": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\requirements-core.txt"
+            },
+            "advisory": "*Disputed* Numpy 1.16.3 includes a fix for CVE-2019-6446: It uses the pickle Python module unsafely, which allows remote attackers to execute arbitrary code via a crafted serialized object, as demonstrated by a numpy.load call.\r\nNOTE: Third parties dispute this issue because it is  a behavior that might have legitimate applications in (for example) loading serialized Python object arrays from trusted and authenticated  sources.\r\nhttps://github.com/numpy/numpy/commit/89b688732b37616c9d26623f81aaee1703c30ffb",
+            "is_transitive": false,
+            "published_date": null,
+            "fixed_versions": [],
+            "closest_versions_without_known_vulnerabilities": [],
+            "resources": [],
+            "CVE": "CVE-2019-6446",
+            "severity": null,
+            "affected_versions": [],
+            "more_info_url": "https://getsafety.com/v/36810/97c"
+        },
+        {
+            "vulnerability_id": "44715",
+            "package_name": "numpy",
+            "ignored": true,
+            "ignored_reason": "This vulnerability is being ignored due to the 'ignore-unpinned-requirements' flag (default True). To change this, set 'ignore-unpinned-requirements' to False under 'security' in your policy file. See https://docs.pyup.io/docs/safety-20-policy-file for more information.",
+            "ignored_expires": null,
+            "vulnerable_spec": [
+                ">=1.4.1,<1.22.2"
+            ],
+            "all_vulnerable_specs": [
+                ">=1.4.1,<1.22.2"
+            ],
+            "analyzed_version": null,
+            "analyzed_requirement": {
+                "raw": "numpy",
+                "extras": [],
+                "marker": null,
+                "name": "numpy",
+                "specifier": ">=0",
+                "url": null,
+                "found": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\requirements-core.txt"
+            },
+            "advisory": "Numpy 1.22.2  includes a fix for CVE-2021-41495: Null Pointer Dereference vulnerability exists in numpy.sort in NumPy in the PyArray_DescrNew function due to missing return-value validation, which allows attackers to conduct DoS attacks by repetitively creating sort arrays. \r\nNOTE: While correct that validation is missing, an error can only occur due to an exhaustion of memory. If the user can exhaust memory, they are already privileged. Further, it should be practically impossible to construct an attack which can target the memory exhaustion to occur at exactly this place.\r\nNOTE2: The specs we include in this advisory differ from the publicly available on other sources. For example, the advisory posted by the NVD indicate that versions up to and including 1.19.0 are affected. However, research by Safety CLI Cybersecurity confirms that the vulnerability remained unaddressed until version 1.22.2.",
+            "is_transitive": false,
+            "published_date": null,
+            "fixed_versions": [],
+            "closest_versions_without_known_vulnerabilities": [],
+            "resources": [],
+            "CVE": "CVE-2021-41495",
+            "severity": null,
+            "affected_versions": [],
+            "more_info_url": "https://getsafety.com/v/44715/97c"
+        },
+        {
+            "vulnerability_id": "44720",
+            "package_name": "numpy",
+            "ignored": true,
+            "ignored_reason": "This vulnerability is being ignored due to the 'ignore-unpinned-requirements' flag (default True). To change this, set 'ignore-unpinned-requirements' to False under 'security' in your policy file. See https://docs.pyup.io/docs/safety-20-policy-file for more information.",
+            "ignored_expires": null,
+            "vulnerable_spec": [
+                "<1.13.2"
+            ],
+            "all_vulnerable_specs": [
+                "<1.13.2"
+            ],
+            "analyzed_version": null,
+            "analyzed_requirement": {
+                "raw": "numpy",
+                "extras": [],
+                "marker": null,
+                "name": "numpy",
+                "specifier": ">=0",
+                "url": null,
+                "found": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\requirements-core.txt"
+            },
+            "advisory": "Numpy 1.13.2 includes a fix for CVE-2017-12852: The numpy.pad function in Numpy 1.13.1 and older versions is missing input validation. An empty list or ndarray will stick into an infinite loop, which can allow attackers to cause a DoS attack.\r\nhttps://github.com/numpy/numpy/issues/9560#issuecomment-322395292",
+            "is_transitive": false,
+            "published_date": null,
+            "fixed_versions": [],
+            "closest_versions_without_known_vulnerabilities": [],
+            "resources": [],
+            "CVE": "CVE-2017-12852",
+            "severity": null,
+            "affected_versions": [],
+            "more_info_url": "https://getsafety.com/v/44720/97c"
+        },
+        {
+            "vulnerability_id": "44719",
+            "package_name": "numpy",
+            "ignored": true,
+            "ignored_reason": "This vulnerability is being ignored due to the 'ignore-unpinned-requirements' flag (default True). To change this, set 'ignore-unpinned-requirements' to False under 'security' in your policy file. See https://docs.pyup.io/docs/safety-20-policy-file for more information.",
+            "ignored_expires": null,
+            "vulnerable_spec": [
+                "<1.8.1"
+            ],
+            "all_vulnerable_specs": [
+                "<1.8.1"
+            ],
+            "analyzed_version": null,
+            "analyzed_requirement": {
+                "raw": "numpy",
+                "extras": [],
+                "marker": null,
+                "name": "numpy",
+                "specifier": ">=0",
+                "url": null,
+                "found": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\requirements-core.txt"
+            },
+            "advisory": "Numpy 1.8.1 includes a fix for CVE-2014-1858: __init__.py in f2py in NumPy before 1.8.1 allows local users to write to arbitrary files via a symlink attack on a temporary file.\r\nhttps://github.com/numpy/numpy/commit/0bb46c1448b0d3f5453d5182a17ea7ac5854ee15",
+            "is_transitive": false,
+            "published_date": null,
+            "fixed_versions": [],
+            "closest_versions_without_known_vulnerabilities": [],
+            "resources": [],
+            "CVE": "CVE-2014-1858",
+            "severity": null,
+            "affected_versions": [],
+            "more_info_url": "https://getsafety.com/v/44719/97c"
+        },
+        {
+            "vulnerability_id": "34726",
+            "package_name": "numpy",
+            "ignored": true,
+            "ignored_reason": "This vulnerability is being ignored due to the 'ignore-unpinned-requirements' flag (default True). To change this, set 'ignore-unpinned-requirements' to False under 'security' in your policy file. See https://docs.pyup.io/docs/safety-20-policy-file for more information.",
+            "ignored_expires": null,
+            "vulnerable_spec": [
+                "<1.8.1"
+            ],
+            "all_vulnerable_specs": [
+                "<1.8.1"
+            ],
+            "analyzed_version": null,
+            "analyzed_requirement": {
+                "raw": "numpy",
+                "extras": [],
+                "marker": null,
+                "name": "numpy",
+                "specifier": ">=0",
+                "url": null,
+                "found": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\requirements-core.txt"
+            },
+            "advisory": "Numpy 1.8.1 includes a fix for CVE-2014-1859: (1) core/tests/test_memmap.py, (2) core/tests/test_multiarray.py, (3) f2py/f2py2e.py, and (4) lib/tests/test_io.py in NumPy before 1.8.1 allow local users to write to arbitrary files via a symlink attack on a temporary file.\r\nhttps://github.com/numpy/numpy/pull/4262",
+            "is_transitive": false,
+            "published_date": null,
+            "fixed_versions": [],
+            "closest_versions_without_known_vulnerabilities": [],
+            "resources": [],
+            "CVE": "CVE-2014-1859",
+            "severity": null,
+            "affected_versions": [],
+            "more_info_url": "https://getsafety.com/v/34726/97c"
+        },
+        {
+            "vulnerability_id": "43453",
+            "package_name": "numpy",
+            "ignored": true,
+            "ignored_reason": "This vulnerability is being ignored due to the 'ignore-unpinned-requirements' flag (default True). To change this, set 'ignore-unpinned-requirements' to False under 'security' in your policy file. See https://docs.pyup.io/docs/safety-20-policy-file for more information.",
+            "ignored_expires": null,
+            "vulnerable_spec": [
+                "<1.21.0rc1"
+            ],
+            "all_vulnerable_specs": [
+                "<1.21.0rc1"
+            ],
+            "analyzed_version": null,
+            "analyzed_requirement": {
+                "raw": "numpy",
+                "extras": [],
+                "marker": null,
+                "name": "numpy",
+                "specifier": ">=0",
+                "url": null,
+                "found": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\requirements-core.txt"
+            },
+            "advisory": "Numpy 1.21.0rc1 includes a fix for CVE-2021-33430: A Buffer Overflow vulnerability in the PyArray_NewFromDescr_int function of ctors.c when specifying arrays of large dimensions (over 32) from Python code, which could let a malicious user cause a Denial of Service. \r\nNOTE: The vendor does not agree this is a vulnerability. In (very limited) circumstances a user may be able provoke the buffer overflow, the user is most likely already privileged to at least provoke denial of service by exhausting memory. Triggering this further requires the use of uncommon API (complicated structured dtypes), which is very unlikely to be available to an unprivileged user.\r\nhttps://github.com/numpy/numpy/issues/18939",
+            "is_transitive": false,
+            "published_date": null,
+            "fixed_versions": [],
+            "closest_versions_without_known_vulnerabilities": [],
+            "resources": [],
+            "CVE": "CVE-2021-33430",
+            "severity": null,
+            "affected_versions": [],
+            "more_info_url": "https://getsafety.com/v/43453/97c"
+        },
+        {
+            "vulnerability_id": "94066",
+            "package_name": "python-dotenv",
+            "ignored": true,
+            "ignored_reason": "This vulnerability is being ignored due to the 'ignore-unpinned-requirements' flag (default True). To change this, set 'ignore-unpinned-requirements' to False under 'security' in your policy file. See https://docs.pyup.io/docs/safety-20-policy-file for more information.",
+            "ignored_expires": null,
+            "vulnerable_spec": [
+                "<1.2.2"
+            ],
+            "all_vulnerable_specs": [
+                "<1.2.2"
+            ],
+            "analyzed_version": null,
+            "analyzed_requirement": {
+                "raw": "python-dotenv>=1.0.0",
+                "extras": [],
+                "marker": null,
+                "name": "python-dotenv",
+                "specifier": ">=1.0.0",
+                "url": null,
+                "found": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\requirements-core.txt"
+            },
+            "advisory": "Affected versions of the python-dotenv package are vulnerable to Arbitrary File Overwrite due to unsafe symlink handling in the rewrite() context manager used by set_key() and unset_key() in dotenv/main.py. When the target .env path is a symbolic link and the system temporary directory resides on a different filesystem, shutil.move() falls back to shutil.copy2(), which follows symlinks by default and writes the new content to the symlink target rather than replacing the symlink itself. A local attacker with write access to the directory containing a .env file can pre-place a symlink pointing to any file writable by the process, causing a subsequent call to set_key() or unset_key() to deterministically overwrite the target with attacker-controlled .env content, resulting in integrity loss, Denial of Service, and potential privilege escalation when the consuming process runs with elevated privileges.",
+            "is_transitive": false,
+            "published_date": null,
+            "fixed_versions": [],
+            "closest_versions_without_known_vulnerabilities": [],
+            "resources": [],
+            "CVE": "CVE-2026-28684",
+            "severity": null,
+            "affected_versions": [],
+            "more_info_url": "https://getsafety.com/v/94066/97c"
+        },
+        {
+            "vulnerability_id": "SFTY-20260619-43815",
+            "package_name": "pydantic-settings",
+            "ignored": true,
+            "ignored_reason": "This vulnerability is being ignored due to the 'ignore-unpinned-requirements' flag (default True). To change this, set 'ignore-unpinned-requirements' to False under 'security' in your policy file. See https://docs.pyup.io/docs/safety-20-policy-file for more information.",
+            "ignored_expires": null,
+            "vulnerable_spec": [
+                ">=2.12.0,<2.14.2"
+            ],
+            "all_vulnerable_specs": [
+                ">=2.12.0,<2.14.2"
+            ],
+            "analyzed_version": null,
+            "analyzed_requirement": {
+                "raw": "pydantic-settings>=2.7",
+                "extras": [],
+                "marker": null,
+                "name": "pydantic-settings",
+                "specifier": ">=2.7",
+                "url": null,
+                "found": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\requirements-core.txt"
+            },
+            "advisory": "Affected versions of the `pydantic-settings` package are vulnerable to Path Traversal due to improper handling of symbolic links in the `NestedSecretsSettingsSource`. The `load_secrets()` function follows symbolic links within the `secrets_dir`, allowing files outside the configured directory to be read, while the `validate_secrets_path()` function fails to account for these links, bypassing the `secrets_dir_max_size` constraint. An attacker with the ability to influence the contents of the `secrets_dir`, such as through a writable or shared secrets mount, can exploit this to perform unintended local file reads and bypass size limitations, potentially accessing sensitive information.",
+            "is_transitive": false,
+            "published_date": null,
+            "fixed_versions": [],
+            "closest_versions_without_known_vulnerabilities": [],
+            "resources": [],
+            "CVE": null,
+            "severity": null,
+            "affected_versions": [],
+            "more_info_url": "https://getsafety.com/v/SFTY-20260619-43815/97c"
+        }
+    ],
+    "remediations": {},
+    "remediations_results": {
+        "vulnerabilities_fixed": [],
+        "remediations_applied": {},
+        "remediations_skipped": {}
+    }
+}
+
+
++===========================================================================================================================================================================================+
+
+
+DEPRECATED: this command (`check`) has been DEPRECATED, and will be unsupported beyond 01 June 2024.
+
+
+We highly encourage switching to the new `scan` command which is easier to use, more powerful, and can be set up to mimic the deprecated command if required.
+
+
++===========================================================================================================================================================================================+
+
+

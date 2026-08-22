@@ -381,6 +381,7 @@ def calculate_cmf(df: pd.DataFrame, period: int = 20) -> pd.Series:
     cmf.iloc[:period] = np.nan
     return cmf
 
+
 def calculate_bbands(
     df: pd.DataFrame, period: int = 20, std_dev: float = 2.0
 ) -> tuple[pd.Series, pd.Series, pd.Series]:
@@ -408,6 +409,7 @@ def calculate_bbands(
     lower_band.iloc[:period] = np.nan
 
     return upper_band, middle_band, lower_band
+
 
 def calculate_cci(
     df: pd.DataFrame, period: int = 20, constant: float = 0.015
@@ -440,6 +442,7 @@ def calculate_cci(
 
     cci.iloc[:period] = np.nan
     return cci
+
 
 def calculate_hurst_exponent(
     df: pd.DataFrame, period: int = 100, min_lag: int = 10, max_lag: int = 50
@@ -505,6 +508,7 @@ def calculate_hurst_exponent(
 
     return float(np.clip(slope, 0.0, 1.0))
 
+
 def detect_regime(
     df: pd.DataFrame,
     hurst_period: int = 100,
@@ -538,9 +542,8 @@ def detect_regime(
     else:  # Default to ranging
         return "RANGING"
 
-def calculate_adx_standalone(
-    df: pd.DataFrame, period: int = 14
-) -> float:
+
+def calculate_adx_standalone(df: pd.DataFrame, period: int = 14) -> float:
     """Standalone ADX calculation for TA module consistency."""
     if len(df) < period:
         return 25.0  # Default neutral value
@@ -571,7 +574,9 @@ def calculate_adx_standalone(
     df_copy["-DI"] = 100 * (df_copy["-DM_smooth"] / df_copy["TR_smooth"])
 
     # Calculate DX and ADX
-    df_copy["DX"] = 100 * abs(df_copy["+DI"] - df_copy["-DI"]) / (df_copy["+DI"] + df_copy["-DI"])
+    plus_di = df_copy["+DI"]
+    minus_di = df_copy["-DI"]
+    df_copy["DX"] = 100 * abs(plus_di - minus_di) / (plus_di + minus_di)
     adx = df_copy["DX"].rolling(window=period).mean().iloc[-1]
 
     return float(adx) if not pd.isna(adx) else 25.0
@@ -815,10 +820,13 @@ class TechnicalAnalysis:
 
         # Add regime detection
         regime = detect_regime(df)
+        regime_value = (
+            0.9 if regime == "TRENDING" else 0.5 if regime == "MEAN_REVERTING" else 0.3
+        )
         indicators.append(
             TAIndicator(
                 name="regime",
-                value=0.9 if regime == "TRENDING" else 0.5 if regime == "MEAN_REVERTING" else 0.3,
+                value=regime_value,
                 timestamp=historical_data[-1].timestamp,
                 metadata={"type": "regime", "regime": regime},
             )

@@ -1,14 +1,13 @@
 """Rate limiter probe to verify CMP Rule 4 compliance."""
+
 import asyncio
 import os
-import sys
 
-sys.path.append("g:\\.OA\\LOATS-13July2026\\LOATS13July2026")
 from loats.config import get_settings
 from loats.utils.rate_limiter import (
+    _reset_singletons_for_testing,
     get_order_rate_limiter,
     get_smart_order_rate_limiter,
-    _reset_singletons_for_testing,
 )
 
 
@@ -30,9 +29,7 @@ def main() -> None:
     print("\n2. Testing Order Rate Limiter:")
     order_limiter = get_order_rate_limiter()
     print(f"   - Order limiter max_ops: {order_limiter.max_ops}")
-    print(
-        f"   - Singleton identity check: {order_limiter is get_order_rate_limiter()}"
-    )
+    print(f"   - Singleton identity check: {order_limiter is get_order_rate_limiter()}")
 
     # Test smart order rate limiter
     print("\n3. Testing Smart Order Rate Limiter:")
