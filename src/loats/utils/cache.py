@@ -9,17 +9,22 @@ import threading
 import time
 from collections import abc
 from collections.abc import Callable
-from typing import Any, TypeVar
+from typing import Any, Generic, TypeVar
 
 from pydantic import BaseModel
 
 from ..loats_logging import get_logger
 
-class SimpleTTLCache:
+KT = TypeVar("KT")
+VT = TypeVar("VT")
+
+
+class SimpleTTLCache[KT, VT]:
     """Simple TTL cache implementation using threading.Lock for better control.
 
-    This replaces cachetools.TTLCache with a simpler, more controllable implementation
-    that uses threading.Lock instead of RLock for better performance in high-contention scenarios.
+    This replaces cachetools.TTLCache with a simpler, more controllable
+    implementation that uses threading.Lock instead of RLock for better
+    performance in high-contention scenarios.
     """
 
     def __init__(self, maxsize: int, ttl: int):
@@ -31,17 +36,17 @@ class SimpleTTLCache:
         """
         self.maxsize = maxsize
         self.ttl = ttl
-        self._cache: dict[str, tuple[Any, float]] = {}
+        self._cache: dict[KT, tuple[VT, float]] = {}
         self._lock = threading.Lock()
-        self._access_order: list[str] = []
+        self._access_order: list[KT] = []
 
-    def __contains__(self, key: str) -> bool:
+    def __contains__(self, key: KT) -> bool:
         """Check if key exists in cache (respecting TTL)."""
         with self._lock:
             self._cleanup_expired()
             return key in self._cache
 
-    def __getitem__(self, key: str) -> Any:
+    def __getitem__(self, key: KT) -> VT:
         """Get item from cache."""
         with self._lock:
             self._cleanup_expired()
@@ -55,7 +60,7 @@ class SimpleTTLCache:
             self._access_order.append(key)
             return value
 
-    def __setitem__(self, key: str, value: Any) -> None:
+    def __setitem__(self, key: KT, value: VT) -> None:
         """Set item in cache."""
         with self._lock:
             self._cleanup_expired()
@@ -74,7 +79,7 @@ class SimpleTTLCache:
                 if oldest_key in self._cache:
                     del self._cache[oldest_key]
 
-    def __delitem__(self, key: str) -> None:
+    def __delitem__(self, key: KT) -> None:
         """Delete item from cache."""
         with self._lock:
             if key in self._cache:
@@ -82,7 +87,7 @@ class SimpleTTLCache:
             if key in self._access_order:
                 self._access_order.remove(key)
 
-    def get(self, key: str, default: Any = None) -> Any:
+    def get(self, key: KT, default: VT | None = None) -> VT | None:
         """Get item from cache with default."""
         with self._lock:
             self._cleanup_expired()
@@ -121,7 +126,7 @@ class SimpleTTLCache:
             self._cleanup_expired()
             return len(self._cache)
 
-    def keys(self) -> list[str]:
+    def keys(self) -> list[KT]:
         """Get list of keys in cache."""
         with self._lock:
             self._cleanup_expired()

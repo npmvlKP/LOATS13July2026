@@ -214,7 +214,7 @@ class TestAsyncRateLimiter:
             # Move clock forward to create a known wait time
             current_time = async_rate_limiter._clock()
             oldest_timestamp = async_rate_limiter.timestamps[0]
-            expected_wait_time = oldest_timestamp + async_rate_limiter.window_size - current_time
+            _ = oldest_timestamp + async_rate_limiter.window_size - current_time
 
             # Wait time should be the time until the oldest timestamp falls out of window
             wait_time = await async_rate_limiter.get_wait_time()

@@ -31,8 +31,7 @@ class TestCacheRedisCoverage:
         # Should initialize with in-memory cache
         await cache_manager.initialize()
         assert cache_manager._cache is not None
-        assert isinstance(cache_manager._cache, TTLCache)
-        assert cache_manager._cache_type == "in_memory_ttl"
+        assert cache_manager._cache_type == "in_memory_simple_ttl"
 
     @pytest.mark.asyncio
     async def test_redis_connection_error_handling(
@@ -42,7 +41,7 @@ class TestCacheRedisCoverage:
         # For LITE edition, always use in-memory cache regardless of Redis config
         await cache_manager.initialize()
         assert cache_manager._cache is not None
-        assert cache_manager._cache_type == "in_memory_ttl"
+        assert cache_manager._cache_type == "in_memory_simple_ttl"
 
     @pytest.mark.asyncio
     async def test_redis_get_with_bytes_response(
@@ -57,7 +56,7 @@ class TestCacheRedisCoverage:
 
         result = await cache_manager.get("test_key")
         assert result == "cached_value"
-        assert cache_manager._cache_type == "in_memory_ttl"
+        assert cache_manager._cache_type == "in_memory_simple_ttl"
 
     @pytest.mark.asyncio
     async def test_redis_get_not_found_handling(
@@ -70,7 +69,7 @@ class TestCacheRedisCoverage:
         result = await cache_manager.get("missing_key")
         # Should return None and increment misses
         assert result is None
-        assert cache_manager._cache_type == "in_memory_ttl"
+        assert cache_manager._cache_type == "in_memory_simple_ttl"
 
     @pytest.mark.asyncio
     async def test_redis_set_error_handling(self, cache_manager: CacheManager) -> None:
@@ -80,7 +79,7 @@ class TestCacheRedisCoverage:
         result = await cache_manager.set("test_key", "test_value")
         # Should work with in-memory cache
         assert result is True
-        assert cache_manager._cache_type == "in_memory_ttl"
+        assert cache_manager._cache_type == "in_memory_simple_ttl"
 
     @pytest.mark.asyncio
     async def test_redis_delete_error_handling(
@@ -95,7 +94,7 @@ class TestCacheRedisCoverage:
         result = await cache_manager.delete("test_key")
         # Should work with in-memory cache
         assert result is True
-        assert cache_manager._cache_type == "in_memory_ttl"
+        assert cache_manager._cache_type == "in_memory_simple_ttl"
 
     @pytest.mark.asyncio
     async def test_redis_clear_with_pattern(self, cache_manager: CacheManager) -> None:
@@ -110,7 +109,7 @@ class TestCacheRedisCoverage:
         result = await cache_manager.clear("test")
         # Should clear matching keys
         assert result == 2
-        assert cache_manager._cache_type == "in_memory_ttl"
+        assert cache_manager._cache_type == "in_memory_simple_ttl"
 
     @pytest.mark.asyncio
     async def test_redis_clear_all_keys(self, cache_manager: CacheManager) -> None:
@@ -124,7 +123,7 @@ class TestCacheRedisCoverage:
         result = await cache_manager.clear("*")
         # Should clear all keys
         assert result == 2
-        assert cache_manager._cache_type == "in_memory_ttl"
+        assert cache_manager._cache_type == "in_memory_simple_ttl"
 
     @pytest.mark.asyncio
     async def test_redis_stats_collection(self, cache_manager: CacheManager) -> None:
@@ -140,7 +139,7 @@ class TestCacheRedisCoverage:
         assert stats["cache_type"] == "lightweight_in_memory"
         assert stats["current_size"] == 1
         assert stats["hits"] == 1
-        assert cache_manager._cache_type == "in_memory_ttl"
+        assert cache_manager._cache_type == "in_memory_simple_ttl"
 
     @pytest.mark.asyncio
     async def test_redis_stats_fallback(self, cache_manager: CacheManager) -> None:
@@ -151,7 +150,7 @@ class TestCacheRedisCoverage:
         # Should return in-memory stats
         assert stats["cache_type"] == "lightweight_in_memory"
         assert stats["enabled"] is True
-        assert cache_manager._cache_type == "in_memory_ttl"
+        assert cache_manager._cache_type == "in_memory_simple_ttl"
 
     @pytest.mark.asyncio
     async def test_cache_close_with_redis(self, cache_manager: CacheManager) -> None:
@@ -161,7 +160,7 @@ class TestCacheRedisCoverage:
         # Close should work with in-memory cache
         await cache_manager.close()
         # Should not raise exception
-        assert cache_manager._cache_type == "in_memory_ttl"
+        assert cache_manager._cache_type == "in_memory_simple_ttl"
 
     @pytest.mark.asyncio
     async def test_redis_connection_parameters(
@@ -184,7 +183,7 @@ class TestCacheRedisCoverage:
         await cache_manager.initialize()
 
         # Should use in-memory cache only
-        assert cache_manager._cache_type == "in_memory_ttl"
+        assert cache_manager._cache_type == "in_memory_simple_ttl"
         assert config.cache_type == "memory"
 
     @pytest.mark.asyncio
@@ -205,7 +204,7 @@ class TestCacheRedisCoverage:
 
         cache_key_custom = cache_manager_custom._get_cache_key("test_key")
         assert cache_key_custom == "custom:test_key"
-        assert cache_manager_custom._cache_type == "in_memory_ttl"
+        assert cache_manager_custom._cache_type == "in_memory_simple_ttl"
 
     @pytest.mark.asyncio
     async def test_redis_fallback_consistency(
@@ -222,4 +221,4 @@ class TestCacheRedisCoverage:
         assert result1 == "consistent_value"
 
         # Verify cache type is in-memory
-        assert cache_manager._cache_type == "in_memory_ttl"
+        assert cache_manager._cache_type == "in_memory_simple_ttl"

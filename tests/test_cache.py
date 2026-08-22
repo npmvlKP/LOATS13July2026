@@ -7,12 +7,12 @@ import json
 from unittest.mock import patch
 
 import pytest
-from cachetools import TTLCache
 from pydantic import BaseModel
 
 from loats.utils.cache import (
     CacheConfig,
     CacheManager,
+    SimpleTTLCache,
     cache_manager,
     close_cache,
     dict_to_cache_key,
@@ -61,7 +61,7 @@ class TestCacheManager:
         """Test successful in-memory cache initialization."""
         await cache_manager.initialize()
         assert cache_manager._cache is not None
-        assert isinstance(cache_manager._cache, TTLCache)
+        assert isinstance(cache_manager._cache, SimpleTTLCache)
 
     @pytest.mark.asyncio
     async def test_close(self, cache_manager: CacheManager) -> None:

@@ -57,8 +57,7 @@ class TestCacheManagerAdditional:
 
         await cache_manager_with_memory.initialize()
         assert cache_manager_with_memory._cache is not None
-        assert isinstance(cache_manager_with_memory._cache, TTLCache)
-        assert cache_manager_with_memory._cache_type == "in_memory_ttl"
+        assert cache_manager_with_memory._cache_type == "in_memory_simple_ttl"
 
     @pytest.mark.asyncio
     async def test_initialize_redis_connection_error(
@@ -74,8 +73,7 @@ class TestCacheManagerAdditional:
 
         await cache_manager_with_memory.initialize()
         assert cache_manager_with_memory._cache is not None
-        assert isinstance(cache_manager_with_memory._cache, TTLCache)
-        assert cache_manager_with_memory._cache_type == "in_memory_ttl"
+        assert cache_manager_with_memory._cache_type == "in_memory_simple_ttl"
 
     @pytest.mark.asyncio
     async def test_get_redis_fallback(self, cache_manager: CacheManager) -> None:
@@ -89,7 +87,7 @@ class TestCacheManagerAdditional:
         # Test in-memory get operation
         result = await cache_manager.get("test_key")
         assert result == "cached_value"
-        assert cache_manager._cache_type == "in_memory_ttl"
+        assert cache_manager._cache_type == "in_memory_simple_ttl"
 
     @pytest.mark.asyncio
     async def test_set_redis_fallback(self, cache_manager: CacheManager) -> None:
@@ -102,7 +100,7 @@ class TestCacheManagerAdditional:
         # Verify it was stored in in-memory cache
         cache_key = cache_manager._get_cache_key("test_key")
         assert cache_manager._cache[cache_key] == "test_value"
-        assert cache_manager._cache_type == "in_memory_ttl"
+        assert cache_manager._cache_type == "in_memory_simple_ttl"
 
     @pytest.mark.asyncio
     async def test_delete_redis_fallback(self, cache_manager: CacheManager) -> None:
@@ -116,7 +114,7 @@ class TestCacheManagerAdditional:
         result = await cache_manager.delete("test_key")
         assert result is True
         assert cache_key not in cache_manager._cache
-        assert cache_manager._cache_type == "in_memory_ttl"
+        assert cache_manager._cache_type == "in_memory_simple_ttl"
 
     @pytest.mark.asyncio
     async def test_clear_redis_fallback(self, cache_manager: CacheManager) -> None:
@@ -130,7 +128,7 @@ class TestCacheManagerAdditional:
         result = await cache_manager.clear()
         assert result == 2
         assert len(cache_manager._cache) == 0
-        assert cache_manager._cache_type == "in_memory_ttl"
+        assert cache_manager._cache_type == "in_memory_simple_ttl"
 
     @pytest.mark.asyncio
     async def test_get_cache_stats_redis_fallback(
@@ -153,7 +151,7 @@ class TestCacheManagerAdditional:
         assert stats["current_size"] == 2
         assert stats["hits"] == 10
         assert stats["misses"] == 5
-        assert cache_manager._cache_type == "in_memory_ttl"
+        assert cache_manager._cache_type == "in_memory_simple_ttl"
 
     @pytest.mark.asyncio
     async def test_get_or_set_error_handling(self, cache_manager: CacheManager) -> None:

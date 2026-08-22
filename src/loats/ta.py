@@ -381,6 +381,201 @@ def calculate_cmf(df: pd.DataFrame, period: int = 20) -> pd.Series:
     cmf.iloc[:period] = np.nan
     return cmf
 
+def calculate_bbands(
+    df: pd.DataFrame, period: int = 20, std_dev: float = 2.0
+) -> tuple[pd.Series, pd.Series, pd.Series]:
+    """Calculate Bollinger Bands (BBANDS).
+
+    Returns: (upper_band, middle_band, lower_band)
+    """
+    if len(df) < period:
+        return (
+            pd.Series([np.nan] * len(df), index=df.index),
+            pd.Series([np.nan] * len(df), index=df.index),
+            pd.Series([np.nan] * len(df), index=df.index),
+        )
+
+    close = df["close"]
+    middle_band = close.rolling(window=period).mean()
+    std = close.rolling(window=period).std()
+
+    upper_band = middle_band + (std * std_dev)
+    lower_band = middle_band - (std * std_dev)
+
+    # Set initial values to NaN for warmup period
+    upper_band.iloc[:period] = np.nan
+    middle_band.iloc[:period] = np.nan
+    lower_band.iloc[:period] = np.nan
+
+    return upper_band, middle_band, lower_band
+
+def calculate_cci(
+    df: pd.DataFrame, period: int = 20, constant: float = 0.015
+) -> pd.Series:
+    """Calculate Commodity Channel Index (CCI).
+
+    CCI measures the difference between current price and historical average price.
+    Values above +100 indicate overbought, below -100 indicate oversold.
+    """
+    if len(df) < period:
+        return pd.Series([np.nan] * len(df), index=df.index)
+
+    high = df["high"]
+    low = df["low"]
+    close = df["close"]
+
+    # Calculate Typical Price
+    typical_price = (high + low + close) / 3
+
+    # Calculate Simple Moving Average of Typical Price
+    sma = typical_price.rolling(window=period).mean()
+
+    # Calculate Mean Deviation
+    mean_deviation = typical_price.rolling(window=period).apply(
+        lambda x: np.mean(np.abs(x - np.mean(x))), raw=True
+    )
+
+    # Calculate CCI
+    cci = (typical_price - sma) / (mean_deviation * constant)
+
+    cci.iloc[:period] = np.nan
+    return cci
+
+def calculate_hurst_exponent(
+    df: pd.DataFrame, period: int = 100, min_lag: int = 10, max_lag: int = 50
+) -> float:
+    """Calculate Hurst exponent for regime detection.
+
+    Hurst exponent measures long-term memory of time series:
+    - H = 0.5: Random walk (Brownian motion)
+    - H > 0.5: Trending/mean-reverting behavior
+    - H < 0.5: Mean-reverting behavior
+
+    Uses rescaled range (R/S) analysis method.
+    """
+    if len(df) < period:
+        return 0.5  # Default neutral value
+
+    close_prices = df["close"].values[-period:]
+    returns = np.diff(np.log(close_prices))
+
+    # Calculate R/S for different lags
+    lags = range(min_lag, max_lag + 1)
+    rs_values = []
+
+    for lag in lags:
+        if len(returns) < lag:
+            continue
+
+        # Split into chunks
+        n_chunks = len(returns) // lag
+        if n_chunks < 2:
+            continue
+
+        rs_chunk = []
+        for i in range(n_chunks):
+            chunk = returns[i * lag : (i + 1) * lag]
+            if len(chunk) < lag:
+                continue
+
+            # Calculate mean and cumulative deviation
+            mean = np.mean(chunk)
+            cum_dev = np.cumsum(chunk - mean)
+
+            # Calculate range (R) and standard deviation (S)
+            R = np.max(cum_dev) - np.min(cum_dev)
+            S = np.std(chunk)
+
+            if S > 0:
+                rs_chunk.append(R / S)
+
+        if rs_chunk:
+            rs_values.append((lag, np.mean(rs_chunk)))
+
+    if len(rs_values) < 3:
+        return 0.5
+
+    # Fit linear regression to log(R/S) vs log(lag)
+    log_lags = np.log([x[0] for x in rs_values])
+    log_rs = np.log([x[1] for x in rs_values])
+
+    # Calculate Hurst exponent as slope of regression
+    A = np.vstack([log_lags, np.ones(len(log_lags))]).T
+    slope, _ = np.linalg.lstsq(A, log_rs, rcond=None)[0]
+
+    return float(np.clip(slope, 0.0, 1.0))
+
+def detect_regime(
+    df: pd.DataFrame,
+    hurst_period: int = 100,
+    adx_period: int = 14,
+    cci_period: int = 20,
+) -> str:
+    """Detect market regime using multiple indicators.
+
+    Returns: "TRENDING", "MEAN_REVERTING", or "RANGING"
+    """
+    if len(df) < max(hurst_period, adx_period, cci_period):
+        return "RANGING"  # Default conservative regime
+
+    # Calculate Hurst exponent
+    hurst = calculate_hurst_exponent(df, period=hurst_period)
+
+    # Calculate ADX (already available in rules module, but we'll implement here too)
+    adx = calculate_adx_standalone(df, period=adx_period)
+
+    # Calculate CCI
+    cci = calculate_cci(df, period=cci_period)
+    cci_value = cci.iloc[-1] if not pd.isna(cci.iloc[-1]) else 0
+
+    # Regime detection logic
+    if hurst > 0.6 and adx > 25:  # Strong trending behavior
+        return "TRENDING"
+    elif hurst < 0.4 and adx < 20:  # Strong mean-reverting behavior
+        return "MEAN_REVERTING"
+    elif abs(cci_value) > 100:  # Overbought/oversold conditions
+        return "MEAN_REVERTING"
+    else:  # Default to ranging
+        return "RANGING"
+
+def calculate_adx_standalone(
+    df: pd.DataFrame, period: int = 14
+) -> float:
+    """Standalone ADX calculation for TA module consistency."""
+    if len(df) < period:
+        return 25.0  # Default neutral value
+
+    # Calculate +DM, -DM, and TR
+    df_copy = df.copy()
+    df_copy["+DM"] = df_copy["high"].diff()
+    df_copy["-DM"] = -df_copy["low"].diff()
+    df_copy.loc[df_copy["+DM"] < 0, "+DM"] = 0
+    df_copy.loc[df_copy["-DM"] < 0, "-DM"] = 0
+
+    df_copy["TR"] = pd.concat(
+        [
+            df_copy["high"] - df_copy["low"],
+            abs(df_copy["high"] - df_copy["close"].shift()),
+            abs(df_copy["low"] - df_copy["close"].shift()),
+        ],
+        axis=1,
+    ).max(axis=1)
+
+    # Calculate smoothed values
+    df_copy["+DM_smooth"] = df_copy["+DM"].rolling(window=period).mean()
+    df_copy["-DM_smooth"] = df_copy["-DM"].rolling(window=period).mean()
+    df_copy["TR_smooth"] = df_copy["TR"].rolling(window=period).mean()
+
+    # Calculate +DI and -DI
+    df_copy["+DI"] = 100 * (df_copy["+DM_smooth"] / df_copy["TR_smooth"])
+    df_copy["-DI"] = 100 * (df_copy["-DM_smooth"] / df_copy["TR_smooth"])
+
+    # Calculate DX and ADX
+    df_copy["DX"] = 100 * abs(df_copy["+DI"] - df_copy["-DI"]) / (df_copy["+DI"] + df_copy["-DI"])
+    adx = df_copy["DX"].rolling(window=period).mean().iloc[-1]
+
+    return float(adx) if not pd.isna(adx) else 25.0
+
 
 class TechnicalAnalysis:
     """Technical Analysis engine with custom indicators."""
@@ -566,6 +761,68 @@ class TechnicalAnalysis:
                     metadata={"type": "standard"},
                 )
             )
+
+        # Add BBANDS indicators
+        upper_band, middle_band, lower_band = calculate_bbands(df)
+        if not pd.isna(upper_band.iloc[-1]):
+            indicators.append(
+                TAIndicator(
+                    name="bbands_upper",
+                    value=float(upper_band.iloc[-1]),
+                    timestamp=historical_data[-1].timestamp,
+                    metadata={"type": "standard", "period": 20},
+                )
+            )
+            indicators.append(
+                TAIndicator(
+                    name="bbands_middle",
+                    value=float(middle_band.iloc[-1]),
+                    timestamp=historical_data[-1].timestamp,
+                    metadata={"type": "standard", "period": 20},
+                )
+            )
+            indicators.append(
+                TAIndicator(
+                    name="bbands_lower",
+                    value=float(lower_band.iloc[-1]),
+                    timestamp=historical_data[-1].timestamp,
+                    metadata={"type": "standard", "period": 20},
+                )
+            )
+
+        # Add CCI indicator
+        cci = calculate_cci(df)
+        if not pd.isna(cci.iloc[-1]):
+            indicators.append(
+                TAIndicator(
+                    name="cci",
+                    value=float(cci.iloc[-1]),
+                    timestamp=historical_data[-1].timestamp,
+                    metadata={"type": "standard", "period": 20},
+                )
+            )
+
+        # Add Hurst exponent
+        hurst = calculate_hurst_exponent(df)
+        indicators.append(
+            TAIndicator(
+                name="hurst",
+                value=float(hurst),
+                timestamp=historical_data[-1].timestamp,
+                metadata={"type": "regime", "period": 100},
+            )
+        )
+
+        # Add regime detection
+        regime = detect_regime(df)
+        indicators.append(
+            TAIndicator(
+                name="regime",
+                value=0.9 if regime == "TRENDING" else 0.5 if regime == "MEAN_REVERTING" else 0.3,
+                timestamp=historical_data[-1].timestamp,
+                metadata={"type": "regime", "regime": regime},
+            )
+        )
 
         return indicators
 

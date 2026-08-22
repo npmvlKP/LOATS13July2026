@@ -14,7 +14,7 @@ import numpy as np
 
 from .config import get_settings
 from .loats_logging import get_logger
-from .models import Signal, SignalType
+from .models import Signal, SignalType, TAIndicator
 
 logger = get_logger(__name__)
 settings = get_settings()
@@ -80,6 +80,96 @@ class StrengthEngine:
             adjusted_strength = base_strength
 
         return self.normalize_strength(adjusted_strength * weight)
+
+    def calculate_regime_strength(
+        self, indicators: list[TAIndicator]
+    ) -> float:
+        """
+        Calculate strength based on regime detection indicators.
+
+        Uses Hurst exponent and regime indicators to determine market regime strength.
+        """
+        hurst = self._get_indicator_value(indicators, "hurst")
+        regime = self._get_indicator_value(indicators, "regime")
+
+        if hurst is None or regime is None:
+            return 0.5
+
+        # Strong trending regime
+        if hurst > 0.6 and regime > 0.8:
+            return 0.9
+        # Strong mean-reverting regime
+        elif hurst < 0.4 and regime > 0.4:
+            return 0.8
+        # Neutral regime
+        else:
+            return 0.5
+
+    def calculate_bbands_strength(
+        self, indicators: list[TAIndicator], current_price: float
+    ) -> float:
+        """
+        Calculate strength based on Bollinger Bands indicators.
+
+        Uses BBANDS to determine overbought/oversold conditions and volatility.
+        """
+        upper_band = self._get_indicator_value(indicators, "bbands_upper")
+        lower_band = self._get_indicator_value(indicators, "bbands_lower")
+        middle_band = self._get_indicator_value(indicators, "bbands_middle")
+
+        if None in (upper_band, lower_band, middle_band):
+            return 0.5
+
+        # Calculate percentage distance from bands
+        if upper_band > lower_band:
+            band_width = upper_band - lower_band
+            if band_width > 0:
+                distance_from_upper = (upper_band - current_price) / band_width
+                distance_from_lower = (current_price - lower_band) / band_width
+
+                # Overbought condition (near upper band)
+                if distance_from_upper < 0.1:
+                    return 0.2  # Weak, potential reversal
+                # Oversold condition (near lower band)
+                elif distance_from_lower < 0.1:
+                    return 0.8  # Strong, potential reversal
+                # Middle of bands
+                else:
+                    return 0.5  # Neutral
+
+        return 0.5
+
+    def calculate_cci_strength(
+        self, indicators: list[TAIndicator]
+    ) -> float:
+        """
+        Calculate strength based on CCI indicator.
+
+        CCI > 100 indicates overbought, CCI < -100 indicates oversold.
+        """
+        cci = self._get_indicator_value(indicators, "cci")
+
+        if cci is None:
+            return 0.5
+
+        # Overbought condition
+        if cci > 100:
+            return 0.2  # Weak, potential reversal
+        # Oversold condition
+        elif cci < -100:
+            return 0.8  # Strong, potential reversal
+        # Neutral zone
+        else:
+            return 0.5
+
+    def _get_indicator_value(
+        self, indicators: list[TAIndicator], name: str
+    ) -> float | None:
+        """Helper method to get indicator value by name."""
+        for indicator in indicators:
+            if indicator.name == name:
+                return float(indicator.value)
+        return None
 
     def calculate_composite_strength(
         self, signals: list[Signal], require_opposition_gate: bool = True
