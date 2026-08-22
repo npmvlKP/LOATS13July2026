@@ -5,8 +5,8 @@ openalgo>=0.1.0
 python-dotenv>=1.0.0
 vollib>=1.0.11
 numpy
-pandas
-scipy
+pandas<3.0
+scipy<1.17
 vaderSentiment>=3.3.2
 feedparser>=6.0
 newspaper4k>=0.9.6

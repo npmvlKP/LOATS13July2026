@@ -7,9 +7,8 @@ import hashlib
 import json
 import threading
 import time
-from collections import abc
 from collections.abc import Callable
-from typing import Any, Generic, TypeVar
+from typing import Any, TypeVar
 
 from pydantic import BaseModel
 
@@ -105,7 +104,8 @@ class SimpleTTLCache[KT, VT]:
         """Remove expired items from cache."""
         current_time = time.time()
         expired_keys = [
-            key for key, (_, timestamp) in self._cache.items()
+            key
+            for key, (_, timestamp) in self._cache.items()
             if current_time - timestamp > self.ttl
         ]
 
@@ -141,6 +141,7 @@ class SimpleTTLCache[KT, VT]:
     def maxsize(self, value: int) -> None:
         """Set maximum cache size."""
         self._maxsize = value
+
 
 logger = get_logger(__name__)
 

@@ -48,7 +48,7 @@ class StrengthEngine:
         }
 
         self.min_sources = 3
-        self.opposition_threshold = 0.6
+        self.opposition_threshold = 0.4  # P5 requirement: no opposition > 0.4
 
     def normalize_strength(self, strength: float) -> float:
         """Normalize strength value to 0-1 range."""
@@ -81,9 +81,7 @@ class StrengthEngine:
 
         return self.normalize_strength(adjusted_strength * weight)
 
-    def calculate_regime_strength(
-        self, indicators: list[TAIndicator]
-    ) -> float:
+    def calculate_regime_strength(self, indicators: list[TAIndicator]) -> float:
         """
         Calculate strength based on regime detection indicators.
 
@@ -113,19 +111,27 @@ class StrengthEngine:
 
         Uses BBANDS to determine overbought/oversold conditions and volatility.
         """
-        upper_band = self._get_indicator_value(indicators, "bbands_upper")
-        lower_band = self._get_indicator_value(indicators, "bbands_lower")
-        middle_band = self._get_indicator_value(indicators, "bbands_middle")
+        upper_band: float | None = self._get_indicator_value(indicators, "bbands_upper")
+        lower_band: float | None = self._get_indicator_value(indicators, "bbands_lower")
+        middle_band: float | None = self._get_indicator_value(
+            indicators, "bbands_middle"
+        )
 
         if None in (upper_band, lower_band, middle_band):
             return 0.5
 
+        # Type narrowing: at this point all are float, not None
+        assert upper_band is not None
+        assert lower_band is not None
+        upper = upper_band
+        lower = lower_band
+
         # Calculate percentage distance from bands
-        if upper_band > lower_band:
-            band_width = upper_band - lower_band
+        if upper > lower:
+            band_width = upper - lower
             if band_width > 0:
-                distance_from_upper = (upper_band - current_price) / band_width
-                distance_from_lower = (current_price - lower_band) / band_width
+                distance_from_upper = (upper - current_price) / band_width
+                distance_from_lower = (current_price - lower) / band_width
 
                 # Overbought condition (near upper band)
                 if distance_from_upper < 0.1:
@@ -139,9 +145,7 @@ class StrengthEngine:
 
         return 0.5
 
-    def calculate_cci_strength(
-        self, indicators: list[TAIndicator]
-    ) -> float:
+    def calculate_cci_strength(self, indicators: list[TAIndicator]) -> float:
         """
         Calculate strength based on CCI indicator.
 
@@ -258,7 +262,7 @@ class StrengthEngine:
 
         Opposition gate fails if:
         - Any source has strong signal (>0.7) in opposite direction
-        - Multiple sources have moderate signals (>0.5) in opposite direction
+        - Multiple sources have moderate signals (>0.4) in opposite direction
         """
         # Determine primary direction
         primary_direction = self._determine_primary_direction(source_signals)
@@ -284,9 +288,9 @@ class StrengthEngine:
                 primary_direction == "SELL"
                 and strongest_signal.signal_type == SignalType.BUY
             ):
-                if strongest_signal.strength > self.opposition_threshold:
+                if strongest_signal.strength > 0.7:  # Strong opposition
                     strong_opposition += 1
-                elif strongest_signal.strength > 0.5:
+                elif strongest_signal.strength > self.opposition_threshold:  # Moderate opposition (> 0.4)
                     moderate_opposition += 1
 
         # Apply opposition rules

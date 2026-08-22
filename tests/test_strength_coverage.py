@@ -42,7 +42,7 @@ class TestStrengthEngineInitialization:
         engine = StrengthEngine()
         assert len(engine.source_weights) == 7
         assert engine.min_sources == 3
-        assert engine.opposition_threshold == 0.6
+        assert engine.opposition_threshold == 0.4
 
         # Check default weights
         assert engine.source_weights[StrengthSource.TECHNICAL_ANALYSIS] == 0.4
@@ -427,7 +427,7 @@ class TestOppositionGate:
                     signal_id="test-002",
                     symbol="NIFTY",
                     signal_type=SignalType.SELL,
-                    strength=0.6,  # Moderate opposition (> 0.5)
+                    strength=0.5,  # Moderate opposition (> 0.4 threshold but <= 0.7)
                     indicators={},
                 )
             ],
@@ -436,7 +436,7 @@ class TestOppositionGate:
                     signal_id="test-003",
                     symbol="NIFTY",
                     signal_type=SignalType.SELL,
-                    strength=0.6,  # Moderate opposition (> 0.5)
+                    strength=0.5,  # Moderate opposition (> 0.4 threshold but <= 0.7)
                     indicators={},
                 )
             ],
@@ -822,7 +822,7 @@ class TestModuleLevelSingleton:
 
         assert isinstance(strength_engine, StrengthEngine)
         assert strength_engine.min_sources == 3
-        assert strength_engine.opposition_threshold == 0.6
+        assert strength_engine.opposition_threshold == 0.4
 
         # Test that it's the same instance
         from loats.strength import strength_engine as strength_engine_2

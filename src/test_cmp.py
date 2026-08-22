@@ -1,7 +1,8 @@
+from datetime import UTC, datetime, timedelta
+
 import pytest
-from datetime import datetime, timedelta, timezone, UTC
+
 from src.cmp import CMP
-from src.utils import get_orderbook_mins
 
 
 class TestCmp:
@@ -17,9 +18,9 @@ class TestCmp:
         cmp1 = CMP()
         cmp2 = CMP()
         assert cmp1 is cmp2, "CMP should be a singleton"
-        assert cmp1.__repr__() == cmp2.__repr__(), (
-            "Singleton instances should have same repr"
-        )
+        assert (
+            cmp1.__repr__() == cmp2.__repr__()
+        ), "Singleton instances should have same repr"
 
     @pytest.mark.parametrize(
         "orders_per_minute, expected",
@@ -52,13 +53,11 @@ class TestCmp:
         now = datetime.now(UTC)
         trades = {
             "SBI": {str(now.timestamp()): 2.5},
-            "RELIANCE": {str(now.timestamp() + 600): 3.0}
+            "RELIANCE": {str(now.timestamp() + 600): 3.0},
         }
 
         # Old window
-        old = instance.monitor_ratchet(
-            now - timedelta(hours=3), trades
-        )
+        old = instance.monitor_ratchet(now - timedelta(hours=3), trades)
         assert old == 0
 
         # Current ratchet

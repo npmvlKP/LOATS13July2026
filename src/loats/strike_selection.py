@@ -14,6 +14,7 @@ import numpy as np
 from .loats_logging import get_logger
 from .models import OptionContract, OptionType
 
+
 class SimpleStrikeCache:
     """Simple cache implementation for strike selection using threading.Lock.
 
@@ -99,7 +100,8 @@ class SimpleStrikeCache:
         """Remove expired items from cache."""
         current_time = time.time()
         expired_keys = [
-            key for key, (_, timestamp) in self._cache.items()
+            key
+            for key, (_, timestamp) in self._cache.items()
             if current_time - timestamp > self.ttl
         ]
 
@@ -135,6 +137,7 @@ class SimpleStrikeCache:
     def maxsize(self, value: int) -> None:
         """Set maximum cache size."""
         self._maxsize = value
+
 
 logger = get_logger(__name__)
 
