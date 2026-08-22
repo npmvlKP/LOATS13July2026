@@ -94,6 +94,9 @@ class Settings(BaseSettings):
         1000,
         description="Maximum position per symbol (fallback for non-NIFTY/BANKNIFTY)",
     )
+    max_modifications: int = Field(
+        30, description="Maximum order modifications allowed (CMP Rule 7: ≤30)"
+    )
     max_nifty_positions: int = Field(
         5, description="Maximum NIFTY positions (CMP Rule 11: 5 lots)"
     )
