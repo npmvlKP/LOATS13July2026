@@ -1,17 +1,17 @@
 {
   "errors": [],
-  "generated_at": "2026-08-21T03:23:02Z",
+  "generated_at": "2026-08-22T03:07:31Z",
   "metrics": {
     "_totals": {
-      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.HIGH": 51,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
       "CONFIDENCE.UNDEFINED": 0,
       "SEVERITY.HIGH": 0,
-      "SEVERITY.LOW": 0,
+      "SEVERITY.LOW": 51,
       "SEVERITY.MEDIUM": 0,
       "SEVERITY.UNDEFINED": 0,
-      "loc": 12062,
+      "loc": 12839,
       "nosec": 0,
       "skipped_tests": 6
     },
@@ -25,6 +25,19 @@
       "SEVERITY.MEDIUM": 0,
       "SEVERITY.UNDEFINED": 0,
       "loc": 7,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    "src/cmp.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 67,
       "nosec": 0,
       "skipped_tests": 0
     },
@@ -76,7 +89,7 @@
       "SEVERITY.LOW": 0,
       "SEVERITY.MEDIUM": 0,
       "SEVERITY.UNDEFINED": 0,
-      "loc": 162,
+      "loc": 165,
       "nosec": 0,
       "skipped_tests": 0
     },
@@ -180,7 +193,7 @@
       "SEVERITY.LOW": 0,
       "SEVERITY.MEDIUM": 0,
       "SEVERITY.UNDEFINED": 0,
-      "loc": 850,
+      "loc": 882,
       "nosec": 0,
       "skipped_tests": 0
     },
@@ -232,7 +245,7 @@
       "SEVERITY.LOW": 0,
       "SEVERITY.MEDIUM": 0,
       "SEVERITY.UNDEFINED": 0,
-      "loc": 314,
+      "loc": 365,
       "nosec": 0,
       "skipped_tests": 0
     },
@@ -297,7 +310,7 @@
       "SEVERITY.LOW": 0,
       "SEVERITY.MEDIUM": 0,
       "SEVERITY.UNDEFINED": 0,
-      "loc": 288,
+      "loc": 384,
       "nosec": 0,
       "skipped_tests": 0
     },
@@ -323,7 +336,7 @@
       "SEVERITY.LOW": 0,
       "SEVERITY.MEDIUM": 0,
       "SEVERITY.UNDEFINED": 0,
-      "loc": 342,
+      "loc": 373,
       "nosec": 0,
       "skipped_tests": 0
     },
@@ -362,7 +375,7 @@
       "SEVERITY.LOW": 0,
       "SEVERITY.MEDIUM": 0,
       "SEVERITY.UNDEFINED": 0,
-      "loc": 308,
+      "loc": 408,
       "nosec": 0,
       "skipped_tests": 0
     },
@@ -443,7 +456,1139 @@
       "loc": 175,
       "nosec": 0,
       "skipped_tests": 1
+    },
+    "src/probe_rate_limiter.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 89,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    "src/test_cmp.py": {
+      "CONFIDENCE.HIGH": 5,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 5,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 50,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    "src/test_cmp_conformance.py": {
+      "CONFIDENCE.HIGH": 29,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 29,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 146,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    "src/test_cmp_ops_threshold.py": {
+      "CONFIDENCE.HIGH": 17,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 17,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 102,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    "src/utils.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 10,
+      "nosec": 0,
+      "skipped_tests": 0
     }
   },
-  "results": []
+  "results": [
+    {
+      "code": "18         cmp2 = CMP()\n19         assert cmp1 is cmp2, \"CMP should be a singleton\"\n20         assert cmp1.__repr__() == cmp2.__repr__(), (\n",
+      "col_offset": 8,
+      "end_col_offset": 56,
+      "filename": "src/test_cmp.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "line_number": 19,
+      "line_range": [
+        19
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b101_assert_used.html",
+      "test_id": "B101",
+      "test_name": "assert_used"
+    },
+    {
+      "code": "19         assert cmp1 is cmp2, \"CMP should be a singleton\"\n20         assert cmp1.__repr__() == cmp2.__repr__(), (\n21             \"Singleton instances should have same repr\"\n22         )\n23 \n",
+      "col_offset": 8,
+      "end_col_offset": 9,
+      "filename": "src/test_cmp.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "line_number": 20,
+      "line_range": [
+        20,
+        21,
+        22
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b101_assert_used.html",
+      "test_id": "B101",
+      "test_name": "assert_used"
+    },
+    {
+      "code": "35         \"\"\"Test open-order limit enforcement.\"\"\"\n36         assert instance.validate(orders_per_minute) is expected\n37 \n",
+      "col_offset": 8,
+      "end_col_offset": 63,
+      "filename": "src/test_cmp.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "line_number": 36,
+      "line_range": [
+        36
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b101_assert_used.html",
+      "test_id": "B101",
+      "test_name": "assert_used"
+    },
+    {
+      "code": "61         )\n62         assert old == 0\n63 \n",
+      "col_offset": 8,
+      "end_col_offset": 23,
+      "filename": "src/test_cmp.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "line_number": 62,
+      "line_range": [
+        62
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b101_assert_used.html",
+      "test_id": "B101",
+      "test_name": "assert_used"
+    },
+    {
+      "code": "65         actual = instance.monitor_ratchet(now, trades)\n66         assert actual == 0.005\n",
+      "col_offset": 8,
+      "end_col_offset": 30,
+      "filename": "src/test_cmp.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "line_number": 66,
+      "line_range": [
+        66
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b101_assert_used.html",
+      "test_id": "B101",
+      "test_name": "assert_used"
+    },
+    {
+      "code": "31     settings = get_settings()\n32     assert settings.nifty_lot_size == 25, (\n33         f\"CMP Rule 1 violated: nifty_lot_size={settings.nifty_lot_size} should be 25\"\n34     )\n35 \n",
+      "col_offset": 4,
+      "end_col_offset": 5,
+      "filename": "src/test_cmp_conformance.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "line_number": 32,
+      "line_range": [
+        32,
+        33,
+        34
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b101_assert_used.html",
+      "test_id": "B101",
+      "test_name": "assert_used"
+    },
+    {
+      "code": "47     # This is a compliance-by-design verification\n48     assert True, \"No resting time logic found - CMP Rule 2 compliant\"\n49 \n",
+      "col_offset": 4,
+      "end_col_offset": 69,
+      "filename": "src/test_cmp_conformance.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "line_number": 48,
+      "line_range": [
+        48
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b101_assert_used.html",
+      "test_id": "B101",
+      "test_name": "assert_used"
+    },
+    {
+      "code": "60     # Verify no algo_id or strategy manipulation methods exist\n61     assert not hasattr(client, \"synthesize_algo_id\"), (\n62         \"Found algo ID synthesis which violates CMP Rule 3\"\n63     )\n64     assert not hasattr(client, \"generate_strategy_tag\"), (\n",
+      "col_offset": 4,
+      "end_col_offset": 5,
+      "filename": "src/test_cmp_conformance.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "line_number": 61,
+      "line_range": [
+        61,
+        62,
+        63
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b101_assert_used.html",
+      "test_id": "B101",
+      "test_name": "assert_used"
+    },
+    {
+      "code": "63     )\n64     assert not hasattr(client, \"generate_strategy_tag\"), (\n65         \"Found strategy tag generation which violates CMP Rule 3\"\n66     )\n67 \n",
+      "col_offset": 4,
+      "end_col_offset": 5,
+      "filename": "src/test_cmp_conformance.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "line_number": 64,
+      "line_range": [
+        64,
+        65,
+        66
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b101_assert_used.html",
+      "test_id": "B101",
+      "test_name": "assert_used"
+    },
+    {
+      "code": "72     # Verify the setting is \u22643 (self-limit)\n73     assert settings.max_ops <= 3, (\n74         f\"CMP Rule 4 violated: max_ops={settings.max_ops} should be \u22643\"\n75     )\n76 \n",
+      "col_offset": 4,
+      "end_col_offset": 5,
+      "filename": "src/test_cmp_conformance.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "line_number": 73,
+      "line_range": [
+        73,
+        74,
+        75
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b101_assert_used.html",
+      "test_id": "B101",
+      "test_name": "assert_used"
+    },
+    {
+      "code": "77     # Verify the setting is \u226410 (NSE threshold)\n78     assert settings.max_ops <= 10, (\n79         f\"CMP Rule 4 violated: max_ops={settings.max_ops} should be \u226410\"\n80     )\n81 \n",
+      "col_offset": 4,
+      "end_col_offset": 5,
+      "filename": "src/test_cmp_conformance.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "line_number": 78,
+      "line_range": [
+        78,
+        79,
+        80
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b101_assert_used.html",
+      "test_id": "B101",
+      "test_name": "assert_used"
+    },
+    {
+      "code": "82     # Verify it's exactly 3 as configured\n83     assert settings.max_ops == 3, (\n84         f\"Expected max_ops=3 for CMP compliance, got {settings.max_ops}\"\n85     )\n86 \n",
+      "col_offset": 4,
+      "end_col_offset": 5,
+      "filename": "src/test_cmp_conformance.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "line_number": 83,
+      "line_range": [
+        83,
+        84,
+        85
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b101_assert_used.html",
+      "test_id": "B101",
+      "test_name": "assert_used"
+    },
+    {
+      "code": "100         acquired.append(result)\n101         assert result is True, f\"Failed to acquire token {len(acquired)}\"\n102 \n",
+      "col_offset": 8,
+      "end_col_offset": 73,
+      "filename": "src/test_cmp_conformance.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "line_number": 101,
+      "line_range": [
+        101
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b101_assert_used.html",
+      "test_id": "B101",
+      "test_name": "assert_used"
+    },
+    {
+      "code": "104     result = await order_limiter.acquire()\n105     assert result is False, \"Should not be able to acquire more than max_ops tokens\"\n106 \n",
+      "col_offset": 4,
+      "end_col_offset": 84,
+      "filename": "src/test_cmp_conformance.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "line_number": 105,
+      "line_range": [
+        105
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b101_assert_used.html",
+      "test_id": "B101",
+      "test_name": "assert_used"
+    },
+    {
+      "code": "114         acquired.append(result)\n115         assert result is True, f\"Failed to acquire token {len(acquired)}\"\n116 \n",
+      "col_offset": 8,
+      "end_col_offset": 73,
+      "filename": "src/test_cmp_conformance.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "line_number": 115,
+      "line_range": [
+        115
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b101_assert_used.html",
+      "test_id": "B101",
+      "test_name": "assert_used"
+    },
+    {
+      "code": "118     result = await smart_limiter.acquire()\n119     assert result is False, \"Should not be able to acquire more than max_ops tokens\"\n120 \n",
+      "col_offset": 4,
+      "end_col_offset": 84,
+      "filename": "src/test_cmp_conformance.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "line_number": 119,
+      "line_range": [
+        119
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b101_assert_used.html",
+      "test_id": "B101",
+      "test_name": "assert_used"
+    },
+    {
+      "code": "125     # Verify default mode is ANALYZE\n126     assert settings.openalgo_mode == \"ANALYZE\", (\n127         f\"CMP Rule 5 violated: openalgo_mode={settings.openalgo_mode} should be ANALYZE\"\n128     )\n129 \n",
+      "col_offset": 4,
+      "end_col_offset": 5,
+      "filename": "src/test_cmp_conformance.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "line_number": 126,
+      "line_range": [
+        126,
+        127,
+        128
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b101_assert_used.html",
+      "test_id": "B101",
+      "test_name": "assert_used"
+    },
+    {
+      "code": "134     # Verify SL-M order type exists\n135     assert hasattr(OrderType, 'SL_M'), \"OrderType should have SL_M\"\n136     assert OrderType.SL_M.value == \"SL-M\", \"SL_M should have correct value\"\n",
+      "col_offset": 4,
+      "end_col_offset": 67,
+      "filename": "src/test_cmp_conformance.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "line_number": 135,
+      "line_range": [
+        135
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b101_assert_used.html",
+      "test_id": "B101",
+      "test_name": "assert_used"
+    },
+    {
+      "code": "135     assert hasattr(OrderType, 'SL_M'), \"OrderType should have SL_M\"\n136     assert OrderType.SL_M.value == \"SL-M\", \"SL_M should have correct value\"\n137 \n",
+      "col_offset": 4,
+      "end_col_offset": 75,
+      "filename": "src/test_cmp_conformance.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "line_number": 136,
+      "line_range": [
+        136
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b101_assert_used.html",
+      "test_id": "B101",
+      "test_name": "assert_used"
+    },
+    {
+      "code": "139     order_fields = Order.model_fields\n140     assert 'trailing_stop_loss' in order_fields, \\\n141         \"Order model should have trailing_stop_loss field\"\n142 \n",
+      "col_offset": 4,
+      "end_col_offset": 58,
+      "filename": "src/test_cmp_conformance.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "line_number": 140,
+      "line_range": [
+        140,
+        141
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b101_assert_used.html",
+      "test_id": "B101",
+      "test_name": "assert_used"
+    },
+    {
+      "code": "147     # Verify NIFTY position limit\n148     assert settings.max_nifty_positions == 5, (\n149         \"CMP Rule 11 violated: \"\n150         f\"max_nifty_positions={settings.max_nifty_positions} should be 5\"\n151     )\n152 \n",
+      "col_offset": 4,
+      "end_col_offset": 5,
+      "filename": "src/test_cmp_conformance.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "line_number": 148,
+      "line_range": [
+        148,
+        149,
+        150,
+        151
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b101_assert_used.html",
+      "test_id": "B101",
+      "test_name": "assert_used"
+    },
+    {
+      "code": "153     # Verify BANKNIFTY position limit\n154     assert settings.max_banknifty_positions == 3, (\n155         \"CMP Rule 11 violated: \"\n156         f\"max_banknifty_positions={settings.max_banknifty_positions} should be 3\"\n157     )\n158 \n",
+      "col_offset": 4,
+      "end_col_offset": 5,
+      "filename": "src/test_cmp_conformance.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "line_number": 154,
+      "line_range": [
+        154,
+        155,
+        156,
+        157
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b101_assert_used.html",
+      "test_id": "B101",
+      "test_name": "assert_used"
+    },
+    {
+      "code": "163     # Verify SL-M order type exists (partial implementation)\n164     assert hasattr(OrderType, 'SL_M'), \"OrderType should have SL_M\"\n165     assert OrderType.SL_M.value == \"SL-M\", \"SL_M should have correct value\"\n",
+      "col_offset": 4,
+      "end_col_offset": 67,
+      "filename": "src/test_cmp_conformance.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "line_number": 164,
+      "line_range": [
+        164
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b101_assert_used.html",
+      "test_id": "B101",
+      "test_name": "assert_used"
+    },
+    {
+      "code": "164     assert hasattr(OrderType, 'SL_M'), \"OrderType should have SL_M\"\n165     assert OrderType.SL_M.value == \"SL-M\", \"SL_M should have correct value\"\n166 \n",
+      "col_offset": 4,
+      "end_col_offset": 75,
+      "filename": "src/test_cmp_conformance.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "line_number": 165,
+      "line_range": [
+        165
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b101_assert_used.html",
+      "test_id": "B101",
+      "test_name": "assert_used"
+    },
+    {
+      "code": "174     # Should be the same instance\n175     assert cmp1 is cmp2, \"CMP should be a singleton\"\n176 \n",
+      "col_offset": 4,
+      "end_col_offset": 52,
+      "filename": "src/test_cmp_conformance.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "line_number": 175,
+      "line_range": [
+        175
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b101_assert_used.html",
+      "test_id": "B101",
+      "test_name": "assert_used"
+    },
+    {
+      "code": "177     # Should have same representation\n178     assert cmp1.__repr__() == cmp2.__repr__(), (\n179         \"Singleton instances should have same repr\"\n180     )\n181 \n",
+      "col_offset": 4,
+      "end_col_offset": 5,
+      "filename": "src/test_cmp_conformance.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "line_number": 178,
+      "line_range": [
+        178,
+        179,
+        180
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b101_assert_used.html",
+      "test_id": "B101",
+      "test_name": "assert_used"
+    },
+    {
+      "code": "186     # Test open-order limit enforcement with set input\n187     assert cmp.validate({10}) is True, \"Should allow 10 orders\"\n188     assert cmp.validate({25}) is True, \"Should allow 25 orders\"\n",
+      "col_offset": 4,
+      "end_col_offset": 63,
+      "filename": "src/test_cmp_conformance.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "line_number": 187,
+      "line_range": [
+        187
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b101_assert_used.html",
+      "test_id": "B101",
+      "test_name": "assert_used"
+    },
+    {
+      "code": "187     assert cmp.validate({10}) is True, \"Should allow 10 orders\"\n188     assert cmp.validate({25}) is True, \"Should allow 25 orders\"\n189     assert cmp.validate({50}) is False, \"Should not allow 50 orders\"\n",
+      "col_offset": 4,
+      "end_col_offset": 63,
+      "filename": "src/test_cmp_conformance.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "line_number": 188,
+      "line_range": [
+        188
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b101_assert_used.html",
+      "test_id": "B101",
+      "test_name": "assert_used"
+    },
+    {
+      "code": "188     assert cmp.validate({25}) is True, \"Should allow 25 orders\"\n189     assert cmp.validate({50}) is False, \"Should not allow 50 orders\"\n190 \n",
+      "col_offset": 4,
+      "end_col_offset": 68,
+      "filename": "src/test_cmp_conformance.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "line_number": 189,
+      "line_range": [
+        189
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b101_assert_used.html",
+      "test_id": "B101",
+      "test_name": "assert_used"
+    },
+    {
+      "code": "191     # Test with dict input - the CMP.validate method takes max of values\n192     assert cmp.validate({\"symbol1\": 10, \"symbol2\": 15}) is True, (\n193         \"Should allow when max under limit\"\n194     )\n195     assert cmp.validate({\"symbol1\": 30, \"symbol2\": 15}) is True, (\n",
+      "col_offset": 4,
+      "end_col_offset": 5,
+      "filename": "src/test_cmp_conformance.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "line_number": 192,
+      "line_range": [
+        192,
+        193,
+        194
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b101_assert_used.html",
+      "test_id": "B101",
+      "test_name": "assert_used"
+    },
+    {
+      "code": "194     )\n195     assert cmp.validate({\"symbol1\": 30, \"symbol2\": 15}) is True, (\n196         \"Should allow when max at limit (30)\"\n197     )\n198     assert cmp.validate({\"symbol1\": 31, \"symbol2\": 15}) is False, (\n",
+      "col_offset": 4,
+      "end_col_offset": 5,
+      "filename": "src/test_cmp_conformance.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "line_number": 195,
+      "line_range": [
+        195,
+        196,
+        197
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b101_assert_used.html",
+      "test_id": "B101",
+      "test_name": "assert_used"
+    },
+    {
+      "code": "197     )\n198     assert cmp.validate({\"symbol1\": 31, \"symbol2\": 15}) is False, (\n199         \"Should not allow when max over limit\"\n200     )\n201 \n",
+      "col_offset": 4,
+      "end_col_offset": 5,
+      "filename": "src/test_cmp_conformance.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "line_number": 198,
+      "line_range": [
+        198,
+        199,
+        200
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b101_assert_used.html",
+      "test_id": "B101",
+      "test_name": "assert_used"
+    },
+    {
+      "code": "206     # Verify the modification limit is \u226430\n207     assert settings.max_modifications <= 30, (\n208         \"CMP Rule 7 violated: \"\n209         f\"max_modifications={settings.max_modifications} should be \u226430\"\n210     )\n211 \n",
+      "col_offset": 4,
+      "end_col_offset": 5,
+      "filename": "src/test_cmp_conformance.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "line_number": 207,
+      "line_range": [
+        207,
+        208,
+        209,
+        210
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b101_assert_used.html",
+      "test_id": "B101",
+      "test_name": "assert_used"
+    },
+    {
+      "code": "212     # Verify it's exactly 30 as configured\n213     assert settings.max_modifications == 30, (\n214         \"Expected max_modifications=30 for CMP compliance, \"\n215         f\"got {settings.max_modifications}\"\n216     )\n217 \n",
+      "col_offset": 4,
+      "end_col_offset": 5,
+      "filename": "src/test_cmp_conformance.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "line_number": 213,
+      "line_range": [
+        213,
+        214,
+        215,
+        216
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b101_assert_used.html",
+      "test_id": "B101",
+      "test_name": "assert_used"
+    },
+    {
+      "code": "32     settings = get_settings()\n33     assert settings.max_ops == 3, f\"Expected max_ops=3, got {settings.max_ops}\"\n34 \n",
+      "col_offset": 4,
+      "end_col_offset": 79,
+      "filename": "src/test_cmp_ops_threshold.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "line_number": 33,
+      "line_range": [
+        33
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b101_assert_used.html",
+      "test_id": "B101",
+      "test_name": "assert_used"
+    },
+    {
+      "code": "44     settings = get_settings()\n45     assert rate_limiter.max_ops == settings.max_ops, \\\n46         f\"Expected rate_limiter.max_ops={settings.max_ops}, got {rate_limiter.max_ops}\"\n47 \n",
+      "col_offset": 4,
+      "end_col_offset": 87,
+      "filename": "src/test_cmp_ops_threshold.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "line_number": 45,
+      "line_range": [
+        45,
+        46
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b101_assert_used.html",
+      "test_id": "B101",
+      "test_name": "assert_used"
+    },
+    {
+      "code": "57     settings = get_settings()\n58     assert rate_limiter.max_ops == settings.max_ops, \\\n59         f\"Expected rate_limiter.max_ops={settings.max_ops}, got {rate_limiter.max_ops}\"\n60 \n",
+      "col_offset": 4,
+      "end_col_offset": 87,
+      "filename": "src/test_cmp_ops_threshold.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "line_number": 58,
+      "line_range": [
+        58,
+        59
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b101_assert_used.html",
+      "test_id": "B101",
+      "test_name": "assert_used"
+    },
+    {
+      "code": "70     settings = get_settings()\n71     assert rate_limiter.max_ops == settings.max_ops, \\\n72         f\"Expected rate_limiter.max_ops={settings.max_ops}, got {rate_limiter.max_ops}\"\n73 \n",
+      "col_offset": 4,
+      "end_col_offset": 87,
+      "filename": "src/test_cmp_ops_threshold.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "line_number": 71,
+      "line_range": [
+        71,
+        72
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b101_assert_used.html",
+      "test_id": "B101",
+      "test_name": "assert_used"
+    },
+    {
+      "code": "83     settings = get_settings()\n84     assert rate_limiter.max_ops == settings.max_ops, \\\n85         f\"Expected rate_limiter.max_ops={settings.max_ops}, got {rate_limiter.max_ops}\"\n86 \n",
+      "col_offset": 4,
+      "end_col_offset": 87,
+      "filename": "src/test_cmp_ops_threshold.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "line_number": 84,
+      "line_range": [
+        84,
+        85
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b101_assert_used.html",
+      "test_id": "B101",
+      "test_name": "assert_used"
+    },
+    {
+      "code": "99         acquired.append(result)\n100         assert result is True, f\"Failed to acquire token {len(acquired)}\"\n101 \n",
+      "col_offset": 8,
+      "end_col_offset": 73,
+      "filename": "src/test_cmp_ops_threshold.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "line_number": 100,
+      "line_range": [
+        100
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b101_assert_used.html",
+      "test_id": "B101",
+      "test_name": "assert_used"
+    },
+    {
+      "code": "103     result = await rate_limiter.acquire()\n104     assert result is False, \"Should not be able to acquire more than max_ops tokens\"\n105 \n",
+      "col_offset": 4,
+      "end_col_offset": 84,
+      "filename": "src/test_cmp_ops_threshold.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "line_number": 104,
+      "line_range": [
+        104
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b101_assert_used.html",
+      "test_id": "B101",
+      "test_name": "assert_used"
+    },
+    {
+      "code": "106     # Verify we got exactly max_ops successful acquisitions\n107     assert sum(acquired) == settings.max_ops, \\\n108         f\"Expected {settings.max_ops} successful acquisitions, got {sum(acquired)}\"\n109 \n",
+      "col_offset": 4,
+      "end_col_offset": 83,
+      "filename": "src/test_cmp_ops_threshold.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "line_number": 107,
+      "line_range": [
+        107,
+        108
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b101_assert_used.html",
+      "test_id": "B101",
+      "test_name": "assert_used"
+    },
+    {
+      "code": "122         acquired.append(result)\n123         assert result is True, f\"Failed to acquire token {len(acquired)}\"\n124 \n",
+      "col_offset": 8,
+      "end_col_offset": 73,
+      "filename": "src/test_cmp_ops_threshold.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "line_number": 123,
+      "line_range": [
+        123
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b101_assert_used.html",
+      "test_id": "B101",
+      "test_name": "assert_used"
+    },
+    {
+      "code": "126     result = await rate_limiter.acquire()\n127     assert result is False, \"Should not be able to acquire more than max_ops tokens\"\n128 \n",
+      "col_offset": 4,
+      "end_col_offset": 84,
+      "filename": "src/test_cmp_ops_threshold.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "line_number": 127,
+      "line_range": [
+        127
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b101_assert_used.html",
+      "test_id": "B101",
+      "test_name": "assert_used"
+    },
+    {
+      "code": "129     # Verify we got exactly max_ops successful acquisitions\n130     assert sum(acquired) == settings.max_ops, \\\n131         f\"Expected {settings.max_ops} successful acquisitions, got {sum(acquired)}\"\n132 \n",
+      "col_offset": 4,
+      "end_col_offset": 83,
+      "filename": "src/test_cmp_ops_threshold.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "line_number": 130,
+      "line_range": [
+        130,
+        131
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b101_assert_used.html",
+      "test_id": "B101",
+      "test_name": "assert_used"
+    },
+    {
+      "code": "137     # Verify the setting is \u22643 (self-limit)\n138     assert settings.max_ops <= 3, \\\n139         f\"CMP Rule 4 violated: max_ops={settings.max_ops} should be \u22643\"\n140 \n",
+      "col_offset": 4,
+      "end_col_offset": 73,
+      "filename": "src/test_cmp_ops_threshold.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "line_number": 138,
+      "line_range": [
+        138,
+        139
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b101_assert_used.html",
+      "test_id": "B101",
+      "test_name": "assert_used"
+    },
+    {
+      "code": "141     # Verify the setting is \u226410 (NSE threshold)\n142     assert settings.max_ops <= 10, \\\n143         f\"CMP Rule 4 violated: max_ops={settings.max_ops} should be \u226410\"\n144 \n",
+      "col_offset": 4,
+      "end_col_offset": 74,
+      "filename": "src/test_cmp_ops_threshold.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "line_number": 142,
+      "line_range": [
+        142,
+        143
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b101_assert_used.html",
+      "test_id": "B101",
+      "test_name": "assert_used"
+    },
+    {
+      "code": "145     # Verify it's exactly 3 as configured\n146     assert settings.max_ops == 3, \\\n147         f\"Expected max_ops=3 for CMP compliance, got {settings.max_ops}\"\n148 \n",
+      "col_offset": 4,
+      "end_col_offset": 72,
+      "filename": "src/test_cmp_ops_threshold.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "line_number": 146,
+      "line_range": [
+        146,
+        147
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b101_assert_used.html",
+      "test_id": "B101",
+      "test_name": "assert_used"
+    },
+    {
+      "code": "158     # They should be the same instance (singleton)\n159     assert limiter1 is limiter2, \"Rate limiter should be a singleton\"\n160 \n",
+      "col_offset": 4,
+      "end_col_offset": 69,
+      "filename": "src/test_cmp_ops_threshold.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "line_number": 159,
+      "line_range": [
+        159
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b101_assert_used.html",
+      "test_id": "B101",
+      "test_name": "assert_used"
+    },
+    {
+      "code": "162     settings = get_settings()\n163     assert limiter1.max_ops == settings.max_ops\n164     assert limiter2.max_ops == settings.max_ops\n",
+      "col_offset": 4,
+      "end_col_offset": 47,
+      "filename": "src/test_cmp_ops_threshold.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "line_number": 163,
+      "line_range": [
+        163
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b101_assert_used.html",
+      "test_id": "B101",
+      "test_name": "assert_used"
+    },
+    {
+      "code": "163     assert limiter1.max_ops == settings.max_ops\n164     assert limiter2.max_ops == settings.max_ops\n165 \n",
+      "col_offset": 4,
+      "end_col_offset": 47,
+      "filename": "src/test_cmp_ops_threshold.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "line_number": 164,
+      "line_range": [
+        164
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b101_assert_used.html",
+      "test_id": "B101",
+      "test_name": "assert_used"
+    }
+  ]
 }

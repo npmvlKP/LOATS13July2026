@@ -146,7 +146,7 @@ disallow_any_generics = true
 disallow_subclassing_any = true
 disallow_untyped_calls = true
 explicit_package_bases = true
-exclude = ["tests/", "scripts/"]
+exclude = ["tests/", "scripts/", "docs/audit-history/"]
 namespace_packages = true
 
 [[tool.mypy.overrides]]

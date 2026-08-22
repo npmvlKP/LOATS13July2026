@@ -1,6 +1,7 @@
 """Test CMP OPS threshold compliance."""
 import asyncio
 import os
+from collections.abc import Generator
 from unittest.mock import patch
 
 import pytest
@@ -15,7 +16,7 @@ from src.loats.utils.rate_limiter import (
 )
 
 @pytest.fixture
-def setup_env():
+def setup_env() -> Generator[None, None, None]:
     """Set up environment for testing."""
     # Set required environment variable
     os.environ["OPENALGO_API_KEY"] = "test_key"
@@ -26,12 +27,12 @@ def setup_env():
     del os.environ["OPENALGO_API_KEY"]
     _reset_singletons_for_testing()
 
-def test_settings_max_ops():
+def test_settings_max_ops() -> None:
     """Test that settings.max_ops is correctly set to 3."""
     settings = get_settings()
     assert settings.max_ops == 3, f"Expected max_ops=3, got {settings.max_ops}"
 
-async def test_async_order_rate_limiter_uses_settings(setup_env):
+async def test_async_order_rate_limiter_uses_settings(setup_env: None) -> None:
     """Test that async order rate limiter uses settings.max_ops."""
     # Reset singletons to ensure clean state
     _reset_singletons_for_testing()
@@ -44,7 +45,7 @@ async def test_async_order_rate_limiter_uses_settings(setup_env):
     assert rate_limiter.max_ops == settings.max_ops, \
         f"Expected rate_limiter.max_ops={settings.max_ops}, got {rate_limiter.max_ops}"
 
-async def test_async_smart_order_rate_limiter_uses_settings(setup_env):
+async def test_async_smart_order_rate_limiter_uses_settings(setup_env: None) -> None:
     """Test that async smart order rate limiter uses settings.max_ops."""
     # Reset singletons to ensure clean state
     _reset_singletons_for_testing()
@@ -57,7 +58,7 @@ async def test_async_smart_order_rate_limiter_uses_settings(setup_env):
     assert rate_limiter.max_ops == settings.max_ops, \
         f"Expected rate_limiter.max_ops={settings.max_ops}, got {rate_limiter.max_ops}"
 
-def test_sync_order_rate_limiter_uses_settings(setup_env):
+def test_sync_order_rate_limiter_uses_settings(setup_env: None) -> None:
     """Test that sync order rate limiter uses settings.max_ops."""
     # Reset singletons to ensure clean state
     _reset_singletons_for_testing()
@@ -70,7 +71,7 @@ def test_sync_order_rate_limiter_uses_settings(setup_env):
     assert rate_limiter.max_ops == settings.max_ops, \
         f"Expected rate_limiter.max_ops={settings.max_ops}, got {rate_limiter.max_ops}"
 
-def test_sync_smart_order_rate_limiter_uses_settings(setup_env):
+def test_sync_smart_order_rate_limiter_uses_settings(setup_env: None) -> None:
     """Test that sync smart order rate limiter uses settings.max_ops."""
     # Reset singletons to ensure clean state
     _reset_singletons_for_testing()
@@ -83,7 +84,7 @@ def test_sync_smart_order_rate_limiter_uses_settings(setup_env):
     assert rate_limiter.max_ops == settings.max_ops, \
         f"Expected rate_limiter.max_ops={settings.max_ops}, got {rate_limiter.max_ops}"
 
-async def test_order_rate_limiter_enforces_max_ops(setup_env):
+async def test_order_rate_limiter_enforces_max_ops(setup_env: None) -> None:
     """Test that order rate limiter enforces the max_ops limit."""
     # Reset singletons to ensure clean state
     _reset_singletons_for_testing()
@@ -106,7 +107,7 @@ async def test_order_rate_limiter_enforces_max_ops(setup_env):
     assert sum(acquired) == settings.max_ops, \
         f"Expected {settings.max_ops} successful acquisitions, got {sum(acquired)}"
 
-async def test_smart_order_rate_limiter_enforces_max_ops(setup_env):
+async def test_smart_order_rate_limiter_enforces_max_ops(setup_env: None) -> None:
     """Test that smart order rate limiter enforces the max_ops limit."""
     # Reset singletons to ensure clean state
     _reset_singletons_for_testing()
@@ -129,7 +130,7 @@ async def test_smart_order_rate_limiter_enforces_max_ops(setup_env):
     assert sum(acquired) == settings.max_ops, \
         f"Expected {settings.max_ops} successful acquisitions, got {sum(acquired)}"
 
-def test_cmp_rule_4_compliance():
+def test_cmp_rule_4_compliance() -> None:
     """Test CMP Rule 4: OPS threshold 10; self-limit ≤3."""
     settings = get_settings()
 
@@ -145,7 +146,7 @@ def test_cmp_rule_4_compliance():
     assert settings.max_ops == 3, \
         f"Expected max_ops=3 for CMP compliance, got {settings.max_ops}"
 
-async def test_rate_limiter_singleton_behavior(setup_env):
+async def test_rate_limiter_singleton_behavior(setup_env: None) -> None:
     """Test that rate limiter singletons work correctly."""
     # Reset singletons to ensure clean state
     _reset_singletons_for_testing()

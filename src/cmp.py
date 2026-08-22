@@ -1,26 +1,25 @@
-# -*- coding: utf-8 -*-
-r"""
+"""
 CMP restrictions module ruling market flow control.
 
 Priority Order (P4/P5):
-  • Position/OpenLimit → Ratio/restriction → Opposition
-  • Validated Defaults:
-      o ≤30 orders open (§7)
-      o ≤25 activity-minute (§11)
+  - Position/OpenLimit -> Ratio/restriction -> Opposition
+  - Validated Defaults:
+      - <=30 orders open (§7)
+      - <=25 activity-minute (§11)
 """
 from src.utils import get_orderbook_mins
-from typing import Dict, Set
 from datetime import datetime, timedelta
+
 
 class CMP:
     """Controls trade frequency limits."""
 
-    _instances: Set[object] = set()
+    _instances: set["CMP"] = set()
 
-    def __new__(cls):
+    def __new__(cls) -> "CMP":
         if len(cls._instances) >= 1:
             return next(iter(cls._instances))
-        instance = super(CMP, cls).__new__(cls)
+        instance = super().__new__(cls)
         cls._instances.add(instance)
         return instance
 
@@ -28,14 +27,15 @@ class CMP:
         return self.__class__.__name__
 
     def reset(self) -> None:
-        print("Calls:", getattr(self, '__count', 0))
+        print("Calls:", getattr(self, "__count", 0))
 
-    def validate(self, orders_per_minute: Dict[str, int] | set) -> bool:
+    def validate(self, orders_per_minute: dict[str, int] | set[int]) -> bool:
         """
         Validate trading against open-limits.
 
         Parameters:
-            orders_per_minute (Dict[str, int] | set): Ratio of ^{ OpenLimit → Position }
+            orders_per_minute (dict[str, int] | set): Ratio of ^
+            { OpenLimit -> Position }
 
         Returns:
             bool: `False` on breach.
@@ -44,27 +44,34 @@ class CMP:
             return max(orders_per_minute) <= 30
         return max(orders_per_minute.values()) <= 30
 
-    def monitor_ratchet(self, current_time: datetime, trades: Dict[str, Dict[str, float]]) -> float:
+    def monitor_ratchet(
+        self, current_time: datetime, trades: dict[str, dict[str, float]]
+    ) -> float:
         """
-        Monitor and adjustമ actionable trailing stop based on meaningful
+        Monitor and adjust actionable trailing stop based on meaningful
         spans to avoid breaches.
 
         Parameters:
-        current_time (datetime): Check against prior market-hours.
-        trades (Dict[str, Dict[str, float]]): {inst: {atomic_price: count}}
+            current_time (datetime): Check against prior market-hours.
+            trades (dict[str, dict[str, float]]): {inst: {atomic_price:
+                count}}
 
         Returns:
-        float: SL-ratio to quadrant W (0.5% lower-layer)
+            float: SL-ratio to quadrant W (0.5% lower-layer)
         """
-        # The function should check trades within the last 2 hours from current_time
-        # So the window is [current_time - 2 hours, current_time]
+        # The function should check trades within the last 2 hours from
+        # current_time. So the window is [current_time - 2 hours,
+        # current_time]
         two_hours_before_current = current_time - timedelta(hours=2)
 
-        # Include trades where timestamp is within the 2-hour window from current_time
-        agg = {
+        # Include trades where timestamp is within the 2-hour window from
+        # current_time
+        agg: dict[str, float] = {
             inst: value
             for inst, hist in trades.items()
-            if two_hours_before_current.timestamp() <= max(float(key) for key in hist.keys()) <= current_time.timestamp()
+            if two_hours_before_current.timestamp()
+            <= max(float(key) for key in hist.keys())
+            <= current_time.timestamp()
             for value in hist.values()
         }
 
@@ -72,10 +79,9 @@ class CMP:
         agg_avg = sum(agg.values()) / len(agg) if agg else 0
         if agg_avg > 0.02:
             return 0.005
-        elif agg_avg < -0.02:
+        if agg_avg < -0.02:
             return -0.003
-        else:
-            return 0
+        return 0
 
     def session_lifecycle(self, state: str) -> None:
         """Lifecycle boundaries through 3 windows."""
