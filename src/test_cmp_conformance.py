@@ -179,6 +179,18 @@ def test_cmp_validation_logic():
     assert cmp.validate({"symbol1": 30, "symbol2": 15}) is True, "Should allow when max at limit (30)"
     assert cmp.validate({"symbol1": 31, "symbol2": 15}) is False, "Should not allow when max over limit"
 
+def test_cmp_rule_7_modification_limit():
+    """CMP Rule 7: Modification limit ≤30."""
+    settings = get_settings()
+
+    # Verify the modification limit is ≤30
+    assert settings.max_modifications <= 30, \
+        f"CMP Rule 7 violated: max_modifications={settings.max_modifications} should be ≤30"
+
+    # Verify it's exactly 30 as configured
+    assert settings.max_modifications == 30, \
+        f"Expected max_modifications=30 for CMP compliance, got {settings.max_modifications}"
+
 def test_cmp_session_lifecycle():
     """Test CMP session lifecycle management."""
     cmp = CMP()
