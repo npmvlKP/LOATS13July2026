@@ -9,16 +9,16 @@ import pytest
 
 from src.loats.config import get_settings
 from src.loats.models import (
-    Signal,
-    Trade,
     Order,
+    OrderStatus,
     OrderType,
     OrderVariety,
-    TransactionType,
     ProductType,
-    OrderStatus,
+    Signal,
+    Trade,
+    TransactionType,
 )
-from src.loats.trading_strategy.core import TradingStrategyCore, StrategyMode
+from src.loats.trading_strategy.core import StrategyMode, TradingStrategyCore
 
 
 @pytest.fixture
@@ -68,7 +68,7 @@ def test_validate_trade_basic(trading_strategy: TradingStrategyCore) -> None:
         quantity=25,
         entry_time=datetime.datetime.now(datetime.UTC),
         status="PENDING",
-        metadata={}
+        metadata={},
     )
 
     is_valid, validation = trading_strategy.validate_trade(trade)
@@ -90,7 +90,7 @@ def test_validate_trade_position_limits(trading_strategy: TradingStrategyCore) -
             quantity=25,
             entry_time=datetime.datetime.now(datetime.UTC),
             status="ACTIVE",
-            metadata={}
+            metadata={},
         )
         trading_strategy.active_trades[f"test_trade_{i}"] = trade
 
@@ -102,7 +102,7 @@ def test_validate_trade_position_limits(trading_strategy: TradingStrategyCore) -
         quantity=25,
         entry_time=datetime.datetime.now(datetime.UTC),
         status="PENDING",
-        metadata={}
+        metadata={},
     )
 
     is_valid, validation = trading_strategy.validate_trade(new_trade)
@@ -118,7 +118,7 @@ def test_execute_trade_in_analyze_mode(trading_strategy: TradingStrategyCore) ->
         strength=0.8,
         timestamp=datetime.datetime.now(datetime.UTC),
         price=100.0,
-        metadata={"strategy": "test"}
+        metadata={"strategy": "test"},
     )
 
     success, trade = trading_strategy.execute_trade(signal)
@@ -136,7 +136,7 @@ def test_execute_trade_in_live_mode(trading_strategy: TradingStrategyCore) -> No
         strength=0.8,
         timestamp=datetime.datetime.now(datetime.UTC),
         price=100.0,
-        metadata={"strategy": "test"}
+        metadata={"strategy": "test"},
     )
 
     success, trade = trading_strategy.execute_trade(signal)
@@ -164,7 +164,7 @@ def test_manage_position_close(trading_strategy: TradingStrategyCore) -> None:
         quantity=25,
         entry_time=datetime.datetime.now(datetime.UTC),
         status="ACTIVE",
-        metadata={}
+        metadata={},
     )
     trading_strategy.active_trades["test_trade_1"] = trade
 
@@ -187,7 +187,7 @@ def test_manage_position_modify(trading_strategy: TradingStrategyCore) -> None:
         quantity=25,
         entry_time=datetime.datetime.now(datetime.UTC),
         status="ACTIVE",
-        metadata={"modification_count": 0}
+        metadata={"modification_count": 0},
     )
     trading_strategy.active_trades["test_trade_1"] = trade
 
@@ -195,7 +195,12 @@ def test_manage_position_modify(trading_strategy: TradingStrategyCore) -> None:
     for i in range(settings.max_modifications - 1):
         result = trading_strategy.manage_position("test_trade_1", "MODIFY")
         assert result is True
-        assert trading_strategy.active_trades["test_trade_1"].metadata["modification_count"] == i + 1
+        assert (
+            trading_strategy.active_trades["test_trade_1"].metadata[
+                "modification_count"
+            ]
+            == i + 1
+        )
 
     # Try to modify one more time - should fail
     result = trading_strategy.manage_position("test_trade_1", "MODIFY")
@@ -220,7 +225,7 @@ def test_get_active_trades(trading_strategy: TradingStrategyCore) -> None:
             quantity=25,
             entry_time=datetime.datetime.now(datetime.UTC),
             status="ACTIVE",
-            metadata={}
+            metadata={},
         )
         trading_strategy.active_trades[f"test_trade_{i}"] = trade
 
@@ -240,7 +245,7 @@ def test_get_trade_status(trading_strategy: TradingStrategyCore) -> None:
         quantity=25,
         entry_time=datetime.datetime.now(datetime.UTC),
         status="ACTIVE",
-        metadata={"modification_count": 2}
+        metadata={"modification_count": 2},
     )
     trading_strategy.active_trades["test_trade_1"] = trade
 
@@ -273,7 +278,7 @@ def test_check_ops_limit(trading_strategy: TradingStrategyCore) -> None:
             product_type=ProductType.MIS,
             status=OrderStatus.OPEN,
             timestamp=datetime.datetime.now(datetime.UTC),
-            filled_quantity=0
+            filled_quantity=0,
         )
         trading_strategy.pending_orders[f"order_{i}"] = order
 
@@ -293,7 +298,7 @@ def test_check_ops_limit(trading_strategy: TradingStrategyCore) -> None:
             product_type=ProductType.MIS,
             status=OrderStatus.OPEN,
             timestamp=datetime.datetime.now(datetime.UTC),
-            filled_quantity=0
+            filled_quantity=0,
         )
         trading_strategy.pending_orders[f"order_{i}"] = order
 
@@ -313,7 +318,7 @@ def test_get_strategy_metrics(trading_strategy: TradingStrategyCore) -> None:
             quantity=25,
             entry_time=datetime.datetime.now(datetime.UTC),
             status="ACTIVE",
-            metadata={}
+            metadata={},
         )
         trading_strategy.active_trades[f"test_trade_{i}"] = trade
 
@@ -329,7 +334,7 @@ def test_get_strategy_metrics(trading_strategy: TradingStrategyCore) -> None:
             product_type=ProductType.MIS,
             status=OrderStatus.OPEN,
             timestamp=datetime.datetime.now(datetime.UTC),
-            filled_quantity=0
+            filled_quantity=0,
         )
         trading_strategy.pending_orders[f"order_{i}"] = order
 
@@ -353,7 +358,7 @@ def test_reset(trading_strategy: TradingStrategyCore) -> None:
         quantity=25,
         entry_time=datetime.datetime.now(datetime.UTC),
         status="ACTIVE",
-        metadata={}
+        metadata={},
     )
     trading_strategy.active_trades["test_trade_1"] = trade
 
@@ -368,7 +373,7 @@ def test_reset(trading_strategy: TradingStrategyCore) -> None:
         product_type=ProductType.MIS,
         status=OrderStatus.OPEN,
         timestamp=datetime.datetime.now(datetime.UTC),
-        filled_quantity=0
+        filled_quantity=0,
     )
     trading_strategy.pending_orders["order_1"] = order
 
@@ -387,7 +392,7 @@ def test_update_market_data(trading_strategy: TradingStrategyCore) -> None:
     market_data = {
         "NIFTY": {"price": 105.0, "volume": 1000000},
         "BANKNIFTY": {"price": 25000.0, "volume": 500000},
-        "timestamp": datetime.datetime.now(datetime.UTC).isoformat()
+        "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
     }
 
     trading_strategy.update_market_data(market_data)
@@ -424,7 +429,7 @@ def test_validate_cmp_compliance(trading_strategy: TradingStrategyCore) -> None:
         quantity=25,
         entry_time=datetime.datetime.now(datetime.UTC),
         status="PENDING",
-        metadata={"modification_count": settings.max_modifications + 1}
+        metadata={"modification_count": settings.max_modifications + 1},
     )
 
     # Fill up position limit
@@ -436,7 +441,7 @@ def test_validate_cmp_compliance(trading_strategy: TradingStrategyCore) -> None:
             quantity=25,
             entry_time=datetime.datetime.now(datetime.UTC),
             status="ACTIVE",
-            metadata={}
+            metadata={},
         )
         trading_strategy.active_trades[f"existing_trade_{i}"] = existing_trade
 
@@ -453,7 +458,7 @@ def test_validate_cmp_compliance(trading_strategy: TradingStrategyCore) -> None:
             product_type=ProductType.MIS,
             status=OrderStatus.OPEN,
             timestamp=datetime.datetime.now(datetime.UTC),
-            filled_quantity=0
+            filled_quantity=0,
         )
         trading_strategy.pending_orders[f"order_{i}"] = order
 
@@ -478,7 +483,7 @@ def test_validate_cmp_compliance_pass(trading_strategy: TradingStrategyCore) -> 
         quantity=25,
         entry_time=datetime.datetime.now(datetime.UTC),
         status="PENDING",
-        metadata={"modification_count": 0}
+        metadata={"modification_count": 0},
     )
 
     is_valid, validation = trading_strategy.validate_cmp_compliance(trade)
@@ -498,7 +503,7 @@ def test_apply_cmp_trailing_stop_long(trading_strategy: TradingStrategyCore) -> 
         entry_time=datetime.datetime.now(datetime.UTC),
         status="ACTIVE",
         metadata={},
-        transaction_type=TransactionType.BUY
+        transaction_type=TransactionType.BUY,
     )
 
     # Apply trailing stop with increasing prices
@@ -512,7 +517,7 @@ def test_apply_cmp_trailing_stop_long(trading_strategy: TradingStrategyCore) -> 
     assert config["trigger_price"] == 103.0  # 105 - 2
 
     # Original config should be updated
-    assert trade.metadata['trailing_config']["trigger_price"] == 103.0
+    assert trade.metadata["trailing_config"]["trigger_price"] == 103.0
 
 
 def test_apply_cmp_trailing_stop_short(trading_strategy: TradingStrategyCore) -> None:
@@ -525,7 +530,7 @@ def test_apply_cmp_trailing_stop_short(trading_strategy: TradingStrategyCore) ->
         entry_time=datetime.datetime.now(datetime.UTC),
         status="ACTIVE",
         metadata={},
-        transaction_type=TransactionType.SELL
+        transaction_type=TransactionType.SELL,
     )
 
     # Apply trailing stop with decreasing prices
@@ -539,7 +544,9 @@ def test_apply_cmp_trailing_stop_short(trading_strategy: TradingStrategyCore) ->
     assert config["trigger_price"] == 97.0  # 95 + 2
 
 
-def test_apply_cmp_trailing_stop_monotonic(trading_strategy: TradingStrategyCore) -> None:
+def test_apply_cmp_trailing_stop_monotonic(
+    trading_strategy: TradingStrategyCore,
+) -> None:
     """Test monotonic ratcheting behavior."""
     trade = Trade(
         trade_id="test_trade_1",
@@ -549,7 +556,7 @@ def test_apply_cmp_trailing_stop_monotonic(trading_strategy: TradingStrategyCore
         entry_time=datetime.datetime.now(datetime.UTC),
         status="ACTIVE",
         metadata={},
-        transaction_type=TransactionType.BUY
+        transaction_type=TransactionType.BUY,
     )
 
     # Move price up
@@ -575,7 +582,7 @@ def test_create_sl_m_order(trading_strategy: TradingStrategyCore) -> None:
         entry_time=datetime.datetime.now(datetime.UTC),
         status="ACTIVE",
         metadata={},
-        transaction_type=TransactionType.BUY
+        transaction_type=TransactionType.BUY,
     )
 
     # Apply trailing stop first
@@ -599,7 +606,9 @@ def test_create_sl_m_order(trading_strategy: TradingStrategyCore) -> None:
     assert sl_m_order.order_id in trading_strategy.pending_orders
 
 
-def test_create_sl_m_order_without_trailing_config(trading_strategy: TradingStrategyCore) -> None:
+def test_create_sl_m_order_without_trailing_config(
+    trading_strategy: TradingStrategyCore,
+) -> None:
     """Test SL-M order creation without trailing config."""
     trade = Trade(
         trade_id="test_trade_1",
@@ -609,7 +618,7 @@ def test_create_sl_m_order_without_trailing_config(trading_strategy: TradingStra
         quantity=25,
         entry_time=datetime.datetime.now(datetime.UTC),
         status="ACTIVE",
-        metadata={}
+        metadata={},
     )
 
     # Try to create SL-M order without trailing config

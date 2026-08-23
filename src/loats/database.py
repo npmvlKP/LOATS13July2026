@@ -991,6 +991,15 @@ class Database:
         # Get previous state audit
         previous = self.get_trade(trade.trade_id)
         previous_state = self._model_to_dict(previous) if previous else None
+        # FIX-F6-H-05: Ensure proper audit logging before database commit
+        if previous_state:
+            self._log_audit(
+                action="UPDATE",
+                entity_type="trade",
+                entity_id=trade.trade_id,
+                previous_state=previous_state,
+                new_state=self._model_to_dict(trade),
+            )
 
         entry_time_ms = (
             int(trade.entry_time.timestamp() * 1000)

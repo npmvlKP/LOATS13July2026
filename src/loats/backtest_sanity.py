@@ -103,9 +103,7 @@ class BacktestSanityEngine:
         checks["win_rate"] = self._check_win_rate(trades)
 
         # Check 3: Maximum drawdown
-        checks["max_drawdown"] = self._check_max_drawdown(
-            trades, initial_capital
-        )
+        checks["max_drawdown"] = self._check_max_drawdown(trades, initial_capital)
 
         # Check 4: Risk-adjusted returns
         checks["sharpe_ratio"] = self._check_sharpe_ratio(trades)
@@ -126,19 +124,18 @@ class BacktestSanityEngine:
         checks["overfitting"] = self._check_overfitting(trades)
 
         # Calculate overall score
-        passed_checks = sum(
-            1 for check in checks.values() if check["passed"]
-        )
+        passed_checks = sum(1 for check in checks.values() if check["passed"])
         total_checks = len(checks)
         overall_score = passed_checks / total_checks
 
         # Overall result
-        overall_passed = (
-            overall_score >= 0.7 and all(checks.values()["passed"] for checks in [
+        overall_passed = overall_score >= 0.7 and all(
+            checks.values()["passed"]
+            for checks in [
                 checks["sample_size"],
                 checks["max_drawdown"],
                 checks["win_rate"],
-            ])
+            ]
         )
 
         details["total_trades"] = len(trades)
@@ -146,9 +143,7 @@ class BacktestSanityEngine:
         details["final_capital"] = self._calculate_final_capital(
             trades, initial_capital
         )
-        details["total_return"] = (
-            details["final_capital"] / initial_capital - 1.0
-        )
+        details["total_return"] = details["final_capital"] / initial_capital - 1.0
 
         logger.info(
             f"Backtest sanity check completed: "
@@ -179,9 +174,7 @@ class BacktestSanityEngine:
 
     def _check_win_rate(self, trades: list[Trade]) -> dict[str, Any]:
         """Check if win rate meets minimum threshold."""
-        profitable_trades = sum(
-            1 for t in trades if t.pnl is not None and t.pnl > 0
-        )
+        profitable_trades = sum(1 for t in trades if t.pnl is not None and t.pnl > 0)
         total_trades = len(trades)
         win_rate = profitable_trades / total_trades if total_trades > 0 else 0.0
 
@@ -279,7 +272,8 @@ class BacktestSanityEngine:
             "threshold": self.min_sharpe_ratio,
             "message": (
                 f"Sharpe ratio {sharpe_ratio:.2f} "
-                f"{'meets' if passed else 'below'} minimum of {self.min_sharpe_ratio:.2f}"
+                f"{'meets' if passed else 'below'} "
+                f"minimum of {self.min_sharpe_ratio:.2f}"
             ),
         }
 
@@ -313,7 +307,7 @@ class BacktestSanityEngine:
         downside_returns = [r for r in returns if r < 0]
 
         if not downside_returns:
-            sortino_ratio = float('inf') if mean_return > 0 else 0.0
+            sortino_ratio = float("inf") if mean_return > 0 else 0.0
         else:
             downside_std = np.std(downside_returns, ddof=1)
             if downside_std == 0:
@@ -325,11 +319,12 @@ class BacktestSanityEngine:
 
         return {
             "passed": passed,
-            "value": float(sortino_ratio) if sortino_ratio != float('inf') else 999.0,
+            "value": float(sortino_ratio) if sortino_ratio != float("inf") else 999.0,
             "threshold": self.min_sortino_ratio,
             "message": (
                 f"Sortino ratio {sortino_ratio:.2f} "
-                f"{'meets' if passed else 'below'} minimum of {self.min_sortino_ratio:.2f}"
+                f"{'meets' if passed else 'below'} "
+                f"minimum of {self.min_sortino_ratio:.2f}"
             ),
         }
 
@@ -364,7 +359,8 @@ class BacktestSanityEngine:
             "threshold": self.max_transaction_cost_ratio,
             "message": (
                 f"Transaction cost ratio {cost_ratio:.2%} "
-                f"{'within' if passed else 'exceeds'} limit of {self.max_transaction_cost_ratio:.2%}"
+                f"{'within' if passed else 'exceeds'} "
+                f"limit of {self.max_transaction_cost_ratio:.2%}"
             ),
         }
 
@@ -378,7 +374,7 @@ class BacktestSanityEngine:
         )
 
         if gross_loss == 0:
-            profit_factor = float('inf') if gross_profit > 0 else 0.0
+            profit_factor = float("inf") if gross_profit > 0 else 0.0
         else:
             profit_factor = gross_profit / gross_loss
 
@@ -387,7 +383,7 @@ class BacktestSanityEngine:
 
         return {
             "passed": passed,
-            "value": float(profit_factor) if profit_factor != float('inf') else 999.0,
+            "value": float(profit_factor) if profit_factor != float("inf") else 999.0,
             "threshold": 1.5,
             "message": (
                 f"Profit factor {profit_factor:.2f} "
@@ -455,15 +451,15 @@ class BacktestSanityEngine:
         # 3. Perfect execution (no slippage)
 
         # Win rate check
-        win_rate = sum(
-            1 for t in trades if t.pnl is not None and t.pnl > 0
-        ) / len(trades)
+        win_rate = sum(1 for t in trades if t.pnl is not None and t.pnl > 0) / len(
+            trades
+        )
 
         # Volatility check
-        returns = [
-            float(t.pnl) for t in trades if t.pnl is not None
-        ]
-        volatility = np.std(returns) / np.mean(returns) if np.mean(returns) != 0 else 0.0
+        returns = [float(t.pnl) for t in trades if t.pnl is not None]
+        volatility = (
+            np.std(returns) / np.mean(returns) if np.mean(returns) != 0 else 0.0
+        )
 
         # Overfitting score (0-1, higher = more likely overfitted)
         overfitting_score = 0.0
@@ -482,7 +478,8 @@ class BacktestSanityEngine:
             "threshold": self.max_overfitting_score,
             "message": (
                 f"Overfitting score {overfitting_score:.2f} "
-                f"{'within' if passed else 'exceeds'} limit of {self.max_overfitting_score:.2f}"
+                f"{'within' if passed else 'exceeds'} "
+                f"limit of {self.max_overfitting_score:.2f}"
             ),
         }
 

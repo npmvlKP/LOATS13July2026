@@ -18,7 +18,8 @@ class StrengthEngineSettings(BaseSettings):
     # Minimum sources required for composite calculation
     min_sources: int = Field(default=3, ge=2, le=10)
 
-    # Opposition threshold (signals above this in opposite direction count as opposition)
+    # Opposition threshold (signals above this in opposite
+    # direction count as opposition)
     opposition_threshold: float = Field(default=0.4, ge=0.0, le=1.0)
 
     # Source weights (can be overridden via env)

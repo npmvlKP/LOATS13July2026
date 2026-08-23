@@ -243,8 +243,12 @@ class Trade(BaseModel):
     take_profit: float | None = Field(default=None, gt=0)
     trailing_stop_loss: float | None = Field(default=None, gt=0)
     metadata: dict[str, Any] = Field(default_factory=dict)
-    signal_type: SignalType | None = Field(default=None, description="Signal type for strategy execution")
-    order_value: float | None = Field(default=None, gt=0, description="Total order value for exposure calculation")
+    signal_type: SignalType | None = Field(
+        default=None, description="Signal type for strategy execution"
+    )
+    order_value: float | None = Field(
+        default=None, gt=0, description="Total order value for exposure calculation"
+    )
 
     @model_validator(mode="after")
     def calculate_pnl_validator(self) -> "Trade":

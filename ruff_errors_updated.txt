@@ -1,643 +1,882 @@
-E501 Line too long (100 > 88)
- --> docs\audit-history\final_circuit_breaker_verification.py:4:89
-  |
-2 | """
-3 | Final comprehensive verification test for circuit breaker functionality.
-4 | This test verifies that the circuit breaker is properly implemented for both GET and POST operations
-  |                                                                                         ^^^^^^^^^^^^
-5 | according to the current architecture.
-6 | """
-  |
-
-E501 Line too long (113 > 88)
-  --> docs\audit-history\final_circuit_breaker_verification.py:22:89
-   |
-21 | def test_circuit_breaker_post_operations_protected():
-22 |     """Verify that POST operations (place_order, modify_order, cancel_order) are protected by circuit breaker."""
-   |                                                                                         ^^^^^^^^^^^^^^^^^^^^^^^^^
-23 |     print("Testing POST operations circuit breaker protection...")
-   |
-
-E501 Line too long (93 > 88)
-  --> docs\audit-history\final_circuit_breaker_verification.py:56:89
-   |
-55 | def test_circuit_breaker_get_operations_with_retry_protected():
-56 |     """Verify that GET operations are protected by circuit breaker with retry composition."""
-   |                                                                                         ^^^^^
-57 |     print("Testing GET operations circuit breaker protection with retry...")
-   |
-
-E501 Line too long (100 > 88)
-   --> docs\audit-history\final_circuit_breaker_verification.py:131:89
-    |
-130 | def test_circuit_breaker_architecture_consistency():
-131 |     """Verify that the circuit breaker architecture is consistent across GET and POST operations."""
-    |                                                                                         ^^^^^^^^^^^^
-132 |     print("Testing circuit breaker architecture consistency...")
-    |
-
-UP036 Version block is outdated for minimum Python version
-  --> docs\audit-history\quick_health_check.py:15:8
-   |
-13 | def check_python_version():
-14 |     """Check Python version is 3.12+"""
-15 |     if sys.version_info < (3, 12):
-   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^
-16 |         print("[FAIL] Python version check failed")
-17 |         return False
-   |
-help: Remove outdated version block
-
-E501 Line too long (90 > 88)
-  --> docs\audit-history\quick_health_check.py:31:89
-   |
-29 |     if missing_vars:
-30 |         print(
-31 |             f"[WARN] Missing environment variables: {missing_vars} (ok for local testing)"
-   |                                                                                         ^^
-32 |         )
-33 |         # Only fail if we're in a container (indicated by presence of some container-specific env vars)
-   |
-
-E501 Line too long (103 > 88)
-  --> docs\audit-history\quick_health_check.py:33:89
-   |
-31 |             f"[WARN] Missing environment variables: {missing_vars} (ok for local testing)"
-32 |         )
-33 |         # Only fail if we're in a container (indicated by presence of some container-specific env vars)
-   |                                                                                         ^^^^^^^^^^^^^^^
-34 |         if any(
-35 |             var in os.environ
-   |
-
-F401 `loats.metrics.record_cycle_time` imported but unused; consider using `importlib.util.find_spec` to test for availability
-  --> docs\audit-history\simple_performance_test.py:20:35
-   |
-19 |     try:
-20 |         from loats.metrics import record_cycle_time
-   |                                   ^^^^^^^^^^^^^^^^^
-21 |         from loats.orchestrator import (
-22 |             TradingOrchestrator,
-   |
-help: Remove unused import: `loats.metrics.record_cycle_time`
-
-F401 `loats.orchestrator.TradingOrchestrator` imported but unused; consider using `importlib.util.find_spec` to test for availability
-  --> docs\audit-history\simple_performance_test.py:22:13
-   |
-20 |         from loats.metrics import record_cycle_time
-21 |         from loats.orchestrator import (
-22 |             TradingOrchestrator,
-   |             ^^^^^^^^^^^^^^^^^^^
-23 |             get_cycle_stats,
-24 |             start_orchestrator,
-   |
-help: Remove unused import
-
-F401 `loats.orchestrator.get_cycle_stats` imported but unused; consider using `importlib.util.find_spec` to test for availability
-  --> docs\audit-history\simple_performance_test.py:23:13
-   |
-21 |         from loats.orchestrator import (
-22 |             TradingOrchestrator,
-23 |             get_cycle_stats,
-   |             ^^^^^^^^^^^^^^^
-24 |             start_orchestrator,
-25 |         )
-   |
-help: Remove unused import
-
-F401 `loats.orchestrator.start_orchestrator` imported but unused; consider using `importlib.util.find_spec` to test for availability
-  --> docs\audit-history\simple_performance_test.py:24:13
-   |
-22 |             TradingOrchestrator,
-23 |             get_cycle_stats,
-24 |             start_orchestrator,
-   |             ^^^^^^^^^^^^^^^^^^
-25 |         )
-26 |         from loats.strike_selection import StrikeSelectionEngine, select_strikes
-   |
-help: Remove unused import
-
-F401 `loats.strike_selection.StrikeSelectionEngine` imported but unused; consider using `importlib.util.find_spec` to test for availability
-  --> docs\audit-history\simple_performance_test.py:26:44
-   |
-24 |             start_orchestrator,
-25 |         )
-26 |         from loats.strike_selection import StrikeSelectionEngine, select_strikes
-   |                                            ^^^^^^^^^^^^^^^^^^^^^
-27 |
-28 |         print("PASS: strike_selection module imported successfully")
-   |
-help: Remove unused import
-
-F401 `loats.strike_selection.select_strikes` imported but unused; consider using `importlib.util.find_spec` to test for availability
-  --> docs\audit-history\simple_performance_test.py:26:67
-   |
-24 |             start_orchestrator,
-25 |         )
-26 |         from loats.strike_selection import StrikeSelectionEngine, select_strikes
-   |                                                                   ^^^^^^^^^^^^^^
-27 |
-28 |         print("PASS: strike_selection module imported successfully")
-   |
-help: Remove unused import
-
-E501 Line too long (93 > 88)
-   --> docs\audit-history\simple_performance_test.py:131:89
-    |
-129 |     )
-130 |     print(
-131 |         f"\nOverall Result: {'ALL TESTS PASSED' if overall_success else 'SOME TESTS FAILED'}"
-    |                                                                                         ^^^^^
-132 |     )
-    |
-
-E501 Line too long (95 > 88)
-   --> docs\audit-history\test_audit_log_fix.py:185:88
-    |
-183 |         db.close()
-184 |         print(
-185 |             "\n✅ All tests passed! Audit log dual-write consistency fix is working correctly."
-    |                                                                                         ^^^^^^^
-186 |         )
-    |
-
-E501 Line too long (101 > 88)
- --> docs\audit-history\test_circuit_breaker_verification.py:4:89
-  |
-2 | """
-3 | Comprehensive verification test for circuit breaker functionality.
-4 | This test verifies that the circuit breaker is properly implemented for both GET and POST operations.
-  |                                                                                         ^^^^^^^^^^^^^
-5 | """
-  |
-
-E501 Line too long (113 > 88)
-  --> docs\audit-history\test_circuit_breaker_verification.py:20:89
-   |
-19 | def test_circuit_breaker_post_operations_protected():
-20 |     """Verify that POST operations (place_order, modify_order, cancel_order) are protected by circuit breaker."""
-   |                                                                                         ^^^^^^^^^^^^^^^^^^^^^^^^^
-21 |     print("Testing POST operations circuit breaker protection...")
-   |
-
-E501 Line too long (90 > 88)
-  --> docs\audit-history\test_idempotency_fix.py:76:89
-   |
-74 |             return False
-75 |
-76 |         # Try to store a different order with a different idempotency key - should succeed
-   |                                                                                         ^^
-77 |         order2 = Order(
-78 |             order_id="test_order_2",
-   |
-
-E501 Line too long (100 > 88)
-   --> docs\audit-history\test_idempotency_fix.py:102:89
-    |
-100 |             return False
-101 |
-102 |         # Try to store an order without an idempotency key - should succeed (backward compatibility)
-    |                                                                                         ^^^^^^^^^^^^
-103 |         order3 = Order(
-104 |             order_id="test_order_3",
-    |
-
-E501 Line too long (95 > 88)
-   --> docs\audit-history\test_idempotency_fix.py:120:88
-    |
-118 |             result4 = db.store_order(order3)
-119 |             print(
-120 |                 "✅ Order without idempotency key stored successfully (backward compatibility)"
-    |                                                                                         ^^^^^^^
-121 |             )
-122 |             assert result4 is True
-    |
-
-E501 Line too long (107 > 88)
-   --> docs\audit-history\test_idempotency_fix.py:225:89
-    |
-223 |     if idempotency_result and audit_result:
-224 |         print(
-225 |             "\nALL TESTS PASSED! Technical debt items R5-F-07 and R5-F-14 have been successfully resolved."
-    |                                                                                         ^^^^^^^^^^^^^^^^^^^
-226 |         )
-227 |         sys.exit(0)
-    |
-
-E501 Line too long (120 > 88)
-  --> docs\audit-history\test_idempotency_quick.py:51:89
-   |
-49 |     )
-50 |     print(
-51 |         "[OK] Payload digest works correctly: same payloads have same digest, different payloads have different digests"
-   |                                                                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-52 |     )
-   |
-
-E501 Line too long (117 > 88)
-  --> docs\audit-history\test_idempotency_verification.py:52:89
-   |
-50 |     )
-51 |     print(
-52 |         "✓ Payload digest works correctly: same payloads have same digest, different payloads have different digests"
-   |                                                                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-53 |     )
-   |
-
-E501 Line too long (97 > 88)
-  --> docs\audit-history\test_metrics_endpoint.py:39:89
-   |
-37 |             body = response.read()
-38 |             print(
-39 |                 f"Response body (first 500 chars): {body[:500].decode('utf-8', errors='ignore')}"
-   |                                                                                         ^^^^^^^^^
-40 |             )
-   |
-
-F401 `loats.orchestrator.TradingOrchestrator` imported but unused; consider using `importlib.util.find_spec` to test for availability
-   --> docs\audit-history\test_performance_implementation.py:140:13
-    |
-138 |     try:
-139 |         from loats.orchestrator import (
-140 |             TradingOrchestrator,
-    |             ^^^^^^^^^^^^^^^^^^^
-141 |             get_cycle_stats,
-142 |             start_orchestrator,
-    |
-help: Remove unused import
-
-F401 `loats.orchestrator.get_cycle_stats` imported but unused; consider using `importlib.util.find_spec` to test for availability
-   --> docs\audit-history\test_performance_implementation.py:141:13
-    |
-139 |         from loats.orchestrator import (
-140 |             TradingOrchestrator,
-141 |             get_cycle_stats,
-    |             ^^^^^^^^^^^^^^^
-142 |             start_orchestrator,
-143 |         )
-    |
-help: Remove unused import
-
-F401 `loats.orchestrator.start_orchestrator` imported but unused; consider using `importlib.util.find_spec` to test for availability
-   --> docs\audit-history\test_performance_implementation.py:142:13
-    |
-140 |             TradingOrchestrator,
-141 |             get_cycle_stats,
-142 |             start_orchestrator,
-    |             ^^^^^^^^^^^^^^^^^^
-143 |         )
-144 |         from loats.strike_selection import StrikeSelectionEngine, select_strikes
-    |
-help: Remove unused import
-
-F401 `loats.strike_selection.StrikeSelectionEngine` imported but unused; consider using `importlib.util.find_spec` to test for availability
-   --> docs\audit-history\test_performance_implementation.py:144:44
-    |
-142 |             start_orchestrator,
-143 |         )
-144 |         from loats.strike_selection import StrikeSelectionEngine, select_strikes
-    |                                            ^^^^^^^^^^^^^^^^^^^^^
-145 |
-146 |         print("  ✅ strike_selection module imported successfully")
-    |
-help: Remove unused import
-
-F401 `loats.strike_selection.select_strikes` imported but unused; consider using `importlib.util.find_spec` to test for availability
-   --> docs\audit-history\test_performance_implementation.py:144:67
-    |
-142 |             start_orchestrator,
-143 |         )
-144 |         from loats.strike_selection import StrikeSelectionEngine, select_strikes
-    |                                                                   ^^^^^^^^^^^^^^
-145 |
-146 |         print("  ✅ strike_selection module imported successfully")
-    |
-help: Remove unused import
-
-E501 Line too long (90 > 88)
-  --> docs\audit-history\test_technical_debt_fixes.py:78:89
-   |
-76 |             return False
-77 |
-78 |         # Try to store a different order with a different idempotency key - should succeed
-   |                                                                                         ^^
-79 |         order2 = Order(
-80 |             order_id="test_order_2",
-   |
-
-E501 Line too long (89 > 88)
-  --> docs\audit-history\test_technical_debt_fixes.py:97:89
-   |
-95 |             result3 = db.store_order(order2)
-96 |             print(
-97 |                 "[OK] Different order with different idempotency key stored successfully"
-   |                                                                                         ^
-98 |             )
-99 |             assert result3 is True
-   |
-
-E501 Line too long (100 > 88)
-   --> docs\audit-history\test_technical_debt_fixes.py:104:89
-    |
-102 |             return False
-103 |
-104 |         # Try to store an order without an idempotency key - should succeed (backward compatibility)
-    |                                                                                         ^^^^^^^^^^^^
-105 |         order3 = Order(
-106 |             order_id="test_order_3",
-    |
-
-E501 Line too long (97 > 88)
-   --> docs\audit-history\test_technical_debt_fixes.py:122:89
-    |
-120 |             result4 = db.store_order(order3)
-121 |             print(
-122 |                 "[OK] Order without idempotency key stored successfully (backward compatibility)"
-    |                                                                                         ^^^^^^^^^
-123 |             )
-124 |             assert result4 is True
-    |
-
-E501 Line too long (92 > 88)
-   --> docs\audit-history\test_technical_debt_fixes.py:303:89
-    |
-301 |     print("TEST RESULTS:")
-302 |     print(
-303 |         f"   Idempotency Key Test (R5-F-07): {'PASSED' if idempotency_result else 'FAILED'}"
-    |                                                                                         ^^^^
-304 |     )
-305 |     print(
-    |
-
-E501 Line too long (91 > 88)
-   --> docs\audit-history\test_technical_debt_fixes.py:317:89
-    |
-315 |     if idempotency_result and holiday_result and audit_result and deps_result:
-316 |         print(
-317 |             "\nALL TESTS PASSED! All technical debt items have been successfully resolved."
-    |                                                                                         ^^^
-318 |         )
-319 |         sys.exit(0)
-    |
-
-F401 `loats.main.TradingSystem` imported but unused; consider using `importlib.util.find_spec` to test for availability
-  --> docs\audit-history\validate_packaging_fix.py:48:32
-   |
-47 |         # Test import of key components
-48 |         from loats.main import TradingSystem
-   |                                ^^^^^^^^^^^^^
-49 |
-50 |         print("✅ TradingSystem imported successfully")
-   |
-help: Remove unused import: `loats.main.TradingSystem`
-
-F401 `loats.config.get_settings` imported but unused; consider using `importlib.util.find_spec` to test for availability
-  --> docs\audit-history\validate_packaging_fix.py:52:34
-   |
-50 |         print("✅ TradingSystem imported successfully")
-51 |
-52 |         from loats.config import get_settings
-   |                                  ^^^^^^^^^^^^
-53 |
-54 |         print("✅ get_settings imported successfully")
-   |
-help: Remove unused import: `loats.config.get_settings`
-
-E501 Line too long (98 > 88)
- --> docs\audit-history\validate_resolved_issues.py:5:89
-  |
-3 | Validation script for resolved issues NEW-M1 to NEW-M4.
-4 |
-5 | This script validates that all the resolved issues mentioned in the task are properly implemented:
-  |                                                                                         ^^^^^^^^^^
-6 | - NEW-M1: HTML injection fix (html.escape() applied)
-7 | - NEW-M2: .env.example synced with Settings
-  |
-
-E501 Line too long (102 > 88)
-  --> docs\audit-history\validate_resolved_issues.py:72:89
-   |
-70 |     # Check that all settings fields are represented in .env.example
-71 |     # Extract field names from settings.py
-72 |     field_pattern = r"(\w+)\s*:\s*(?:SecretStr|str|int|float|Decimal|Path|list|Literal)\s*=\s*Field\("
-   |                                                                                         ^^^^^^^^^^^^^^
-73 |     fields = re.findall(field_pattern, settings_content)
-   |
-
-E501 Line too long (90 > 88)
-   --> docs\audit-history\validate_resolved_issues.py:182:89
-    |
-181 |     print(
-182 |         "NEW-M4: negative t clamping fix validated - ExpiredContractError properly raised"
-    |                                                                                         ^^
-183 |     )
-184 |     return True
-    |
-
-E501 Line too long (100 > 88)
-   --> docs\audit-history\validate_resolved_issues.py:218:89
-    |
-216 |     all_passed = all(results)
-217 |     print(
-218 |         f"\nOverall Result: {'ALL VALIDATIONS PASSED' if all_passed else 'SOME VALIDATIONS FAILED'}"
-    |                                                                                         ^^^^^^^^^^^^
-219 |     )
-    |
-
-E501 Line too long (96 > 88)
- --> docs\audit-history\verify_no_sql_injection.py:4:89
-  |
-2 | """
-3 | SQL Injection Verification Script
-4 | This script verifies that no SQL injection vulnerabilities exist in the database implementation.
-  |                                                                                         ^^^^^^^^
-5 | Run this script to confirm the forensic analysis findings.
-6 | """
-  |
-
-E501 Line too long (93 > 88)
-  --> docs\audit-history\verify_no_sql_injection.py:90:89
-   |
-88 |         print("RESULT: ❌ POTENTIAL SQL INJECTION VULNERABILITIES FOUND")
-89 |         print(
-90 |             "The database implementation may have security issues that need to be addressed."
-   |                                                                                         ^^^^^
-91 |         )
-92 |         return False
-   |
-
-E501 Line too long (95 > 88)
-  --> reports\ai-generated\fix_assertions.py:38:89
-   |
-36 |     # test_send_signal_alert_html_injection_prevention
-37 |     (
-38 |         'assert "<script>" in sent_message\n        assert "<b>indicator</b>" in sent_message',
-   |                                                                                         ^^^^^^^
-39 |         'assert "<script>" in sent_message\n        assert "<b>indicator</b>" in sent_message',
-40 |     ),
-   |
-
-E501 Line too long (95 > 88)
-  --> reports\ai-generated\fix_assertions.py:39:89
-   |
-37 |     (
-38 |         'assert "<script>" in sent_message\n        assert "<b>indicator</b>" in sent_message',
-39 |         'assert "<script>" in sent_message\n        assert "<b>indicator</b>" in sent_message',
-   |                                                                                         ^^^^^^^
-40 |     ),
-41 | ]
-   |
-
-E501 Line too long (95 > 88)
-  --> reports\ai-generated\fix_html_test_assertions.py:49:89
-   |
-47 |     # Input: <script> and <b>indicator</b> escape to <script> and <b>indicator</b>
-48 |     (
-49 |         'assert "<script>" in sent_message\n        assert "<b>indicator</b>" in sent_message',
-   |                                                                                         ^^^^^^^
-50 |         'assert "<script>" in sent_message\n        assert "<b>indicator</b>" in sent_message',
-51 |     ),
-   |
-
-E501 Line too long (95 > 88)
-  --> reports\ai-generated\fix_html_test_assertions.py:50:89
-   |
-48 |     (
-49 |         'assert "<script>" in sent_message\n        assert "<b>indicator</b>" in sent_message',
-50 |         'assert "<script>" in sent_message\n        assert "<b>indicator</b>" in sent_message',
-   |                                                                                         ^^^^^^^
-51 |     ),
-52 | ]
-   |
-
-F401 [*] `.models.ProductType` imported but unused
-   --> src\loats\orchestrator.py:627:61
-    |
-625 |             if current_positions:
-626 |                 # Create a Trade object from the Position
-627 |                 from .models import Trade, TransactionType, ProductType
-    |                                                             ^^^^^^^^^^^
-628 |
-629 |                 trade = Trade(
-    |
-help: Remove unused import: `.models.ProductType`
-
-E501 Line too long (117 > 88)
-   --> src\loats\orchestrator.py:634:89
-    |
-632 |                     quantity=current_positions.quantity,
-633 |                     entry_price=current_positions.average_price,
-634 |                     transaction_type=TransactionType.BUY if current_positions.quantity > 0 else TransactionType.SELL,
-    |                                                                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-635 |                     product_type=current_positions.product_type,
-636 |                     status="OPEN",
-    |
-
-F841 [*] Local variable `e` is assigned to but never used
-   --> tests\test_load_latency_integration.py:184:33
-    |
-182 |                     await test_db.async_create_signal(signal)
-183 |                     signals_created += 1
-184 |             except Exception as e:
-    |                                 ^
-185 |                 errors += 1
-    |
-help: Remove assignment to unused variable `e`
-
-F841 Local variable `rsi` is assigned to but never used
-   --> tests\test_load_latency_integration.py:278:13
-    |
-276 |             # Calculate indicators
-277 |             supertrend, direction = calculate_supertrend(df)
-278 |             rsi = calculate_rsi(df, period=14)
-    |             ^^^
-279 |
-280 |             end_time = time.time()
-    |
-help: Remove assignment to unused variable `rsi`
-
-F841 [*] Local variable `e` is assigned to but never used
-   --> tests\test_load_latency_integration.py:332:33
-    |
-330 |                     else:
-331 |                         errors += 1
-332 |             except Exception as e:
-    |                                 ^
-333 |                 errors += 1
-    |
-help: Remove assignment to unused variable `e`
-
-F841 Local variable `mock_ta` is assigned to but never used
-   --> tests\test_orchestrator.py:460:14
-    |
-458 |         with patch.object(
-459 |             self.orchestrator, "_execute_ta_analysis", new_callable=AsyncMock
-460 |         ) as mock_ta:
-    |              ^^^^^^^
-461 |             with patch.object(
-462 |                 self.orchestrator, "_execute_sentiment_analysis", new_callable=AsyncMock
-    |
-help: Remove assignment to unused variable `mock_ta`
-
-F841 Local variable `mock_sentiment` is assigned to but never used
-   --> tests\test_orchestrator.py:463:18
-    |
-461 |             with patch.object(
-462 |                 self.orchestrator, "_execute_sentiment_analysis", new_callable=AsyncMock
-463 |             ) as mock_sentiment:
-    |                  ^^^^^^^^^^^^^^
-464 |                 with patch.object(
-465 |                     self.orchestrator,
-    |
-help: Remove assignment to unused variable `mock_sentiment`
-
-F841 Local variable `mock_market` is assigned to but never used
-   --> tests\test_orchestrator.py:468:22
-    |
-466 |                     "_execute_market_data_update",
-467 |                     new_callable=AsyncMock,
-468 |                 ) as mock_market:
-    |                      ^^^^^^^^^^^
-469 |                     with patch.object(
-470 |                         self.orchestrator,
-    |
-help: Remove assignment to unused variable `mock_market`
-
-F841 Local variable `mock_signal` is assigned to but never used
-   --> tests\test_orchestrator.py:473:26
-    |
-471 |                         "_execute_signal_generation",
-472 |                         new_callable=AsyncMock,
-473 |                     ) as mock_signal:
-    |                          ^^^^^^^^^^^
-474 |                         with patch.object(
-475 |                             self.orchestrator,
-    |
-help: Remove assignment to unused variable `mock_signal`
-
-F841 Local variable `mock_risk` is assigned to but never used
-   --> tests\test_orchestrator.py:478:30
-    |
-476 |                             "_execute_risk_management",
-477 |                             new_callable=AsyncMock,
-478 |                         ) as mock_risk:
-    |                              ^^^^^^^^^
-479 |                             with patch.object(
-480 |                                 self.orchestrator,
-    |
-help: Remove assignment to unused variable `mock_risk`
-
-F841 Local variable `mock_cmp` is assigned to but never used
-   --> tests\test_orchestrator.py:483:34
-    |
-481 | …                         "_execute_cmp_strategy",
-482 | …                         new_callable=AsyncMock,
-483 | …                     ) as mock_cmp:
-    |                            ^^^^^^^^
-484 | …                         # Execute one trading cycle via _run_cycle_loop logic
-485 | …                         # Manually call the cycle execution and record cycle time
-    |
-help: Remove assignment to unused variable `mock_cmp`
-
-Found 58 errors.
-[*] 3 fixable with the `--fix` option (8 hidden fixes can be enabled with the `--unsafe-fixes` option).
+[
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 91,
+      "row": 282
+    },
+    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\src\\loats\\backtest_sanity.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 282
+    },
+    "message": "Line too long (90 > 88)",
+    "noqa_row": 282,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 92,
+      "row": 332
+    },
+    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\src\\loats\\backtest_sanity.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 332
+    },
+    "message": "Line too long (91 > 88)",
+    "noqa_row": 332,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 102,
+      "row": 367
+    },
+    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\src\\loats\\backtest_sanity.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 367
+    },
+    "message": "Line too long (101 > 88)",
+    "noqa_row": 367,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 90,
+      "row": 466
+    },
+    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\src\\loats\\backtest_sanity.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 466
+    },
+    "message": "Line too long (89 > 88)",
+    "noqa_row": 466,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 97,
+      "row": 485
+    },
+    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\src\\loats\\backtest_sanity.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 485
+    },
+    "message": "Line too long (96 > 88)",
+    "noqa_row": 485,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "W292",
+    "end_location": {
+      "column": 2,
+      "row": 507
+    },
+    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\src\\loats\\backtest_sanity.py",
+    "fix": {
+      "applicability": "safe",
+      "edits": [
+        {
+          "content": "\n",
+          "end_location": {
+            "column": 2,
+            "row": 507
+          },
+          "location": {
+            "column": 2,
+            "row": 507
+          }
+        }
+      ],
+      "message": "Add trailing newline"
+    },
+    "location": {
+      "column": 2,
+      "row": 507
+    },
+    "message": "No newline at end of file",
+    "noqa_row": 507,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/missing-newline-at-end-of-file"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 97,
+      "row": 87
+    },
+    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\src\\loats\\config\\settings.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 87
+    },
+    "message": "Line too long (96 > 88)",
+    "noqa_row": 87,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 107,
+      "row": 246
+    },
+    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\src\\loats\\models.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 246
+    },
+    "message": "Line too long (106 > 88)",
+    "noqa_row": 246,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 116,
+      "row": 247
+    },
+    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\src\\loats\\models.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 247
+    },
+    "message": "Line too long (115 > 88)",
+    "noqa_row": 247,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 107,
+      "row": 293
+    },
+    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\src\\loats\\strength\\__init__.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 293
+    },
+    "message": "Line too long (106 > 88)",
+    "noqa_row": 293,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 90,
+      "row": 21
+    },
+    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\src\\loats\\strength\\config.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 21
+    },
+    "message": "Line too long (89 > 88)",
+    "noqa_row": 21,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "W292",
+    "end_location": {
+      "column": 62,
+      "row": 118
+    },
+    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\src\\loats\\strength\\config.py",
+    "fix": {
+      "applicability": "safe",
+      "edits": [
+        {
+          "content": "\n",
+          "end_location": {
+            "column": 62,
+            "row": 118
+          },
+          "location": {
+            "column": 62,
+            "row": 118
+          }
+        }
+      ],
+      "message": "Add trailing newline"
+    },
+    "location": {
+      "column": 62,
+      "row": 118
+    },
+    "message": "No newline at end of file",
+    "noqa_row": 118,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/missing-newline-at-end-of-file"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 110,
+      "row": 11
+    },
+    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\src\\loats\\trading_strategy\\core.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 11
+    },
+    "message": "Line too long (109 > 88)",
+    "noqa_row": 11,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 94,
+      "row": 81
+    },
+    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\src\\loats\\trading_strategy\\core.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 81
+    },
+    "message": "Line too long (93 > 88)",
+    "noqa_row": 81,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 101,
+      "row": 84
+    },
+    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\src\\loats\\trading_strategy\\core.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 84
+    },
+    "message": "Line too long (100 > 88)",
+    "noqa_row": 84,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 110,
+      "row": 89
+    },
+    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\src\\loats\\trading_strategy\\core.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 89
+    },
+    "message": "Line too long (109 > 88)",
+    "noqa_row": 89,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 95,
+      "row": 170
+    },
+    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\src\\loats\\trading_strategy\\core.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 170
+    },
+    "message": "Line too long (94 > 88)",
+    "noqa_row": 170,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 124,
+      "row": 195
+    },
+    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\src\\loats\\trading_strategy\\core.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 195
+    },
+    "message": "Line too long (123 > 88)",
+    "noqa_row": 195,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 107,
+      "row": 215
+    },
+    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\src\\loats\\trading_strategy\\core.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 215
+    },
+    "message": "Line too long (106 > 88)",
+    "noqa_row": 215,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 93,
+      "row": 229
+    },
+    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\src\\loats\\trading_strategy\\core.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 229
+    },
+    "message": "Line too long (92 > 88)",
+    "noqa_row": 229,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 109,
+      "row": 231
+    },
+    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\src\\loats\\trading_strategy\\core.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 231
+    },
+    "message": "Line too long (108 > 88)",
+    "noqa_row": 231,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 100,
+      "row": 233
+    },
+    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\src\\loats\\trading_strategy\\core.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 233
+    },
+    "message": "Line too long (99 > 88)",
+    "noqa_row": 233,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 96,
+      "row": 236
+    },
+    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\src\\loats\\trading_strategy\\core.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 236
+    },
+    "message": "Line too long (95 > 88)",
+    "noqa_row": 236,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 94,
+      "row": 249
+    },
+    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\src\\loats\\trading_strategy\\core.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 249
+    },
+    "message": "Line too long (93 > 88)",
+    "noqa_row": 249,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 102,
+      "row": 255
+    },
+    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\src\\loats\\trading_strategy\\core.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 255
+    },
+    "message": "Line too long (101 > 88)",
+    "noqa_row": 255,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 100,
+      "row": 256
+    },
+    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\src\\loats\\trading_strategy\\core.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 256
+    },
+    "message": "Line too long (99 > 88)",
+    "noqa_row": 256,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 102,
+      "row": 262
+    },
+    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\src\\loats\\trading_strategy\\core.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 262
+    },
+    "message": "Line too long (101 > 88)",
+    "noqa_row": 262,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "F811",
+    "end_location": {
+      "column": 46,
+      "row": 268
+    },
+    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\src\\loats\\trading_strategy\\core.py",
+    "fix": {
+      "applicability": "safe",
+      "edits": [
+        {
+          "content": "from ..models import Order",
+          "end_location": {
+            "column": 46,
+            "row": 268
+          },
+          "location": {
+            "column": 9,
+            "row": 268
+          }
+        }
+      ],
+      "message": "Remove definition: `OrderType`"
+    },
+    "location": {
+      "column": 37,
+      "row": 268
+    },
+    "message": "Redefinition of unused `OrderType` from line 11: `OrderType` redefined here",
+    "noqa_row": 268,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/redefined-while-unused"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 93,
+      "row": 270
+    },
+    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\src\\loats\\trading_strategy\\core.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 270
+    },
+    "message": "Line too long (92 > 88)",
+    "noqa_row": 270,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 96,
+      "row": 297
+    },
+    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\src\\loats\\trading_strategy\\core.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 297
+    },
+    "message": "Line too long (95 > 88)",
+    "noqa_row": 297,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "W292",
+    "end_location": {
+      "column": 10,
+      "row": 344
+    },
+    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\src\\loats\\trading_strategy\\core.py",
+    "fix": {
+      "applicability": "safe",
+      "edits": [
+        {
+          "content": "\n",
+          "end_location": {
+            "column": 10,
+            "row": 344
+          },
+          "location": {
+            "column": 10,
+            "row": 344
+          }
+        }
+      ],
+      "message": "Add trailing newline"
+    },
+    "location": {
+      "column": 10,
+      "row": 344
+    },
+    "message": "No newline at end of file",
+    "noqa_row": 344,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/missing-newline-at-end-of-file"
+  },
+  {
+    "cell": null,
+    "code": "W292",
+    "end_location": {
+      "column": 34,
+      "row": 622
+    },
+    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\tests\\test_trading_strategy_core.py",
+    "fix": {
+      "applicability": "safe",
+      "edits": [
+        {
+          "content": "\n",
+          "end_location": {
+            "column": 34,
+            "row": 622
+          },
+          "location": {
+            "column": 34,
+            "row": 622
+          }
+        }
+      ],
+      "message": "Add trailing newline"
+    },
+    "location": {
+      "column": 34,
+      "row": 622
+    },
+    "message": "No newline at end of file",
+    "noqa_row": 622,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/missing-newline-at-end-of-file"
+  },
+  {
+    "cell": null,
+    "code": "F811",
+    "end_location": {
+      "column": 10,
+      "row": 11
+    },
+    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\tests\\test_trading_strategy_performance.py",
+    "fix": {
+      "applicability": "safe",
+      "edits": [
+        {
+          "content": "",
+          "end_location": {
+            "column": 1,
+            "row": 12
+          },
+          "location": {
+            "column": 1,
+            "row": 11
+          }
+        }
+      ],
+      "message": "Remove definition: `os`"
+    },
+    "location": {
+      "column": 8,
+      "row": 11
+    },
+    "message": "Redefinition of unused `os` from line 5: `os` redefined here",
+    "noqa_row": 11,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/redefined-while-unused"
+  },
+  {
+    "cell": null,
+    "code": "PTH120",
+    "end_location": {
+      "column": 32,
+      "row": 12
+    },
+    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\tests\\test_trading_strategy_performance.py",
+    "fix": null,
+    "location": {
+      "column": 17,
+      "row": 12
+    },
+    "message": "`os.path.dirname()` should be replaced by `Path.parent`",
+    "noqa_row": 12,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/os-path-dirname"
+  },
+  {
+    "cell": null,
+    "code": "PTH120",
+    "end_location": {
+      "column": 48,
+      "row": 12
+    },
+    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\tests\\test_trading_strategy_performance.py",
+    "fix": null,
+    "location": {
+      "column": 33,
+      "row": 12
+    },
+    "message": "`os.path.dirname()` should be replaced by `Path.parent`",
+    "noqa_row": 12,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/os-path-dirname"
+  },
+  {
+    "cell": null,
+    "code": "PTH100",
+    "end_location": {
+      "column": 64,
+      "row": 12
+    },
+    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\tests\\test_trading_strategy_performance.py",
+    "fix": null,
+    "location": {
+      "column": 49,
+      "row": 12
+    },
+    "message": "`os.path.abspath()` should be replaced by `Path.resolve()`",
+    "noqa_row": 12,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/os-path-abspath"
+  },
+  {
+    "cell": null,
+    "code": "F841",
+    "end_location": {
+      "column": 13,
+      "row": 32
+    },
+    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\tests\\test_trading_strategy_performance.py",
+    "fix": {
+      "applicability": "unsafe",
+      "edits": [
+        {
+          "content": "",
+          "end_location": {
+            "column": 16,
+            "row": 32
+          },
+          "location": {
+            "column": 5,
+            "row": 32
+          }
+        }
+      ],
+      "message": "Remove assignment to unused variable `settings`"
+    },
+    "location": {
+      "column": 5,
+      "row": 32
+    },
+    "message": "Local variable `settings` is assigned to but never used",
+    "noqa_row": 32,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/unused-variable"
+  },
+  {
+    "cell": null,
+    "code": "F841",
+    "end_location": {
+      "column": 13,
+      "row": 78
+    },
+    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\tests\\test_trading_strategy_performance.py",
+    "fix": {
+      "applicability": "unsafe",
+      "edits": [
+        {
+          "content": "",
+          "end_location": {
+            "column": 16,
+            "row": 78
+          },
+          "location": {
+            "column": 5,
+            "row": 78
+          }
+        }
+      ],
+      "message": "Remove assignment to unused variable `settings`"
+    },
+    "location": {
+      "column": 5,
+      "row": 78
+    },
+    "message": "Local variable `settings` is assigned to but never used",
+    "noqa_row": 78,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/unused-variable"
+  },
+  {
+    "cell": null,
+    "code": "F841",
+    "end_location": {
+      "column": 16,
+      "row": 338
+    },
+    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\tests\\test_trading_strategy_performance.py",
+    "fix": {
+      "applicability": "unsafe",
+      "edits": [
+        {
+          "content": "",
+          "end_location": {
+            "column": 19,
+            "row": 338
+          },
+          "location": {
+            "column": 9,
+            "row": 338
+          }
+        }
+      ],
+      "message": "Remove assignment to unused variable `metrics`"
+    },
+    "location": {
+      "column": 9,
+      "row": 338
+    },
+    "message": "Local variable `metrics` is assigned to but never used",
+    "noqa_row": 338,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/unused-variable"
+  },
+  {
+    "cell": null,
+    "code": "W292",
+    "end_location": {
+      "column": 87,
+      "row": 428
+    },
+    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\tests\\test_trading_strategy_performance.py",
+    "fix": {
+      "applicability": "safe",
+      "edits": [
+        {
+          "content": "\n",
+          "end_location": {
+            "column": 87,
+            "row": 428
+          },
+          "location": {
+            "column": 87,
+            "row": 428
+          }
+        }
+      ],
+      "message": "Add trailing newline"
+    },
+    "location": {
+      "column": 87,
+      "row": 428
+    },
+    "message": "No newline at end of file",
+    "noqa_row": 428,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/missing-newline-at-end-of-file"
+  }
+]

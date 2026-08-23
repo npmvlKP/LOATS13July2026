@@ -84,7 +84,9 @@ class Settings(BaseSettings):
         Decimal("200000.00"), description="Maximum order value per order (Rs 2,00,000)"
     )
     max_daily_orders: int = Field(500, description="Maximum orders per day")
-    max_ops: int = Field(3, description="Maximum orders per second (CMP Rule 4: self-limit ≤3)")
+    max_ops: int = Field(
+        3, description="Maximum orders per second (CMP Rule 4: self-limit ≤3)"
+    )
     circuit_limit_pct: Decimal = Field(
         Decimal("0.05"), description="Circuit limit percentage (+-5%)"
     )

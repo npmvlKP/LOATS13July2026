@@ -12,9 +12,9 @@ from typing import Any
 
 import numpy as np
 
-from .config import get_settings
 from ..loats_logging import get_logger
 from ..models import Signal, SignalType, TAIndicator
+from .config import get_settings
 
 logger = get_logger(__name__)
 settings = get_settings()
@@ -290,7 +290,9 @@ class StrengthEngine:
             ):
                 if strongest_signal.strength > 0.7:  # Strong opposition
                     strong_opposition += 1
-                elif strongest_signal.strength > self.opposition_threshold:  # Moderate opposition (> 0.4)
+                elif (
+                    strongest_signal.strength > self.opposition_threshold
+                ):  # Moderate opposition (> 0.4)
                     moderate_opposition += 1
 
         # Apply opposition rules

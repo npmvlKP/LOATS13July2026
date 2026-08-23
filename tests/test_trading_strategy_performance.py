@@ -1,28 +1,30 @@
 """Performance benchmarks for the trading strategy core implementation."""
 
 import datetime
-import time
 import os
+import sys
+import time
 from typing import Any
 
 import pytest
 
-import sys
-import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.loats.config import get_settings
-from src.loats.models import Signal, Trade, Order, OrderType
-from src.loats.trading_strategy.core import TradingStrategyCore, StrategyMode
+from src.loats.models import Order, OrderType, Signal, Trade
+from src.loats.trading_strategy.core import StrategyMode, TradingStrategyCore
+
 
 def setup_environment() -> None:
     """Set up environment for performance testing."""
     os.environ["OPENALGO_API_KEY"] = "test_key"
 
+
 def cleanup_environment() -> None:
     """Clean up environment after performance testing."""
     if "OPENALGO_API_KEY" in os.environ:
         del os.environ["OPENALGO_API_KEY"]
+
 
 def benchmark_trade_validation_performance() -> dict[str, Any]:
     """Benchmark trade validation performance."""
@@ -43,7 +45,7 @@ def benchmark_trade_validation_performance() -> dict[str, Any]:
             entry_time=datetime.datetime.now(datetime.UTC),
             status="PENDING",
             metadata={"modification_count": i % 30},
-            order_value=5000.0 + (i % 1000)
+            order_value=5000.0 + (i % 1000),
         )
         trades.append(trade)
 
@@ -67,8 +69,9 @@ def benchmark_trade_validation_performance() -> dict[str, Any]:
         "total_time_seconds": total_time,
         "average_time_per_trade_ms": avg_time_per_trade * 1000,
         "trades_per_second": trades_per_second,
-        "performance_target_met": avg_time_per_trade < 0.001  # < 1ms per trade
+        "performance_target_met": avg_time_per_trade < 0.001,  # < 1ms per trade
     }
+
 
 def benchmark_cmp_compliance_performance() -> dict[str, Any]:
     """Benchmark CMP compliance validation performance."""
@@ -88,7 +91,7 @@ def benchmark_cmp_compliance_performance() -> dict[str, Any]:
             quantity=25,
             entry_time=datetime.datetime.now(datetime.UTC),
             status="PENDING",
-            metadata={"modification_count": i % 30}
+            metadata={"modification_count": i % 30},
         )
         trades.append(trade)
 
@@ -112,8 +115,9 @@ def benchmark_cmp_compliance_performance() -> dict[str, Any]:
         "total_time_seconds": total_time,
         "average_time_per_trade_ms": avg_time_per_trade * 1000,
         "trades_per_second": trades_per_second,
-        "performance_target_met": avg_time_per_trade < 0.0005  # < 0.5ms per trade
+        "performance_target_met": avg_time_per_trade < 0.0005,  # < 0.5ms per trade
     }
+
 
 def benchmark_trailing_stop_performance() -> dict[str, Any]:
     """Benchmark trailing stop calculation performance."""
@@ -132,7 +136,7 @@ def benchmark_trailing_stop_performance() -> dict[str, Any]:
             quantity=25,
             entry_time=datetime.datetime.now(datetime.UTC),
             status="ACTIVE",
-            metadata={}
+            metadata={},
         )
         trades.append(trade)
 
@@ -158,8 +162,9 @@ def benchmark_trailing_stop_performance() -> dict[str, Any]:
         "total_time_seconds": total_time,
         "average_time_per_trade_ms": avg_time_per_trade * 1000,
         "trades_per_second": trades_per_second,
-        "performance_target_met": avg_time_per_trade < 0.0003  # < 0.3ms per trade
+        "performance_target_met": avg_time_per_trade < 0.0003,  # < 0.3ms per trade
     }
+
 
 def benchmark_sl_m_order_creation_performance() -> dict[str, Any]:
     """Benchmark SL-M order creation performance."""
@@ -178,7 +183,7 @@ def benchmark_sl_m_order_creation_performance() -> dict[str, Any]:
             quantity=25,
             entry_time=datetime.datetime.now(datetime.UTC),
             status="ACTIVE",
-            metadata={}
+            metadata={},
         )
 
         # Apply trailing stop to create config
@@ -205,8 +210,9 @@ def benchmark_sl_m_order_creation_performance() -> dict[str, Any]:
         "total_time_seconds": total_time,
         "average_time_per_order_ms": avg_time_per_order * 1000,
         "orders_per_second": orders_per_second,
-        "performance_target_met": avg_time_per_order < 0.0002  # < 0.2ms per order
+        "performance_target_met": avg_time_per_order < 0.0002,  # < 0.2ms per order
     }
+
 
 def benchmark_trade_execution_performance() -> dict[str, Any]:
     """Benchmark trade execution performance."""
@@ -223,7 +229,7 @@ def benchmark_trade_execution_performance() -> dict[str, Any]:
             signal_type="BUY" if i % 3 != 0 else "SELL",
             price=100.0 + (i % 20),
             timestamp=datetime.datetime.now(datetime.UTC),
-            metadata={"strategy": "benchmark"}
+            metadata={"strategy": "benchmark"},
         )
         signals.append(signal)
 
@@ -247,8 +253,9 @@ def benchmark_trade_execution_performance() -> dict[str, Any]:
         "total_time_seconds": total_time,
         "average_time_per_trade_ms": avg_time_per_trade * 1000,
         "trades_per_second": trades_per_second,
-        "performance_target_met": avg_time_per_trade < 0.005  # < 5ms per trade
+        "performance_target_met": avg_time_per_trade < 0.005,  # < 5ms per trade
     }
+
 
 def benchmark_memory_usage() -> dict[str, Any]:
     """Benchmark memory usage with large number of trades."""
@@ -268,7 +275,7 @@ def benchmark_memory_usage() -> dict[str, Any]:
             entry_time=datetime.datetime.now(datetime.UTC),
             status="ACTIVE",
             metadata={"modification_count": i % 30},
-            order_value=5000.0 + (i % 2000)
+            order_value=5000.0 + (i % 2000),
         )
         strategy.active_trades[f"memory_test_trade_{i}"] = trade
 
@@ -279,13 +286,16 @@ def benchmark_memory_usage() -> dict[str, Any]:
             symbol="NIFTY",
             quantity=25,
             order_type=OrderType.LIMIT,
-            price=100.0 + (i % 20)
+            price=100.0 + (i % 20),
         )
         strategy.pending_orders[f"memory_test_order_{i}"] = order
 
     # Get memory usage (approximate)
     import sys
-    memory_usage = sys.getsizeof(strategy.active_trades) + sys.getsizeof(strategy.pending_orders)
+
+    memory_usage = sys.getsizeof(strategy.active_trades) + sys.getsizeof(
+        strategy.pending_orders
+    )
 
     cleanup_environment()
 
@@ -295,8 +305,9 @@ def benchmark_memory_usage() -> dict[str, Any]:
         "total_orders": 100,
         "approximate_memory_bytes": memory_usage,
         "memory_per_trade_bytes": memory_usage / num_trades,
-        "performance_target_met": memory_usage < 10_000_000  # < 10MB for 1000 trades
+        "performance_target_met": memory_usage < 10_000_000,  # < 10MB for 1000 trades
     }
+
 
 def benchmark_strategy_metrics_performance() -> dict[str, Any]:
     """Benchmark strategy metrics calculation performance."""
@@ -316,7 +327,7 @@ def benchmark_strategy_metrics_performance() -> dict[str, Any]:
             entry_time=datetime.datetime.now(datetime.UTC),
             status="ACTIVE",
             metadata={"modification_count": i % 30},
-            order_value=5000.0 + (i % 2000)
+            order_value=5000.0 + (i % 2000),
         )
         strategy.active_trades[f"metrics_test_trade_{i}"] = trade
 
@@ -327,7 +338,7 @@ def benchmark_strategy_metrics_performance() -> dict[str, Any]:
             symbol="NIFTY",
             quantity=25,
             order_type=OrderType.LIMIT,
-            price=100.0 + (i % 20)
+            price=100.0 + (i % 20),
         )
         strategy.pending_orders[f"metrics_test_order_{i}"] = order
 
@@ -352,8 +363,10 @@ def benchmark_strategy_metrics_performance() -> dict[str, Any]:
         "total_time_seconds": total_time,
         "average_time_per_calculation_ms": avg_time_per_calculation * 1000,
         "calculations_per_second": 100 / total_time,
-        "performance_target_met": avg_time_per_calculation < 0.001  # < 1ms per calculation
+        "performance_target_met": avg_time_per_calculation
+        < 0.001,  # < 1ms per calculation
     }
+
 
 def run_all_performance_benchmarks() -> list[dict[str, Any]]:
     """Run all performance benchmarks and return results."""
@@ -367,7 +380,7 @@ def run_all_performance_benchmarks() -> list[dict[str, Any]]:
         benchmark_sl_m_order_creation_performance,
         benchmark_trade_execution_performance,
         benchmark_memory_usage,
-        benchmark_strategy_metrics_performance
+        benchmark_strategy_metrics_performance,
     ]
 
     results = []
@@ -377,12 +390,12 @@ def run_all_performance_benchmarks() -> list[dict[str, Any]]:
         results.append(result)
         print(f"  [OK] {result['test_name']}")
         print(f"    Total Time: {result['total_time_seconds']:.4f}s")
-        if 'average_time_per_trade_ms' in result:
+        if "average_time_per_trade_ms" in result:
             print(f"    Avg Time/Trade: {result['average_time_per_trade_ms']:.4f}ms")
-        if 'trades_per_second' in result:
+        if "trades_per_second" in result:
             print(f"    Throughput: {result['trades_per_second']:.2f}/sec")
-        if 'performance_target_met' in result:
-            status = "[PASS]" if result['performance_target_met'] else "[FAIL]"
+        if "performance_target_met" in result:
+            status = "[PASS]" if result["performance_target_met"] else "[FAIL]"
             print(f"    Performance Target: {status}")
 
     print("\n" + "=" * 80)
@@ -390,8 +403,8 @@ def run_all_performance_benchmarks() -> list[dict[str, Any]]:
 
     all_passed = True
     for result in results:
-        if 'performance_target_met' in result:
-            if not result['performance_target_met']:
+        if "performance_target_met" in result:
+            if not result["performance_target_met"]:
                 all_passed = False
                 break
 
@@ -399,6 +412,7 @@ def run_all_performance_benchmarks() -> list[dict[str, Any]]:
     print(f"Overall Result: {overall_status}")
 
     return results
+
 
 def test_performance_benchmarks() -> None:
     """Test that performance benchmarks run successfully."""
@@ -416,12 +430,14 @@ def test_performance_benchmarks() -> None:
             # performance targets (which may vary by environment)
             assert isinstance(result["performance_target_met"], bool)
 
+
 if __name__ == "__main__":
     # Run performance benchmarks
     results = run_all_performance_benchmarks()
 
     # Optionally save results to file
     import json
+
     with open("trading_strategy_performance_results.json", "w") as f:
         json.dump(results, f, indent=2)
 

@@ -172,11 +172,12 @@ class TestDatabase:
         for i in range(5):
             signal = Signal(
                 **sample_signal.model_dump(
-                    exclude={"signal_id", "timestamp", "strength"}
+                    exclude={"signal_id", "timestamp", "strength", "price"}
                 ),
                 signal_id=f"signal_{i}",
                 timestamp=datetime.now() - timedelta(minutes=i),
                 strength=0.8 - (i * 0.1),
+                price=100.0 + i,  # Ensure price is greater than 0
             )
             db.create_signal(signal)
 
@@ -195,17 +196,19 @@ class TestDatabase:
         """Test get_latest_signals filters by metadata scan_type."""
         for i in range(3):
             signal = Signal(
-                **sample_signal.model_dump(exclude={"signal_id", "timestamp"}),
+                **sample_signal.model_dump(exclude={"signal_id", "timestamp", "price"}),
                 signal_id=f"filter_signal_{i}",
                 timestamp=datetime.now() - timedelta(minutes=i),
+                price=100.0 + i,  # Ensure price is greater than 0
             )
             db.create_signal(signal)
 
         sentiment_signal = Signal(
-            **sample_signal.model_dump(exclude={"signal_id", "timestamp", "metadata"}),
+            **sample_signal.model_dump(exclude={"signal_id", "timestamp", "metadata", "price"}),
             signal_id="filter_sentiment_0",
             timestamp=datetime.now(),
             metadata={"scan_type": "sentiment", "news_count": 5},
+            price=150.0,  # Ensure price is greater than 0
         )
         db.create_signal(sentiment_signal)
 

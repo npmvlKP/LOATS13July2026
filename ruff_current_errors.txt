@@ -1,0 +1,450 @@
+E501 Line too long (90 > 88)
+   --> src\loats\backtest_sanity.py:282:89
+    |
+280 |             "message": (
+281 |                 f"Sharpe ratio {sharpe_ratio:.2f} "
+282 |                 f"{'meets' if passed else 'below'} minimum of {self.min_sharpe_ratio:.2f}"
+    |                                                                                         ^^
+283 |             ),
+284 |         }
+    |
+
+E501 Line too long (91 > 88)
+   --> src\loats\backtest_sanity.py:332:89
+    |
+330 |             "message": (
+331 |                 f"Sortino ratio {sortino_ratio:.2f} "
+332 |                 f"{'meets' if passed else 'below'} minimum of {self.min_sortino_ratio:.2f}"
+    |                                                                                         ^^^
+333 |             ),
+334 |         }
+    |
+
+E501 Line too long (101 > 88)
+   --> src\loats\backtest_sanity.py:367:89
+    |
+365 |             "message": (
+366 |                 f"Transaction cost ratio {cost_ratio:.2%} "
+367 |                 f"{'within' if passed else 'exceeds'} limit of {self.max_transaction_cost_ratio:.2%}"
+    |                                                                                         ^^^^^^^^^^^^^
+368 |             ),
+369 |         }
+    |
+
+E501 Line too long (89 > 88)
+   --> src\loats\backtest_sanity.py:466:89
+    |
+464 |             float(t.pnl) for t in trades if t.pnl is not None
+465 |         ]
+466 |         volatility = np.std(returns) / np.mean(returns) if np.mean(returns) != 0 else 0.0
+    |                                                                                         ^
+467 |
+468 |         # Overfitting score (0-1, higher = more likely overfitted)
+    |
+
+E501 Line too long (96 > 88)
+   --> src\loats\backtest_sanity.py:485:89
+    |
+483 |             "message": (
+484 |                 f"Overfitting score {overfitting_score:.2f} "
+485 |                 f"{'within' if passed else 'exceeds'} limit of {self.max_overfitting_score:.2f}"
+    |                                                                                         ^^^^^^^^
+486 |             ),
+487 |         }
+    |
+
+W292 [*] No newline at end of file
+   --> src\loats\backtest_sanity.py:507:2
+    |
+505 |     "BacktestSanityResult",
+506 |     "backtest_sanity_engine",
+507 | ]
+    |  ^
+    |
+help: Add trailing newline
+
+E501 Line too long (96 > 88)
+  --> src\loats\config\settings.py:87:89
+   |
+85 |     )
+86 |     max_daily_orders: int = Field(500, description="Maximum orders per day")
+87 |     max_ops: int = Field(3, description="Maximum orders per second (CMP Rule 4: self-limit ≤3)")
+   |                                                                                         ^^^^^^^^
+88 |     circuit_limit_pct: Decimal = Field(
+89 |         Decimal("0.05"), description="Circuit limit percentage (+-5%)"
+   |
+
+E501 Line too long (106 > 88)
+   --> src\loats\models.py:246:89
+    |
+244 |     trailing_stop_loss: float | None = Field(default=None, gt=0)
+245 |     metadata: dict[str, Any] = Field(default_factory=dict)
+246 |     signal_type: SignalType | None = Field(default=None, description="Signal type for strategy execution")
+    |                                                                                         ^^^^^^^^^^^^^^^^^^
+247 |     order_value: float | None = Field(default=None, gt=0, description="Total order value for exposure calculation")
+    |
+
+E501 Line too long (115 > 88)
+   --> src\loats\models.py:247:89
+    |
+245 |     metadata: dict[str, Any] = Field(default_factory=dict)
+246 |     signal_type: SignalType | None = Field(default=None, description="Signal type for strategy execution")
+247 |     order_value: float | None = Field(default=None, gt=0, description="Total order value for exposure calculation")
+    |                                                                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+248 |
+249 |     @model_validator(mode="after")
+    |
+
+E501 Line too long (106 > 88)
+   --> src\loats\strength\__init__.py:293:89
+    |
+291 |                 if strongest_signal.strength > 0.7:  # Strong opposition
+292 |                     strong_opposition += 1
+293 |                 elif strongest_signal.strength > self.opposition_threshold:  # Moderate opposition (> 0.4)
+    |                                                                                         ^^^^^^^^^^^^^^^^^^
+294 |                     moderate_opposition += 1
+    |
+
+E501 Line too long (89 > 88)
+  --> src\loats\strength\config.py:21:89
+   |
+19 |     min_sources: int = Field(default=3, ge=2, le=10)
+20 |
+21 |     # Opposition threshold (signals above this in opposite direction count as opposition)
+   |                                                                                         ^
+22 |     opposition_threshold: float = Field(default=0.4, ge=0.0, le=1.0)
+   |
+
+W292 [*] No newline at end of file
+   --> src\loats\strength\config.py:118:62
+    |
+116 | def get_config() -> StrengthEngineConfig:
+117 |     """Get cached config instance."""
+118 |     return StrengthEngineConfig.from_settings(get_settings())
+    |                                                              ^
+    |
+help: Add trailing newline
+
+E501 Line too long (109 > 88)
+  --> src\loats\trading_strategy\core.py:11:89
+   |
+ 9 | from ..config import get_settings
+10 | from ..loats_logging import get_logger
+11 | from ..models import Signal, Trade, Order, OrderType, OrderVariety, TransactionType, ProductType, OrderStatus
+   |                                                                                         ^^^^^^^^^^^^^^^^^^^^^
+12 |
+13 | logger = get_logger(__name__)
+   |
+
+E501 Line too long (93 > 88)
+  --> src\loats\trading_strategy\core.py:81:89
+   |
+79 |                 validation_result["valid"] = False
+80 |                 validation_result["reasons"].append(
+81 |                     f"Order value {trade.order_value} exceeds max {settings.max_order_value}"
+   |                                                                                         ^^^^^
+82 |                 )
+83 |         else:
+   |
+
+E501 Line too long (100 > 88)
+  --> src\loats\trading_strategy\core.py:84:89
+   |
+82 |                 )
+83 |         else:
+84 |             # If order_value is not available or is None, calculate it from entry_price and quantity
+   |                                                                                         ^^^^^^^^^^^^
+85 |             calculated_order_value = trade.entry_price * trade.quantity
+86 |             if calculated_order_value > settings.max_order_value:
+   |
+
+E501 Line too long (109 > 88)
+  --> src\loats\trading_strategy\core.py:89:89
+   |
+87 |                 validation_result["valid"] = False
+88 |                 validation_result["reasons"].append(
+89 |                     f"Calculated order value {calculated_order_value} exceeds max {settings.max_order_value}"
+   |                                                                                         ^^^^^^^^^^^^^^^^^^^^^
+90 |                 )
+   |
+
+E501 Line too long (94 > 88)
+   --> src\loats\trading_strategy\core.py:170:89
+    |
+168 |             "symbol": trade.symbol,
+169 |             "entry_price": trade.entry_price,
+170 |             "current_price": trade.current_price if hasattr(trade, 'current_price') else None,
+    |                                                                                         ^^^^^^
+171 |             "pnl": trade.pnl if hasattr(trade, 'pnl') else None,
+172 |             "modifications": trade.metadata.get("modification_count", 0)
+    |
+
+E501 Line too long (123 > 88)
+   --> src\loats\trading_strategy\core.py:195:89
+    |
+193 |             cmp_validation["valid"] = False
+194 |             cmp_validation["reasons"].append(
+195 |                 f"CMP Rule 7 violation: Modification count {modification_count} exceeds limit {settings.max_modifications}"
+    |                                                                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+196 |             )
+197 |         cmp_validation["cmp_rules_checked"].append("Rule 7")
+    |
+
+E501 Line too long (106 > 88)
+   --> src\loats\trading_strategy\core.py:215:89
+    |
+213 |             cmp_validation["valid"] = False
+214 |             cmp_validation["reasons"].append(
+215 |                 f"CMP Rule 11 violation: Position limit reached for {trade.symbol} (max: {max_positions})"
+    |                                                                                         ^^^^^^^^^^^^^^^^^^
+216 |             )
+217 |         cmp_validation["cmp_rules_checked"].append("Rule 11")
+    |
+
+E501 Line too long (92 > 88)
+   --> src\loats\trading_strategy\core.py:229:89
+    |
+227 |         return cmp_validation["valid"], cmp_validation
+228 |
+229 |     def apply_cmp_trailing_stop(self, trade: Trade, current_price: float) -> dict[str, Any]:
+    |                                                                                         ^^^^
+230 |         """Apply CMP-compliant trailing stop logic."""
+231 |         # Use metadata field to store trailing config since Pydantic models don't allow arbitrary attributes
+    |
+
+E501 Line too long (108 > 88)
+   --> src\loats\trading_strategy\core.py:231:89
+    |
+229 |     def apply_cmp_trailing_stop(self, trade: Trade, current_price: float) -> dict[str, Any]:
+230 |         """Apply CMP-compliant trailing stop logic."""
+231 |         # Use metadata field to store trailing config since Pydantic models don't allow arbitrary attributes
+    |                                                                                         ^^^^^^^^^^^^^^^^^^^^
+232 |         if 'trailing_config' not in trade.metadata:
+233 |             # Determine direction based on transaction_type if available, otherwise default to LONG
+    |
+
+E501 Line too long (99 > 88)
+   --> src\loats\trading_strategy\core.py:233:89
+    |
+231 |         # Use metadata field to store trailing config since Pydantic models don't allow arbitrary attributes
+232 |         if 'trailing_config' not in trade.metadata:
+233 |             # Determine direction based on transaction_type if available, otherwise default to LONG
+    |                                                                                         ^^^^^^^^^^^
+234 |             direction = "LONG"
+235 |             if hasattr(trade, 'transaction_type') and trade.transaction_type:
+    |
+
+E501 Line too long (95 > 88)
+   --> src\loats\trading_strategy\core.py:236:89
+    |
+234 |             direction = "LONG"
+235 |             if hasattr(trade, 'transaction_type') and trade.transaction_type:
+236 |                 direction = "LONG" if str(trade.transaction_type).upper() == "BUY" else "SHORT"
+    |                                                                                         ^^^^^^^
+237 |
+238 |             trade.metadata['trailing_config'] = {
+    |
+
+E501 Line too long (93 > 88)
+   --> src\loats\trading_strategy\core.py:249:89
+    |
+248 |         # CMP Rule 12: Monotonic ratcheting
+249 |         if is_long and current_price > config["trigger_price"] + config["trailing_distance"]:
+    |                                                                                         ^^^^^
+250 |             # Only move stop up for long positions (monotonic ratchet)
+251 |             new_trigger = current_price - config["trailing_distance"]
+    |
+
+E501 Line too long (101 > 88)
+   --> src\loats\trading_strategy\core.py:255:89
+    |
+253 |                 config["trigger_price"] = new_trigger
+254 |                 config["last_update"] = datetime.datetime.now(datetime.UTC)
+255 |                 logger.info(f"Trailing stop updated for {trade.trade_id}: {config['trigger_price']}")
+    |                                                                                         ^^^^^^^^^^^^^
+256 |         elif not is_long and current_price < config["trigger_price"] - config["trailing_distance"]:
+257 |             # Only move stop down for short positions (monotonic ratchet)
+    |
+
+E501 Line too long (99 > 88)
+   --> src\loats\trading_strategy\core.py:256:89
+    |
+254 |                 config["last_update"] = datetime.datetime.now(datetime.UTC)
+255 |                 logger.info(f"Trailing stop updated for {trade.trade_id}: {config['trigger_price']}")
+256 |         elif not is_long and current_price < config["trigger_price"] - config["trailing_distance"]:
+    |                                                                                         ^^^^^^^^^^^
+257 |             # Only move stop down for short positions (monotonic ratchet)
+258 |             new_trigger = current_price + config["trailing_distance"]
+    |
+
+E501 Line too long (101 > 88)
+   --> src\loats\trading_strategy\core.py:262:89
+    |
+260 |                 config["trigger_price"] = new_trigger
+261 |                 config["last_update"] = datetime.datetime.now(datetime.UTC)
+262 |                 logger.info(f"Trailing stop updated for {trade.trade_id}: {config['trigger_price']}")
+    |                                                                                         ^^^^^^^^^^^^^
+263 |
+264 |         return config
+    |
+
+F811 [*] Redefinition of unused `OrderType` from line 11
+   --> src\loats\trading_strategy\core.py:268:37
+    |
+266 |     def create_sl_m_order(self, trade: Trade) -> Order:
+267 |         """Create CMP-compliant SL-M order (CMP Rule 6 & 12)."""
+268 |         from ..models import Order, OrderType
+    |                                     ^^^^^^^^^ `OrderType` redefined here
+269 |
+270 |         if 'trailing_config' not in trade.metadata or not trade.metadata['trailing_config']:
+    |
+   ::: src\loats\trading_strategy\core.py:11:44
+    |
+  9 | from ..config import get_settings
+ 10 | from ..loats_logging import get_logger
+ 11 | from ..models import Signal, Trade, Order, OrderType, OrderVariety, TransactionType, ProductType, OrderStatus
+    |                                            --------- previous definition of `OrderType` here
+ 12 |
+ 13 | logger = get_logger(__name__)
+    |
+help: Remove definition: `OrderType`
+
+E501 Line too long (92 > 88)
+   --> src\loats\trading_strategy\core.py:270:89
+    |
+268 |         from ..models import Order, OrderType
+269 |
+270 |         if 'trailing_config' not in trade.metadata or not trade.metadata['trailing_config']:
+    |                                                                                         ^^^^
+271 |             raise ValueError("Trade must have trailing_config to create SL-M order")
+    |
+
+E501 Line too long (95 > 88)
+   --> src\loats\trading_strategy\core.py:297:89
+    |
+296 |         self.pending_orders[sl_m_order.order_id] = sl_m_order
+297 |         logger.info(f"SL-M order created: {sl_m_order.order_id} at {sl_m_order.trigger_price}")
+    |                                                                                         ^^^^^^^
+298 |
+299 |         return sl_m_order
+    |
+
+W292 [*] No newline at end of file
+   --> src\loats\trading_strategy\core.py:344:10
+    |
+342 |             "max_nifty_positions": settings.max_nifty_positions,
+343 |             "max_banknifty_positions": settings.max_banknifty_positions
+344 |         }
+    |          ^
+    |
+help: Add trailing newline
+
+W292 [*] No newline at end of file
+   --> tests\test_trading_strategy_core.py:622:34
+    |
+620 | if __name__ == "__main__":
+621 |     # Run the tests
+622 |     pytest.main([__file__, "-v"])
+    |                                  ^
+    |
+help: Add trailing newline
+
+F811 [*] Redefinition of unused `os` from line 5
+  --> tests\test_trading_strategy_performance.py:11:8
+   |
+10 | import sys
+11 | import os
+   |        ^^ `os` redefined here
+12 | sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+   |
+  ::: tests\test_trading_strategy_performance.py:5:8
+   |
+ 3 | import datetime
+ 4 | import time
+ 5 | import os
+   |        -- previous definition of `os` here
+ 6 | from typing import Any
+   |
+help: Remove definition: `os`
+
+PTH120 `os.path.dirname()` should be replaced by `Path.parent`
+  --> tests\test_trading_strategy_performance.py:12:17
+   |
+10 | import sys
+11 | import os
+12 | sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+   |                 ^^^^^^^^^^^^^^^
+13 |
+14 | from src.loats.config import get_settings
+   |
+help: Replace with `Path(...).parent`
+
+PTH120 `os.path.dirname()` should be replaced by `Path.parent`
+  --> tests\test_trading_strategy_performance.py:12:33
+   |
+10 | import sys
+11 | import os
+12 | sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+   |                                 ^^^^^^^^^^^^^^^
+13 |
+14 | from src.loats.config import get_settings
+   |
+help: Replace with `Path(...).parent`
+
+PTH100 `os.path.abspath()` should be replaced by `Path.resolve()`
+  --> tests\test_trading_strategy_performance.py:12:49
+   |
+10 | import sys
+11 | import os
+12 | sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+   |                                                 ^^^^^^^^^^^^^^^
+13 |
+14 | from src.loats.config import get_settings
+   |
+help: Replace with `Path(...).resolve()`
+
+F841 Local variable `settings` is assigned to but never used
+  --> tests\test_trading_strategy_performance.py:32:5
+   |
+31 |     strategy = TradingStrategyCore()
+32 |     settings = get_settings()
+   |     ^^^^^^^^
+33 |
+34 |     # Create test trades
+   |
+help: Remove assignment to unused variable `settings`
+
+F841 Local variable `settings` is assigned to but never used
+  --> tests\test_trading_strategy_performance.py:78:5
+   |
+77 |     strategy = TradingStrategyCore()
+78 |     settings = get_settings()
+   |     ^^^^^^^^
+79 |
+80 |     # Create test trades
+   |
+help: Remove assignment to unused variable `settings`
+
+F841 Local variable `metrics` is assigned to but never used
+   --> tests\test_trading_strategy_performance.py:338:9
+    |
+337 |     for _ in range(100):  # Calculate metrics 100 times
+338 |         metrics = strategy.get_strategy_metrics()
+    |         ^^^^^^^
+339 |
+340 |     end_time = time.perf_counter()
+    |
+help: Remove assignment to unused variable `metrics`
+
+W292 [*] No newline at end of file
+   --> tests\test_trading_strategy_performance.py:428:87
+    |
+426 |         json.dump(results, f, indent=2)
+427 |
+428 |     print(f"\nPerformance results saved to trading_strategy_performance_results.json")
+    |                                                                                       ^
+    |
+help: Add trailing newline
+
+Found 40 errors.
+[*] 7 fixable with the `--fix` option (3 hidden fixes can be enabled with the `--unsafe-fixes` option).

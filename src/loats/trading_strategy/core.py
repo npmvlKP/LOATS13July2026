@@ -8,10 +8,20 @@ from typing import Any
 
 from ..config import get_settings
 from ..loats_logging import get_logger
-from ..models import Signal, Trade, Order, OrderType, OrderVariety, TransactionType, ProductType, OrderStatus
+from ..models import (
+    Order,
+    OrderStatus,
+    OrderType,
+    OrderVariety,
+    ProductType,
+    Signal,
+    Trade,
+    TransactionType,
+)
 
 logger = get_logger(__name__)
 settings = get_settings()
+
 
 class StrategyMode(StrEnum):
     """Trading strategy mode enumeration."""
@@ -19,6 +29,7 @@ class StrategyMode(StrEnum):
     ANALYZE = "ANALYZE"
     LIVE = "LIVE"
     BACKTEST = "BACKTEST"
+
 
 class TradingStrategyCore:
     """Core trading strategy implementation."""
@@ -62,10 +73,9 @@ class TradingStrategyCore:
         else:
             max_positions = settings.max_position_per_symbol
 
-        current_positions = len([
-            t for t in self.active_trades.values()
-            if t.symbol == trade.symbol
-        ])
+        current_positions = len(
+            [t for t in self.active_trades.values() if t.symbol == trade.symbol]
+        )
 
         if current_positions >= max_positions:
             validation_result["valid"] = False
@@ -74,14 +84,15 @@ class TradingStrategyCore:
             )
 
         # Check order value limits (if order_value is available)
-        if hasattr(trade, 'order_value') and trade.order_value is not None:
+        if hasattr(trade, "order_value") and trade.order_value is not None:
             if trade.order_value > settings.max_order_value:
                 validation_result["valid"] = False
                 validation_result["reasons"].append(
                     f"Order value {trade.order_value} exceeds max {settings.max_order_value}"
                 )
         else:
-            # If order_value is not available or is None, calculate it from entry_price and quantity
+            # If order_value is not available or is None,
+            # calculate it from entry_price and quantity
             calculated_order_value = trade.entry_price * trade.quantity
             if calculated_order_value > settings.max_order_value:
                 validation_result["valid"] = False
@@ -106,7 +117,7 @@ class TradingStrategyCore:
             quantity=self.nifty_lot_size,  # Use standard lot size
             entry_time=datetime.datetime.now(datetime.UTC),
             status="PENDING",
-            metadata={"source": "strategy_core"}
+            metadata={"source": "strategy_core"},
         )
 
         # Calculate and set order_value
@@ -167,9 +178,11 @@ class TradingStrategyCore:
             "trade_id": trade.trade_id,
             "symbol": trade.symbol,
             "entry_price": trade.entry_price,
-            "current_price": trade.current_price if hasattr(trade, 'current_price') else None,
-            "pnl": trade.pnl if hasattr(trade, 'pnl') else None,
-            "modifications": trade.metadata.get("modification_count", 0)
+            "current_price": (
+                trade.current_price if hasattr(trade, "current_price") else None
+            ),
+            "pnl": trade.pnl if hasattr(trade, "pnl") else None,
+            "modifications": trade.metadata.get("modification_count", 0),
         }
 
     def check_ops_limit(self) -> bool:
@@ -184,7 +197,7 @@ class TradingStrategyCore:
             "valid": True,
             "reasons": [],
             "warnings": [],
-            "cmp_rules_checked": []
+            "cmp_rules_checked": [],
         }
 
         # CMP Rule 7: Order modification limit
@@ -204,10 +217,9 @@ class TradingStrategyCore:
         else:
             max_positions = settings.max_position_per_symbol
 
-        current_positions = len([
-            t for t in self.active_trades.values()
-            if t.symbol == trade.symbol
-        ])
+        current_positions = len(
+            [t for t in self.active_trades.values() if t.symbol == trade.symbol]
+        )
 
         if current_positions >= max_positions:
             cmp_validation["valid"] = False
@@ -226,51 +238,68 @@ class TradingStrategyCore:
 
         return cmp_validation["valid"], cmp_validation
 
-    def apply_cmp_trailing_stop(self, trade: Trade, current_price: float) -> dict[str, Any]:
+    def apply_cmp_trailing_stop(
+        self, trade: Trade, current_price: float
+    ) -> dict[str, Any]:
         """Apply CMP-compliant trailing stop logic."""
         # Use metadata field to store trailing config since Pydantic models don't allow arbitrary attributes
-        if 'trailing_config' not in trade.metadata:
+        if "trailing_config" not in trade.metadata:
             # Determine direction based on transaction_type if available, otherwise default to LONG
             direction = "LONG"
-            if hasattr(trade, 'transaction_type') and trade.transaction_type:
-                direction = "LONG" if str(trade.transaction_type).upper() == "BUY" else "SHORT"
+            if hasattr(trade, "transaction_type") and trade.transaction_type:
+                direction = (
+                    "LONG" if str(trade.transaction_type).upper() == "BUY" else "SHORT"
+                )
 
-            trade.metadata['trailing_config'] = {
+            trade.metadata["trailing_config"] = {
                 "trigger_price": trade.entry_price * 0.98,  # 2% initial stop
                 "trailing_distance": trade.entry_price * 0.02,
                 "last_update": trade.entry_time,
-                "direction": direction
+                "direction": direction,
             }
 
-        config = trade.metadata['trailing_config']
+        config = trade.metadata["trailing_config"]
         is_long = config["direction"] == "LONG"
 
         # CMP Rule 12: Monotonic ratcheting
-        if is_long and current_price > config["trigger_price"] + config["trailing_distance"]:
+        if (
+            is_long
+            and current_price > config["trigger_price"] + config["trailing_distance"]
+        ):
             # Only move stop up for long positions (monotonic ratchet)
             new_trigger = current_price - config["trailing_distance"]
             if new_trigger > config["trigger_price"]:
                 config["trigger_price"] = new_trigger
                 config["last_update"] = datetime.datetime.now(datetime.UTC)
-                logger.info(f"Trailing stop updated for {trade.trade_id}: {config['trigger_price']}")
-        elif not is_long and current_price < config["trigger_price"] - config["trailing_distance"]:
+                logger.info(
+                    f"Trailing stop updated for {trade.trade_id}: {config['trigger_price']}"
+                )
+        elif (
+            not is_long
+            and current_price < config["trigger_price"] - config["trailing_distance"]
+        ):
             # Only move stop down for short positions (monotonic ratchet)
             new_trigger = current_price + config["trailing_distance"]
             if new_trigger < config["trigger_price"]:
                 config["trigger_price"] = new_trigger
                 config["last_update"] = datetime.datetime.now(datetime.UTC)
-                logger.info(f"Trailing stop updated for {trade.trade_id}: {config['trigger_price']}")
+                logger.info(
+                    f"Trailing stop updated for {trade.trade_id}: {config['trigger_price']}"
+                )
 
         return config
 
     def create_sl_m_order(self, trade: Trade) -> Order:
         """Create CMP-compliant SL-M order (CMP Rule 6 & 12)."""
-        from ..models import Order, OrderType
+        from ..models import Order
 
-        if 'trailing_config' not in trade.metadata or not trade.metadata['trailing_config']:
+        if (
+            "trailing_config" not in trade.metadata
+            or not trade.metadata["trailing_config"]
+        ):
             raise ValueError("Trade must have trailing_config to create SL-M order")
 
-        config = trade.metadata['trailing_config']
+        config = trade.metadata["trailing_config"]
 
         sl_m_order = Order(
             order_id=f"slm_{trade.trade_id}_{datetime.datetime.now(datetime.UTC).timestamp()}",
@@ -289,12 +318,14 @@ class TradingStrategyCore:
             metadata={
                 "source": "trading_strategy_core",
                 "cmp_rule": "Rule 12",
-                "created_at": datetime.datetime.now(datetime.UTC)
-            }
+                "created_at": datetime.datetime.now(datetime.UTC),
+            },
         )
 
         self.pending_orders[sl_m_order.order_id] = sl_m_order
-        logger.info(f"SL-M order created: {sl_m_order.order_id} at {sl_m_order.trigger_price}")
+        logger.info(
+            f"SL-M order created: {sl_m_order.order_id} at {sl_m_order.trigger_price}"
+        )
 
         return sl_m_order
 
@@ -303,9 +334,9 @@ class TradingStrategyCore:
         # Handle None order_value in exposure calculation
         current_exposure = 0.0
         for trade in self.active_trades.values():
-            if hasattr(trade, 'order_value') and trade.order_value is not None:
+            if hasattr(trade, "order_value") and trade.order_value is not None:
                 current_exposure += trade.order_value
-            elif hasattr(trade, 'entry_price') and hasattr(trade, 'quantity'):
+            elif hasattr(trade, "entry_price") and hasattr(trade, "quantity"):
                 current_exposure += trade.entry_price * trade.quantity
 
         return {
@@ -315,7 +346,7 @@ class TradingStrategyCore:
             "max_ops": self.max_ops,
             "max_daily_orders": self.max_daily_orders,
             "current_exposure": current_exposure,
-            "max_exposure": float(settings.max_total_exposure)
+            "max_exposure": float(settings.max_total_exposure),
         }
 
     def reset(self) -> None:
@@ -340,5 +371,5 @@ class TradingStrategyCore:
             "max_order_value": float(settings.max_order_value),
             "max_total_exposure": float(settings.max_total_exposure),
             "max_nifty_positions": settings.max_nifty_positions,
-            "max_banknifty_positions": settings.max_banknifty_positions
+            "max_banknifty_positions": settings.max_banknifty_positions,
         }
