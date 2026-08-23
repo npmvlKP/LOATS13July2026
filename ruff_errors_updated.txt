@@ -1,882 +1,157 @@
-[
-  {
-    "cell": null,
-    "code": "E501",
-    "end_location": {
-      "column": 91,
-      "row": 282
-    },
-    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\src\\loats\\backtest_sanity.py",
-    "fix": null,
-    "location": {
-      "column": 89,
-      "row": 282
-    },
-    "message": "Line too long (90 > 88)",
-    "noqa_row": 282,
-    "severity": "error",
-    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
-  },
-  {
-    "cell": null,
-    "code": "E501",
-    "end_location": {
-      "column": 92,
-      "row": 332
-    },
-    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\src\\loats\\backtest_sanity.py",
-    "fix": null,
-    "location": {
-      "column": 89,
-      "row": 332
-    },
-    "message": "Line too long (91 > 88)",
-    "noqa_row": 332,
-    "severity": "error",
-    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
-  },
-  {
-    "cell": null,
-    "code": "E501",
-    "end_location": {
-      "column": 102,
-      "row": 367
-    },
-    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\src\\loats\\backtest_sanity.py",
-    "fix": null,
-    "location": {
-      "column": 89,
-      "row": 367
-    },
-    "message": "Line too long (101 > 88)",
-    "noqa_row": 367,
-    "severity": "error",
-    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
-  },
-  {
-    "cell": null,
-    "code": "E501",
-    "end_location": {
-      "column": 90,
-      "row": 466
-    },
-    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\src\\loats\\backtest_sanity.py",
-    "fix": null,
-    "location": {
-      "column": 89,
-      "row": 466
-    },
-    "message": "Line too long (89 > 88)",
-    "noqa_row": 466,
-    "severity": "error",
-    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
-  },
-  {
-    "cell": null,
-    "code": "E501",
-    "end_location": {
-      "column": 97,
-      "row": 485
-    },
-    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\src\\loats\\backtest_sanity.py",
-    "fix": null,
-    "location": {
-      "column": 89,
-      "row": 485
-    },
-    "message": "Line too long (96 > 88)",
-    "noqa_row": 485,
-    "severity": "error",
-    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
-  },
-  {
-    "cell": null,
-    "code": "W292",
-    "end_location": {
-      "column": 2,
-      "row": 507
-    },
-    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\src\\loats\\backtest_sanity.py",
-    "fix": {
-      "applicability": "safe",
-      "edits": [
-        {
-          "content": "\n",
-          "end_location": {
-            "column": 2,
-            "row": 507
-          },
-          "location": {
-            "column": 2,
-            "row": 507
-          }
-        }
-      ],
-      "message": "Add trailing newline"
-    },
-    "location": {
-      "column": 2,
-      "row": 507
-    },
-    "message": "No newline at end of file",
-    "noqa_row": 507,
-    "severity": "error",
-    "url": "https://docs.astral.sh/ruff/rules/missing-newline-at-end-of-file"
-  },
-  {
-    "cell": null,
-    "code": "E501",
-    "end_location": {
-      "column": 97,
-      "row": 87
-    },
-    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\src\\loats\\config\\settings.py",
-    "fix": null,
-    "location": {
-      "column": 89,
-      "row": 87
-    },
-    "message": "Line too long (96 > 88)",
-    "noqa_row": 87,
-    "severity": "error",
-    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
-  },
-  {
-    "cell": null,
-    "code": "E501",
-    "end_location": {
-      "column": 107,
-      "row": 246
-    },
-    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\src\\loats\\models.py",
-    "fix": null,
-    "location": {
-      "column": 89,
-      "row": 246
-    },
-    "message": "Line too long (106 > 88)",
-    "noqa_row": 246,
-    "severity": "error",
-    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
-  },
-  {
-    "cell": null,
-    "code": "E501",
-    "end_location": {
-      "column": 116,
-      "row": 247
-    },
-    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\src\\loats\\models.py",
-    "fix": null,
-    "location": {
-      "column": 89,
-      "row": 247
-    },
-    "message": "Line too long (115 > 88)",
-    "noqa_row": 247,
-    "severity": "error",
-    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
-  },
-  {
-    "cell": null,
-    "code": "E501",
-    "end_location": {
-      "column": 107,
-      "row": 293
-    },
-    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\src\\loats\\strength\\__init__.py",
-    "fix": null,
-    "location": {
-      "column": 89,
-      "row": 293
-    },
-    "message": "Line too long (106 > 88)",
-    "noqa_row": 293,
-    "severity": "error",
-    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
-  },
-  {
-    "cell": null,
-    "code": "E501",
-    "end_location": {
-      "column": 90,
-      "row": 21
-    },
-    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\src\\loats\\strength\\config.py",
-    "fix": null,
-    "location": {
-      "column": 89,
-      "row": 21
-    },
-    "message": "Line too long (89 > 88)",
-    "noqa_row": 21,
-    "severity": "error",
-    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
-  },
-  {
-    "cell": null,
-    "code": "W292",
-    "end_location": {
-      "column": 62,
-      "row": 118
-    },
-    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\src\\loats\\strength\\config.py",
-    "fix": {
-      "applicability": "safe",
-      "edits": [
-        {
-          "content": "\n",
-          "end_location": {
-            "column": 62,
-            "row": 118
-          },
-          "location": {
-            "column": 62,
-            "row": 118
-          }
-        }
-      ],
-      "message": "Add trailing newline"
-    },
-    "location": {
-      "column": 62,
-      "row": 118
-    },
-    "message": "No newline at end of file",
-    "noqa_row": 118,
-    "severity": "error",
-    "url": "https://docs.astral.sh/ruff/rules/missing-newline-at-end-of-file"
-  },
-  {
-    "cell": null,
-    "code": "E501",
-    "end_location": {
-      "column": 110,
-      "row": 11
-    },
-    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\src\\loats\\trading_strategy\\core.py",
-    "fix": null,
-    "location": {
-      "column": 89,
-      "row": 11
-    },
-    "message": "Line too long (109 > 88)",
-    "noqa_row": 11,
-    "severity": "error",
-    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
-  },
-  {
-    "cell": null,
-    "code": "E501",
-    "end_location": {
-      "column": 94,
-      "row": 81
-    },
-    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\src\\loats\\trading_strategy\\core.py",
-    "fix": null,
-    "location": {
-      "column": 89,
-      "row": 81
-    },
-    "message": "Line too long (93 > 88)",
-    "noqa_row": 81,
-    "severity": "error",
-    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
-  },
-  {
-    "cell": null,
-    "code": "E501",
-    "end_location": {
-      "column": 101,
-      "row": 84
-    },
-    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\src\\loats\\trading_strategy\\core.py",
-    "fix": null,
-    "location": {
-      "column": 89,
-      "row": 84
-    },
-    "message": "Line too long (100 > 88)",
-    "noqa_row": 84,
-    "severity": "error",
-    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
-  },
-  {
-    "cell": null,
-    "code": "E501",
-    "end_location": {
-      "column": 110,
-      "row": 89
-    },
-    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\src\\loats\\trading_strategy\\core.py",
-    "fix": null,
-    "location": {
-      "column": 89,
-      "row": 89
-    },
-    "message": "Line too long (109 > 88)",
-    "noqa_row": 89,
-    "severity": "error",
-    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
-  },
-  {
-    "cell": null,
-    "code": "E501",
-    "end_location": {
-      "column": 95,
-      "row": 170
-    },
-    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\src\\loats\\trading_strategy\\core.py",
-    "fix": null,
-    "location": {
-      "column": 89,
-      "row": 170
-    },
-    "message": "Line too long (94 > 88)",
-    "noqa_row": 170,
-    "severity": "error",
-    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
-  },
-  {
-    "cell": null,
-    "code": "E501",
-    "end_location": {
-      "column": 124,
-      "row": 195
-    },
-    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\src\\loats\\trading_strategy\\core.py",
-    "fix": null,
-    "location": {
-      "column": 89,
-      "row": 195
-    },
-    "message": "Line too long (123 > 88)",
-    "noqa_row": 195,
-    "severity": "error",
-    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
-  },
-  {
-    "cell": null,
-    "code": "E501",
-    "end_location": {
-      "column": 107,
-      "row": 215
-    },
-    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\src\\loats\\trading_strategy\\core.py",
-    "fix": null,
-    "location": {
-      "column": 89,
-      "row": 215
-    },
-    "message": "Line too long (106 > 88)",
-    "noqa_row": 215,
-    "severity": "error",
-    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
-  },
-  {
-    "cell": null,
-    "code": "E501",
-    "end_location": {
-      "column": 93,
-      "row": 229
-    },
-    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\src\\loats\\trading_strategy\\core.py",
-    "fix": null,
-    "location": {
-      "column": 89,
-      "row": 229
-    },
-    "message": "Line too long (92 > 88)",
-    "noqa_row": 229,
-    "severity": "error",
-    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
-  },
-  {
-    "cell": null,
-    "code": "E501",
-    "end_location": {
-      "column": 109,
-      "row": 231
-    },
-    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\src\\loats\\trading_strategy\\core.py",
-    "fix": null,
-    "location": {
-      "column": 89,
-      "row": 231
-    },
-    "message": "Line too long (108 > 88)",
-    "noqa_row": 231,
-    "severity": "error",
-    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
-  },
-  {
-    "cell": null,
-    "code": "E501",
-    "end_location": {
-      "column": 100,
-      "row": 233
-    },
-    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\src\\loats\\trading_strategy\\core.py",
-    "fix": null,
-    "location": {
-      "column": 89,
-      "row": 233
-    },
-    "message": "Line too long (99 > 88)",
-    "noqa_row": 233,
-    "severity": "error",
-    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
-  },
-  {
-    "cell": null,
-    "code": "E501",
-    "end_location": {
-      "column": 96,
-      "row": 236
-    },
-    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\src\\loats\\trading_strategy\\core.py",
-    "fix": null,
-    "location": {
-      "column": 89,
-      "row": 236
-    },
-    "message": "Line too long (95 > 88)",
-    "noqa_row": 236,
-    "severity": "error",
-    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
-  },
-  {
-    "cell": null,
-    "code": "E501",
-    "end_location": {
-      "column": 94,
-      "row": 249
-    },
-    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\src\\loats\\trading_strategy\\core.py",
-    "fix": null,
-    "location": {
-      "column": 89,
-      "row": 249
-    },
-    "message": "Line too long (93 > 88)",
-    "noqa_row": 249,
-    "severity": "error",
-    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
-  },
-  {
-    "cell": null,
-    "code": "E501",
-    "end_location": {
-      "column": 102,
-      "row": 255
-    },
-    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\src\\loats\\trading_strategy\\core.py",
-    "fix": null,
-    "location": {
-      "column": 89,
-      "row": 255
-    },
-    "message": "Line too long (101 > 88)",
-    "noqa_row": 255,
-    "severity": "error",
-    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
-  },
-  {
-    "cell": null,
-    "code": "E501",
-    "end_location": {
-      "column": 100,
-      "row": 256
-    },
-    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\src\\loats\\trading_strategy\\core.py",
-    "fix": null,
-    "location": {
-      "column": 89,
-      "row": 256
-    },
-    "message": "Line too long (99 > 88)",
-    "noqa_row": 256,
-    "severity": "error",
-    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
-  },
-  {
-    "cell": null,
-    "code": "E501",
-    "end_location": {
-      "column": 102,
-      "row": 262
-    },
-    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\src\\loats\\trading_strategy\\core.py",
-    "fix": null,
-    "location": {
-      "column": 89,
-      "row": 262
-    },
-    "message": "Line too long (101 > 88)",
-    "noqa_row": 262,
-    "severity": "error",
-    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
-  },
-  {
-    "cell": null,
-    "code": "F811",
-    "end_location": {
-      "column": 46,
-      "row": 268
-    },
-    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\src\\loats\\trading_strategy\\core.py",
-    "fix": {
-      "applicability": "safe",
-      "edits": [
-        {
-          "content": "from ..models import Order",
-          "end_location": {
-            "column": 46,
-            "row": 268
-          },
-          "location": {
-            "column": 9,
-            "row": 268
-          }
-        }
-      ],
-      "message": "Remove definition: `OrderType`"
-    },
-    "location": {
-      "column": 37,
-      "row": 268
-    },
-    "message": "Redefinition of unused `OrderType` from line 11: `OrderType` redefined here",
-    "noqa_row": 268,
-    "severity": "error",
-    "url": "https://docs.astral.sh/ruff/rules/redefined-while-unused"
-  },
-  {
-    "cell": null,
-    "code": "E501",
-    "end_location": {
-      "column": 93,
-      "row": 270
-    },
-    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\src\\loats\\trading_strategy\\core.py",
-    "fix": null,
-    "location": {
-      "column": 89,
-      "row": 270
-    },
-    "message": "Line too long (92 > 88)",
-    "noqa_row": 270,
-    "severity": "error",
-    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
-  },
-  {
-    "cell": null,
-    "code": "E501",
-    "end_location": {
-      "column": 96,
-      "row": 297
-    },
-    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\src\\loats\\trading_strategy\\core.py",
-    "fix": null,
-    "location": {
-      "column": 89,
-      "row": 297
-    },
-    "message": "Line too long (95 > 88)",
-    "noqa_row": 297,
-    "severity": "error",
-    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
-  },
-  {
-    "cell": null,
-    "code": "W292",
-    "end_location": {
-      "column": 10,
-      "row": 344
-    },
-    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\src\\loats\\trading_strategy\\core.py",
-    "fix": {
-      "applicability": "safe",
-      "edits": [
-        {
-          "content": "\n",
-          "end_location": {
-            "column": 10,
-            "row": 344
-          },
-          "location": {
-            "column": 10,
-            "row": 344
-          }
-        }
-      ],
-      "message": "Add trailing newline"
-    },
-    "location": {
-      "column": 10,
-      "row": 344
-    },
-    "message": "No newline at end of file",
-    "noqa_row": 344,
-    "severity": "error",
-    "url": "https://docs.astral.sh/ruff/rules/missing-newline-at-end-of-file"
-  },
-  {
-    "cell": null,
-    "code": "W292",
-    "end_location": {
-      "column": 34,
-      "row": 622
-    },
-    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\tests\\test_trading_strategy_core.py",
-    "fix": {
-      "applicability": "safe",
-      "edits": [
-        {
-          "content": "\n",
-          "end_location": {
-            "column": 34,
-            "row": 622
-          },
-          "location": {
-            "column": 34,
-            "row": 622
-          }
-        }
-      ],
-      "message": "Add trailing newline"
-    },
-    "location": {
-      "column": 34,
-      "row": 622
-    },
-    "message": "No newline at end of file",
-    "noqa_row": 622,
-    "severity": "error",
-    "url": "https://docs.astral.sh/ruff/rules/missing-newline-at-end-of-file"
-  },
-  {
-    "cell": null,
-    "code": "F811",
-    "end_location": {
-      "column": 10,
-      "row": 11
-    },
-    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\tests\\test_trading_strategy_performance.py",
-    "fix": {
-      "applicability": "safe",
-      "edits": [
-        {
-          "content": "",
-          "end_location": {
-            "column": 1,
-            "row": 12
-          },
-          "location": {
-            "column": 1,
-            "row": 11
-          }
-        }
-      ],
-      "message": "Remove definition: `os`"
-    },
-    "location": {
-      "column": 8,
-      "row": 11
-    },
-    "message": "Redefinition of unused `os` from line 5: `os` redefined here",
-    "noqa_row": 11,
-    "severity": "error",
-    "url": "https://docs.astral.sh/ruff/rules/redefined-while-unused"
-  },
-  {
-    "cell": null,
-    "code": "PTH120",
-    "end_location": {
-      "column": 32,
-      "row": 12
-    },
-    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\tests\\test_trading_strategy_performance.py",
-    "fix": null,
-    "location": {
-      "column": 17,
-      "row": 12
-    },
-    "message": "`os.path.dirname()` should be replaced by `Path.parent`",
-    "noqa_row": 12,
-    "severity": "error",
-    "url": "https://docs.astral.sh/ruff/rules/os-path-dirname"
-  },
-  {
-    "cell": null,
-    "code": "PTH120",
-    "end_location": {
-      "column": 48,
-      "row": 12
-    },
-    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\tests\\test_trading_strategy_performance.py",
-    "fix": null,
-    "location": {
-      "column": 33,
-      "row": 12
-    },
-    "message": "`os.path.dirname()` should be replaced by `Path.parent`",
-    "noqa_row": 12,
-    "severity": "error",
-    "url": "https://docs.astral.sh/ruff/rules/os-path-dirname"
-  },
-  {
-    "cell": null,
-    "code": "PTH100",
-    "end_location": {
-      "column": 64,
-      "row": 12
-    },
-    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\tests\\test_trading_strategy_performance.py",
-    "fix": null,
-    "location": {
-      "column": 49,
-      "row": 12
-    },
-    "message": "`os.path.abspath()` should be replaced by `Path.resolve()`",
-    "noqa_row": 12,
-    "severity": "error",
-    "url": "https://docs.astral.sh/ruff/rules/os-path-abspath"
-  },
-  {
-    "cell": null,
-    "code": "F841",
-    "end_location": {
-      "column": 13,
-      "row": 32
-    },
-    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\tests\\test_trading_strategy_performance.py",
-    "fix": {
-      "applicability": "unsafe",
-      "edits": [
-        {
-          "content": "",
-          "end_location": {
-            "column": 16,
-            "row": 32
-          },
-          "location": {
-            "column": 5,
-            "row": 32
-          }
-        }
-      ],
-      "message": "Remove assignment to unused variable `settings`"
-    },
-    "location": {
-      "column": 5,
-      "row": 32
-    },
-    "message": "Local variable `settings` is assigned to but never used",
-    "noqa_row": 32,
-    "severity": "error",
-    "url": "https://docs.astral.sh/ruff/rules/unused-variable"
-  },
-  {
-    "cell": null,
-    "code": "F841",
-    "end_location": {
-      "column": 13,
-      "row": 78
-    },
-    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\tests\\test_trading_strategy_performance.py",
-    "fix": {
-      "applicability": "unsafe",
-      "edits": [
-        {
-          "content": "",
-          "end_location": {
-            "column": 16,
-            "row": 78
-          },
-          "location": {
-            "column": 5,
-            "row": 78
-          }
-        }
-      ],
-      "message": "Remove assignment to unused variable `settings`"
-    },
-    "location": {
-      "column": 5,
-      "row": 78
-    },
-    "message": "Local variable `settings` is assigned to but never used",
-    "noqa_row": 78,
-    "severity": "error",
-    "url": "https://docs.astral.sh/ruff/rules/unused-variable"
-  },
-  {
-    "cell": null,
-    "code": "F841",
-    "end_location": {
-      "column": 16,
-      "row": 338
-    },
-    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\tests\\test_trading_strategy_performance.py",
-    "fix": {
-      "applicability": "unsafe",
-      "edits": [
-        {
-          "content": "",
-          "end_location": {
-            "column": 19,
-            "row": 338
-          },
-          "location": {
-            "column": 9,
-            "row": 338
-          }
-        }
-      ],
-      "message": "Remove assignment to unused variable `metrics`"
-    },
-    "location": {
-      "column": 9,
-      "row": 338
-    },
-    "message": "Local variable `metrics` is assigned to but never used",
-    "noqa_row": 338,
-    "severity": "error",
-    "url": "https://docs.astral.sh/ruff/rules/unused-variable"
-  },
-  {
-    "cell": null,
-    "code": "W292",
-    "end_location": {
-      "column": 87,
-      "row": 428
-    },
-    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\tests\\test_trading_strategy_performance.py",
-    "fix": {
-      "applicability": "safe",
-      "edits": [
-        {
-          "content": "\n",
-          "end_location": {
-            "column": 87,
-            "row": 428
-          },
-          "location": {
-            "column": 87,
-            "row": 428
-          }
-        }
-      ],
-      "message": "Add trailing newline"
-    },
-    "location": {
-      "column": 87,
-      "row": 428
-    },
-    "message": "No newline at end of file",
-    "noqa_row": 428,
-    "severity": "error",
-    "url": "https://docs.astral.sh/ruff/rules/missing-newline-at-end-of-file"
-  }
-]
+E501 Line too long (93 > 88)
+  --> src\loats\trading_strategy\core.py:91:89
+   |
+89 |                 validation_result["valid"] = False
+90 |                 validation_result["reasons"].append(
+91 |                     f"Order value {trade.order_value} exceeds max {settings.max_order_value}"
+   |                                                                                         ^^^^^
+92 |                 )
+93 |         else:
+   |
+
+E501 Line too long (109 > 88)
+   --> src\loats\trading_strategy\core.py:100:89
+    |
+ 98 |                 validation_result["valid"] = False
+ 99 |                 validation_result["reasons"].append(
+100 |                     f"Calculated order value {calculated_order_value} exceeds max {settings.max_order_value}"
+    |                                                                                         ^^^^^^^^^^^^^^^^^^^^^
+101 |                 )
+    |
+
+E501 Line too long (123 > 88)
+   --> src\loats\trading_strategy\core.py:208:89
+    |
+206 |             cmp_validation["valid"] = False
+207 |             cmp_validation["reasons"].append(
+208 |                 f"CMP Rule 7 violation: Modification count {modification_count} exceeds limit {settings.max_modifications}"
+    |                                                                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+209 |             )
+210 |         cmp_validation["cmp_rules_checked"].append("Rule 7")
+    |
+
+E501 Line too long (106 > 88)
+   --> src\loats\trading_strategy\core.py:227:89
+    |
+225 |             cmp_validation["valid"] = False
+226 |             cmp_validation["reasons"].append(
+227 |                 f"CMP Rule 11 violation: Position limit reached for {trade.symbol} (max: {max_positions})"
+    |                                                                                         ^^^^^^^^^^^^^^^^^^
+228 |             )
+229 |         cmp_validation["cmp_rules_checked"].append("Rule 11")
+    |
+
+E501 Line too long (108 > 88)
+   --> src\loats\trading_strategy\core.py:245:89
+    |
+243 |     ) -> dict[str, Any]:
+244 |         """Apply CMP-compliant trailing stop logic."""
+245 |         # Use metadata field to store trailing config since Pydantic models don't allow arbitrary attributes
+    |                                                                                         ^^^^^^^^^^^^^^^^^^^^
+246 |         if "trailing_config" not in trade.metadata:
+247 |             # Determine direction based on transaction_type if available, otherwise default to LONG
+    |
+
+E501 Line too long (99 > 88)
+   --> src\loats\trading_strategy\core.py:247:89
+    |
+245 |         # Use metadata field to store trailing config since Pydantic models don't allow arbitrary attributes
+246 |         if "trailing_config" not in trade.metadata:
+247 |             # Determine direction based on transaction_type if available, otherwise default to LONG
+    |                                                                                         ^^^^^^^^^^^
+248 |             direction = "LONG"
+249 |             if hasattr(trade, "transaction_type") and trade.transaction_type:
+    |
+
+E501 Line too long (92 > 88)
+   --> src\loats\trading_strategy\core.py:275:89
+    |
+273 |                 config["last_update"] = datetime.datetime.now(datetime.UTC)
+274 |                 logger.info(
+275 |                     f"Trailing stop updated for {trade.trade_id}: {config['trigger_price']}"
+    |                                                                                         ^^^^
+276 |                 )
+277 |         elif (
+    |
+
+E501 Line too long (92 > 88)
+   --> src\loats\trading_strategy\core.py:287:89
+    |
+285 |                 config["last_update"] = datetime.datetime.now(datetime.UTC)
+286 |                 logger.info(
+287 |                     f"Trailing stop updated for {trade.trade_id}: {config['trigger_price']}"
+    |                                                                                         ^^^^
+288 |                 )
+    |
+
+PTH120 `os.path.dirname()` should be replaced by `Path.parent`
+  --> tests\test_trading_strategy_performance.py:11:17
+   |
+ 9 | import pytest
+10 |
+11 | sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+   |                 ^^^^^^^^^^^^^^^
+12 |
+13 | from src.loats.config import get_settings
+   |
+help: Replace with `Path(...).parent`
+
+PTH120 `os.path.dirname()` should be replaced by `Path.parent`
+  --> tests\test_trading_strategy_performance.py:11:33
+   |
+ 9 | import pytest
+10 |
+11 | sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+   |                                 ^^^^^^^^^^^^^^^
+12 |
+13 | from src.loats.config import get_settings
+   |
+help: Replace with `Path(...).parent`
+
+PTH100 `os.path.abspath()` should be replaced by `Path.resolve()`
+  --> tests\test_trading_strategy_performance.py:11:49
+   |
+ 9 | import pytest
+10 |
+11 | sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+   |                                                 ^^^^^^^^^^^^^^^
+12 |
+13 | from src.loats.config import get_settings
+   |
+help: Replace with `Path(...).resolve()`
+
+F841 Local variable `settings` is assigned to but never used
+  --> tests\test_trading_strategy_performance.py:34:5
+   |
+33 |     strategy = TradingStrategyCore()
+34 |     settings = get_settings()
+   |     ^^^^^^^^
+35 |
+36 |     # Create test trades
+   |
+help: Remove assignment to unused variable `settings`
+
+F841 Local variable `settings` is assigned to but never used
+  --> tests\test_trading_strategy_performance.py:81:5
+   |
+80 |     strategy = TradingStrategyCore()
+81 |     settings = get_settings()
+   |     ^^^^^^^^
+82 |
+83 |     # Create test trades
+   |
+help: Remove assignment to unused variable `settings`
+
+F841 Local variable `metrics` is assigned to but never used
+   --> tests\test_trading_strategy_performance.py:349:9
+    |
+348 |     for _ in range(100):  # Calculate metrics 100 times
+349 |         metrics = strategy.get_strategy_metrics()
+    |         ^^^^^^^
+350 |
+351 |     end_time = time.perf_counter()
+    |
+help: Remove assignment to unused variable `metrics`
+
+Found 14 errors.
+No fixes available (3 hidden fixes can be enabled with the `--unsafe-fixes` option).

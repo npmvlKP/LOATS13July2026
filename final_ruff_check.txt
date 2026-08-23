@@ -1,0 +1,22 @@
+E501 Line too long (92 > 88)
+   --> src\loats\trading_strategy\core.py:281:89
+    |
+279 |                 config["last_update"] = datetime.datetime.now(datetime.UTC)
+280 |                 logger.info(
+281 |                     f"Trailing stop updated for {trade.trade_id}: {config['trigger_price']}"
+    |                                                                                         ^^^^
+282 |                 )
+283 |         elif (
+    |
+
+E501 Line too long (92 > 88)
+   --> src\loats\trading_strategy\core.py:293:89
+    |
+291 |                 config["last_update"] = datetime.datetime.now(datetime.UTC)
+292 |                 logger.info(
+293 |                     f"Trailing stop updated for {trade.trade_id}: {config['trigger_price']}"
+    |                                                                                         ^^^^
+294 |                 )
+    |
+
+Found 2 errors.

@@ -1,0 +1,302 @@
+[
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 94,
+      "row": 91
+    },
+    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\src\\loats\\trading_strategy\\core.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 91
+    },
+    "message": "Line too long (93 > 88)",
+    "noqa_row": 91,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 110,
+      "row": 100
+    },
+    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\src\\loats\\trading_strategy\\core.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 100
+    },
+    "message": "Line too long (109 > 88)",
+    "noqa_row": 100,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 124,
+      "row": 208
+    },
+    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\src\\loats\\trading_strategy\\core.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 208
+    },
+    "message": "Line too long (123 > 88)",
+    "noqa_row": 208,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 107,
+      "row": 227
+    },
+    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\src\\loats\\trading_strategy\\core.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 227
+    },
+    "message": "Line too long (106 > 88)",
+    "noqa_row": 227,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 109,
+      "row": 245
+    },
+    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\src\\loats\\trading_strategy\\core.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 245
+    },
+    "message": "Line too long (108 > 88)",
+    "noqa_row": 245,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 100,
+      "row": 247
+    },
+    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\src\\loats\\trading_strategy\\core.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 247
+    },
+    "message": "Line too long (99 > 88)",
+    "noqa_row": 247,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 93,
+      "row": 275
+    },
+    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\src\\loats\\trading_strategy\\core.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 275
+    },
+    "message": "Line too long (92 > 88)",
+    "noqa_row": 275,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": {
+      "column": 93,
+      "row": 287
+    },
+    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\src\\loats\\trading_strategy\\core.py",
+    "fix": null,
+    "location": {
+      "column": 89,
+      "row": 287
+    },
+    "message": "Line too long (92 > 88)",
+    "noqa_row": 287,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  },
+  {
+    "cell": null,
+    "code": "PTH120",
+    "end_location": {
+      "column": 32,
+      "row": 11
+    },
+    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\tests\\test_trading_strategy_performance.py",
+    "fix": null,
+    "location": {
+      "column": 17,
+      "row": 11
+    },
+    "message": "`os.path.dirname()` should be replaced by `Path.parent`",
+    "noqa_row": 11,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/os-path-dirname"
+  },
+  {
+    "cell": null,
+    "code": "PTH120",
+    "end_location": {
+      "column": 48,
+      "row": 11
+    },
+    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\tests\\test_trading_strategy_performance.py",
+    "fix": null,
+    "location": {
+      "column": 33,
+      "row": 11
+    },
+    "message": "`os.path.dirname()` should be replaced by `Path.parent`",
+    "noqa_row": 11,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/os-path-dirname"
+  },
+  {
+    "cell": null,
+    "code": "PTH100",
+    "end_location": {
+      "column": 64,
+      "row": 11
+    },
+    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\tests\\test_trading_strategy_performance.py",
+    "fix": null,
+    "location": {
+      "column": 49,
+      "row": 11
+    },
+    "message": "`os.path.abspath()` should be replaced by `Path.resolve()`",
+    "noqa_row": 11,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/os-path-abspath"
+  },
+  {
+    "cell": null,
+    "code": "F841",
+    "end_location": {
+      "column": 13,
+      "row": 34
+    },
+    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\tests\\test_trading_strategy_performance.py",
+    "fix": {
+      "applicability": "unsafe",
+      "edits": [
+        {
+          "content": "",
+          "end_location": {
+            "column": 16,
+            "row": 34
+          },
+          "location": {
+            "column": 5,
+            "row": 34
+          }
+        }
+      ],
+      "message": "Remove assignment to unused variable `settings`"
+    },
+    "location": {
+      "column": 5,
+      "row": 34
+    },
+    "message": "Local variable `settings` is assigned to but never used",
+    "noqa_row": 34,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/unused-variable"
+  },
+  {
+    "cell": null,
+    "code": "F841",
+    "end_location": {
+      "column": 13,
+      "row": 81
+    },
+    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\tests\\test_trading_strategy_performance.py",
+    "fix": {
+      "applicability": "unsafe",
+      "edits": [
+        {
+          "content": "",
+          "end_location": {
+            "column": 16,
+            "row": 81
+          },
+          "location": {
+            "column": 5,
+            "row": 81
+          }
+        }
+      ],
+      "message": "Remove assignment to unused variable `settings`"
+    },
+    "location": {
+      "column": 5,
+      "row": 81
+    },
+    "message": "Local variable `settings` is assigned to but never used",
+    "noqa_row": 81,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/unused-variable"
+  },
+  {
+    "cell": null,
+    "code": "F841",
+    "end_location": {
+      "column": 16,
+      "row": 349
+    },
+    "filename": "g:\\.OA\\LOATS-13July2026\\LOATS13July2026\\tests\\test_trading_strategy_performance.py",
+    "fix": {
+      "applicability": "unsafe",
+      "edits": [
+        {
+          "content": "",
+          "end_location": {
+            "column": 19,
+            "row": 349
+          },
+          "location": {
+            "column": 9,
+            "row": 349
+          }
+        }
+      ],
+      "message": "Remove assignment to unused variable `metrics`"
+    },
+    "location": {
+      "column": 9,
+      "row": 349
+    },
+    "message": "Local variable `metrics` is assigned to but never used",
+    "noqa_row": 349,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/unused-variable"
+  }
+]

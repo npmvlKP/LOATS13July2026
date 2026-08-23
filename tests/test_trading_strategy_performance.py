@@ -4,11 +4,12 @@ import datetime
 import os
 import sys
 import time
+from pathlib import Path
 from typing import Any
 
 import pytest
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(str(Path(__file__).parent.parent.resolve()))
 
 from src.loats.config import get_settings
 from src.loats.models import Order, OrderType, Signal, Trade
@@ -31,7 +32,6 @@ def benchmark_trade_validation_performance() -> dict[str, Any]:
     setup_environment()
 
     strategy = TradingStrategyCore()
-    settings = get_settings()
 
     # Create test trades
     trades = []
@@ -78,7 +78,6 @@ def benchmark_cmp_compliance_performance() -> dict[str, Any]:
     setup_environment()
 
     strategy = TradingStrategyCore()
-    settings = get_settings()
 
     # Create test trades
     trades = []
@@ -346,7 +345,7 @@ def benchmark_strategy_metrics_performance() -> dict[str, Any]:
     start_time = time.perf_counter()
 
     for _ in range(100):  # Calculate metrics 100 times
-        metrics = strategy.get_strategy_metrics()
+        strategy.get_strategy_metrics()
 
     end_time = time.perf_counter()
 

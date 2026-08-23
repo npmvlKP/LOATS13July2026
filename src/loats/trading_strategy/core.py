@@ -88,7 +88,8 @@ class TradingStrategyCore:
             if trade.order_value > settings.max_order_value:
                 validation_result["valid"] = False
                 validation_result["reasons"].append(
-                    f"Order value {trade.order_value} exceeds max {settings.max_order_value}"
+                    f"Order value {trade.order_value} exceeds max "
+                    f"{settings.max_order_value}"
                 )
         else:
             # If order_value is not available or is None,
@@ -97,7 +98,8 @@ class TradingStrategyCore:
             if calculated_order_value > settings.max_order_value:
                 validation_result["valid"] = False
                 validation_result["reasons"].append(
-                    f"Calculated order value {calculated_order_value} exceeds max {settings.max_order_value}"
+                    f"Calculated order value {calculated_order_value} exceeds max "
+                    f"{settings.max_order_value}"
                 )
 
         return validation_result["valid"], validation_result
@@ -205,7 +207,8 @@ class TradingStrategyCore:
         if modification_count >= settings.max_modifications:
             cmp_validation["valid"] = False
             cmp_validation["reasons"].append(
-                f"CMP Rule 7 violation: Modification count {modification_count} exceeds limit {settings.max_modifications}"
+                f"CMP Rule 7 violation: Modification count {modification_count} "
+                f"exceeds limit {settings.max_modifications}"
             )
         cmp_validation["cmp_rules_checked"].append("Rule 7")
 
@@ -224,7 +227,8 @@ class TradingStrategyCore:
         if current_positions >= max_positions:
             cmp_validation["valid"] = False
             cmp_validation["reasons"].append(
-                f"CMP Rule 11 violation: Position limit reached for {trade.symbol} (max: {max_positions})"
+                f"CMP Rule 11 violation: Position limit reached for {trade.symbol} "
+                f"(max: {max_positions})"
             )
         cmp_validation["cmp_rules_checked"].append("Rule 11")
 
@@ -242,9 +246,11 @@ class TradingStrategyCore:
         self, trade: Trade, current_price: float
     ) -> dict[str, Any]:
         """Apply CMP-compliant trailing stop logic."""
-        # Use metadata field to store trailing config since Pydantic models don't allow arbitrary attributes
+        # Use metadata field to store trailing config since Pydantic models
+        # don't allow arbitrary attributes
         if "trailing_config" not in trade.metadata:
-            # Determine direction based on transaction_type if available, otherwise default to LONG
+            # Determine direction based on transaction_type if available,
+            # otherwise default to LONG
             direction = "LONG"
             if hasattr(trade, "transaction_type") and trade.transaction_type:
                 direction = (
@@ -272,7 +278,8 @@ class TradingStrategyCore:
                 config["trigger_price"] = new_trigger
                 config["last_update"] = datetime.datetime.now(datetime.UTC)
                 logger.info(
-                    f"Trailing stop updated for {trade.trade_id}: {config['trigger_price']}"
+                    f"Trailing stop updated for {trade.trade_id}: "
+                    f"{config['trigger_price']}"
                 )
         elif (
             not is_long
@@ -284,7 +291,8 @@ class TradingStrategyCore:
                 config["trigger_price"] = new_trigger
                 config["last_update"] = datetime.datetime.now(datetime.UTC)
                 logger.info(
-                    f"Trailing stop updated for {trade.trade_id}: {config['trigger_price']}"
+                    f"Trailing stop updated for {trade.trade_id}: "
+                    f"{config['trigger_price']}"
                 )
 
         return config
