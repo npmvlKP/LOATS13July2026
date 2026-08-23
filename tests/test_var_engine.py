@@ -212,9 +212,9 @@ class TestVaREngine(TestCase):
                 ratio = abs((test_var - historical_var) / historical_var)
                 # Different VaR methods can produce significantly different results
                 # This test just ensures they produce reasonable positive values
-                assert ratio < Decimal(
-                    "2.0"
-                ), "Methods should produce reasonable results"
+                assert ratio < Decimal("2.0"), (
+                    "Methods should produce reasonable results"
+                )
 
     def test_rounding_differences(self):
         """Test handling of rounding differences in Decimal calculations"""
@@ -234,9 +234,9 @@ class TestVaREngine(TestCase):
         assert isinstance(result, dict), "Should return dict"
         assert "var" in result, "Missing var key"
         assert result["var"] >= Decimal("0"), "Negative VaR"
-        assert (
-            Decimal("-Infinity") < result["var"] < Decimal("Infinity")
-        ), "Out of bounds"
+        assert Decimal("-Infinity") < result["var"] < Decimal("Infinity"), (
+            "Out of bounds"
+        )
 
     def test_numeric_integrity_parametric(self):
         """Test basic numeric integrity for parametric method"""
@@ -248,9 +248,9 @@ class TestVaREngine(TestCase):
         assert isinstance(result, dict), "Should return dict"
         assert "var" in result, "Missing var key"
         assert result["var"] >= Decimal("0"), "Negative VaR"
-        assert (
-            Decimal("-Infinity") < result["var"] < Decimal("Infinity")
-        ), "Out of bounds"
+        assert Decimal("-Infinity") < result["var"] < Decimal("Infinity"), (
+            "Out of bounds"
+        )
 
     def test_numeric_integrity_monte_carlo(self):
         """Test basic numeric integrity for monte carlo method"""
@@ -262,9 +262,9 @@ class TestVaREngine(TestCase):
         assert isinstance(result, dict), "Should return dict"
         assert "var" in result, "Missing var key"
         assert result["var"] >= Decimal("0"), "Negative VaR"
-        assert (
-            Decimal("-Infinity") < result["var"] < Decimal("Infinity")
-        ), "Out of bounds"
+        assert Decimal("-Infinity") < result["var"] < Decimal("Infinity"), (
+            "Out of bounds"
+        )
 
 
 class TestVaREngineValidation(TestCase):
@@ -524,9 +524,9 @@ class TestVaREngineToDecimal(TestCase):
 
         for float_val, expected in test_cases:
             result = self.engine._to_decimal(float_val)
-            assert (
-                result == expected
-            ), f"Failed for {float_val}: got {result}, expected {expected}"
+            assert result == expected, (
+                f"Failed for {float_val}: got {result}, expected {expected}"
+            )
 
 
 class TestVaREngineUncoveredLines(TestCase):

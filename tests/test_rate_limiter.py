@@ -514,9 +514,9 @@ class TestRateLimiterConcurrencyBurst:
             limiter = get_order_rate_limiter()
 
             # Verify we're using the same singleton instance
-            assert (
-                limiter is limiter1
-            ), f"Call {call_id} must use same singleton instance"
+            assert limiter is limiter1, (
+                f"Call {call_id} must use same singleton instance"
+            )
 
             try:
                 acquired = await limiter.acquire()
@@ -550,18 +550,18 @@ class TestRateLimiterConcurrencyBurst:
 
         settings = get_settings()
         expected_successful = settings.max_ops
-        assert (
-            len(successful) == expected_successful
-        ), f"Expected exactly {expected_successful} successful calls, got {len(successful)}"
-        assert (
-            len(failed) == num_calls - expected_successful
-        ), f"Expected exactly {num_calls - expected_successful} failed calls, got {len(failed)}"
+        assert len(successful) == expected_successful, (
+            f"Expected exactly {expected_successful} successful calls, got {len(successful)}"
+        )
+        assert len(failed) == num_calls - expected_successful, (
+            f"Expected exactly {num_calls - expected_successful} failed calls, got {len(failed)}"
+        )
 
         # Verify all failures are RateLimitExceededError
         for failure in failed:
-            assert isinstance(
-                failure, RateLimitExceededError
-            ), f"All failures must be RateLimitExceededError, got {type(failure)}"
+            assert isinstance(failure, RateLimitExceededError), (
+                f"All failures must be RateLimitExceededError, got {type(failure)}"
+            )
 
         # Verify singleton is still the same instance after burst
         limiter3 = get_order_rate_limiter()
@@ -599,9 +599,9 @@ class TestRateLimiterConcurrencyBurst:
         results = await asyncio.gather(*tasks)
 
         # All tasks must have received the same singleton instance
-        assert all(
-            results
-        ), "All concurrent accesses must return same singleton instance"
+        assert all(results), (
+            "All concurrent accesses must return same singleton instance"
+        )
 
         # Final verification
         final_instance = get_order_rate_limiter()

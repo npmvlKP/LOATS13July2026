@@ -204,7 +204,9 @@ class TestDatabase:
             db.create_signal(signal)
 
         sentiment_signal = Signal(
-            **sample_signal.model_dump(exclude={"signal_id", "timestamp", "metadata", "price"}),
+            **sample_signal.model_dump(
+                exclude={"signal_id", "timestamp", "metadata", "price"}
+            ),
             signal_id="filter_sentiment_0",
             timestamp=datetime.now(),
             metadata={"scan_type": "sentiment", "news_count": 5},

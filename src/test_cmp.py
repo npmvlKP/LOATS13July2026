@@ -18,9 +18,9 @@ class TestCmp:
         cmp1 = CMP()
         cmp2 = CMP()
         assert cmp1 is cmp2, "CMP should be a singleton"
-        assert (
-            cmp1.__repr__() == cmp2.__repr__()
-        ), "Singleton instances should have same repr"
+        assert cmp1.__repr__() == cmp2.__repr__(), (
+            "Singleton instances should have same repr"
+        )
 
     @pytest.mark.parametrize(
         "orders_per_minute, expected",

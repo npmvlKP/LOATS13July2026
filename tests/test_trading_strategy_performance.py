@@ -12,7 +12,16 @@ import pytest
 sys.path.append(str(Path(__file__).parent.parent.resolve()))
 
 from src.loats.config import get_settings
-from src.loats.models import Order, OrderType, Signal, Trade
+from src.loats.models import (
+    Order,
+    OrderStatus,
+    OrderType,
+    OrderVariety,
+    ProductType,
+    Signal,
+    Trade,
+    TransactionType,
+)
 from src.loats.trading_strategy.core import StrategyMode, TradingStrategyCore
 
 
@@ -226,6 +235,7 @@ def benchmark_trade_execution_performance() -> dict[str, Any]:
         signal = Signal(
             symbol="NIFTY" if i % 2 == 0 else "BANKNIFTY",
             signal_type="BUY" if i % 3 != 0 else "SELL",
+            strength=0.75,  # Add required strength field
             price=100.0 + (i % 20),
             timestamp=datetime.datetime.now(datetime.UTC),
             metadata={"strategy": "benchmark"},
@@ -286,6 +296,12 @@ def benchmark_memory_usage() -> dict[str, Any]:
             quantity=25,
             order_type=OrderType.LIMIT,
             price=100.0 + (i % 20),
+            variety=OrderVariety.REGULAR,
+            transaction_type=TransactionType.BUY,
+            product_type=ProductType.MIS,
+            status=OrderStatus.OPEN,
+            timestamp=datetime.datetime.now(datetime.UTC),
+            filled_quantity=0,
         )
         strategy.pending_orders[f"memory_test_order_{i}"] = order
 
@@ -338,6 +354,12 @@ def benchmark_strategy_metrics_performance() -> dict[str, Any]:
             quantity=25,
             order_type=OrderType.LIMIT,
             price=100.0 + (i % 20),
+            variety=OrderVariety.REGULAR,
+            transaction_type=TransactionType.BUY,
+            product_type=ProductType.MIS,
+            status=OrderStatus.OPEN,
+            timestamp=datetime.datetime.now(datetime.UTC),
+            filled_quantity=0,
         )
         strategy.pending_orders[f"metrics_test_order_{i}"] = order
 
@@ -388,7 +410,8 @@ def run_all_performance_benchmarks() -> list[dict[str, Any]]:
         result = benchmark()
         results.append(result)
         print(f"  [OK] {result['test_name']}")
-        print(f"    Total Time: {result['total_time_seconds']:.4f}s")
+        if "total_time_seconds" in result:
+            print(f"    Total Time: {result['total_time_seconds']:.4f}s")
         if "average_time_per_trade_ms" in result:
             print(f"    Avg Time/Trade: {result['average_time_per_trade_ms']:.4f}ms")
         if "trades_per_second" in result:
@@ -396,6 +419,9 @@ def run_all_performance_benchmarks() -> list[dict[str, Any]]:
         if "performance_target_met" in result:
             status = "[PASS]" if result["performance_target_met"] else "[FAIL]"
             print(f"    Performance Target: {status}")
+        if "approximate_memory_bytes" in result:
+            print(f"    Memory Usage: {result['approximate_memory_bytes']:,} bytes")
+            print(f"    Memory/Trade: {result['memory_per_trade_bytes']:.2f} bytes")
 
     print("\n" + "=" * 80)
     print("Performance Benchmark Summary:")
@@ -423,7 +449,9 @@ def test_performance_benchmarks() -> None:
     # Verify each result has expected structure
     for result in results:
         assert "test_name" in result
-        assert "total_time_seconds" in result
+        # Only check for total_time_seconds if it's a timing benchmark
+        if result["test_name"] != "Memory Usage Benchmark":
+            assert "total_time_seconds" in result
         if "performance_target_met" in result:
             # For now, we just verify the benchmarks run, not that they pass
             # performance targets (which may vary by environment)

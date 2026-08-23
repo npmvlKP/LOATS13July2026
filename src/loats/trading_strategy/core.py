@@ -310,7 +310,10 @@ class TradingStrategyCore:
         config = trade.metadata["trailing_config"]
 
         sl_m_order = Order(
-            order_id=f"slm_{trade.trade_id}_{datetime.datetime.now(datetime.UTC).timestamp()}",
+            order_id=(
+                f"slm_{trade.trade_id}_"
+                f"{datetime.datetime.now(datetime.UTC).timestamp()}"
+            ),
             symbol=trade.symbol,
             quantity=trade.quantity,
             order_type=OrderType.SL_M,

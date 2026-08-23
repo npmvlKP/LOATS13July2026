@@ -44,9 +44,9 @@ async def test_async_order_rate_limiter_uses_settings(setup_env: None) -> None:
 
     # Verify it uses the correct max_ops from settings
     settings = get_settings()
-    assert (
-        rate_limiter.max_ops == settings.max_ops
-    ), f"Expected rate_limiter.max_ops={settings.max_ops}, got {rate_limiter.max_ops}"
+    assert rate_limiter.max_ops == settings.max_ops, (
+        f"Expected rate_limiter.max_ops={settings.max_ops}, got {rate_limiter.max_ops}"
+    )
 
 
 async def test_async_smart_order_rate_limiter_uses_settings(setup_env: None) -> None:
@@ -59,9 +59,9 @@ async def test_async_smart_order_rate_limiter_uses_settings(setup_env: None) -> 
 
     # Verify it uses the correct max_ops from settings
     settings = get_settings()
-    assert (
-        rate_limiter.max_ops == settings.max_ops
-    ), f"Expected rate_limiter.max_ops={settings.max_ops}, got {rate_limiter.max_ops}"
+    assert rate_limiter.max_ops == settings.max_ops, (
+        f"Expected rate_limiter.max_ops={settings.max_ops}, got {rate_limiter.max_ops}"
+    )
 
 
 def test_sync_order_rate_limiter_uses_settings(setup_env: None) -> None:
@@ -74,9 +74,9 @@ def test_sync_order_rate_limiter_uses_settings(setup_env: None) -> None:
 
     # Verify it uses the correct max_ops from settings
     settings = get_settings()
-    assert (
-        rate_limiter.max_ops == settings.max_ops
-    ), f"Expected rate_limiter.max_ops={settings.max_ops}, got {rate_limiter.max_ops}"
+    assert rate_limiter.max_ops == settings.max_ops, (
+        f"Expected rate_limiter.max_ops={settings.max_ops}, got {rate_limiter.max_ops}"
+    )
 
 
 def test_sync_smart_order_rate_limiter_uses_settings(setup_env: None) -> None:
@@ -89,9 +89,9 @@ def test_sync_smart_order_rate_limiter_uses_settings(setup_env: None) -> None:
 
     # Verify it uses the correct max_ops from settings
     settings = get_settings()
-    assert (
-        rate_limiter.max_ops == settings.max_ops
-    ), f"Expected rate_limiter.max_ops={settings.max_ops}, got {rate_limiter.max_ops}"
+    assert rate_limiter.max_ops == settings.max_ops, (
+        f"Expected rate_limiter.max_ops={settings.max_ops}, got {rate_limiter.max_ops}"
+    )
 
 
 async def test_order_rate_limiter_enforces_max_ops(setup_env: None) -> None:
@@ -114,9 +114,9 @@ async def test_order_rate_limiter_enforces_max_ops(setup_env: None) -> None:
     assert result is False, "Should not be able to acquire more than max_ops tokens"
 
     # Verify we got exactly max_ops successful acquisitions
-    assert (
-        sum(acquired) == settings.max_ops
-    ), f"Expected {settings.max_ops} successful acquisitions, got {sum(acquired)}"
+    assert sum(acquired) == settings.max_ops, (
+        f"Expected {settings.max_ops} successful acquisitions, got {sum(acquired)}"
+    )
 
 
 async def test_smart_order_rate_limiter_enforces_max_ops(setup_env: None) -> None:
@@ -139,9 +139,9 @@ async def test_smart_order_rate_limiter_enforces_max_ops(setup_env: None) -> Non
     assert result is False, "Should not be able to acquire more than max_ops tokens"
 
     # Verify we got exactly max_ops successful acquisitions
-    assert (
-        sum(acquired) == settings.max_ops
-    ), f"Expected {settings.max_ops} successful acquisitions, got {sum(acquired)}"
+    assert sum(acquired) == settings.max_ops, (
+        f"Expected {settings.max_ops} successful acquisitions, got {sum(acquired)}"
+    )
 
 
 def test_cmp_rule_4_compliance() -> None:
@@ -149,19 +149,19 @@ def test_cmp_rule_4_compliance() -> None:
     settings = get_settings()
 
     # Verify the setting is ≤3 (self-limit)
-    assert (
-        settings.max_ops <= 3
-    ), f"CMP Rule 4 violated: max_ops={settings.max_ops} should be ≤3"
+    assert settings.max_ops <= 3, (
+        f"CMP Rule 4 violated: max_ops={settings.max_ops} should be ≤3"
+    )
 
     # Verify the setting is ≤10 (NSE threshold)
-    assert (
-        settings.max_ops <= 10
-    ), f"CMP Rule 4 violated: max_ops={settings.max_ops} should be ≤10"
+    assert settings.max_ops <= 10, (
+        f"CMP Rule 4 violated: max_ops={settings.max_ops} should be ≤10"
+    )
 
     # Verify it's exactly 3 as configured
-    assert (
-        settings.max_ops == 3
-    ), f"Expected max_ops=3 for CMP compliance, got {settings.max_ops}"
+    assert settings.max_ops == 3, (
+        f"Expected max_ops=3 for CMP compliance, got {settings.max_ops}"
+    )
 
 
 async def test_rate_limiter_singleton_behavior(setup_env: None) -> None:

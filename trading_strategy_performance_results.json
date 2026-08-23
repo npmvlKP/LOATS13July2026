@@ -1,0 +1,60 @@
+[
+  {
+    "test_name": "Trade Validation Performance",
+    "total_trades": 1000,
+    "total_time_seconds": 0.0008809999999357387,
+    "average_time_per_trade_ms": 0.0008809999999357387,
+    "trades_per_second": 1135073.7798784804,
+    "performance_target_met": true
+  },
+  {
+    "test_name": "CMP Compliance Validation Performance",
+    "total_trades": 1000,
+    "total_time_seconds": 0.0006035000005795155,
+    "average_time_per_trade_ms": 0.0006035000005795155,
+    "trades_per_second": 1657000.8269092666,
+    "performance_target_met": true
+  },
+  {
+    "test_name": "Trailing Stop Calculation Performance",
+    "total_trades": 1000,
+    "total_time_seconds": 0.16214079999917885,
+    "average_time_per_trade_ms": 0.16214079999917885,
+    "trades_per_second": 6167.479129281861,
+    "performance_target_met": true
+  },
+  {
+    "test_name": "SL-M Order Creation Performance",
+    "total_orders": 1000,
+    "total_time_seconds": 0.1812221000000136,
+    "average_time_per_order_ms": 0.1812221000000136,
+    "orders_per_second": 5518.090784732794,
+    "performance_target_met": true
+  },
+  {
+    "test_name": "Trade Execution Performance",
+    "total_trades": 100,
+    "total_time_seconds": 0.09286419999989448,
+    "average_time_per_trade_ms": 0.9286419999989448,
+    "trades_per_second": 1076.8412369902894,
+    "performance_target_met": true
+  },
+  {
+    "test_name": "Memory Usage Benchmark",
+    "total_trades": 1000,
+    "total_orders": 100,
+    "approximate_memory_bytes": 29360,
+    "memory_per_trade_bytes": 29.36,
+    "performance_target_met": true
+  },
+  {
+    "test_name": "Strategy Metrics Calculation Performance",
+    "total_trades": 500,
+    "total_orders": 50,
+    "total_calculations": 100,
+    "total_time_seconds": 0.004294700000173179,
+    "average_time_per_calculation_ms": 0.042947000001731794,
+    "calculations_per_second": 23284.51346915212,
+    "performance_target_met": true
+  }
+]

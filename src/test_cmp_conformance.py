@@ -30,9 +30,9 @@ def setup_env() -> Generator[None, None, None]:
 def test_cmp_rule_1_nifty_lot_size() -> None:
     """CMP Rule 1: NIFTY lot size 25."""
     settings = get_settings()
-    assert (
-        settings.nifty_lot_size == 25
-    ), f"CMP Rule 1 violated: nifty_lot_size={settings.nifty_lot_size} should be 25"
+    assert settings.nifty_lot_size == 25, (
+        f"CMP Rule 1 violated: nifty_lot_size={settings.nifty_lot_size} should be 25"
+    )
 
 
 def test_cmp_rule_2_no_resting_time() -> None:
@@ -62,12 +62,12 @@ def test_cmp_rule_3_algo_id_tagging() -> None:
     client = OpenAlgoClient()
 
     # Verify no algo_id or strategy manipulation methods exist
-    assert not hasattr(
-        client, "synthesize_algo_id"
-    ), "Found algo ID synthesis which violates CMP Rule 3"
-    assert not hasattr(
-        client, "generate_strategy_tag"
-    ), "Found strategy tag generation which violates CMP Rule 3"
+    assert not hasattr(client, "synthesize_algo_id"), (
+        "Found algo ID synthesis which violates CMP Rule 3"
+    )
+    assert not hasattr(client, "generate_strategy_tag"), (
+        "Found strategy tag generation which violates CMP Rule 3"
+    )
 
 
 def test_cmp_rule_4_ops_threshold() -> None:
@@ -75,19 +75,19 @@ def test_cmp_rule_4_ops_threshold() -> None:
     settings = get_settings()
 
     # Verify the setting is ≤3 (self-limit)
-    assert (
-        settings.max_ops <= 3
-    ), f"CMP Rule 4 violated: max_ops={settings.max_ops} should be ≤3"
+    assert settings.max_ops <= 3, (
+        f"CMP Rule 4 violated: max_ops={settings.max_ops} should be ≤3"
+    )
 
     # Verify the setting is ≤10 (NSE threshold)
-    assert (
-        settings.max_ops <= 10
-    ), f"CMP Rule 4 violated: max_ops={settings.max_ops} should be ≤10"
+    assert settings.max_ops <= 10, (
+        f"CMP Rule 4 violated: max_ops={settings.max_ops} should be ≤10"
+    )
 
     # Verify it's exactly 3 as configured
-    assert (
-        settings.max_ops == 3
-    ), f"Expected max_ops=3 for CMP compliance, got {settings.max_ops}"
+    assert settings.max_ops == 3, (
+        f"Expected max_ops=3 for CMP compliance, got {settings.max_ops}"
+    )
 
 
 async def test_cmp_rule_4_rate_limiter_integration(setup_env: None) -> None:
@@ -130,9 +130,9 @@ def test_cmp_rule_5_paper_trading_analyzer_mode() -> None:
     settings = get_settings()
 
     # Verify default mode is ANALYZE
-    assert (
-        settings.openalgo_mode == "ANALYZE"
-    ), f"CMP Rule 5 violated: openalgo_mode={settings.openalgo_mode} should be ANALYZE"
+    assert settings.openalgo_mode == "ANALYZE", (
+        f"CMP Rule 5 violated: openalgo_mode={settings.openalgo_mode} should be ANALYZE"
+    )
 
 
 def test_cmp_rule_6_trailing_sl_and_sl_m() -> None:
@@ -145,9 +145,9 @@ def test_cmp_rule_6_trailing_sl_and_sl_m() -> None:
 
     # Verify trailing stop loss field exists in models
     order_fields = Order.model_fields
-    assert (
-        "trailing_stop_loss" in order_fields
-    ), "Order model should have trailing_stop_loss field"
+    assert "trailing_stop_loss" in order_fields, (
+        "Order model should have trailing_stop_loss field"
+    )
 
 
 def test_cmp_rule_11_position_limits() -> None:
@@ -187,9 +187,9 @@ def test_cmp_singleton_pattern() -> None:
     assert cmp1 is cmp2, "CMP should be a singleton"
 
     # Should have same representation
-    assert (
-        cmp1.__repr__() == cmp2.__repr__()
-    ), "Singleton instances should have same repr"
+    assert cmp1.__repr__() == cmp2.__repr__(), (
+        "Singleton instances should have same repr"
+    )
 
 
 def test_cmp_validation_logic() -> None:
@@ -202,15 +202,15 @@ def test_cmp_validation_logic() -> None:
     assert cmp.validate({50}) is False, "Should not allow 50 orders"
 
     # Test with dict input - the CMP.validate method takes max of values
-    assert (
-        cmp.validate({"symbol1": 10, "symbol2": 15}) is True
-    ), "Should allow when max under limit"
-    assert (
-        cmp.validate({"symbol1": 30, "symbol2": 15}) is True
-    ), "Should allow when max at limit (30)"
-    assert (
-        cmp.validate({"symbol1": 31, "symbol2": 15}) is False
-    ), "Should not allow when max over limit"
+    assert cmp.validate({"symbol1": 10, "symbol2": 15}) is True, (
+        "Should allow when max under limit"
+    )
+    assert cmp.validate({"symbol1": 30, "symbol2": 15}) is True, (
+        "Should allow when max at limit (30)"
+    )
+    assert cmp.validate({"symbol1": 31, "symbol2": 15}) is False, (
+        "Should not allow when max over limit"
+    )
 
 
 def test_cmp_rule_7_modification_limit() -> None:

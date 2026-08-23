@@ -139,9 +139,9 @@ def validate_cmp_rule_11() -> bool:
     ]
     result, details = engine.check_position_limits("BANKNIFTY", banknifty_positions)
     assert not result, f"BANKNIFTY position at limit should fail: {details}"
-    assert (
-        details["max_allowed"] == 75
-    ), f"BANKNIFTY max allowed should be 75: {details}"
+    assert details["max_allowed"] == 75, (
+        f"BANKNIFTY max allowed should be 75: {details}"
+    )
 
     # Test other symbols (fallback to max_position_per_symbol)
     other_positions = [
@@ -157,9 +157,9 @@ def validate_cmp_rule_11() -> bool:
     ]
     result, details = engine.check_position_limits("RELIANCE", other_positions)
     assert result, f"Other symbol position under limit should pass: {details}"
-    assert (
-        details["max_allowed"] == settings.max_position_per_symbol
-    ), f"Other symbol max allowed should be {settings.max_position_per_symbol}: {details}"
+    assert details["max_allowed"] == settings.max_position_per_symbol, (
+        f"Other symbol max allowed should be {settings.max_position_per_symbol}: {details}"
+    )
 
     logger.info("✅ CMP Rule 11 validation PASSED")
     return True
@@ -174,15 +174,15 @@ async def validate_f6_h_04() -> bool:
     engine = CMPRulesEngine()
 
     # Test session lifecycle
-    assert TradingSession.PRE_OPEN in list(
-        TradingSession
-    ), "PRE_OPEN session should exist"
-    assert TradingSession.REGULAR in list(
-        TradingSession
-    ), "REGULAR session should exist"
-    assert TradingSession.POST_CLOSE in list(
-        TradingSession
-    ), "POST_CLOSE session should exist"
+    assert TradingSession.PRE_OPEN in list(TradingSession), (
+        "PRE_OPEN session should exist"
+    )
+    assert TradingSession.REGULAR in list(TradingSession), (
+        "REGULAR session should exist"
+    )
+    assert TradingSession.POST_CLOSE in list(TradingSession), (
+        "POST_CLOSE session should exist"
+    )
 
     # Test gating rules
     signal = Signal(
@@ -213,9 +213,9 @@ async def validate_f6_h_04() -> bool:
     with unittest.mock.patch.object(engine, "is_trading_allowed", return_value=True):
         with unittest.mock.patch.object(engine, "get_vix_level", return_value=12.0):
             result, details = engine.apply_gating_rules(signal, historical_data, 105.0)
-            assert (
-                "iv_rank" in details
-            ), f"Gating rules should return iv_rank: {details}"
+            assert "iv_rank" in details, (
+                f"Gating rules should return iv_rank: {details}"
+            )
             assert "adx" in details, f"Gating rules should return adx: {details}"
             assert "vix" in details, f"Gating rules should return vix: {details}"
 
@@ -283,9 +283,9 @@ async def validate_f6_h_04() -> bool:
     ]
     strength, details = strength_engine.calculate_composite_strength(opposing_signals)
     assert strength == 0, f"Opposition gate should fail: {details}"
-    assert (
-        details["reason"] == "opposition_gate_failed"
-    ), f"Should fail due to opposition: {details}"
+    assert details["reason"] == "opposition_gate_failed", (
+        f"Should fail due to opposition: {details}"
+    )
 
     # 3. Validate 2% fixed-frac sizing (cost+margin aware)
     logger.info("  3. Validating 2% fixed-frac sizing (cost+margin aware)")
@@ -304,9 +304,9 @@ async def validate_f6_h_04() -> bool:
     )
     assert position_size > 0, f"Position size should be positive: {details}"
     assert details["fixed_fraction"] == 0.02, f"Should use 2% risk: {details}"
-    assert (
-        details["method"] == "fixed_fraction"
-    ), f"Should use fixed fraction method: {details}"
+    assert details["method"] == "fixed_fraction", (
+        f"Should use fixed fraction method: {details}"
+    )
 
     # 4. Validate monotonic trailing ratchet with SL-M
     logger.info("  4. Validating monotonic trailing ratchet with SL-M")
@@ -326,12 +326,12 @@ async def validate_f6_h_04() -> bool:
     trailing_config = trailing_stop_engine.initialize_trailing_stop(
         trade, 100.0, TrailingStopType.PERCENTAGE, {"percentage": 0.01}
     )
-    assert (
-        trailing_config["stop_type"] == TrailingStopType.PERCENTAGE
-    ), f"Should be percentage type: {trailing_config}"
-    assert (
-        trailing_config["trigger_price"] is not None
-    ), f"Should have trigger price: {trailing_config}"
+    assert trailing_config["stop_type"] == TrailingStopType.PERCENTAGE, (
+        f"Should be percentage type: {trailing_config}"
+    )
+    assert trailing_config["trigger_price"] is not None, (
+        f"Should have trigger price: {trailing_config}"
+    )
 
     # Test monotonic trailing (should only move in favorable direction)
     # Note: The exact behavior depends on the trailing stop implementation
@@ -340,17 +340,17 @@ async def validate_f6_h_04() -> bool:
         trailing_config, 102.0
     )
     assert not triggered, "Should not trigger at higher price"
-    assert (
-        updated_config["status"] == "active"
-    ), f"Should remain active: {updated_config}"
+    assert updated_config["status"] == "active", (
+        f"Should remain active: {updated_config}"
+    )
     # For this test, we'll accept that the stop may or may not have moved
     # The key requirement is that it doesn't trigger and maintains monotonic behavior
 
     # Test SL-M order creation
     sl_m_order = trailing_stop_engine.create_sl_m_order(trade, updated_config)
-    assert (
-        sl_m_order.order_type.value == "SL-M"
-    ), f"Should create SL-M order: {sl_m_order}"
+    assert sl_m_order.order_type.value == "SL-M", (
+        f"Should create SL-M order: {sl_m_order}"
+    )
 
     # 5. Validate per-source breakers
     logger.info("  5. Validating per-source breakers")
@@ -371,9 +371,9 @@ async def validate_f6_h_04() -> bool:
 
     result, details = engine.check_circuit_breakers("NIFTY", recent_trades)
     assert not result, f"Should trigger circuit breaker: {details}"
-    assert (
-        details["reason"] == "consecutive_losses_circuit_breaker"
-    ), f"Should be consecutive losses: {details}"
+    assert details["reason"] == "consecutive_losses_circuit_breaker", (
+        f"Should be consecutive losses: {details}"
+    )
 
     # 6. Validate session lifecycle (PRE_OPEN→REGULAR→POST_CLOSE)
     logger.info("  6. Validating session lifecycle (PRE_OPEN→REGULAR→POST_CLOSE)")
@@ -438,20 +438,21 @@ async def validate_f6_h_04() -> bool:
             with unittest.mock.patch.object(
                 rules_engine, "get_current_session", return_value=TradingSession.REGULAR
             ):
-                decision, creation_result = (
-                    await trade_decision_engine.create_trade_decision(
-                        signals, historical_data, 105.0, funds, []
-                    )
+                (
+                    decision,
+                    creation_result,
+                ) = await trade_decision_engine.create_trade_decision(
+                    signals, historical_data, 105.0, funds, []
                 )
-                assert (
-                    decision is not None
-                ), f"Should create trade decision: {creation_result}"
+                assert decision is not None, (
+                    f"Should create trade decision: {creation_result}"
+                )
 
                 # Test routing to Analyzer
                 routing_result = await trade_decision_engine.route_to_analyzer(decision)
-                assert (
-                    routing_result["status"] == "success"
-                ), f"Should route successfully: {routing_result}"
+                assert routing_result["status"] == "success", (
+                    f"Should route successfully: {routing_result}"
+                )
 
     logger.info("✅ F6-H-04 validation PASSED")
     return True
@@ -478,12 +479,12 @@ def validate_orchestrator_risk_check() -> bool:
 
     result, details = engine.check_position_limits("NIFTY", [mock_trade])
     assert not result, f"Should detect position limit violation: {details}"
-    assert (
-        details["reason"] == "position_limit_exceeded"
-    ), f"Should be position limit exceeded: {details}"
-    assert (
-        details["cmp_rule"] == "CMP Rule 11"
-    ), f"Should reference CMP Rule 11: {details}"
+    assert details["reason"] == "position_limit_exceeded", (
+        f"Should be position limit exceeded: {details}"
+    )
+    assert details["cmp_rule"] == "CMP Rule 11", (
+        f"Should reference CMP Rule 11: {details}"
+    )
     assert details["max_allowed"] == 125, f"NIFTY max allowed should be 125: {details}"
 
     logger.info("✅ Orchestrator risk check validation PASSED")
