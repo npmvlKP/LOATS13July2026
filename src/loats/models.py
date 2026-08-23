@@ -185,6 +185,15 @@ class FundsData(BaseModel):
     timestamp: datetime
 
 
+class SignalType(StrEnum):
+    """Signal type enumeration."""
+
+    BUY = "BUY"
+    SELL = "SELL"
+    HOLD = "HOLD"
+    NEUTRAL = "NEUTRAL"
+
+
 class Order(BaseModel):
     """Order model."""
 
@@ -207,6 +216,7 @@ class Order(BaseModel):
     idempotency_key: str | None = Field(
         default=None, description="Unique key to prevent duplicate order submissions"
     )
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class Trade(BaseModel):
@@ -233,6 +243,8 @@ class Trade(BaseModel):
     take_profit: float | None = Field(default=None, gt=0)
     trailing_stop_loss: float | None = Field(default=None, gt=0)
     metadata: dict[str, Any] = Field(default_factory=dict)
+    signal_type: SignalType | None = Field(default=None, description="Signal type for strategy execution")
+    order_value: float | None = Field(default=None, gt=0, description="Total order value for exposure calculation")
 
     @model_validator(mode="after")
     def calculate_pnl_validator(self) -> "Trade":
@@ -258,15 +270,6 @@ class Trade(BaseModel):
             return (self.entry_price - current_price) * self.quantity
 
 
-class SignalType(StrEnum):
-    """Signal type enumeration."""
-
-    BUY = "BUY"
-    SELL = "SELL"
-    HOLD = "HOLD"
-    NEUTRAL = "NEUTRAL"
-
-
 class Signal(BaseModel):
     """Trading signal model."""
 
@@ -280,6 +283,7 @@ class Signal(BaseModel):
     signal_type: SignalType
     strength: float = Field(ge=0, le=1)
     timestamp: datetime
+    price: float = Field(default=0.0, gt=0)
     indicators: dict[str, float] = Field(default_factory=dict)
     metadata: dict[str, Any] = Field(default_factory=dict)
     confidence: float | None = Field(default=None, ge=0, le=1)

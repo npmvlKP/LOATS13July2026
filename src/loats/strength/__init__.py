@@ -13,8 +13,8 @@ from typing import Any
 import numpy as np
 
 from .config import get_settings
-from .loats_logging import get_logger
-from .models import Signal, SignalType, TAIndicator
+from ..loats_logging import get_logger
+from ..models import Signal, SignalType, TAIndicator
 
 logger = get_logger(__name__)
 settings = get_settings()
