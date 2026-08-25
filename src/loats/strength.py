@@ -32,6 +32,41 @@ class StrengthSource(StrEnum):
     OPTIONS_FLOW = "options_flow"
 
 
+# Deliberate alias map: external producer tags → canonical enum value.
+# Unknown strings NOT in this map cause a loud rejection.
+SOURCE_ALIASES: dict[str, str] = {
+    # Add explicit aliases here, e.g.: "tech_analysis": "ta",
+}
+
+
+def resolve_source(raw: str) -> StrengthSource:
+    """Resolve a raw source string to a StrengthSource enum member.
+
+    Resolution order:
+      1. Direct enum lookup (``StrengthSource(raw)``)
+      2. Alias map lookup (``SOURCE_ALIASES``)
+      3. Rejection with ``ValueError`` listing the offender
+
+    Raises:
+        ValueError: if *raw* is not a known source or alias.
+    """
+    try:
+        return StrengthSource(raw)
+    except ValueError:
+        pass
+
+    canonical = SOURCE_ALIASES.get(raw)
+    if canonical is not None:
+        return StrengthSource(canonical)
+
+    valid = [s.value for s in StrengthSource]
+    valid += list(SOURCE_ALIASES.keys())
+    raise ValueError(
+        f"unknown_source: {raw!r} is not a valid signal source. "
+        f"Valid values: {sorted(valid)}"
+    )
+
+
 class StrengthEngine:
     """CMP Strategy Strength Engine with composite calculation."""
 
@@ -125,10 +160,7 @@ class StrengthEngine:
             # Use the strongest signal from each source
             strongest_signal = max(signal_list, key=lambda s: s.strength)
 
-            try:
-                source_enum = StrengthSource(source)
-            except ValueError:
-                source_enum = StrengthSource.TECHNICAL_ANALYSIS  # Default
+            source_enum = resolve_source(source)
 
             source_strength = self.calculate_source_strength(
                 strongest_signal, source_enum
@@ -251,11 +283,8 @@ class StrengthEngine:
         source_types = set()
 
         for source in source_signals.keys():
-            try:
-                source_enum = StrengthSource(source)
-                source_types.add(source_enum)
-            except ValueError:
-                source_types.add(StrengthSource.TECHNICAL_ANALYSIS)
+            source_enum = resolve_source(source)
+            source_types.add(source_enum)
 
         # Diversity score based on number of unique source types
         diversity_score = min(len(source_types) / len(StrengthSource), 1.0)
@@ -272,10 +301,27 @@ class StrengthEngine:
         - Source diversity
         - No duplicate sources
         """
-        source_set = set()
+        source_set: set[str] = set()
+        unknown_sources: list[str] = []
         for signal in signals:
             source = signal.metadata.get("source", "unknown")
             source_set.add(source)
+
+        # Reject unknown source strings loudly
+        for src in source_set:
+            try:
+                resolve_source(src)
+            except ValueError:
+                unknown_sources.append(src)
+        if unknown_sources:
+            return False, {
+                "reason": "unknown_source",
+                "offenders": unknown_sources,
+                "message": (
+                    f"Unknown source string(s): {unknown_sources}. "
+                    f"Valid values: {[s.value for s in StrengthSource]}"
+                ),
+            }
 
         if len(source_set) < self.min_sources:
             return False, {
@@ -326,10 +372,7 @@ class StrengthEngine:
         for source, signal_list in source_signals.items():
             strongest_signal = max(signal_list, key=lambda s: s.strength)
 
-            try:
-                source_enum = StrengthSource(source)
-            except ValueError:
-                source_enum = StrengthSource.TECHNICAL_ANALYSIS
+            source_enum = resolve_source(source)
 
             source_strength = self.calculate_source_strength(
                 strongest_signal, source_enum
@@ -362,4 +405,10 @@ class StrengthEngine:
 # Module-level singleton instance
 strength_engine = StrengthEngine()
 
-__all__ = ["StrengthEngine", "StrengthSource", "strength_engine"]
+__all__ = [
+    "StrengthEngine",
+    "StrengthSource",
+    "SOURCE_ALIASES",
+    "resolve_source",
+    "strength_engine",
+]
