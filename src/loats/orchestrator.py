@@ -20,6 +20,7 @@ from .models import HistoricalData, OptionContract, QuoteData, Signal
 from .openalgo import KillSwitchError, async_client
 from .rules import rules_engine
 from .sentiment import sentiment
+from .strength import StrengthSource
 from .strike_selection import select_strikes
 from .ta import technical_analysis
 from .trade_decision import trade_decision_engine
@@ -266,7 +267,7 @@ class TradingOrchestrator:
                         timestamp=datetime.datetime.now(datetime.UTC),
                         indicators={ind.name: ind.value for ind in indicators},
                         confidence=strength,
-                        metadata={"scan_type": "ta", "source": "orchestrator"},
+                        metadata={"scan_type": "ta", "source": StrengthSource.TECHNICAL_ANALYSIS.value},
                     )
                     await db.async_create_signal(signal)
 
@@ -333,7 +334,7 @@ class TradingOrchestrator:
                     confidence=abs(result.sentiment_score),
                     metadata={
                         "scan_type": "sentiment",
-                        "source": "orchestrator",
+                        "source": StrengthSource.SENTIMENT.value,
                         "news_count": result.news_count,
                     },
                 )
@@ -475,7 +476,7 @@ class TradingOrchestrator:
                 confidence=combined_strength,
                 metadata={
                     "scan_type": "combined",
-                    "source": "orchestrator",
+                    "source": StrengthSource.PRICE_ACTION.value,
                     "ta_strength": ta_strength,
                     "sentiment_strength": sentiment_strength,
                     "current_price": current_price,
