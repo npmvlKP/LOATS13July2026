@@ -121,9 +121,53 @@ jobs:
           retention-days: 30
 
   # ================================================================
-  # 5b CHECKS — added to required list at wave end (TODO-5b)
-  # These jobs run but are NOT yet required for merge.
+  # 5b CHECKS — required for merge at wave end (TODO-5b)
   # ================================================================
+  commit-lint:
+    name: commit-lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Validate commit messages
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          # Determine commit range
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ] && [ -n "$BASE_SHA" ] && [ -n "$HEAD_SHA" ]; then
+            RANGE="${BASE_SHA}..${HEAD_SHA}"
+          else
+            RANGE="HEAD~1..HEAD"
+          fi
+          echo "Checking commits in range: $RANGE"
+          FAILED=0
+          for phrase in \
+            "ready for deployment" \
+            "production ready" \
+            "ready for production" \
+            "deployment ready" \
+            "production-ready" \
+            "deployment-ready" \
+            "fully compliant" \
+            "FULLY COMPLIANT"
+          do
+            MATCHES=$(git log --format="%H %s" $RANGE | grep -i "$phrase" || true)
+            if [ -n "$MATCHES" ]; then
+              echo "FAIL: prohibited phrase found: '$phrase'"
+              echo "$MATCHES"
+              FAILED=1
+            fi
+          done
+          if [ "$FAILED" = "1" ]; then
+            echo ""
+            echo "ERROR: One or more commits contain prohibited phrases."
+            echo "See CONTRIBUTING.md for commit message guidelines."
+            exit 1
+          fi
+          echo "All commit messages validated successfully."
+
   mypy:
     name: mypy
     runs-on: ubuntu-latest
