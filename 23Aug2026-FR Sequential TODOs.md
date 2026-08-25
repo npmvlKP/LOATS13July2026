@@ -1,0 +1,1554 @@
+# LOATS13July2026 — FR Sequential TODOs & Build-Wave Health Verification
+
+**Date:** 2026-08-23
+**Revision:** 2 (23Aug2026, late) — sequence corrections (see §1 REV-2 note and the companion `23Aug2026-Seq ToDos.txt` §0, the AI-agent operating layer: checkpoints CP-0…CP-4, TODO-5 split 5a/5b, TODO-15 after TODO-3).
+**Derived from:** `23Aug2026-Consolidated FR.md` (authoritative final deliverable of the 23Aug2026 review chain: FR7 Investigator + FR7-R Reviewer, HEAD `163cdf9`)
+**Purpose:** (1) prioritized, dependency-ordered TODOs with implementation guidance for the next build wave; (2) comprehensive Python verification scripts to measure overall codebase healthiness before, during, and after the wave.
+**Mode of this document:** Build-companion. The consolidated FR is REVIEW-ONLY; this file converts its §0 checklist into actionable engineering instructions. Every change still requires explicit USER APPROVAL per the FR's standing rule.
+
+**Environment invariant (from project rules):** all gates and scripts run in the clean venv `.\LOATS13July2026\Scripts\python.exe` — NOT system Python (20+ conflicting packages). CI gate order: `check_deps_sync.py → ruff check → ruff format --check → isort → flake8 → mypy --strict → bandit → pip-audit`, all over `src/ tests/ scripts/`. flake8 reads `.flake8` (not pyproject.toml).
+
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+<=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=>
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+
+## 1. Build Order — Dependency Graph
+
+```
+WAVE START (baseline: run HC full → snapshot 00-baseline.json)
+│
+├─ STAGE A (P0, gates)          TODO-1 → TODO-2 → TODO-6        [structure + process]
+│    └─ gates green: TODO-3 (coverage lift) ∥ TODO-4 (pip-audit online) ∥ TODO-5a (partial branch protection; 5b completes at wave end)
+│
+├─ STAGE B (P0, strategy life)  TODO-7 (tag) → TODO-8 (4th producer OR threshold ADR)
+│    ├─ TODO-9 (unknown-source loud) ─┐
+│    └─ TODO-10 (e2e test) ──────────┤
+│                                     ▼
+├─ STAGE C (P1, chain real)     TODO-12 (VIX) → TODO-13 (routing) → TODO-14 (trailing driver)
+│    └─ TODO-15 (per-module ≥80) runs continuously alongside B/C
+│
+├─ STAGE D (P2, values)         TODO-16, TODO-17 (independent; 17 before 14 finalizes)
+│    TODO-18 (lazy settings) — anytime, do EARLY to unbreak imports
+│    TODO-19 → after TODO-7/8     TODO-20, TODO-21 — anytime
+│
+└─ STAGE E (P3, hygiene)        TODO-22 … TODO-27
+WAVE END: run HC full → snapshot 99-final.json → compare → enable FULL branch protection enforcement (TODO-5b) → commit wave
+
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+<=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=>
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+
+**Recommended true sequencing (strict, REV-2 CORRECTED — authoritative):** TODO-1 → 2 → 18 → 6 → 5a → 7 → 9 → 8 [CP-2] → 10 → 11 → 12 → 16 → 17 → 13 [CP-3] → 19 [CP-3] → 14 → **3 → 15** → 4 → 5b [CP-4] → 20 → 21 → 22…27.
+(Rationale: kill the mypy breaker first so every later step can be type-checked; make settings lazy second so probe/test imports stop needing env hacks; then resurrect the strategy chain; then make it real; then values/hygiene. REV-2 corrections: (i) TODO-15 runs AFTER TODO-3 — blocking per-module floors before coverage is lifted would red-lock CI; (ii) HC-09 green requires TODO-1 AND TODO-2 together; (iii) TODO-5 is SPLIT — 5a early/partial (CI is not fully green after TODO-1/2; coverage stays red until TODO-3) and 5b wave-end/full. Checkpoints CP-0…CP-4 and full agent operating rules: `23Aug2026-Seq ToDos.txt` §0.)
+
+
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+<=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=>
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+
+## 2. Stage A — P0: Restore Truthful Gates
+
+### TODO-1 (F7-C-01a) — Delete `src/__init__.py` (the mypy collision breaker)
+
+- **Action:** `git rm src/__init__.py`. Nothing else. Re-run mypy immediately.
+- **Why:** mypy computes `src.loats.*` module names when `src` is a package while imports resolve as `loats.*` → exit 2 "Source file found twice under different module names", checking aborts before a single file is type-checked. This one file is the entire mypy failure (FR7 F7-C-01, verbatim reproduced twice).
+- **How:** single deletion. If `src/__init__.py` contains anything of value, move it into `src/loats/__init__.py` (which already has the PEP 562 lazy-settings accessor) first. Expect follow-on mypy `--strict` errors to surface once checking actually runs — fix them as a separate commit (they were invisible until now).
+- **Acceptance (REV-2):** the "Source file found twice under different module names" collision error is GONE (mypy now runs and reports real findings). Full exit-0 requires TODO-2 as well — see §1 REV-2 (ii).
+- **Health check:** HC-09 (collision-abort gone).
+- **Status:** ? DONE 2026-08-24 � HC-09 PASS - commit 62b9cf1
+
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+<=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=>
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+
+### TODO-2 (F7-C-01b / F7-M-06) — Relocate the 8 stray `src/*.py` files; delete the 7 empty shells
+
+- **Action:**
+  - `src/cmp.py`, `src/utils.py`, `src/probe_rate_limiter.py` → `scripts/` (probe scripts; fix their imports to `loats.*`).
+  - `src/test_cmp.py`, `src/test_cmp_conformance.py`, `src/test_cmp_ops_threshold.py` → `tests/` (rename to `test_cmp_*` conventions already match pytest discovery; verify they still collect).
+  - `src/var_engine.py` → `src/loats/var_engine.py` (it is real, 100%-covered code living outside the package; update importers; keep coverage counting via `--cov=src` → now `--cov=src` still works, module just moves under the importable package).
+  - Delete empty shells: `src/loats/connectors/`, `src/loats/risk/` (incl. `manager/`), `src/loats/strategy/` (incl. `rules/`) — 5 directories / 7 shell `__init__.py` files, ~159–175 bytes of CMP §4 structure theater.
+- **Why:** strays break mypy pathing and pollute coverage; shells are dead weight claiming CMP §4 structure that does not exist (F7-M-06).
+- **Acceptance (REV-2):** `git ls-files 'src/*.py'` returns nothing; `src/` contains only `loats/`; pytest suite stays GREEN and GROWS (the moved `src/test_cmp*.py` files were never collected before — run them; if any duplicate or contradict the existing suite, delete with justification in the commit body); ruff/isort/flake8 clean after import fixes; **mypy --strict now exits 0** (fix whatever strict errors surfaced, in code — never via ignores).
+- **Health check:** HC-02, HC-03.
+
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+<=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=>
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+
+### TODO-3 (F7-C-01c / F7-H-03 / F7-M-07) — Lift coverage: trailing_stop 11%→≥80, trade_decision 30%→≥80, backtest_sanity 0%→≥80, orchestrator CMP body, options.py 66%→≥85; aggregate ≥80
+
+- **Action (test targets, in priority order):**
+  1. `tests/test_trailing_stop.py` (new): ratchet monotonicity property tests — stop level never loosens across arbitrary favorable/adverse price sequences; gap handling; freeze/monitor transitions; SL-M order-type emission; config validation.
+  2. `tests/test_trade_decision.py` (extend): routing success/failure/timeout paths; decision-queue processor lifecycle (start-on-first-enqueue, drain, bounded); persistence bodies; rejection reasons for each gate (Gate 1 unique-sources, Gate 2 diversity, VIX, IV-rank, ADX, position limits, opposition 0.4).
+  3. `tests/test_backtest_sanity.py` (new): walk-forward window slicing; per-window PnL aggregation; sanity assertions (no look-ahead: window t uses only data ≤ t); CLI/driver entry.
+  4. `tests/test_orchestrator.py` (extend): drive `_execute_cmp_strategy()` with mocked DB signals through the full chain — the same shape as the new e2e test (TODO-10) but mocked at DB boundary.
+  5. `tests/test_options_var.py` (extend): VaR vs known distributions (normal → analytic quantile match), Greeks edge cases (zero vol, expiry boundary), portfolio aggregation.
+- **Why:** the least-tested code is the highest-consequence code (position size, stops, VaR). Aggregate 76.38% < 80 fails CI (F7-C-01c/F7-H-03); options regressed 90→66 exactly when VaR became pre-trade input (F7-M-07).
+- **Acceptance:** `pytest --cov-fail-under=80` exits 0; per-module floors (HC-13 map) all green; `scripts/check_per_module_coverage.py` exits 0.
+- **Health check:** HC-12, HC-13.
+
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+<=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=>
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+
+### TODO-4 (F7-C-01d / F7-L-02) — Re-run pip-audit in a network-enabled environment
+
+- **Action:** `pip-audit --format=json` (or `python -m pip_audit`) on a machine/container with egress to the vulnerability DB. The tool IS installed (`pip_audit 2.10.1`) — the review sandbox's network block, not absence, hid the result.
+- **Why:** the only gate with no verdict at HEAD. CI invokes it correctly (`ci.yml:48`); local verification was impossible offline.
+- **Acceptance:** exit 0 (no known-vulnerable pinned versions) or a triaged exception list with rationale.
+- **Health check:** HC-11 (reports SKIP offline, PASS/FAIL online).
+
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+<=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=>
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+
+
+### TODO-5 (F7-C-01e) — Branch protection on `main`, SPLIT into 5a (early, partial) and 5b (wave end, full) [REV-2]
+
+- **TODO-5a (execute right after TODO-6, before TODO-7):** GitHub repo → Settings → Branches → rule for `main`: require PR reviews (≥1), reject direct pushes, and require ONLY the checks already green at that point (deps-sync, ruff, format, isort, flake8, bandit). From this moment all wave work happens on branch `fix/fr7-wave` via PRs — no direct pushes.
+
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+<=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=>
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+
+- **TODO-5b (wave end, after TODO-3, 15, 4):** add mypy --strict, pytest-coverage (aggregate 80 + per-module floors), pip-audit, and commit-lint to the required-checks list before merging the wave PR.
+- **Why:** four consecutive reviews (R5b-F-NEW-1 → F6-C-02 → F7-C-01) documented commits claiming "FULLY COMPLIANT"/"READY FOR LIVE DEPLOYMENT" on a red tree. Direct-push ability is the enabling condition; 5a kills it immediately, 5b completes enforcement once the remaining gates are actually green. (REV-2 resolves the draft's early-vs-wave-end conflict: CI is NOT fully green after TODO-1/2 — coverage stays red until TODO-3 — so full enforcement at that point would red-lock the wave.)
+- **Acceptance 5a:** `git push origin main` (direct) rejected; wave branch `fix/fr7-wave` exists. **Acceptance 5b:** a PR with ANY red required check cannot merge.
+- **Health check:** manual/organizational — not scriptable from the repo. Verify in GitHub UI.
+
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+<=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=>
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+
+### TODO-6 (F7-C-01f) — Enforce the commit-message hook
+
+- **Action:** make `scripts/commit_message_check.py` a git `commit-msg` hook (`.git/hooks/commit-msg` → `python scripts/commit_message_check.py`); document in CONTRIBUTING.md; optionally add a CI step validating commit messages on PR.
+- **Why:** discipline rules exist and were violated by the same wave that cited them (4th consecutive review).
+- **Acceptance:** a commit with a misleading/oversized message is rejected locally; CI commit-lint step green.
+- **Health check:** manual + CI.
+
+
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+<=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=>
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+
+
+## 3. Stage B — P0: Resurrect the Strategy Chain
+
+### TODO-7 (F7-C-02a) — Tag the three signal producers with enum-valid source identities
+
+- **Action:** in `src/loats/orchestrator.py`, change metadata at the three creation sites:
+  - `:271` TA signal → `"source": "ta"` (matches `StrengthSource.TECHNICAL_ANALYSIS`)
+  - `:336-340` sentiment signal → `"source": "sentiment"` (matches `SENTIMENT`)
+  - `:478-484` combined signal → `"source": "price_action"` (matches `PRICE_ACTION`) — or better, stop emitting the third legacy "combined" signal in the CMP-read path (ties into TODO-19).
+  Use the canonical `StrengthSource` enum values (`strength/__init__.py:23-32`) — import the enum and derive strings from it (`StrengthSource.TECHNICAL_ANALYSIS.value`) so tags can never drift from the validator.
+- **Why:** all three currently carry `"source": "orchestrator"` → Gate 1 (`≥3 unique`) sees exactly 1 and `create_trade_decision` rejects at Step 1 every cycle, forever (F7-C-02). The chain is otherwise complete.
+- **Acceptance:** `git grep '"source": "orchestrator"' -- src/loats/orchestrator.py` → 0 matches; strength-engine probe on the real signals sees 3 distinct enum-valid sources.
+- **Health check:** HC-17.
+
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+<=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=>
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+
+### TODO-8 (F7-C-02b — the Reviewer extension) — Deliver a FOURTH real producer OR recalibrate the diversity threshold with an ADR
+
+- **Why this is non-negotiable arithmetic:** Gate 2 requires `diversity_score ≥ 0.5` where `score = unique_enum_sources / 7` (`strength/__init__.py:396`, `:365`). 3 sources = 3/7 = **0.4286 < 0.5 → REJECTED** (empirically probed). 4 sources = 4/7 = **0.5714 → PASS**. The Investigator's original 3-producer fix is mathematically insufficient, and the CMP's own P5 wording ("≥3 sources") is unattainable under the current threshold — a strict-direction conformance deviation.
+- **Option A (preferred — build the 4th producer):** add a `volatility` producer — nearly free from data the system already computes:
+  ```python
+  # orchestrator.py, new task beside TA/sentiment in the 80ms parallel window
+  async def _generate_volatility_signal(self, market_snapshot) -> Signal:
+      atr = calculate_atr(...)            # existing ta.py machinery
+      hurst = calculate_hurst_exponent(...)  # existing
+      vol_score = normalize(atr_pct, lo=0, hi=1)          # high ATR -> high strength
+      regime = "trending" if hurst > 0.5 else "mean_reverting"
+      metadata = {
+          "scan_type": "volatility",
+          "source": StrengthSource.VOLATILITY.value,   # 4th enum-valid source
+          "regime": regime, "atr_pct": atr_pct, "hurst": hurst,
+      }
+      ...
+  ```
+  Candidates beyond volatility: `OPTIONS_FLOW` (from OpenAlgo option chain data) or `MARKET_DATA`/`PRICE_ACTION` microstructure — but `volatility` reuses existing code paths.
+- **Option B (recalibrate):** set `diversity_threshold = 3/7` (≈0.4286, or express as `3 / len(StrengthSource)` so it stays correct if the enum grows) and write `docs/adr/0001-diversity-threshold.md` reconciling it with CMP P5 "≥3 sources" (the CMP wording wins; the 0.5 constant was never CMP-derived). This unblocks 3 producers but weakens the gate — prefer Option A.
+- **Acceptance:** e2e (TODO-10) shows `create_trade_decision` reaching Step 2+ with real orchestrator-produced signals; HC-15 probe (3-fail/4-pass math) still green as a regression net; if Option B, ADR file exists and threshold derives from enum length.
+- **Health check:** HC-15 (+ HC-17 for tagging).
+
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+<=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=>
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+
+
+### TODO-9 (F7-C-02c) — Reject unknown source strings loudly
+
+- **Action:** in `strength/__init__.py:361-362`, replace the silent `unknown → TECHNICAL_ANALYSIS` collapse with a validation failure: unknown source string → reject with `reason: "unknown_source"`, listing the offender. (If a deliberate alias map is needed — e.g. `"tech_analysis"` → `ta` — make it an explicit dict next to the enum.)
+- **Why:** today a typo'd producer tag silently masquerades as TA, lowering the unique-source count invisibly. Gate integrity requires loud failure.
+- **Acceptance:** probe with `source="banana"` → rejected with explicit unknown-source reason; all legitimate enum values still pass.
+- **Health check:** HC-16.
+
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+<=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=>
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+
+
+### TODO-10 (F7-C-02d) — End-to-end test: REAL orchestrator signals → create_trade_decision
+
+- **Action:** new `tests/test_e2e_cmp_chain.py`: spin the orchestrator's signal-generation tasks against a fixture market/sentiment feed (mock only the external OpenAlgo/RSS boundaries), let the signals land in the (temp) DB exactly as production does, then call `_execute_cmp_strategy()` and assert a TradeDecision object emerges (or a specific, correct rejection reason per gate). No fabricated `Signal(metadata={...})` objects injected past the producers.
+- **Why:** the single test gap that let F7-C-02 survive four reviews — every existing CMP test fabricates multi-source signal sets production could not produce.
+- **Acceptance:** test passes at HEAD of this stage; deliberately reverting TODO-7's tagging makes it fail (mutation check).
+- **Health check:** HC-12 aggregate (it's a test); HC-15 math net.
+
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+<=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=>
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+
+
+### TODO-11 (F7-C-02e) — Elevate the insufficient-signals log
+
+- **Action:** `orchestrator.py:631` — `logger.debug("Insufficient signals...")` → `logger.warning` + a periodic counter (e.g., every N cycles or via the metrics server at `:8001`: `cmp_chain_rejections_total{reason=...}`). Reset/annotate on state change.
+- **Why:** the system's core mandate silently no-opped at debug level every 100 ms cycle. Operators had no signal.
+- **Acceptance:** with gates failing, warning appears within one cycle and the counter increments; log noise bounded (periodic, not per-cycle spam).
+- **Health check:** code review + metrics endpoint presence (manual; covered by HC-12 tests if you add one).
+
+
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+<=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=>
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+
+
+## 4. Stage C — P1: Make the CMP Chain Real
+
+### TODO-12 (F7-H-02 / CMP Rule 10) — Wire India VIX with a SYMMETRIC fail-safe
+
+- **Action:**
+  1. On the market-data parallel task (already in the 80 ms window), fetch India VIX via a cached OpenAlgo quote (`utils/cache.py` TTL, 30–60 s) and call `rules_engine.set_vix_level(vix)` every cycle the feed is live.
+  2. Replace the 18.5 "Neutral default" with explicit unknown-state handling: no-feed/stale-feed ⇒ the VIX gate FAILS for BOTH directions (or a configured `vix_fail_mode: "block_all" | "block_buy"` with block_all default), loudly logged. Never a fake number.
+  ```python
+  # rules.py sketch
+  def get_vix_level(self) -> float | None:        # None = unknown
+      return self._vix_level                      # None until wired; stale check via timestamp
+  def check_vix_gate(self, direction) -> bool:
+      vix = self.get_vix_level()
+      if vix is None:
+          log.warning("VIX unknown — gate blocked (symmetric fail-safe)")
+          return False                             # both BUY and SELL blocked
+      return vix > 15 if direction == "SELL" else vix < 15
+  ```
+- **Why:** the 18.5 fallback permanently blocks BUY (`vix < 15` unreachable) and vacuously passes SELL (`vix > 15` always true) — structurally anti-BUY, and the risk-off control cannot detect risk-off because nothing feeds it (`set_vix_level` has zero callers at HEAD).
+- **Acceptance:** `set_vix_level` has ≥1 production caller (orchestrator market-data task); simulated no-feed blocks both directions; BUY/SELL gating reacts to a mocked VIX series.
+- **Health check:** HC-18 (wired), HC-25 (no bare 18.5 fallback).
+
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+<=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=>
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+
+
+### TODO-13 (F7-H-01) — Real Analyzer routing + decision persistence
+
+- **Action:** replace `trade_decision.py:231-279` stub:
+  1. `analyzer_routing_enabled` default → `False` (kill the default-on fabrication immediately, even before the real path lands).
+  2. Route via `AsyncOpenAlgoClient` ANALYZE mode — submit the decision payload as an analysis request; return the REAL response.
+  3. Persist EVERY `TradeDecision` + routing outcome to SQLite/JSONL audit (new `db.async_record_trade_decision`) — audit-grade, survives restarts.
+  4. Integration test asserting an external side-effect (HTTP call recorded via mock transport OR audit row present).
+  ```python
+  async def route_to_analyzer(self, decision: TradeDecision) -> dict:
+      payload = decision.to_analyzer_payload()
+      resp = await self.client.place_analyzer_request(payload)      # REAL call
+      await self.db.async_record_trade_decision(decision, resp)     # audit row
+      return resp
+  ```
+- **Why:** current stub logs, `sleep(0.1)`, and fabricates `{"status":"success","analyzer_response":{"status":"QUEUED_FOR_ANALYSIS"}}` — default-ON. No decision ever leaves the process; CMP P5 "route ALL TradeDecisions to Analyzer" unmet; the 2-week forward test cannot begin.
+- **Acceptance:** no `asyncio.sleep` simulation in the routing path; routing failure propagates (no fabricated success); audit row exists per decision; integration test green.
+- **Health check:** HC-19.
+
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+<=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=>
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+
+
+### TODO-14 (F7-H-04 / CMP Rule 12) — Trailing-stop runtime driver
+
+- **Action:** per open position, on an orchestrator risk step or APScheduler job (interval ≪ 1 s budget per CMP "trail <1 ms" gate — the ratchet math itself is pure compute):
+  ```python
+  # orchestrator risk step (or scheduler job), per open position
+  price = await self.client.get_ltp(position.symbol)
+  new_sl = trailing_engine.update_trailing_stop(position.order_id, price)   # monotonic ratchet
+  if new_sl and new_sl != position.current_sl:
+      await self.client.modify_order(                        # Rule-7-gated (≤25) ANALYZE-mode SL-M
+          order_id=position.order_id, trigger_price=new_sl, order_type="SL-M")
+      await self.db.async_record_ratchet_event(position.order_id, position.current_sl, new_sl, price)
+  ```
+  Pair with TODO-17 (persisted modification counters) so the driver cannot blow the Rule 7 budget across restarts; add `backtest_sanity` invocation here too if it becomes the P4 gate driver (TODO-26).
+- **Why:** `initialize_trailing_stop` is called once at decision time (`trade_decision.py:145`); `update_trailing_stop` has ZERO production callers — stops configured at entry never trail. With bracket orders disabled (Rule 6), the core exit protection does not exist operationally. 11% coverage matches: only init is exercised.
+- **Acceptance:** `update_trailing_stop` has ≥1 production caller; live-loop test drives a mocked price series through ratchet + Rule-7-gated modify; ratchet events land in audit; ratchet monotonicity property tests written AND green IN THIS TODO — they later count toward TODO-3's floors [REV-2: never reference TODO-3 tests before they exist].
+- **Health check:** HC-20.
+
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+<=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=>
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+
+
+### TODO-15 (F7-H-03) — Per-module ≥80% enforcement, blocking (REV-2: executes AFTER TODO-3 — §1; the draft order that placed it before TODO-3 would red-lock CI)
+
+- **Action:** after TODO-3's tests land, make `scripts/check_per_module_coverage.py` a blocking CI step (verify its final `exit(0)` path first — F7-L-04); wire HC-13's floor map into it or replace with it.
+- **Acceptance:** CI fails if any floor-mapped module drops below threshold.
+- **Health check:** HC-13.
+
+
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+<=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=>
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+
+
+## 5. Stage D — P2: CMP-Correct Values + Robustness
+
+### TODO-16 (F7-M-01) — BUY IV-rank gate 60 → 30
+
+- **Action:** `rules.py:256-257` — `iv_pass = iv_rank < 60` → `< 30` (CMP §strategy/rules: "buy: IV rank<30"). Update the comment. Add tests pinning BUY<30 / SELL>40.
+- **Why:** the BUY band is double the plan — buys permitted in IV regimes the CMP classifies as sell-side.
+- **Acceptance:** literal threshold 30 in source; tests pin it.
+- **Health check:** HC-24.
+
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+<=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=>
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+
+
+### TODO-17 (F7-M-02 / CMP Rule 7) — max_modifications 30 → 25, wired + persisted + fail-closed
+
+- **Action:**
+  1. `config/settings.py:99-101` — `max_modifications: int = 25`, comment "CMP Rule 7: ≤25".
+  2. `openalgo.py:514` — `check_modification_limit(order_id, limit=25)` → read from settings (`get_settings().max_modifications`) — no hard-coded duplicate.
+  3. `rules.py:396-420` — persist counters (SQLite table `modification_counts(order_id, count, updated_at)`); `return True  # No tracking yet` fail-open → fail-closed (unknown order → check DB; DB down → reject the modification, loud log).
+- **Why:** the knob is dead AND wrong (30 ≠ 25, mislabeled "CMP Rule 7: ≤30"; commit `042a006` codified the wrong value); in-memory counters reset on restart — a restart resets an order's modification budget; fail-open means untracked orders bypass the limit entirely.
+- **Acceptance:** settings=25 and gate reads it; counter survives process restart (test); DB-down → modification rejected.
+- **Health check:** HC-23.
+
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+<=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=>
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+
+
+### TODO-18 (F7-M-03) — Lazy settings in all 11 modules
+
+- **Action:** replace module-level `settings = get_settings()` with function-local access. **Follow the project's locked pattern** (architecture constraint): `loats.config` must NOT export a lazy `settings` instance (a real submodule `loats/config/settings.py` permanently shadows any PEP 562 `__getattr__`). Use:
+  ```python
+  from loats.config import get_settings   # lru_cached accessor — call INSIDE functions
+
+  def _cfg() -> Settings:
+      return get_settings()
+  ```
+  Apply in: `alerts.py:37`, `backtest_sanity.py:26`, `main.py:19`, `rules.py:22`, `scheduler.py:36`, `sentiment.py:22`, `sizing.py:21`, `strength/__init__.py:20`, `trade_decision.py:26`, `trading_strategy/core.py:23`, `trailing_stop.py:28` (the 11th — missed by the Investigator).
+- **Why:** importing any of these without `OPENALGO_API_KEY` crashes at import time — which is exactly why the health script (§7) must set a dummy key. Fixed in `orchestrator.py` once, then reintroduced 11× elsewhere.
+- **Acceptance:** AST scan finds zero module-level `get_settings()` calls under `src/loats` (excluding `config/`); `python -c "import loats.sizing"` works with a bare env.
+- **Health check:** HC-21.
+
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+<=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=>
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+
+
+### TODO-19 (F7-M-04) — Retire or convert the legacy signal engine
+
+- **Action:** Option A — retire `_execute_signal_generation()`'s 2-source combiner once the tagged producers (TODO-7/8) write to the DB directly with threshold 0.5 semantics. Option B — keep it AS the TA+sentiment tagged producer set (it already computes both; it only needs real source tags and to stop emitting the third "combined" pseudo-signal). One engine, one threshold, one DB semantics.
+- **Why:** two engines run every cycle — legacy combiner (threshold 0.6) writes the very DB signals the CMP path (threshold 0.5, `trade_decision.py:88`) then starved on. Which engine is the source of record is unanswerable today.
+- **Acceptance:** single signal-production path; single threshold constant; orchestrator coverage of the removed path drops out naturally.
+- **Health check:** HC-17 (+ code review).
+
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+<=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=>
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+
+
+### TODO-20 (F7-M-05) — Kill the audit PYTEST_CURRENT_TEST bypass
+
+- **Action:** delete `database.py:774` (`if os.environ.get("PYTEST_CURRENT_TEST"): skip`). Fix tests instead: audit JSONL paths must be injectable (tmp_path fixture) so the suite exercises the REAL dual-write path.
+- **Why:** commit `a03047e` claimed this was fixed; it was not. The JSONL-first canonical SHA-256 guarantee — the SEBI-audit core — is never executed by the test suite; test-runtime behavior silently diverges from production.
+- **Acceptance:** `git grep PYTEST_CURRENT_TEST -- src/` → empty; a test asserts both SQLite row AND JSONL line + digest for a write.
+- **Health check:** HC-22.
+
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+<=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=>
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+
+
+### TODO-21 (F7-M-08) — Untrack root junk; prune stale docs/reports
+
+- **Action:** `git rm --cached '$null' '[100%]' '0.21.0'` + the ~14 root lint/security report JSONs (or move under `reports/` with .gitignore); review `docs/audit-history/` (75 files incl. `debug_*.py`, `fix_test_imports.py`, `test_redis_cache.py` with stale `src.loats` imports) and `reports/ai-generated/` (42) — archive off-repo or delete what no longer parses.
+- **Why:** 343 tracked files and counting; "cleanup" moved junk, not removed it; stale scripts inside the tree drag mypy/ruff exclusions.
+- **Acceptance:** root tracked files = source-of-truth set (README, LICENSE, pyproject, etc.); no junk filenames; `git ls-files | wc -l` shrinks; gates still green (exclusion lists shrink too).
+- **Health check:** HC-26.
+
+
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+<=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=>
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+
+
+## 6. Stage E — P3: Hygiene
+
+### TODO-22 (F7-L-01) — Shrink the ruff ignore list
+Remove `F401`, `I001` (redundant with isort gate), `E402`, `PGH003` at minimum; fix the resulting findings instead of ignoring them; keep genuinely-waived rules with inline `# noqa` + reason. Verify with `ruff check --statistics` before/after.
+
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+<=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=>
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+
+
+### TODO-23 (F7-L-03) — Dead strength-source weights
+`FUNDAMENTAL 0.1 / MACHINE_LEARNING 0.3 / OPTIONS_FLOW 0.2` (`strength/__init__.py:45-47`) have no producers. Remove, or keep with a `# pending producer — see TODO-8 candidates` comment so the config is not silently dead.
+
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+<=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=>
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+
+
+### TODO-24 (F7-L-04) — Verify `check_per_module_coverage.py` exit semantics
+Trace the final `sys.exit(0)` at `:113` — ensure no warning path can fall through to exit 0. Add a unit test for the script's exit codes (pass file / fail file fixtures). Fold into TODO-15.
+
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+<=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=>
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+
+
+### TODO-25 (F7-L-05) — Collect P1/P5 phase-gate evidence
+P1: live ANALYZE round-trip latency measurements (log to `reports/`); P5: begin the 2-week forward test ONLY after TODO-13 lands (routing must be real for the test to mean anything).
+
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+<=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=>
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+
+
+### TODO-26 (F7-L-06) — Drive `backtest_sanity`
+Zero production callers = the P4 exit gate is a module without a driver. Wire into the trailing driver's job (TODO-14) or a weekly scheduler job against `/history` data; results to audit.
+
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+<=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=>
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+
+
+### TODO-27 (carried) — Remaining carried items
+(a) vollib → py_vollib successor per `VOLLIB_MIGRATION_PLAN.md`; (b) `ta` dependency drop-or-adopt; (c) bound the decision queue: `asyncio.Queue(maxsize=N)` + backpressure in `trade_decision.py:324-332` once routing is real (unbounded queue + lazy processor = memory growth if enqueues outpace routing); (d) re-validate bloombergquint feed (carried since FR6).
+
+
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+<=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=>
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+
+
+## 7. Comprehensive Health-Verification Scripts
+
+Two scripts. **Master** (`scripts/fr7_health_check.py`) runs every structural, static, live-probe, and gate check, maps each to its TODO, prints a grouped report, and exits 0 only when nothing fails (SKIP allowed). **Snapshot** (`scripts/fr7_health_snapshot.py`) wraps the master with `--json` and writes timestamped baselines to `reports/health/` for wave-over-wave trend comparison.
+
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+<=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=>
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+
+
+### 7.1 Check registry (what "healthy" means, measurably)
+
+| ID | Check | Maps to | Baseline expectation at HEAD `163cdf9` |
+|---|---|---|---|
+| HC-01 | `src/__init__.py` absent | TODO-1 | FAIL |
+| HC-02 | zero stray `src/*.py` | TODO-2 | FAIL (8) |
+| HC-03 | zero empty package shells | TODO-2 | FAIL (7) |
+| HC-04 | deps-sync gate | gate | PASS |
+| HC-05 | ruff check | gate | PASS |
+| HC-06 | ruff format --check | gate | PASS |
+| HC-07 | isort --check-only | gate | PASS |
+| HC-08 | flake8 | gate | PASS |
+| HC-09 | mypy --strict exit 0 | TODO-1 | FAIL (exit 2) |
+| HC-10 | bandit | gate | PASS |
+| HC-11 | pip-audit | TODO-4 | SKIP offline / verdict online |
+| HC-12 | pytest aggregate coverage ≥80% | TODO-3 | FAIL (76.38%) |
+| HC-13 | per-module coverage floors | TODO-3/15 | FAIL (0/11/30/66/67%) |
+| HC-14 | OPS limiter probe: singleton, max_ops=3, 3/10 acquires | F6-C-01 regression net | PASS |
+| HC-15 | strength-gate math probe: 3 sources→reject (0.4286), 4→pass (0.5714) | TODO-8 regression net | PASS (gate math is correct — the feed is what's broken) |
+| HC-16 | unknown source string loudly rejected | TODO-9 | FAIL (silent TA collapse) |
+| HC-17 | zero `"source": "orchestrator"` in orchestrator.py | TODO-7 | FAIL (3) |
+| HC-18 | `set_vix_level` has ≥1 production caller | TODO-12 | FAIL (0) |
+| HC-19 | routing real: no sleep-sim, no default-on, integration present | TODO-13 | FAIL |
+| HC-20 | `update_trailing_stop` has ≥1 production caller | TODO-14 | FAIL (0) |
+| HC-21 | zero module-level eager `get_settings()` (AST) | TODO-18 | FAIL (11) |
+| HC-22 | no `PYTEST_CURRENT_TEST` in src/ | TODO-20 | FAIL |
+| HC-23 | config conformance: mods=25, lot=25, 5/3 positions, max_ops=3, mode=ANALYZE, ±0.05 | TODO-17 | FAIL (mods=30) |
+| HC-24 | rules thresholds: BUY IV<30, SELL IV>40 | TODO-16 | FAIL (60) |
+| HC-25 | no bare 18.5 VIX fallback in rules.py | TODO-12 | FAIL |
+| HC-26 | root junk files absent | TODO-21 | FAIL |
+| HC-27 | decision queue bounded | TODO-27c | FAIL (unbounded) |
+
+Baseline: 4 gate PASS + 2 probe PASS (HC-14, HC-15) + 1 SKIP; the rest FAIL — exactly the consolidated FR's verdict, machine-checkable. Wave goal: **all PASS (HC-11 SKIP tolerated offline)**.
+
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+<=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=>
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+
+
+### 7.2 `scripts/fr7_health_check.py` — master script
+
+Save as `scripts/fr7_health_check.py`. Run from repo root with the clean venv:
+
+```powershell
+.\LOATS13July2026\Scripts\python.exe scripts\fr7_health_check.py            # full run (~5-8 min incl. pytest)
+.\LOATS13July2026\Scripts\python.exe scripts\fr7_health_check.py --fast     # skip pytest/pip-audit/per-module (~30 s)
+.\LOATS13July2026\Scripts\python.exe scripts\fr7_health_check.py --only HC-14,HC-15
+.\LOATS13July2026\Scripts\python.exe scripts\fr7_health_check.py --json reports/health/run.json
+```
+
+```python
+#!/usr/bin/env python
+"""FR7 consolidated health check — LOATS13July2026 build-wave verification.
+
+Derived from 23Aug2026-Consolidated FR.md (FR7 + FR7-R, HEAD 163cdf9).
+Each check maps to a TODO in 23Aug2026-FR Sequential TODOs.md.
+
+Exit codes: 0 = no failures (SKIP allowed); 1 = one or more FAIL;
+            2 = usage error. ASCII-only output by design.
+"""
+
+from __future__ import annotations
+
+import argparse
+import ast
+import asyncio
+import inspect
+import json
+import os
+import re
+import subprocess
+import sys
+import time
+from dataclasses import dataclass, field
+from pathlib import Path
+from types import SimpleNamespace
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+SRC = REPO_ROOT / "src"
+LOATS = SRC / "loats"
+
+# F7-M-03 mitigation: eager module-level settings in up to 11 modules make
+# imports crash without OPENALGO_API_KEY. Set a dummy BEFORE importing loats
+# and report it (HC-21 fails until TODO-18 lands).
+_ENV_INJECTED = False
+if not os.environ.get("OPENALGO_API_KEY"):
+    os.environ["OPENALGO_API_KEY"] = "fr7-health-probe"
+    _ENV_INJECTED = True
+
+# ---------------------------------------------------------------- report ----
+
+
+@dataclass
+class Result:
+    check_id: str
+    name: str
+    todo: str
+    status: str  # PASS | FAIL | SKIP
+    detail: str = ""
+    evidence: list = field(default_factory=list)
+
+
+class Report:
+    def __init__(self) -> None:
+        self.results: list[Result] = []
+        self.t0 = time.time()
+
+    def add(self, r: Result) -> None:
+        self.results.append(r)
+        mark = {"PASS": "[PASS]", "FAIL": "[FAIL]", "SKIP": "[SKIP]"}[r.status]
+        print(f"{mark} {r.check_id:<7} ({r.todo:<10}) {r.name}")
+        if r.detail:
+            print(f"         {r.detail}")
+        for line in r.evidence[:8]:
+            print(f"         - {line}")
+        if len(r.evidence) > 8:
+            print(f"         - ... +{len(r.evidence) - 8} more")
+
+    def summary(self) -> int:
+        p = sum(1 for r in self.results if r.status == "PASS")
+        f = sum(1 for r in self.results if r.status == "FAIL")
+        s = sum(1 for r in self.results if r.status == "SKIP")
+        print("\n" + "=" * 72)
+        print(
+            f"HEALTH SUMMARY: {p} PASS / {f} FAIL / {s} SKIP "
+            f"in {time.time() - self.t0:.1f}s"
+        )
+        if f:
+            print("Failing checks (by TODO):")
+            for r in self.results:
+                if r.status == "FAIL":
+                    print(f"  {r.check_id:<7} {r.todo:<10} {r.name}")
+        print("=" * 72)
+        return 1 if f else 0
+
+    def to_json(self) -> dict:
+        return {
+            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S"),
+            "python": sys.version.split()[0],
+            "env_key_injected": _ENV_INJECTED,
+            "results": [vars(r) for r in self.results],
+            "summary": {
+                "pass": sum(1 for r in self.results if r.status == "PASS"),
+                "fail": sum(1 for r in self.results if r.status == "FAIL"),
+                "skip": sum(1 for r in self.results if r.status == "SKIP"),
+            },
+        }
+
+
+# ------------------------------------------------------ filesystem checks ----
+
+
+def check_structure(rep: Report) -> None:
+    # HC-01
+    init = SRC / "__init__.py"
+    rep.add(
+        Result(
+            "HC-01",
+            "src/__init__.py absent (mypy collision breaker)",
+            "TODO-1",
+            "PASS" if not init.exists() else "FAIL",
+            "mypy strict gate cannot run while src is a package"
+            if init.exists()
+            else "",
+        )
+    )
+
+    # HC-02 — strays directly under src/ (anything except the loats/ dir)
+    strays = sorted(p.name for p in SRC.glob("*.py"))
+    rep.add(
+        Result(
+            "HC-02",
+            "no stray .py files directly in src/",
+            "TODO-2",
+            "PASS" if not strays else "FAIL",
+            f"{len(strays)} stray file(s) break mypy pathing" if strays else "",
+            strays,
+        )
+    )
+
+    # HC-03 — empty CMP-named shells
+    shells = []
+    for rel in ("connectors", "risk", "risk/manager", "strategy", "strategy/rules"):
+        d = LOATS / rel
+        if d.is_dir():
+            py = list(d.rglob("*.py"))
+            non_init = [p for p in py if p.name != "__init__.py"]
+            if not non_init and all(p.stat().st_size < 512 for p in py):
+                shells.append(rel)
+    rep.add(
+        Result(
+            "HC-03",
+            "no empty CMP-named package shells",
+            "TODO-2",
+            "PASS" if not shells else "FAIL",
+            "structure theater" if shells else "",
+            shells,
+        )
+    )
+
+    # HC-26 — root junk artifacts
+    junk = [n for n in ("$null", "[100%]", "0.21.0") if (REPO_ROOT / n).exists()]
+    rep.add(
+        Result(
+            "HC-26",
+            "root junk artifacts absent",
+            "TODO-21",
+            "PASS" if not junk else "FAIL",
+            "tracked junk at repo root" if junk else "",
+            junk,
+        )
+    )
+
+
+# ---------------------------------------------------------- static AST -------
+
+
+def _is_test_file(p: Path) -> bool:
+    return "tests" in p.parts or p.stem.startswith("test_") or p.stem == "conftest"
+
+
+def _iter_py(exclude_tests: bool = True):
+    for p in LOATS.rglob("*.py"):
+        rel = p.relative_to(REPO_ROOT).as_posix()
+        if rel.startswith("src/loats/config/"):
+            continue
+        if exclude_tests and _is_test_file(p):
+            continue
+        yield p
+
+
+def _parse(p: Path):
+    try:
+        return ast.parse(p.read_text(encoding="utf-8"), filename=str(p))
+    except SyntaxError:
+        return None
+
+
+def _find_attr_callers(attr_name: str, skip_files: tuple[str, ...] = ()):
+    """Production call sites of `*.attr_name(...)` under src/loats (no tests)."""
+    hits = []
+    for p in _iter_py():
+        if p.name in skip_files:
+            continue
+        tree = _parse(p)
+        if tree is None:
+            continue
+        for node in ast.walk(tree):
+            if (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Attribute)
+                and node.func.attr == attr_name
+            ):
+                hits.append(f"{p.relative_to(REPO_ROOT).as_posix()}:{node.lineno}")
+    return hits
+
+
+def check_eager_settings(rep: Report) -> None:
+    """HC-21 — eager module-level `settings = get_settings()` (Assign or AnnAssign)."""
+    offenders = []
+    for p in _iter_py():
+        tree = _parse(p)
+        if tree is None:
+            continue
+        for node in tree.body:  # module level only
+            if isinstance(node, ast.Assign):
+                call = node.value
+            elif isinstance(node, ast.AnnAssign) and node.value is not None:
+                call = node.value  # `settings: Settings = get_settings()`
+            else:
+                continue
+            if (
+                isinstance(call, ast.Call)
+                and isinstance(call.func, ast.Name)
+                and call.func.id == "get_settings"
+            ):
+                offenders.append(f"{p.relative_to(REPO_ROOT).as_posix()}:{node.lineno}")
+    rep.add(
+        Result(
+            "HC-21",
+            "no module-level eager get_settings() (lazy access)",
+            "TODO-18",
+            "PASS" if not offenders else "FAIL",
+            f"{len(offenders)} module(s) crash import without OPENALGO_API_KEY"
+            if offenders
+            else "",
+            offenders,
+        )
+    )
+
+
+def check_wiring(rep: Report) -> None:
+    """HC-18 / HC-20 — runtime drivers wired (VIX setter, trailing ratchet)."""
+    callers = _find_attr_callers("set_vix_level", skip_files=("rules.py",))
+    rep.add(
+        Result(
+            "HC-18",
+            "set_vix_level has >=1 production caller",
+            "TODO-12",
+            "PASS" if callers else "FAIL",
+            "VIX gate runs on fallback constant — decorative" if not callers else "",
+            callers,
+        )
+    )
+
+    drivers = _find_attr_callers(
+        "update_trailing_stop", skip_files=("trailing_stop.py",)
+    )
+    rep.add(
+        Result(
+            "HC-20",
+            "update_trailing_stop has >=1 production caller",
+            "TODO-14",
+            "PASS" if drivers else "FAIL",
+            "ratchet initialized but never driven (Rule 12 dormant)"
+            if not drivers
+            else "",
+            drivers,
+        )
+    )
+
+
+def check_decision_code(rep: Report) -> None:
+    """HC-17 / HC-19 / HC-22 / HC-24 / HC-25 / HC-27 — decision-layer conformance."""
+    # HC-22 — audit bypass
+    db = LOATS / "database.py"
+    bypass = db.exists() and "PYTEST_CURRENT_TEST" in db.read_text(encoding="utf-8")
+    rep.add(
+        Result(
+            "HC-22",
+            "no PYTEST_CURRENT_TEST bypass in database.py",
+            "TODO-20",
+            "FAIL" if bypass else "PASS",
+            "JSONL-first dual-write untested by suite" if bypass else "",
+        )
+    )
+
+    # HC-17 — untagged orchestrator source metadata
+    orch = LOATS / "orchestrator.py"
+    n = (
+        orch.read_text(encoding="utf-8").count('"source": "orchestrator"')
+        if orch.exists()
+        else -1
+    )
+    rep.add(
+        Result(
+            "HC-17",
+            'zero "source": "orchestrator" tags in orchestrator.py',
+            "TODO-7",
+            "PASS" if n == 0 else "FAIL",
+            f"{n} occurrence(s): Gate 1 sees 1 unique source, chain dead" if n else "",
+        )
+    )
+
+    # HC-19 — routing stub detection in trade_decision.py
+    td = LOATS / "trade_decision.py"
+    sim_sleep, default_on, integrates = False, False, False
+    if td.exists():
+        tree = _parse(td)
+        text = td.read_text(encoding="utf-8")
+        default_on = re.search(r"analyzer_routing_enabled\s*=\s*True", text) is not None
+        if tree is not None:
+            for node in ast.walk(tree):
+                if isinstance(node, ast.AsyncFunctionDef) and (
+                    node.name == "route_to_analyzer"
+                ):
+                    body_src = ast.get_source_segment(text, node) or ""
+                    sim_sleep = "asyncio.sleep" in body_src
+                    integrates = bool(
+                        re.search(
+                            r"client|openalgo|httpx|place_analyzer", body_src, re.I
+                        )
+                    )
+        ok = (not sim_sleep) and (not default_on) and integrates
+    else:
+        ok = False
+    rep.add(
+        Result(
+            "HC-19",
+            "Analyzer routing real (no sim-sleep, default-off, integration)",
+            "TODO-13",
+            "PASS" if ok else "FAIL",
+            f"sleep-sim={sim_sleep}, default_on={default_on}, integrated={integrates}",
+        )
+    )
+
+    # HC-24 — rules thresholds
+    rules = LOATS / "rules.py"
+    buy_iv = sell_iv = None
+    if rules.exists():
+        text = rules.read_text(encoding="utf-8")
+        m = re.search(r"iv_rank\s*<\s*(\d+)", text)
+        buy_iv = int(m.group(1)) if m else None
+        m = re.search(r"iv_rank\s*>\s*(\d+)", text)
+        sell_iv = int(m.group(1)) if m else None
+    rep.add(
+        Result(
+            "HC-24",
+            "IV-rank thresholds BUY<30 / SELL>40 (CMP)",
+            "TODO-16",
+            "PASS" if buy_iv == 30 and sell_iv == 40 else "FAIL",
+            f"found BUY<{buy_iv} / SELL>{sell_iv} — CMP says <30 / >40",
+        )
+    )
+
+    # HC-25 — bare 18.5 VIX fallback
+    has_fallback = rules.exists() and re.search(
+        r"18\.5", rules.read_text(encoding="utf-8")
+    )
+    rep.add(
+        Result(
+            "HC-25",
+            "no bare 18.5 VIX fallback (symmetric fail-safe)",
+            "TODO-12",
+            "FAIL" if has_fallback else "PASS",
+            "fallback biases BUY/SELL gating — wire real VIX (TODO-12)"
+            if has_fallback
+            else "",
+        )
+    )
+
+    # HC-27 — decision queue bounded
+    td_text = td.read_text(encoding="utf-8") if td.exists() else ""
+    m = re.search(r"asyncio\.Queue\(([^)]*)\)", td_text)
+    bounded = bool(m and m.group(1).strip())  # non-empty args => maxsize present
+    rep.add(
+        Result(
+            "HC-27",
+            "decision queue bounded (maxsize set)",
+            "TODO-27c",
+            "PASS" if bounded else "FAIL",
+            "unbounded queue + lazy processor = unbounded memory"
+            if not bounded
+            else "",
+        )
+    )
+
+
+# ---------------------------------------------------------- live probes ------
+
+
+def _norm(v):
+    """Normalize validate_signal_sources return to (bool, reason-ish)."""
+    if isinstance(v, tuple) and v:
+        ok = bool(v[0])
+        info = v[1] if len(v) > 1 else {}
+        if isinstance(info, dict):
+            reason = info.get("reason", json.dumps(info)[:120])
+        else:
+            reason = str(info)[:120]
+        return ok, reason
+    return bool(v), ""
+
+
+def _sig(sources: list[str]):
+    return [
+        SimpleNamespace(metadata={"source": s, "scan_type": "probe"}) for s in sources
+    ]
+
+
+def probe_strength_gate(rep: Report) -> None:
+    """HC-15 / HC-16 — drive the source gates directly (gate-math regression net)."""
+    try:
+        import loats.strength as st
+    except Exception as exc:  # pragma: no cover
+        rep.add(
+            Result(
+                "HC-15",
+                "strength-gate math probe",
+                "TODO-8",
+                "SKIP",
+                f"import failed: {exc!r}",
+            )
+        )
+        rep.add(
+            Result(
+                "HC-16",
+                "unknown-source loud rejection",
+                "TODO-9",
+                "SKIP",
+                "loats.strength unimportable",
+            )
+        )
+        return
+
+    engine = None
+    for name in ("StrengthEngine", "CompositeStrengthEngine", "get_strength_engine"):
+        obj = getattr(st, name, None)
+        if obj is None:
+            continue
+        engine = obj() if callable(obj) else obj
+        break
+    fn = getattr(engine, "validate_signal_sources", None) or getattr(
+        st, "validate_signal_sources", None
+    )
+    if fn is None:
+        rep.add(
+            Result(
+                "HC-15",
+                "strength-gate math probe",
+                "TODO-8",
+                "SKIP",
+                "validate_signal_sources not found",
+            )
+        )
+        rep.add(
+            Result(
+                "HC-16",
+                "unknown-source loud rejection",
+                "TODO-9",
+                "SKIP",
+                "validator not found",
+            )
+        )
+        return
+
+    def call(srcs):
+        try:
+            return _norm(fn(_sig(srcs)))
+        except Exception as exc:
+            return False, f"probe error: {exc!r}"
+
+    three = call(["ta", "sentiment", "price_action"])
+    four = call(["ta", "sentiment", "price_action", "volatility"])
+    ok15 = (three[0] is False) and (four[0] is True)
+    rep.add(
+        Result(
+            "HC-15",
+            "source-gate math: 3 distinct -> reject, 4 -> pass",
+            "TODO-8",
+            "PASS" if ok15 else "FAIL",
+            f"3-src={three[1]} | 4-src={four[1]}",
+            [
+                f"3 distinct sources accepted: {three[0]} (expect False — diversity 0.4286)",
+                f"4 distinct sources accepted: {four[0]} (expect True — diversity 0.5714)",
+            ],
+        )
+    )
+
+    bogus = call(["banana", "ta", "sentiment", "price_action"])
+    loud = (bogus[0] is False) and (
+        "unknown" in bogus[1].lower() or "invalid" in bogus[1].lower()
+    )
+    rep.add(
+        Result(
+            "HC-16",
+            "unknown source string loudly rejected",
+            "TODO-9",
+            "PASS" if loud else "FAIL",
+            f"reason: {bogus[1]} — expected explicit unknown/invalid rejection;"
+            " silent TECHNICAL_ANALYSIS collapse fails this check",
+        )
+    )
+
+
+def probe_rate_limiter(rep: Report) -> None:
+    """HC-14 — F6-C-01 regression net: singleton, max_ops=3, burst 3/10."""
+    try:
+        from loats.openalgo import (
+            get_order_rate_limiter,
+            get_smart_order_rate_limiter,
+        )
+    except Exception as exc:
+        rep.add(
+            Result(
+                "HC-14",
+                "OPS limiter probe (<=3/s, singleton)",
+                "F6-C-01",
+                "SKIP",
+                f"import failed: {exc!r}",
+            )
+        )
+        return
+
+    async def burst(lim, n=10):
+        passed = 0
+        for _ in range(n):
+            r = lim.acquire()
+            if inspect.iscoroutine(r):
+                r = await r
+            if r:
+                passed += 1
+        return passed
+
+    try:
+        a, b = get_order_rate_limiter(), get_order_rate_limiter()
+        smart = get_smart_order_rate_limiter()
+        ident = a is b
+        eff = getattr(a, "max_ops", None)
+        if eff is None:
+            eff = getattr(a, "_max_ops", None)
+        try:
+            from loats.config import get_settings
+
+            cfg = get_settings().max_ops
+        except Exception:
+            cfg = None
+        ordn = asyncio.run(burst(a))
+        smartn = asyncio.run(burst(smart))
+        ok = ident and eff == 3 and cfg == 3 and ordn == 3 and smartn == 3
+        rep.add(
+            Result(
+                "HC-14",
+                "OPS limiter: singleton, max_ops=3, 3/10 burst",
+                "F6-C-01",
+                "PASS" if ok else "FAIL",
+                f"identity={ident} effective={eff} settings={cfg} "
+                f"order={ordn}/10 smart={smartn}/10 (expect 3)",
+            )
+        )
+    except Exception as exc:
+        rep.add(
+            Result(
+                "HC-14",
+                "OPS limiter probe (<=3/s, singleton)",
+                "F6-C-01",
+                "FAIL",
+                f"probe error: {exc!r}",
+            )
+        )
+
+
+def probe_config(rep: Report) -> None:
+    """HC-23 — CMP zero-assumption config values."""
+    try:
+        from loats.config import get_settings
+
+        s = get_settings()
+    except Exception as exc:
+        rep.add(
+            Result(
+                "HC-23",
+                "config conformance (Rule 1/4/5/7/11)",
+                "TODO-17",
+                "SKIP",
+                f"import failed: {exc!r}",
+            )
+        )
+        return
+    checks = {
+        "nifty_lot_size=25": getattr(s, "nifty_lot_size", None) == 25,
+        "max_modifications=25 (Rule 7)": getattr(s, "max_modifications", None) == 25,
+        "max_nifty_positions=5 (Rule 11)": getattr(s, "max_nifty_positions", None) == 5,
+        "max_banknifty_positions=3": getattr(s, "max_banknifty_positions", None) == 3,
+        "max_ops=3 (Rule 4)": getattr(s, "max_ops", None) == 3,
+        "openalgo_mode=ANALYZE (Rule 5)": getattr(s, "openalgo_mode", None)
+        == "ANALYZE",
+        "sentiment_threshold=0.05 (Rule 9)": getattr(s, "sentiment_threshold", None)
+        == 0.05,
+    }
+    bad = [k for k, ok in checks.items() if not ok]
+    rep.add(
+        Result(
+            "HC-23",
+            "config conformance (CMP zero-assumption rules)",
+            "TODO-17",
+            "PASS" if not bad else "FAIL",
+            "all conform" if not bad else "non-conformant: " + ", ".join(bad),
+            [f"{k}: {'ok' if v else 'MISMATCH'}" for k, v in checks.items()],
+        )
+    )
+
+
+# ------------------------------------------------------------ gate runner ----
+
+
+def run_gate(rep: Report, check_id, todo, name, cmd, timeout=300, allow_skip=None):
+    try:
+        proc = subprocess.run(
+            cmd, cwd=REPO_ROOT, capture_output=True, text=True, timeout=timeout
+        )
+    except subprocess.TimeoutExpired:
+        status = "SKIP" if allow_skip else "FAIL"
+        rep.add(
+            Result(
+                check_id,
+                name,
+                todo,
+                status,
+                f"timeout after {timeout}s"
+                + (f" ({allow_skip})" if allow_skip else ""),
+            )
+        )
+        return None
+    tail = (proc.stdout or "").strip().splitlines()[-3:]
+    tail += (proc.stderr or "").strip().splitlines()[-2:]
+    rep.add(
+        Result(
+            check_id,
+            name,
+            todo,
+            "PASS" if proc.returncode == 0 else "FAIL",
+            f"exit {proc.returncode}",
+            [t[:160] for t in tail if t.strip()],
+        )
+    )
+    return proc.returncode
+
+
+def check_gates(rep: Report, fast: bool) -> dict:
+    py = sys.executable
+    run_gate(rep, "HC-04", "gate", "deps-sync", [py, "scripts/check_deps_sync.py"], 120)
+    run_gate(
+        rep,
+        "HC-05",
+        "gate",
+        "ruff check",
+        [
+            py,
+            "-m",
+            "ruff",
+            "check",
+            "src/",
+            "tests/",
+            "scripts/",
+            "--config",
+            "pyproject.toml",
+        ],
+        180,
+    )
+    run_gate(
+        rep,
+        "HC-06",
+        "gate",
+        "ruff format --check",
+        [py, "-m", "ruff", "format", "--check", "src/", "tests/", "scripts/"],
+        180,
+    )
+    run_gate(
+        rep,
+        "HC-07",
+        "gate",
+        "isort --check-only",
+        [
+            py,
+            "-m",
+            "isort",
+            "--check-only",
+            "src/",
+            "tests/",
+            "scripts/",
+            "--settings-path",
+            "pyproject.toml",
+        ],
+        180,
+    )
+    run_gate(
+        rep,
+        "HC-08",
+        "gate",
+        "flake8 (.flake8)",
+        [py, "-m", "flake8", "src/", "tests/", "scripts/"],
+        180,
+    )
+    run_gate(
+        rep,
+        "HC-09",
+        "TODO-1",
+        "mypy src/ --strict",
+        [py, "-m", "mypy", "src/", "--strict", "--config-file", "pyproject.toml"],
+        300,
+    )
+    run_gate(
+        rep,
+        "HC-10",
+        "gate",
+        "bandit",
+        [py, "-m", "bandit", "-r", "src/", "-c", "pyproject.toml", "-q"],
+        180,
+    )
+
+    rc = {"pip_audit": None, "pytest": None}
+    if not fast:
+        run_gate(
+            rep,
+            "HC-11",
+            "TODO-4",
+            "pip-audit (vuln DB)",
+            [py, "-m", "pip_audit"],
+            240,
+            allow_skip="network-blocked offline",
+        )
+        rc["pip_audit"] = 0
+
+        # HC-12 — pytest with aggregate coverage gate
+        rc["pytest"] = run_gate(
+            rep,
+            "HC-12",
+            "TODO-3",
+            "pytest --cov-fail-under=80 (aggregate)",
+            [
+                py,
+                "-m",
+                "pytest",
+                "tests/",
+                "--cov=src",
+                "--cov-branch",
+                "--cov-report=term-missing:skip-covered",
+                "--cov-report=json:"
+                + (REPO_ROOT / "reports/health/coverage.json").as_posix(),
+                "--cov-fail-under=80",
+                "-q",
+            ],
+            900,
+        )
+        check_module_floors(rep)
+    else:
+        rep.add(Result("HC-11", "pip-audit (vuln DB)", "TODO-4", "SKIP", "--fast mode"))
+        rep.add(
+            Result(
+                "HC-12",
+                "pytest aggregate coverage >=80%",
+                "TODO-3",
+                "SKIP",
+                "--fast mode",
+            )
+        )
+        rep.add(
+            Result(
+                "HC-13",
+                "per-module coverage floors",
+                "TODO-3/15",
+                "SKIP",
+                "--fast mode",
+            )
+        )
+    return rc
+
+
+PER_MODULE_FLOORS = {
+    "src/loats/trailing_stop.py": 80,
+    "src/loats/trade_decision.py": 80,
+    "src/loats/backtest_sanity.py": 80,
+    "src/loats/orchestrator.py": 80,
+    "src/loats/options.py": 85,
+    "src/loats/database.py": 80,
+    "src/loats/alerts.py": 80,
+    "src/loats/scheduler.py": 80,
+    "src/loats/strike_selection.py": 75,
+    "src/loats/database_async_additions.py": 80,
+}
+
+
+def check_module_floors(rep: Report) -> None:
+    """HC-13 — per-module coverage floors from coverage.json (written by HC-12 run)."""
+    cj = REPO_ROOT / "reports/health/coverage.json"
+    if not cj.exists():
+        rep.add(
+            Result(
+                "HC-13",
+                "per-module coverage floors",
+                "TODO-3/15",
+                "SKIP",
+                "coverage.json not found",
+            )
+        )
+        return
+    try:
+        data = json.loads(cj.read_text(encoding="utf-8"))
+    except Exception as exc:
+        rep.add(
+            Result(
+                "HC-13",
+                "per-module coverage floors",
+                "TODO-3/15",
+                "SKIP",
+                f"unparsable coverage.json: {exc!r}",
+            )
+        )
+        return
+    files = data.get("files", {})
+    evidence, failures = [], []
+    for rel, floor in sorted(PER_MODULE_FLOORS.items()):
+        key = next(
+            (k for k in files if k.replace("\\", "/").endswith(rel.replace("\\", "/"))),
+            None,
+        )
+        if key is None:
+            failures.append(f"{rel}: NOT MEASURED")
+            continue
+        pct = files[key].get("summary", {}).get("percent_covered", 0.0)
+        line = f"{rel}: {pct:.1f}% (floor {floor})"
+        (evidence if pct >= floor else failures).append(line)
+    rep.add(
+        Result(
+            "HC-13",
+            "per-module coverage floors (key modules)",
+            "TODO-3/15",
+            "PASS" if not failures else "FAIL",
+            f"{len(failures)} module(s) below floor" if failures else "all floors met",
+            failures + evidence,
+        )
+    )
+
+
+# ------------------------------------------------------------------ main -----
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument(
+        "--fast",
+        action="store_true",
+        help="skip pytest / pip-audit / per-module floors",
+    )
+    ap.add_argument(
+        "--only", default="", help="comma-separated check IDs to run (e.g. HC-14,HC-15)"
+    )
+    ap.add_argument(
+        "--json", default="", help="write machine-readable report to this path"
+    )
+    args = ap.parse_args()
+
+    only = {x.strip().upper() for x in args.only.split(",") if x.strip()}
+    rep = Report()
+    print(
+        f"# FR7 health check — {REPO_ROOT.name} @ {os.environ.get('COMPUTERNAME', '')}"
+    )
+    if _ENV_INJECTED:
+        print("# NOTE: OPENALGO_API_KEY injected (dummy) — HC-21 tracks why (TODO-18)")
+    print()
+
+    def wants(*ids):
+        return not only or any(i.upper() in only for i in ids)
+
+    if wants("HC-01", "HC-02", "HC-03", "HC-26"):
+        check_structure(rep)
+    if wants("HC-21"):
+        check_eager_settings(rep)
+    if wants("HC-18", "HC-20"):
+        check_wiring(rep)
+    if wants("HC-17", "HC-19", "HC-22", "HC-24", "HC-25", "HC-27"):
+        check_decision_code(rep)
+    if wants("HC-14"):
+        probe_rate_limiter(rep)
+    if wants("HC-15", "HC-16"):
+        probe_strength_gate(rep)
+    if wants("HC-23"):
+        probe_config(rep)
+    if not only or wants(
+        "HC-04",
+        "HC-05",
+        "HC-06",
+        "HC-07",
+        "HC-08",
+        "HC-09",
+        "HC-10",
+        "HC-11",
+        "HC-12",
+        "HC-13",
+    ):
+        check_gates(rep, fast=args.fast)
+
+    if args.json:
+        out = Path(args.json)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(json.dumps(rep.to_json(), indent=2), encoding="utf-8")
+        print(f"\nJSON report -> {out}")
+    return rep.summary()
+
+
+if __name__ == "__main__":
+    sys.exit(main())
+```
+
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+<=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=>
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+
+
+### 7.3 `scripts/fr7_health_snapshot.py` — wave-over-wave trend snapshots
+
+```python
+#!/usr/bin/env python
+"""Write a timestamped FR7 health snapshot to reports/health/ for trend tracking.
+
+Usage (clean venv):
+  python scripts/fr7_health_snapshot.py            # full run
+  python scripts/fr7_health_snapshot.py --fast     # quick structural pass
+  python scripts/fr7_health_snapshot.py --label baseline   # custom label
+"""
+
+from __future__ import annotations
+
+import argparse
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+HEALTH_DIR = REPO_ROOT / "reports" / "health"
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--fast", action="store_true")
+    ap.add_argument("--label", default="", help="baseline | stage-a | final | ...")
+    args = ap.parse_args()
+
+    HEALTH_DIR.mkdir(parents=True, exist_ok=True)
+    stamp = time.strftime("%Y%m%d-%H%M%S")
+    label = f"-{args.label}" if args.label else ""
+    out = HEALTH_DIR / f"health{label}-{stamp}.json"
+
+    cmd = [sys.executable, "scripts/fr7_health_check.py", "--json", str(out)]
+    if args.fast:
+        cmd.append("--fast")
+    print("Running:", " ".join(cmd))
+    rc = subprocess.run(cmd, cwd=REPO_ROOT).returncode
+
+    print(f"\nSnapshot: {out.name}  (master exit={rc})")
+    prev = sorted(HEALTH_DIR.glob("health*.json"))
+    if len(prev) > 1:
+        print(
+            f"{len(prev) - 1} earlier snapshot(s) in reports/health/ — "
+            "compare summary.fail counts to track wave progress."
+        )
+    return rc
+
+
+if __name__ == "__main__":
+    sys.exit(main())
+```
+
+### 7.4 Usage protocol for the build wave
+
+```
+WAVE START:  python scripts/fr7_health_snapshot.py --label 00-baseline
+             → expect the §7.1 baseline column (4+2 PASS, 1 SKIP, rest FAIL)
+
+EACH TODO:   implement → python scripts/fr7_health_check.py --only <its HC-ids>
+             → its check(s) flip to PASS; adjacent regression nets (HC-14/HC-15) stay PASS
+
+STAGE GATES (REV-2, position-based): after TODO-2+18+6 [CP-1]: HC-01,02,03,09,21 green + all gates green
+              after TODO-7..11: HC-17 and HC-16 green, HC-15 STAYS green, TODO-10 e2e in suite
+              after TODO-12..17: HC-18,25,24,23 green
+              after TODO-13+19: HC-19 green, HC-17 held
+              after TODO-14: HC-20 green
+              after TODO-3: HC-12 and HC-13 green — THEN TODO-15 turns floors blocking
+              wave end (TODO-4, 5b): HC-11 verdict recorded online, HC-22/26/27 green via TODO-20/21/27c — target 0 FAIL
+
+WAVE END:    python scripts/fr7_health_snapshot.py --label 99-final
+             → diff summary.fail vs baseline; target: 0 FAIL (HC-11 SKIP allowed offline)
+              → then enable/verify FULL branch protection (TODO-5b) and commit the wave
+```
+
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+<=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=>
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+
+
+### 7.5 Notes & guardrails
+
+- **Dummy API key:** the master script injects `OPENALGO_API_KEY=fr7-health-probe` only if unset (F7-M-03 makes imports crash otherwise). HC-21 fails until TODO-18 removes the need. The injected key never reaches the network (probes use in-process engines; OpenAlgo REST is never called).
+- **Probe state isolation:** HC-14/15/16 run in the master's process and mutate in-memory limiter/strength state — they are terminal-use probes; do not import this script as a library.
+- **No false greens:** checks assert the *consolidated FR's* arithmetic (3 sources = 0.4286 reject; 4 = 0.5714 pass; 3/10 acquires; thresholds 30/40/15; mods 25). A check can only pass by the code actually conforming.
+- **Baseline honesty:** at HEAD `163cdf9` the expected result is exactly §7.1's baseline column. If a baseline check unexpectedly PASSES, investigate — either code changed since the FR or the check is wrong; fix the check before trusting it.
+- **CI integration (post-wave):** add `python scripts/fr7_health_check.py --fast` as a CI step after the standard gates — it is the cheapest permanent regression net for the FR7 fix set (structure, tagging, wiring, thresholds, config).
+
+
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+<=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=>
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+
+
+## 8. Acceptance Matrix — TODO → Health Check → Done-when
+
+| TODO | Check | Done when |
+|---|---|---|
+| 1 delete src/__init__.py | HC-09 | mypy --strict exit 0 |
+| 2 relocate strays/shells | HC-02, HC-03 | zero strays, zero shells, suite count held |
+| 3 coverage lift | HC-12, HC-13 | aggregate ≥80 + all floors green |
+| 4 pip-audit online | HC-11 | verdict recorded (PASS or triaged) |
+| 5 branch protection | manual | direct push rejected; PR requires CI |
+| 6 commit hook | manual/CI | misleading message rejected |
+| 7 tag producers | HC-17 | 0 "orchestrator" tags; enum-derived |
+| 8 4th producer / ADR | HC-15 + e2e | real signals pass both gates (or ADR + 3/7 threshold) |
+| 9 loud unknown source | HC-16 | "banana" → explicit unknown-source rejection |
+| 10 e2e chain test | suite | real-path test green; mutation check fails on revert |
+| 11 log elevation | review | warning + counter visible on rejection |
+| 12 VIX wired + symmetric | HC-18, HC-25 | setter called each cycle; no-feed blocks BOTH directions |
+| 13 real routing + persist | HC-19 | no sim-sleep; default-off→real; audit row per decision |
+| 14 trailing driver | HC-20 | ratchet driven per position; Rule-7-gated; audited |
+| 15 per-module blocking | HC-13 | floors enforced in CI |
+| 16 BUY IV<30 | HC-24 | literal 30; tests pin |
+| 17 mods=25 wired/persisted/fail-closed | HC-23 | settings=gate=25; counter survives restart |
+| 18 lazy settings ×11 | HC-21 | AST scan zero; bare-env import works |
+| 19 single signal engine | HC-17 + review | one producer path, one threshold |
+| 20 kill audit bypass | HC-22 | no PYTEST_CURRENT_TEST; dual-write tested |
+| 21 untrack junk | HC-26 | root clean; tracked count down |
+| 22 ruff ignore shrink | gate HC-05 | F401/I001/E402/PGH003 gone from ignore |
+| 23 dead weights | review | removed or annotated-pending |
+| 24 cov-script exits | review | exit-code unit test green |
+| 25 P1/P5 evidence | review | latency logs + forward test begun (post-13) |
+| 26 backtest driver | review | invoked by scheduler/job |
+| 27 carried set | HC-27 (c) | queue bounded; rest per plan docs |
+
+
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+<=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=><=O0O=>
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+
+
+**End of FR Sequential TODOs. Companion to `23Aug2026-Consolidated FR.md` (evidence authority) — this file is the build-wave execution + verification layer. All changes require explicit USER APPROVAL.**
+
+*Note: this file is an untracked repo-root artifact — relocate to `docs/audit-history/` before any release, per F7-M-08.*

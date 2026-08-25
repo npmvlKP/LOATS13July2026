@@ -1,4 +1,4 @@
-"""Test cases for Value-at-Risk module"""
+﻿"""Test cases for Value-at-Risk module"""
 
 from decimal import Decimal
 from unittest import TestCase, mock
@@ -6,7 +6,7 @@ from unittest import TestCase, mock
 import numpy as np
 import pytest
 
-from src.var_engine import VaREngine
+from loats.var_engine import VaREngine
 
 
 class TestVaREngine(TestCase):

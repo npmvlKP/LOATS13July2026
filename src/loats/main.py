@@ -16,7 +16,9 @@ from .scheduler import scheduler
 from .utils.cache import close_cache, initialize_cache
 
 # Module-level exports for testing (F-CONC-3)
-settings = get_settings()
+from loats.config import get_settings
+from loats import settings
+
 db = Database(
     db_path=settings.sqlite_db_path,
     audit_log_path=settings.audit_log_path,

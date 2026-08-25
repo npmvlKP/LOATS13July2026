@@ -21,9 +21,9 @@ from .rules import rules_engine
 from .sizing import sizing_engine
 from .strength import strength_engine
 from .trailing_stop import TrailingStopType, trailing_stop_engine
+from loats import settings
 
 logger = get_logger(__name__)
-settings = get_settings()
 
 
 class DecisionStatus(StrEnum):

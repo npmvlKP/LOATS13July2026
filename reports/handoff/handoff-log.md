@@ -1,0 +1,1 @@
+﻿2026-08-24 10:05 | TODO-1 (F7-C-01a) | loatsEV | src/__init__.py deleted | HC-09 PASS (mypy collision-abort gone, mypy now runs and reports 14 real type errors in 2 files) | commit 62b9cf1 | follow-on mypy strict errors to fix in TODO-2 | Next: TODO-2 (relocate stray src/*.py files)

@@ -1,11 +1,11 @@
-"""Comprehensive CMP conformance tests."""
+﻿"""Comprehensive CMP conformance tests."""
 
 import os
 from collections.abc import Generator
 
 import pytest
 
-from src.cmp import CMP
+from scripts.cmp import CMP
 from src.loats.config import get_settings
 from src.loats.utils.rate_limiter import (
     _reset_singletons_for_testing,
@@ -71,17 +71,17 @@ def test_cmp_rule_3_algo_id_tagging() -> None:
 
 
 def test_cmp_rule_4_ops_threshold() -> None:
-    """CMP Rule 4: OPS threshold 10; self-limit ≤3."""
+    """CMP Rule 4: OPS threshold 10; self-limit â‰¤3."""
     settings = get_settings()
 
-    # Verify the setting is ≤3 (self-limit)
+    # Verify the setting is â‰¤3 (self-limit)
     assert settings.max_ops <= 3, (
-        f"CMP Rule 4 violated: max_ops={settings.max_ops} should be ≤3"
+        f"CMP Rule 4 violated: max_ops={settings.max_ops} should be â‰¤3"
     )
 
-    # Verify the setting is ≤10 (NSE threshold)
+    # Verify the setting is â‰¤10 (NSE threshold)
     assert settings.max_ops <= 10, (
-        f"CMP Rule 4 violated: max_ops={settings.max_ops} should be ≤10"
+        f"CMP Rule 4 violated: max_ops={settings.max_ops} should be â‰¤10"
     )
 
     # Verify it's exactly 3 as configured
@@ -214,13 +214,13 @@ def test_cmp_validation_logic() -> None:
 
 
 def test_cmp_rule_7_modification_limit() -> None:
-    """CMP Rule 7: Modification limit ≤30."""
+    """CMP Rule 7: Modification limit â‰¤30."""
     settings = get_settings()
 
-    # Verify the modification limit is ≤30
+    # Verify the modification limit is â‰¤30
     assert settings.max_modifications <= 30, (
         "CMP Rule 7 violated: "
-        f"max_modifications={settings.max_modifications} should be ≤30"
+        f"max_modifications={settings.max_modifications} should be â‰¤30"
     )
 
     # Verify it's exactly 30 as configured

@@ -23,9 +23,10 @@ from .models import (
     Trade,
     TransactionType,
 )
+from loats import settings
+from loats.config.settings import Settings
 
 logger = get_logger(__name__)
-settings = get_settings()
 
 
 class TrailingStopType(StrEnum):

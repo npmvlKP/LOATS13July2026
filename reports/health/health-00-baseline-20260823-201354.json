@@ -1,0 +1,280 @@
+{
+  "timestamp": "2026-08-23T20:14:07",
+  "python": "3.12.7",
+  "env_key_injected": true,
+  "results": [
+    {
+      "check_id": "HC-01",
+      "name": "src/__init__.py absent (mypy collision breaker)",
+      "todo": "TODO-1",
+      "status": "FAIL",
+      "detail": "mypy strict gate cannot run while src is a package",
+      "evidence": []
+    },
+    {
+      "check_id": "HC-02",
+      "name": "no stray .py files directly in src/",
+      "todo": "TODO-2",
+      "status": "FAIL",
+      "detail": "8 stray file(s) break mypy pathing",
+      "evidence": [
+        "__init__.py",
+        "cmp.py",
+        "probe_rate_limiter.py",
+        "test_cmp.py",
+        "test_cmp_conformance.py",
+        "test_cmp_ops_threshold.py",
+        "utils.py",
+        "var_engine.py"
+      ]
+    },
+    {
+      "check_id": "HC-03",
+      "name": "no empty CMP-named package shells",
+      "todo": "TODO-2",
+      "status": "FAIL",
+      "detail": "structure theater",
+      "evidence": [
+        "connectors",
+        "risk",
+        "risk/manager",
+        "strategy",
+        "strategy/rules"
+      ]
+    },
+    {
+      "check_id": "HC-26",
+      "name": "root junk artifacts absent",
+      "todo": "TODO-21",
+      "status": "FAIL",
+      "detail": "tracked junk at repo root",
+      "evidence": [
+        "$null",
+        "[100%]",
+        "0.21.0"
+      ]
+    },
+    {
+      "check_id": "HC-21",
+      "name": "no module-level eager get_settings() (lazy access)",
+      "todo": "TODO-18",
+      "status": "FAIL",
+      "detail": "11 module(s) crash import without OPENALGO_API_KEY",
+      "evidence": [
+        "src/loats/alerts.py:37",
+        "src/loats/backtest_sanity.py:26",
+        "src/loats/main.py:19",
+        "src/loats/rules.py:22",
+        "src/loats/scheduler.py:36",
+        "src/loats/sentiment.py:22",
+        "src/loats/sizing.py:21",
+        "src/loats/trade_decision.py:26",
+        "src/loats/trailing_stop.py:28",
+        "src/loats/strength/__init__.py:20",
+        "src/loats/trading_strategy/core.py:23"
+      ]
+    },
+    {
+      "check_id": "HC-18",
+      "name": "set_vix_level has >=1 production caller",
+      "todo": "TODO-12",
+      "status": "FAIL",
+      "detail": "VIX gate runs on fallback constant \u2014 decorative",
+      "evidence": []
+    },
+    {
+      "check_id": "HC-20",
+      "name": "update_trailing_stop has >=1 production caller",
+      "todo": "TODO-14",
+      "status": "FAIL",
+      "detail": "ratchet initialized but never driven (Rule 12 dormant)",
+      "evidence": []
+    },
+    {
+      "check_id": "HC-22",
+      "name": "no PYTEST_CURRENT_TEST bypass in database.py",
+      "todo": "TODO-20",
+      "status": "FAIL",
+      "detail": "JSONL-first dual-write untested by suite",
+      "evidence": []
+    },
+    {
+      "check_id": "HC-17",
+      "name": "zero \"source\": \"orchestrator\" tags in orchestrator.py",
+      "todo": "TODO-7",
+      "status": "FAIL",
+      "detail": "3 occurrence(s): Gate 1 sees 1 unique source, chain dead",
+      "evidence": []
+    },
+    {
+      "check_id": "HC-19",
+      "name": "Analyzer routing real (no sim-sleep, default-off, integration)",
+      "todo": "TODO-13",
+      "status": "FAIL",
+      "detail": "sleep-sim=True, default_on=True, integrated=True",
+      "evidence": []
+    },
+    {
+      "check_id": "HC-24",
+      "name": "IV-rank thresholds BUY<30 / SELL>40 (CMP)",
+      "todo": "TODO-16",
+      "status": "FAIL",
+      "detail": "found BUY<60 / SELL>40 \u2014 CMP says <30 / >40",
+      "evidence": []
+    },
+    {
+      "check_id": "HC-25",
+      "name": "no bare 18.5 VIX fallback (symmetric fail-safe)",
+      "todo": "TODO-12",
+      "status": "FAIL",
+      "detail": "fallback biases BUY/SELL gating \u2014 wire real VIX (TODO-12)",
+      "evidence": []
+    },
+    {
+      "check_id": "HC-27",
+      "name": "decision queue bounded (maxsize set)",
+      "todo": "TODO-27c",
+      "status": "FAIL",
+      "detail": "unbounded queue + lazy processor = unbounded memory",
+      "evidence": []
+    },
+    {
+      "check_id": "HC-14",
+      "name": "OPS limiter: singleton, max_ops=3, 3/10 burst",
+      "todo": "F6-C-01",
+      "status": "PASS",
+      "detail": "identity=True effective=3 settings=3 order=3/10 smart=3/10 (expect 3)",
+      "evidence": []
+    },
+    {
+      "check_id": "HC-15",
+      "name": "source-gate math: 3 distinct -> reject, 4 -> pass",
+      "todo": "TODO-8",
+      "status": "PASS",
+      "detail": "3-src=insufficient_source_diversity | 4-src=source_validation_passed",
+      "evidence": [
+        "3 distinct sources accepted: False (expect False \u2014 diversity 0.4286)",
+        "4 distinct sources accepted: True (expect True \u2014 diversity 0.5714)"
+      ]
+    },
+    {
+      "check_id": "HC-16",
+      "name": "unknown source string loudly rejected",
+      "todo": "TODO-9",
+      "status": "FAIL",
+      "detail": "reason: insufficient_source_diversity \u2014 expected explicit unknown/invalid rejection; silent TECHNICAL_ANALYSIS collapse fails this check",
+      "evidence": []
+    },
+    {
+      "check_id": "HC-23",
+      "name": "config conformance (CMP zero-assumption rules)",
+      "todo": "TODO-17",
+      "status": "FAIL",
+      "detail": "non-conformant: max_modifications=25 (Rule 7)",
+      "evidence": [
+        "nifty_lot_size=25: ok",
+        "max_modifications=25 (Rule 7): MISMATCH",
+        "max_nifty_positions=5 (Rule 11): ok",
+        "max_banknifty_positions=3: ok",
+        "max_ops=3 (Rule 4): ok",
+        "openalgo_mode=ANALYZE (Rule 5): ok",
+        "sentiment_threshold=0.05 (Rule 9): ok"
+      ]
+    },
+    {
+      "check_id": "HC-04",
+      "name": "deps-sync",
+      "todo": "gate",
+      "status": "PASS",
+      "detail": "exit 0",
+      "evidence": [
+        "Dependency manifests are in sync."
+      ]
+    },
+    {
+      "check_id": "HC-05",
+      "name": "ruff check",
+      "todo": "gate",
+      "status": "PASS",
+      "detail": "exit 0",
+      "evidence": [
+        "All checks passed!"
+      ]
+    },
+    {
+      "check_id": "HC-06",
+      "name": "ruff format --check",
+      "todo": "gate",
+      "status": "PASS",
+      "detail": "exit 0",
+      "evidence": [
+        "134 files already formatted"
+      ]
+    },
+    {
+      "check_id": "HC-07",
+      "name": "isort --check-only",
+      "todo": "gate",
+      "status": "PASS",
+      "detail": "exit 0",
+      "evidence": []
+    },
+    {
+      "check_id": "HC-08",
+      "name": "flake8 (.flake8)",
+      "todo": "gate",
+      "status": "PASS",
+      "detail": "exit 0",
+      "evidence": []
+    },
+    {
+      "check_id": "HC-09",
+      "name": "mypy src/ --strict",
+      "todo": "TODO-1",
+      "status": "FAIL",
+      "detail": "exit 2",
+      "evidence": [
+        "src\\loats\\utils\\rate_limiter.py: note:     a) adding `__init__.py` somewhere,",
+        "src\\loats\\utils\\rate_limiter.py: note:     b) using `--explicit-package-bases` or adjusting `MYPYPATH`",
+        "Found 1 error in 1 file (errors prevented further checking)"
+      ]
+    },
+    {
+      "check_id": "HC-10",
+      "name": "bandit",
+      "todo": "gate",
+      "status": "PASS",
+      "detail": "exit 0",
+      "evidence": []
+    },
+    {
+      "check_id": "HC-11",
+      "name": "pip-audit (vuln DB)",
+      "todo": "TODO-4",
+      "status": "SKIP",
+      "detail": "--fast mode",
+      "evidence": []
+    },
+    {
+      "check_id": "HC-12",
+      "name": "pytest aggregate coverage >=80%",
+      "todo": "TODO-3",
+      "status": "SKIP",
+      "detail": "--fast mode",
+      "evidence": []
+    },
+    {
+      "check_id": "HC-13",
+      "name": "per-module coverage floors",
+      "todo": "TODO-3/15",
+      "status": "SKIP",
+      "detail": "--fast mode",
+      "evidence": []
+    }
+  ],
+  "summary": {
+    "pass": 8,
+    "fail": 16,
+    "skip": 3
+  }
+}

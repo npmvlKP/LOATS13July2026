@@ -15,9 +15,10 @@ import numpy as np
 from ..loats_logging import get_logger
 from ..models import Signal, SignalType, TAIndicator
 from .config import get_settings
+from loats import settings
+from loats.config.settings import Settings
 
 logger = get_logger(__name__)
-settings = get_settings()
 
 
 class StrengthSource(StrEnum):

@@ -410,8 +410,8 @@ def test_get_strategy_config(trading_strategy: TradingStrategyCore) -> None:
     assert config["mode"] == "ANALYZE"
     assert config["max_ops"] == settings.max_ops
     assert config["max_daily_orders"] == settings.max_daily_orders
-    assert config["nifty_lot_size"] == settings.nifty_lot_size
-    assert config["max_order_value"] == float(settings.max_order_value)
+    assert config["nifty_lot_size"] == _cfg().nifty_lot_size
+    assert config["max_order_value"] == float(_cfg().max_order_value)
     assert config["max_total_exposure"] == float(settings.max_total_exposure)
     assert config["max_nifty_positions"] == settings.max_nifty_positions
     assert config["max_banknifty_positions"] == settings.max_banknifty_positions

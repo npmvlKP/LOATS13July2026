@@ -31,10 +31,11 @@ from .utils.resilience import (
     telegram_circuit_breaker_retry_async,
 )
 
-logger = get_logger(__name__)
+from loats.config import get_settings
+from loats import settings
+from loats.config.settings import Settings
 
-# Settings must be accessed after all imports to avoid circular imports
-settings = get_settings()
+logger = get_logger(__name__)
 
 
 class AlertSystem:

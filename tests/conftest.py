@@ -63,7 +63,7 @@ def test_settings() -> Settings:
 def db(test_settings) -> collections.abc.Generator[Database, None, None]:
     """Create test database instance."""
     db_instance = Database(
-        db_path=test_settings.sqlite_db_path,
+        db_path=test__cfg().sqlite_db_path,
         audit_log_path=test_settings.audit_log_path,
     )
     db_instance.retention_days = 30

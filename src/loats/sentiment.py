@@ -18,8 +18,7 @@ from .config import get_settings
 from .loats_logging import get_logger
 from .models import NewsItem, SentimentAnalysisResult
 from .utils.cache import cache_manager
-
-settings = get_settings()
+from loats import settings
 
 logger = get_logger(__name__)
 

@@ -469,7 +469,7 @@ class TestLoadLatencyIntegration:
         from loats.config import get_settings
 
         settings = get_settings()
-        expected_max_ops = settings.max_ops
+        expected_max_ops = _cfg().max_ops
 
         # Reset rate limiter to get fresh instance
         from loats.utils.rate_limiter import create_test_rate_limiter

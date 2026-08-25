@@ -17,9 +17,10 @@ import pandas as pd
 from .config import get_settings
 from .loats_logging import get_logger
 from .models import HistoricalData, Signal, SignalType, Trade
+from loats import settings
+from loats.config.settings import Settings
 
 logger = get_logger(__name__)
-settings = get_settings()
 
 
 class RuleType(StrEnum):

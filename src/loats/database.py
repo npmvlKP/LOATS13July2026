@@ -122,10 +122,10 @@ class Database:
             audit_log_path: Path audit log JSONL file
             retention_days: Number days retain data (defaults to settings)
         """
-        settings = get_settings()
-        self.db_path = db_path or Path(settings.sqlite_db_path)
-        self.audit_log_path = audit_log_path or Path(settings.audit_log_path)
-        self.retention_days = retention_days or settings.retention_days
+        settings_local = get_settings()
+        self.db_path = db_path or Path(settings_local.sqlite_db_path)
+        self.audit_log_path = audit_log_path or Path(settings_local.audit_log_path)
+        self.retention_days = retention_days or settings_local.retention_days
 
         self._thread_local = threading.local()
 

@@ -1,8 +1,8 @@
-from datetime import UTC, datetime, timedelta
+﻿from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from src.cmp import CMP
+from scripts.cmp import CMP
 
 
 class TestCmp:

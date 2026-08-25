@@ -32,8 +32,8 @@ from .utils.circuit_breaker import (
     OPENALGO_CIRCUIT_BREAKER,
 )
 from .utils.resilience import openalgo_circuit_breaker_retry_async
-
-settings = get_settings()
+from loats import settings
+from loats.config.settings import Settings
 
 logger = get_logger(__name__)
 

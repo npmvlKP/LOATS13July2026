@@ -16,9 +16,9 @@ import numpy as np
 from .config import get_settings
 from .loats_logging import get_logger
 from .models import FundsData, Trade
+from loats import settings
 
 logger = get_logger(__name__)
-settings = get_settings()
 
 
 class SizingMethod(StrEnum):

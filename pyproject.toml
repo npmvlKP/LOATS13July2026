@@ -191,12 +191,6 @@ source = ["src"]
 omit = [
     "tests/*",
     "*/__init__.py",
-    "src/cmp.py",
-    "src/probe_rate_limiter.py",
-    "src/test_cmp.py",
-    "src/test_cmp_conformance.py",
-    "src/test_cmp_ops_threshold.py",
-    "src/utils.py",
 ]
 
 [tool.coverage.report]

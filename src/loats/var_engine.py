@@ -1,4 +1,4 @@
-"""Value-at-Risk (VaR) Calculation Engine
+﻿"""Value-at-Risk (VaR) Calculation Engine
 
 Implements multiple VaR calculation methods for risk management
 with support for different asset classes and risk parameters.
