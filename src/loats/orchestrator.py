@@ -10,6 +10,7 @@ from typing import Any
 from urllib.parse import urlparse
 
 import httpx
+import numpy as np
 
 from .alerts import alerts
 from .config import get_settings
@@ -168,11 +169,12 @@ class TradingOrchestrator:
             # with timeout
             ta_task = asyncio.create_task(self._execute_ta_analysis())
             sentiment_task = asyncio.create_task(self._execute_sentiment_analysis())
+            volatility_task = asyncio.create_task(self._execute_volatility_analysis())
             market_data_task = asyncio.create_task(self._execute_market_data_update())
 
             try:
                 await asyncio.wait_for(
-                    asyncio.gather(ta_task, sentiment_task, market_data_task),
+                    asyncio.gather(ta_task, sentiment_task, volatility_task, market_data_task),
                     timeout=0.08,
                 )
             except TimeoutError:
@@ -352,6 +354,193 @@ class TradingOrchestrator:
                 logger.warning(
                     f"Sentiment analysis exceeded budget: {duration * 1000:.2f}ms"
                 )
+
+    async def _execute_volatility_analysis(self) -> None:
+        """Execute volatility analysis — 4th signal producer for diversity gate.
+
+        Uses existing TA machinery (ATR, VWAP) and adds Hurst exponent
+        regime detection. Runs inside the 80ms parallel window.
+        """
+        start_time = datetime.datetime.now(datetime.UTC)
+
+        try:
+            global settings
+            if settings is None:
+                settings = get_settings()
+
+            symbol = settings.default_symbol
+            timeframe = settings.timeframe
+
+            historical_data_raw = await async_client.get_historical_data(
+                symbol=symbol,
+                exchange=settings.exchange,
+                interval=timeframe,
+                limit=100,
+            )
+
+            if not historical_data_raw or not historical_data_raw.get("data"):
+                logger.warning("No historical data for volatility analysis")
+                return
+
+            historical_data_objs = [
+                HistoricalData(
+                    timestamp=datetime.datetime.fromisoformat(item["timestamp"]),
+                    open=item["open"], high=item["high"],
+                    low=item["low"], close=item["close"],
+                    volume=item["volume"], interval=timeframe,
+                )
+                for item in historical_data_raw["data"]
+            ]
+
+            if len(historical_data_objs) < 50:
+                logger.warning(
+                    f"Insufficient bars for volatility: {len(historical_data_objs)}"
+                )
+                return
+
+            import pandas as pd
+            from .ta import calculate_atr, calculate_vwap
+            from .models import SignalType
+
+            df = pd.DataFrame({
+                "timestamp": [h.timestamp for h in historical_data_objs],
+                "open": [h.open for h in historical_data_objs],
+                "high": [h.high for h in historical_data_objs],
+                "low": [h.low for h in historical_data_objs],
+                "close": [h.close for h in historical_data_objs],
+                "volume": [h.volume for h in historical_data_objs],
+            })
+
+            atr_series = calculate_atr(df, period=14)
+            current_atr = (
+                atr_series.iloc[-1] if not pd.isna(atr_series.iloc[-1]) else 0
+            )
+
+            current_price = df["close"].iloc[-1]
+            atr_pct = (current_atr / current_price * 100) if current_price > 0 else 0
+
+            vwap_series = calculate_vwap(df)
+            current_vwap = (
+                vwap_series.iloc[-1]
+                if not pd.isna(vwap_series.iloc[-1])
+                else current_price
+            )
+
+            hurst_exponent = self._calculate_hurst_exponent(df["close"].values)
+            regime = (
+                "trending" if hurst_exponent is not None and hurst_exponent > 0.5
+                else "mean_reverting" if hurst_exponent is not None
+                else "unknown"
+            )
+
+            vol_score = min(atr_pct / 2.0, 1.0)
+
+            signal_type = "NEUTRAL"
+            signal_strength = 0.5
+
+            if regime == "trending" and vol_score > 0.6:
+                signal_type = "BUY" if current_price > current_vwap else "SELL"
+                signal_strength = 0.7 + vol_score * 0.2
+            elif regime == "mean_reverting" and vol_score > 0.5:
+                signal_type = "SELL" if current_price > current_vwap else "BUY"
+                signal_strength = 0.65 + vol_score * 0.15
+            elif vol_score < 0.3:
+                signal_type = "NEUTRAL"
+                signal_strength = 0.4
+
+            signal = Signal(
+                symbol=symbol,
+                signal_type=SignalType(signal_type),
+                strength=signal_strength,
+                timestamp=datetime.datetime.now(datetime.UTC),
+                indicators={
+                    "atr": float(current_atr),
+                    "atr_pct": float(atr_pct),
+                    "vwap": float(current_vwap),
+                    "hurst_exponent": (
+                        float(hurst_exponent)
+                        if hurst_exponent is not None
+                        else 0.5
+                    ),
+                },
+                confidence=signal_strength,
+                metadata={
+                    "scan_type": "volatility",
+                    "source": StrengthSource.VOLATILITY.value,
+                    "regime": regime,
+                    "atr_pct": float(atr_pct),
+                    "hurst": (
+                        float(hurst_exponent)
+                        if hurst_exponent is not None
+                        else 0.5
+                    ),
+                },
+            )
+            await db.async_create_signal(signal)
+
+        except Exception as e:
+            logger.error(f"Volatility analysis failed: {e}")
+            raise
+        finally:
+            duration = (
+                datetime.datetime.now(datetime.UTC) - start_time
+            ).total_seconds()
+            if duration > 0.03:
+                logger.warning(
+                    f"Volatility analysis exceeded budget: {duration * 1000:.2f}ms"
+                )
+
+    def _calculate_hurst_exponent(
+        self, close_prices: np.ndarray,
+    ) -> float | None:
+        """Hurst exponent via R/S analysis.
+
+        H < 0.5 = mean-reverting, H > 0.5 = trending.
+        """
+        try:
+            from scipy import stats as sp_stats
+
+            if len(close_prices) < 50:
+                return None
+
+            returns = np.diff(np.log(close_prices))
+            if len(returns) < 30:
+                return None
+
+            window_sizes = [10, 20, 30, 40]
+            rs_values: list[tuple[int, float]] = []
+
+            for w in window_sizes:
+                if w >= len(returns):
+                    continue
+                n_sub = len(returns) // w
+                if n_sub < 1:
+                    continue
+                rs_sub: list[float] = []
+                for i in range(n_sub):
+                    subset = returns[i * w : (i + 1) * w]
+                    if len(subset) < 2:
+                        continue
+                    mean_s = np.mean(subset)
+                    devs = np.cumsum(subset - mean_s)
+                    r = np.max(devs) - np.min(devs)
+                    s = np.std(subset, ddof=1)
+                    if s > 0:
+                        rs_sub.append(float(r / s))
+                if rs_sub:
+                    rs_values.append((w, float(np.mean(rs_sub))))
+
+            if len(rs_values) < 2:
+                return None
+
+            log_n = np.log([x[0] for x in rs_values])
+            log_rs = np.log([x[1] for x in rs_values])
+            slope, _, _, _, _ = sp_stats.linregress(log_n, log_rs)
+            return float(slope)
+
+        except Exception as e:
+            logger.warning(f"Failed to calculate Hurst exponent: {e}")
+            return None
 
     async def _execute_market_data_update(self) -> None:
         """Update market data with performance monitoring."""
