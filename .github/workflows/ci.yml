@@ -32,6 +32,31 @@ jobs:
           pip install ".[dev]"
       - name: Check dependency manifest sync
         run: python scripts/check_deps_sync.py
+      - name: Validate commit messages
+        run: |
+          # Validate all commits in this PR or push
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            # For PRs, check commits between base and head
+            BASE_SHA="${{ github.event.pull_request.base.sha }}"
+            HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+            git fetch origin $BASE_SHA $HEAD_SHA
+            COMMITS=$(git rev-list $BASE_SHA..$HEAD_SHA)
+          else
+            # For pushes, check commits since last ref
+            COMMITS=$(git rev-list ${{ github.event.before }}..${{ github.event.after }})
+          fi
+          
+          # Validate each commit message
+          for commit in $COMMITS; do
+            echo "Validating commit: $commit"
+            git log -1 --pretty=%B $commit > /tmp/commit_msg.txt
+            python scripts/commit_message_check.py /tmp/commit_msg.txt || {
+              echo "❌ Commit message validation failed for commit $commit"
+              echo "See CONTRIBUTING.md for commit message guidelines"
+              exit 1
+            }
+          done
+          echo "✅ All commit messages passed validation"
       - name: Run Ruff linter
         run: ruff check src/ tests/ scripts/ --config pyproject.toml --output-format=github
       - name: Run Ruff formatter
