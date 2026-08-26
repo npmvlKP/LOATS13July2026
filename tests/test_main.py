@@ -77,19 +77,21 @@ async def test_trading_system_start_shutdown(trading_system):
 
 @pytest.mark.asyncio
 async def test_trading_system_run_once(trading_system):
+    """Test run_once executes scheduler scans (TA and sentiment).
+
+    Note: Signal generation is handled by the orchestrator cycle loop,
+    not by scheduler. The orchestrator runs signal generation in
+    _execute_trading_cycle() when started via start_orchestrator().
+    """
     with (
         patch("loats.main.scheduler.run_ta_scan", new_callable=AsyncMock) as mock_ta,
         patch(
             "loats.main.scheduler.run_sentiment_scan", new_callable=AsyncMock
         ) as mock_sentiment,
-        patch(
-            "loats.main.scheduler.run_signal_generation", new_callable=AsyncMock
-        ) as mock_signal,
     ):
         await trading_system.run_once()
         mock_ta.assert_called_once()
         mock_sentiment.assert_called_once()
-        mock_signal.assert_called_once()
 
 
 @pytest.mark.asyncio

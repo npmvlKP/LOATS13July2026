@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """
 Comprehensive test suite for orchestrator.py module.
 
@@ -25,6 +25,7 @@ from loats.models import (
 from loats.openalgo import KillSwitchError
 from loats.orchestrator import TradingOrchestrator, get_cycle_stats
 
+
 @pytest.fixture
 def temp_db():
     """Create a temporary database for testing."""
@@ -41,12 +42,14 @@ def temp_db():
         # Clean up
         db.close_all()
 
+
 @pytest.fixture
 def mock_alerts():
     """Create a mock AlertSystem for testing."""
     alerts = MagicMock(spec=AlertSystem)
     alerts.is_kill_switch_active.return_value = False
     return alerts
+
 
 class TestTradingOrchestrator(unittest.IsolatedAsyncioTestCase):
     """Test suite for TradingOrchestrator."""
@@ -261,26 +264,26 @@ class TestTradingOrchestrator(unittest.IsolatedAsyncioTestCase):
                         "_execute_risk_management",
                         new_callable=AsyncMock,
                     ) as mock_risk:
-                            # Mock CMP strategy: real implementation performs
-                            # httpx network I/O via _safe_get_history. Unit
-                            # tests must not hit the network; an abandoned
-                            # connect_tcp coroutine otherwise leaks (warning).
-                            with patch.object(
-                                self.orchestrator,
-                                "_execute_cmp_strategy",
-                                new_callable=AsyncMock,
-                            ) as mock_cmp:
-                                # Mock rules_engine to allow CMP execution
-                                with patch("loats.orchestrator.rules_engine") as mock_rules:
-                                    mock_rules.is_trading_allowed.return_value = True
-                                    await self.orchestrator._execute_trading_cycle()
+                        # Mock CMP strategy: real implementation performs
+                        # httpx network I/O via _safe_get_history. Unit
+                        # tests must not hit the network; an abandoned
+                        # connect_tcp coroutine otherwise leaks (warning).
+                        with patch.object(
+                            self.orchestrator,
+                            "_execute_cmp_strategy",
+                            new_callable=AsyncMock,
+                        ) as mock_cmp:
+                            # Mock rules_engine to allow CMP execution
+                            with patch("loats.orchestrator.rules_engine") as mock_rules:
+                                mock_rules.is_trading_allowed.return_value = True
+                                await self.orchestrator._execute_trading_cycle()
 
-                                    mock_ta.assert_called_once()
-                                    mock_sentiment.assert_called_once()
-                                    mock_market.assert_called_once()
-                                    mock_signal.assert_called_once()
-                                    mock_risk.assert_called_once()
-                                    mock_cmp.assert_called_once()
+                                mock_ta.assert_called_once()
+                                mock_sentiment.assert_called_once()
+                                mock_market.assert_called_once()
+                                # Note: signal_generation was removed during TODO-19 legacy engine retirement
+                                mock_risk.assert_called_once()
+                                mock_cmp.assert_called_once()
 
     async def test_execute_trading_cycle_with_kill_switch(self):
         """Test trading cycle with kill switch active."""
@@ -463,33 +466,30 @@ class TestTradingOrchestrator(unittest.IsolatedAsyncioTestCase):
                 ):
                     with patch.object(
                         self.orchestrator,
-                        "_execute_signal_generation",
+                        "_execute_risk_management",
                         new_callable=AsyncMock,
                     ):
                         with patch.object(
                             self.orchestrator,
-                            "_execute_risk_management",
+                            "_execute_cmp_strategy",
                             new_callable=AsyncMock,
                         ):
-                            with patch.object(
-                                self.orchestrator,
-                                "_execute_cmp_strategy",
-                                new_callable=AsyncMock,
-                            ):
-                                # Execute one trading cycle via _run_cycle_loop logic
-                                # Manually call the cycle execution and record cycle time
-                                await self.orchestrator._execute_trading_cycle()
-                                self.orchestrator._record_cycle_time(0.05)
+                            # Note: _execute_signal_generation was removed during TODO-19 legacy engine retirement
+                            # Signal generation is now part of _execute_cmp_strategy
+                            # Execute one trading cycle via _run_cycle_loop logic
+                            # Manually call the cycle execution and record cycle time
+                            await self.orchestrator._execute_trading_cycle()
+                            self.orchestrator._record_cycle_time(0.05)
 
-                                # Cycle count should be incremented exactly once
-                                assert self.orchestrator.cycle_count == 1
+                            # Cycle count should be incremented exactly once
+                            assert self.orchestrator.cycle_count == 1
 
-                                # Execute another cycle
-                                await self.orchestrator._execute_trading_cycle()
-                                self.orchestrator._record_cycle_time(0.07)
+                            # Execute another cycle
+                            await self.orchestrator._execute_trading_cycle()
+                            self.orchestrator._record_cycle_time(0.07)
 
-                                # Cycle count should now be 2
-                                assert self.orchestrator.cycle_count == 2
+                            # Cycle count should now be 2
+                            assert self.orchestrator.cycle_count == 2
 
     async def test_lazy_settings_loading(self):
         """Test that settings are loaded lazily to avoid import-time failures (F6-H-05 #2)."""
@@ -669,23 +669,20 @@ class TestTradingOrchestrator(unittest.IsolatedAsyncioTestCase):
                             # Mock sequential phase: real implementations hit
                             # the network / global db (test isolation defect
                             # that leaked a connect_tcp coroutine).
+                            # Note: _execute_signal_generation was removed during TODO-19 legacy engine retirement
+                            # Signal generation is now part of _execute_cmp_strategy
                             with patch.object(
                                 self.orchestrator,
-                                "_execute_signal_generation",
+                                "_execute_risk_management",
                                 new_callable=AsyncMock,
                             ):
                                 with patch.object(
                                     self.orchestrator,
-                                    "_execute_risk_management",
+                                    "_execute_cmp_strategy",
                                     new_callable=AsyncMock,
                                 ):
-                                    with patch.object(
-                                        self.orchestrator,
-                                        "_execute_cmp_strategy",
-                                        new_callable=AsyncMock,
-                                    ):
-                                        # Execute trading cycle
-                                        await self.orchestrator._execute_trading_cycle()
+                                    # Execute trading cycle
+                                    await self.orchestrator._execute_trading_cycle()
 
                             # Verify TA analysis was included in the parallel execution
                             mock_gather.assert_called_once()
@@ -734,8 +731,7 @@ class TestTradingOrchestrator(unittest.IsolatedAsyncioTestCase):
         assert funds_model.available_margin == 0.0
         assert funds_model.total_equity == 1500.0
 
+
 if __name__ == "__main__":
     # Run the tests
     unittest.main(verbosity=2)
-
-

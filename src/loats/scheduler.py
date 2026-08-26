@@ -18,9 +18,7 @@ from .database import db
 from .loats_logging import get_logger
 from .metrics import record_signal, track_job
 from .models import (
-    FundsData,
     HistoricalData,
-    Position,
     QuoteData,
     Signal,
     SignalType,
@@ -594,4 +592,3 @@ class TradingScheduler:
 # Export default instance and provide backward-compatible alias
 scheduler = TradingScheduler()
 Scheduler = TradingScheduler  # Backward compatibility alias
-

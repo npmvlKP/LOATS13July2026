@@ -98,7 +98,9 @@ async def test_trading_system_start_success(trading_system):
 @pytest.mark.asyncio
 async def test_trading_system_start_exception(trading_system):
     """Test start exception handling (lines 64-66)."""
-    with (patch("loats.main.alerts.start", side_effect=Exception("Start error")),):
+    with (
+        patch("loats.main.alerts.start", side_effect=Exception("Start error")),
+    ):
         with pytest.raises(Exception, match="Start error"):
             await trading_system.start()
         assert trading_system.running is False
@@ -162,14 +164,10 @@ async def test_trading_system_run_once_success(trading_system):
         patch(
             "loats.main.scheduler.run_sentiment_scan", new_callable=AsyncMock
         ) as mock_sentiment,
-        patch(
-            "loats.main.scheduler.run_signal_generation", new_callable=AsyncMock
-        ) as mock_signal,
     ):
         await trading_system.run_once()
         mock_ta.assert_called_once()
         mock_sentiment.assert_called_once()
-        mock_signal.assert_called_once()
 
 
 @pytest.mark.asyncio

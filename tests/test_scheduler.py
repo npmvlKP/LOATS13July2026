@@ -1,4 +1,4 @@
-﻿from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -25,7 +25,6 @@ async def test_start_shutdown(scheduler):
     # Mock scan methods to avoid real async calls during start
     scheduler.run_ta_scan = AsyncMock()
     scheduler.run_sentiment_scan = AsyncMock()
-    
 
     # Mock scheduler methods
     scheduler.scheduler.start = MagicMock()
@@ -61,4 +60,3 @@ async def test_ta_scan_task_tracks_metrics(scheduler):
     assert manager.job_execution_stats["total"] == 1
     assert manager.job_execution_stats["success"] == 1
     assert manager.job_latency_stats["count"] == 1
-

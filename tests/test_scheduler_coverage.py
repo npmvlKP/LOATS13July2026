@@ -94,8 +94,9 @@ class TestSchedulerCoverage:
 
         await scheduler_instance._add_jobs()
 
-        # Verify that add_job was called for all expected jobs
-        assert mock_add_job.call_count == 5
+        # Verify that add_job was called for all expected jobs (ta_scan, sentiment_scan, market_status_check, data_cleanup)
+        # Note: signal_generation was removed during TODO-19 legacy engine retirement
+        assert mock_add_job.call_count == 4
 
         # Check that each job was added with correct parameters
         calls = mock_add_job.call_args_list
@@ -230,39 +231,6 @@ class TestSchedulerCoverage:
                 await scheduler_instance._sentiment_scan_task()
 
     @pytest.mark.asyncio
-    async def test_run_signal_generation_task(self, scheduler_instance):
-        """Test run_signal_generation method (lines 396-399)."""
-
-        # Mock the _signal_generation_task method with a lambda that returns None
-        scheduler_instance._signal_generation_task = lambda: None
-
-        # Mock asyncio.create_task to return a proper awaitable task
-        with patch("asyncio.create_task") as mock_create_task:
-            # Create a proper async task that can be awaited
-            async def mock_task_coro():
-                return None
-
-            mock_task = asyncio.ensure_future(mock_task_coro())
-            mock_create_task.return_value = mock_task
-
-            # Mock the task to be stored in scan_tasks
-            with patch.object(scheduler_instance, "scan_tasks", {}):
-                await scheduler_instance.run_signal_generation()
-
-                # Verify task was created and stored - check that it was called with a coroutine
-                assert mock_create_task.called
-                # The task should have been stored and then removed (due to try/finally)
-                # So we just verify the create_task was called
-
-    @pytest.mark.asyncio
-    async def test_signal_generation_task_with_kill_switch(self, scheduler_instance):
-        """Test _signal_generation_task with kill switch active (lines 420-424)."""
-        # Mock kill switch to be active
-        with patch("loats.scheduler.alerts.is_kill_switch_active", return_value=True):
-            with pytest.raises(Exception, match="Kill switch active"):
-                await scheduler_instance._signal_generation_task()
-
-    @pytest.mark.asyncio
     async def test_check_market_status_task(self, scheduler_instance):
         """Test check_market_status method (lines 438-441)."""
 
@@ -299,17 +267,17 @@ class TestSchedulerCoverage:
         scheduler_instance.scheduler.get_job = mock_get_job
         scheduler_instance.scheduler.remove_job = mock_remove_job
 
-        # Mock jobs to exist
+        # Mock jobs to exist (ta_scan and sentiment_scan only)
+        # Note: signal_generation job was removed during TODO-19 legacy engine retirement
         mock_get_job.side_effect = lambda job_id: (
-            MagicMock()
-            if job_id in ["ta_scan", "sentiment_scan", "signal_generation"]
-            else None
+            MagicMock() if job_id in ["ta_scan", "sentiment_scan"] else None
         )
 
         await scheduler_instance._market_status_check_task()
 
-        # Verify jobs were removed
-        assert mock_remove_job.call_count == 3
+        # Verify jobs were removed (ta_scan and sentiment_scan only)
+        # Note: signal_generation job was removed during TODO-19 legacy engine retirement
+        assert mock_remove_job.call_count == 2
 
     @pytest.mark.asyncio
     async def test_market_status_check_task_market_open(self, scheduler_instance):
@@ -326,8 +294,9 @@ class TestSchedulerCoverage:
 
         await scheduler_instance._market_status_check_task()
 
-        # Verify jobs were added
-        assert mock_add_job.call_count == 3
+        # Verify jobs were added (ta_scan and sentiment_scan only)
+        # Note: signal_generation job was removed during TODO-19 legacy engine retirement
+        assert mock_add_job.call_count == 2
 
     @pytest.mark.asyncio
     async def test_run_data_cleanup_task(self, scheduler_instance):
@@ -388,34 +357,37 @@ class TestSchedulerCoverage:
     @pytest.mark.asyncio
     async def test_run_once_method(self, scheduler_instance):
         """Test run_once method (lines 591, 593-594)."""
-        # Mock the various run methods
+        # Mock the various run methods (excluding signal_generation)
+        # Note: run_signal_generation was removed during TODO-19 legacy engine retirement
         mock_ta_scan = AsyncMock()
         mock_sentiment_scan = AsyncMock()
-        mock_signal_generation = AsyncMock()
         mock_market_status = AsyncMock()
         mock_data_cleanup = AsyncMock()
 
         scheduler_instance.run_ta_scan = mock_ta_scan
         scheduler_instance.run_sentiment_scan = mock_sentiment_scan
-        scheduler_instance.run_signal_generation = mock_signal_generation
         scheduler_instance.check_market_status = mock_market_status
         scheduler_instance.run_data_cleanup = mock_data_cleanup
 
-        # Test each job type
+        # Test each job type (excluding signal_generation)
         await scheduler_instance.run_once("ta_scan")
         mock_ta_scan.assert_awaited_once()
 
         await scheduler_instance.run_once("sentiment_scan")
         mock_sentiment_scan.assert_awaited_once()
 
-        await scheduler_instance.run_once("signal_generation")
-        mock_signal_generation.assert_awaited_once()
-
         await scheduler_instance.run_once("market_status_check")
         mock_market_status.assert_awaited_once()
 
         await scheduler_instance.run_once("data_cleanup")
         mock_data_cleanup.assert_awaited_once()
+
+        # Test signal_generation (should log warning as unknown job)
+        with patch("loats.scheduler.logger") as mock_logger:
+            await scheduler_instance.run_once("signal_generation")
+            mock_logger.warning.assert_called_once_with(
+                "Unknown job ID: %s", "signal_generation"
+            )
 
         # Test unknown job
         with patch("loats.scheduler.logger") as mock_logger:

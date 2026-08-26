@@ -147,7 +147,9 @@ class TradingSystem:
             logger.info("Running all scans once")
             await scheduler.run_ta_scan()
             await scheduler.run_sentiment_scan()
-            await scheduler.run_signal_generation()
+            # Note: Signal generation is handled by the orchestrator cycle loop,
+            # not by scheduler. The orchestrator runs signal generation in
+            # _execute_trading_cycle() when started via start_orchestrator().
             logger.info("All scans completed")
         except Exception as e:
             logger.error(f"Error running scans: {e}")

@@ -1020,6 +1020,7 @@ class AsyncOpenAlgoClient:
             - Errors propagate, no fabricated success responses
             - Uses circuit breaker pattern for resilience
         """
+
         # Analyzer requests don't require kill switch check (analysis-only, not trading)
         # Use circuit breaker with retry for analyzer requests (idempotent GET-like behavior)
         async def _analyze_impl() -> dict[str, Any]:

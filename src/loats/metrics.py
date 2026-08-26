@@ -110,7 +110,9 @@ class MetricsManager:
         self.signals_generated_counter = _MetricFactory(self._record_signal_via_mock)
         self.kill_switch_status = _SimpleSetter(self._set_kill_switch_via_mock)
         self.circuit_breaker_status = _MetricFactory(self._set_circuit_breaker_via_mock)
-        self.cmp_chain_rejections_counter = _MetricFactory(self._track_cmp_rejection_via_mock)
+        self.cmp_chain_rejections_counter = _MetricFactory(
+            self._track_cmp_rejection_via_mock
+        )
 
         self._server_started = False
         self._initialized = True
@@ -171,6 +173,7 @@ class MetricsManager:
             self.system_status["circuit_breaker_status"][component] = bool(value)
         except Exception as e:
             logger.warning(f"Failed to set circuit breaker via mock: {e}")
+
     def _track_cmp_rejection_via_mock(self, reason: str) -> None:
         """Track CMP chain rejection via mock interface."""
         try:
@@ -394,6 +397,7 @@ def set_circuit_breaker_status(
     except Exception:  # nosec B110
         # Silently handle metrics errors to not interfere with application flow
         pass
+
 
 def record_cmp_chain_rejection(
     reason: str, manager: "MetricsManager | None" = None

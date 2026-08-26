@@ -85,7 +85,9 @@ class TradeDecisionEngine:
         composite_strength, strength_details = (
             strength_engine.calculate_composite_strength(signals)
         )
-        if composite_strength <= settings.composite_strength_threshold:  # Minimum strength threshold
+        if (
+            composite_strength <= settings.composite_strength_threshold
+        ):  # Minimum strength threshold
             return None, {
                 "status": "rejected",
                 "reason": "insufficient_strength",
