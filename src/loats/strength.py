@@ -286,8 +286,14 @@ class StrengthEngine:
             source_enum = resolve_source(source)
             source_types.add(source_enum)
 
-        # Diversity score based on number of unique source types
-        diversity_score = min(len(source_types) / len(StrengthSource), 1.0)
+        # Diversity score: unique sources relative to required minimum.
+        # Using min_sources (3) as denominator ensures that meeting the
+        # source-count requirement always yields diversity >= 1.0,
+        # while partial coverage scales linearly.
+        # Previous formula (len(source_types) / len(StrengthSource))
+        # made 3/7 = 0.429 which was always < 0.5 threshold, deadlocking
+        # the entire CMP chain in production.
+        diversity_score = min(len(source_types) / self.min_sources, 1.0)
         return float(diversity_score)
 
     def validate_signal_sources(

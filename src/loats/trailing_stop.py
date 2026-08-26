@@ -81,7 +81,7 @@ class TrailingStopEngine:
             "stop_type": stop_type,
             "status": TrailingStopStatus.ACTIVE,
             "trigger_price": None,
-            "last_adjustment": datetime.datetime.now(datetime.UTC),
+            "last_adjustment": datetime.datetime.now(datetime.UTC).isoformat(),
             "adjustment_count": 0,
             "locked_profit": 0.0,
             "parameters": parameters,

@@ -147,6 +147,7 @@ class TradeDecisionEngine:
                 symbol=symbol,
                 quantity=position_size,
                 entry_price=current_price,
+                entry_time=datetime.datetime.now(datetime.UTC),
                 transaction_type=(
                     TransactionType.BUY
                     if decision_type == SignalType.BUY
