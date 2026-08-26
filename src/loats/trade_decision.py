@@ -290,7 +290,8 @@ class TradeDecisionEngine:
                         "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
                     }
                     logger.info(
-                        f"Successfully routed decision {trade_decision.decision_id} to Analyzer"
+                        f"Successfully routed decision "
+                        f"{trade_decision.decision_id} to Analyzer"
                     )
 
             except Exception as e:
@@ -310,11 +311,13 @@ class TradeDecisionEngine:
         try:
             await db.async_record_trade_decision(trade_decision, response)
             logger.debug(
-                f"Persisted decision {trade_decision.decision_id} routing outcome to audit trail"
+                f"Persisted decision {trade_decision.decision_id} "
+                f"routing outcome to audit trail"
             )
         except Exception as e:
             logger.error(
-                f"Failed to persist decision {trade_decision.decision_id} to audit trail: {e}"
+                f"Failed to persist decision {trade_decision.decision_id} "
+                f"to audit trail: {e}"
             )
             # Don't fail the routing if audit persistence fails
             # but log the error for monitoring

@@ -777,7 +777,8 @@ class TradingOrchestrator:
                     logger.warning(
                         f"Insufficient signals for CMP strategy: "
                         f"{len(recent_signals)} signals "
-                        f"(rejected {self._insufficient_signals_count} times since last session change)"
+                        f"(rejected {self._insufficient_signals_count} "
+                        f"times since last session change)"
                     )
                     self._last_insufficient_signals_warning_time = current_time
                 return

@@ -71,7 +71,10 @@ class Settings(BaseSettings):
     )
     analyzer_routing_enabled: bool = Field(
         False,
-        description="Enable routing to Analyzer service (default False to prevent default-on fabrication)",
+        description=(
+            "Enable routing to Analyzer service "
+            "(default False to prevent default-on fabrication)"
+        ),
     )
 
     # Telegram Configuration

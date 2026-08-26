@@ -1022,7 +1022,8 @@ class AsyncOpenAlgoClient:
         """
 
         # Analyzer requests don't require kill switch check (analysis-only, not trading)
-        # Use circuit breaker with retry for analyzer requests (idempotent GET-like behavior)
+        # Use circuit breaker with retry for analyzer requests
+        # (idempotent GET-like behavior)
         async def _analyze_impl() -> dict[str, Any]:
             return await self._request("POST", "analyze", json=payload)
 
