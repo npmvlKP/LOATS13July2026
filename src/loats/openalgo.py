@@ -997,6 +997,36 @@ class AsyncOpenAlgoClient:
 
         return await OPENALGO_CIRCUIT_BREAKER.call_async(_cancel_order_impl)
 
+    async def place_analyzer_request(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """
+        Submit a TradeDecision payload to the Analyzer service for analysis.
+
+        Routes the decision payload via OpenAlgo's ANALYZE mode endpoint.
+        Returns the real response from the Analyzer service without fabrication.
+
+        Args:
+            payload: TradeDecision payload from decision.to_analyzer_payload()
+
+        Returns:
+            Real response from Analyzer service
+
+        Raises:
+            OpenAlgoError: If the Analyzer request fails (propagated, not fabricated)
+            OpenAlgoAPIError: If the API returns an error status
+            CircuitBreakerOpenError: If circuit breaker is open
+
+        Note:
+            - No asyncio.sleep simulation - real HTTP call
+            - Errors propagate, no fabricated success responses
+            - Uses circuit breaker pattern for resilience
+        """
+        # Analyzer requests don't require kill switch check (analysis-only, not trading)
+        # Use circuit breaker with retry for analyzer requests (idempotent GET-like behavior)
+        async def _analyze_impl() -> dict[str, Any]:
+            return await self._request("POST", "analyze", json=payload)
+
+        return await OPENALGO_CIRCUIT_BREAKER.call_async(_analyze_impl)
+
     async def get_order_status(self, order_id: str) -> dict[str, Any]:
         payload = {"order_id": order_id}
         return await self._request("POST", "order_status", json=payload)

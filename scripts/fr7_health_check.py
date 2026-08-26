@@ -14,37 +14,46 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
+# Get the current Python interpreter to ensure subprocess uses the same one
+PYTHON_INTERPRETER = sys.executable
+
 # Health check definitions
 HEALTH_CHECKS = {
     "HC-12": {
         "name": "CMP Chain Integration Test",
         "description": "End-to-end test for CMP chain signal flow to TradeDecision creation",
-        "command": ["python", "-m", "pytest", "tests/test_e2e_cmp_chain.py", "-v", "--tb=short"],
+        "command": [PYTHON_INTERPRETER, "-m", "pytest", "tests/test_e2e_cmp_chain.py", "-v", "--tb=short"],
         "timeout": 60,
     },
     "HC-15": {
         "name": "Math & Aggregate Validation",
         "description": "Validate composite strength calculations and aggregation math",
-        "command": ["python", "-m", "pytest", "tests/test_trade_decision.py", "-k", "composite", "-v"],
+        "command": [PYTHON_INTERPRETER, "-m", "pytest", "tests/test_trade_decision.py", "-k", "composite", "-v"],
         "timeout": 30,
     },
     "HC-17": {
         "name": "Signal Source Validation",
         "description": "Validate signal source tagging and enum validation (F7-C-02a fix)",
-        "command": ["python", "-m", "pytest", "tests/test_trade_decision.py", "-k", "source", "-v"],
+        "command": [PYTHON_INTERPRETER, "-m", "pytest", "tests/test_trade_decision.py", "-k", "source", "-v"],
         "timeout": 30,
     },
     "HC-18": {
         "name": "VIX Integration Wired",
         "description": "Verify VIX integration is wired with symmetric fail-safe (TODO-12)",
-        "command": ["python", "-m", "pytest", "tests/test_vix_integration.py", "-v"],
+        "command": [PYTHON_INTERPRETER, "-m", "pytest", "tests/test_vix_integration.py", "-v"],
         "timeout": 30,
     },
     "HC-25": {
         "name": "No 18.5 VIX Fallback",
         "description": "Verify no bare 18.5 VIX fallback remains (TODO-12)",
-        "command": ["python", "-m", "pytest", "tests/test_vix_integration.py::TestVIXNo18_5Fallback", "-v"],
+        "command": [PYTHON_INTERPRETER, "-m", "pytest", "tests/test_vix_integration.py::TestVIXNo18_5Fallback", "-v"],
         "timeout": 15,
+    },
+    "HC-19": {
+        "name": "Real Analyzer Routing",
+        "description": "Verify real Analyzer routing with audit persistence (TODO-13)",
+        "command": [PYTHON_INTERPRETER, "-m", "pytest", "tests/test_analyzer_routing_integration.py", "-v"],
+        "timeout": 30,
     },
 }
 

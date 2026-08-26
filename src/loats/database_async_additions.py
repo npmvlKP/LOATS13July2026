@@ -20,6 +20,7 @@ from .models import (
     QuoteData,
     Signal,
     Trade,
+    TradeDecision,
 )
 
 AIOSQLITE_AVAILABLE = importlib.util.find_spec("aiosqlite") is not None
@@ -599,6 +600,65 @@ async def _async_update_order_status_wrapper(
         return await asyncio.to_thread(self.update_order_status, order_id, status)
 
 
+async def _async_record_trade_decision(
+    self: Database, decision: TradeDecision, response: dict[str, Any]
+) -> None:
+    """
+    Record TradeDecision routing outcome to audit trail with dual-write consistency.
+
+    Implements atomic dual-write: JSONL file + SQLite database.
+    Persists both the TradeDecision and the Analyzer response for audit-grade
+    traceability that survives restarts.
+
+    Args:
+        decision: TradeDecision that was routed
+        response: Response from Analyzer routing (or disabled status)
+
+    Dual-Write Guarantee:
+    - JSONL write occurs first
+    - Database commit only after successful JSONL write
+    - Ensures audit trail integrity across restarts
+    """
+    decision_dict = decision.model_dump()
+    await self._async_log_audit(
+        action="ROUTE_TO_ANALYZER",
+        entity_type="trade_decision",
+        entity_id=decision.decision_id,
+        user="system",
+        metadata={
+            "routing_response": response,
+            "routing_timestamp": datetime.now(UTC).isoformat(),
+        },
+        previous_state=None,
+        new_state=decision_dict,
+    )
+
+
+async def _async_record_trade_decision_wrapper(
+    self: Database, decision: TradeDecision, response: dict[str, Any]
+) -> None:
+    """Async wrapper record_trade_decision() avoid blocking event loop."""
+    if AIOSQLITE_AVAILABLE and hasattr(self, "_async_pool") and self._async_pool:
+        await self._async_record_trade_decision(decision, response)  # type: ignore[attr-defined]
+    else:
+        # Fallback to synchronous audit logging
+        from .database import db
+
+        decision_dict = decision.model_dump()
+        db._log_audit(
+            action="ROUTE_TO_ANALYZER",
+            entity_type="trade_decision",
+            entity_id=decision.decision_id,
+            user="system",
+            metadata={
+                "routing_response": response,
+                "routing_timestamp": datetime.now(UTC).isoformat(),
+            },
+            previous_state=None,
+            new_state=decision_dict,
+        )
+
+
 # Add async methods to Database class if they don't exist
 def extend_database_class() -> None:
     """Extend the Database class with async methods."""
@@ -614,6 +674,7 @@ def extend_database_class() -> None:
         Database._async_get_latest_signals = _async_get_latest_signals  # type: ignore[attr-defined]
         Database._async_update_trade = _async_update_trade  # type: ignore[attr-defined]
         Database._async_update_order_status = _async_update_order_status  # type: ignore[attr-defined]
+        Database._async_record_trade_decision = _async_record_trade_decision  # type: ignore[attr-defined]
         Database.async_get_trade = async_get_trade  # type: ignore[attr-defined]
         Database._async_log_audit = _async_log_audit  # type: ignore[attr-defined]
 
@@ -631,6 +692,9 @@ def extend_database_class() -> None:
     _add_wrapper_method(Database, "async_update_trade", _async_update_trade_wrapper)
     _add_wrapper_method(
         Database, "async_update_order_status", _async_update_order_status_wrapper
+    )
+    _add_wrapper_method(
+        Database, "async_record_trade_decision", _async_record_trade_decision_wrapper
     )
 
 

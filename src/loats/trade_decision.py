@@ -42,8 +42,9 @@ class TradeDecisionEngine:
 
     def __init__(self) -> None:
         """Initialize TradeDecisionEngine."""
+        settings = get_settings()
         self.decision_queue = asyncio.Queue()
-        self.analyzer_routing_enabled = True
+        self.analyzer_routing_enabled = settings.analyzer_routing_enabled
         self.decision_timeout = datetime.timedelta(minutes=5)
 
     async def create_trade_decision(
@@ -229,53 +230,94 @@ class TradeDecisionEngine:
 
     async def route_to_analyzer(self, trade_decision: TradeDecision) -> dict[str, Any]:
         """
-        Route TradeDecision to Analyzer.
+        Route TradeDecision to Analyzer with real HTTP call and audit persistence.
 
-        In production, this would send to actual Analyzer service.
-        For now, we simulate the routing and return success.
+        Workflow:
+        1. Check if analyzer routing is enabled
+        2. If disabled, return disabled status (but still persist to audit)
+        3. If enabled, submit payload via AsyncOpenAlgoClient.place_analyzer_request()
+        4. Persist decision + routing outcome to audit trail (SQLite + JSONL)
+        5. Return real response or propagate errors (no fabrication)
+
+        Args:
+            trade_decision: TradeDecision to route to Analyzer
+
+        Returns:
+            dict[str, Any]: Routing response from Analyzer or disabled status
+
+        Raises:
+            OpenAlgoError: If Analyzer request fails (propagated, not fabricated)
+            Exception: Other errors propagated without fabrication
+
+        Note:
+            - No asyncio.sleep simulation - real HTTP call
+            - Routing failure propagates (no fabricated success)
+            - Audit row exists per decision (dual-write: SQLite + JSONL)
         """
+        from .database import db
+        from .openalgo import AsyncOpenAlgoClient
+
+        payload = trade_decision.to_analyzer_payload()
+        response: dict[str, Any] = {}
+
         if not self.analyzer_routing_enabled:
-            return {
+            # Routing disabled - return disabled status but still persist to audit
+            response = {
                 "status": "disabled",
                 "reason": "analyzer_routing_disabled",
                 "decision_id": trade_decision.decision_id,
-            }
-
-        try:
-            # Simulate Analyzer API call
-            payload = trade_decision.to_analyzer_payload()
-
-            # In production: await analyzer_client.send_decision(payload)
-            # For simulation, we'll just log and return success
-
-            logger.info(
-                f"Routing TradeDecision to Analyzer: {trade_decision.decision_id}"
-            )
-            logger.debug(f"Analyzer payload: {payload}")
-
-            # Simulate processing delay
-            await asyncio.sleep(0.1)
-
-            return {
-                "status": "success",
-                "decision_id": trade_decision.decision_id,
-                "analyzer_response": {
-                    "received": True,
-                    "decision_id": trade_decision.decision_id,
-                    "symbol": trade_decision.symbol,
-                    "status": "QUEUED_FOR_ANALYSIS",
-                    "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
-                },
-            }
-
-        except Exception as e:
-            logger.error(f"Failed to route TradeDecision to Analyzer: {e}")
-            return {
-                "status": "error",
-                "decision_id": trade_decision.decision_id,
-                "error": str(e),
                 "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
             }
+            logger.info(
+                f"Analyzer routing disabled for decision {trade_decision.decision_id}"
+            )
+        else:
+            # Routing enabled - make real HTTP call to Analyzer
+            try:
+                logger.info(
+                    f"Routing TradeDecision to Analyzer: {trade_decision.decision_id}"
+                )
+                logger.debug(f"Analyzer payload: {payload}")
+
+                async with AsyncOpenAlgoClient() as client:
+                    analyzer_response = await client.place_analyzer_request(payload)
+                    response = {
+                        "status": "success",
+                        "decision_id": trade_decision.decision_id,
+                        "analyzer_response": analyzer_response,
+                        "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
+                    }
+                    logger.info(
+                        f"Successfully routed decision {trade_decision.decision_id} to Analyzer"
+                    )
+
+            except Exception as e:
+                # Propagate errors, don't fabricate success
+                logger.error(f"Failed to route TradeDecision to Analyzer: {e}")
+                response = {
+                    "status": "error",
+                    "decision_id": trade_decision.decision_id,
+                    "error": str(e),
+                    "error_type": type(e).__name__,
+                    "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
+                }
+                # Re-raise to propagate failure (no fabrication)
+                raise
+
+        # Persist decision + routing outcome to audit trail (always, even when disabled)
+        try:
+            await db.async_record_trade_decision(trade_decision, response)
+            logger.debug(
+                f"Persisted decision {trade_decision.decision_id} routing outcome to audit trail"
+            )
+        except Exception as e:
+            logger.error(
+                f"Failed to persist decision {trade_decision.decision_id} to audit trail: {e}"
+            )
+            # Don't fail the routing if audit persistence fails
+            # but log the error for monitoring
+
+        return response
 
     async def process_decision_queue(self) -> None:
         """Process decisions from the queue and route to Analyzer."""

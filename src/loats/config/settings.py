@@ -66,6 +66,14 @@ class Settings(BaseSettings):
     openalgo_mode: Literal["ANALYZE", "LIVE"] = Field(
         "ANALYZE", description="OpenAlgo mode (ANALYZE only until all gates pass)"
     )
+    analyzer_routing_enabled: bool = Field(
+        False,
+        description="Enable routing to Analyzer service (default False to prevent default-on fabrication)",
+    )
+    analyzer_routing_enabled: bool = Field(
+        False,
+        description="Enable routing to Analyzer service (default False to prevent default-on fabrication)",
+    )
 
     # Telegram Configuration
     telegram_bot_token: SecretStr = Field(
