@@ -273,8 +273,7 @@ class CMPRulesEngine:
                     return True
             else:
                 logger.error(
-                    f"Invalid vix_fail_mode: {fail_mode}, "
-                    "defaulting to block_all"
+                    f"Invalid vix_fail_mode: {fail_mode}, defaulting to block_all"
                 )
                 return False
 
@@ -342,8 +341,8 @@ class CMPRulesEngine:
                 }
 
         elif signal.signal_type == SignalType.BUY:
-            # BUY rules: IV-rank < 60 / ADX > 25 / VIX < 15
-            iv_pass = iv_rank < 60
+            # BUY rules: IV-rank < 30 / ADX > 25 / VIX < 15
+            iv_pass = iv_rank < 30
             adx_pass = adx > 25
             vix_pass = self.check_vix_gate("BUY")
 
