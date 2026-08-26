@@ -25,11 +25,73 @@ from .strength import StrengthSource
 from .strike_selection import select_strikes
 from .ta import technical_analysis
 from .trade_decision import trade_decision_engine
+from .utils.cache import cache_manager
 from .utils.circuit_breaker import OPENALGO_CIRCUIT_BREAKER
 from .utils.resilience import openalgo_circuit_breaker_retry_async
 
 logger = get_logger(__name__)
 settings = None
+
+
+async def _fetch_cached_vix() -> float | None:
+    """
+    Fetch India VIX via cached OpenAlgo quote.
+
+    Returns:
+        VIX level as float, or None if unavailable
+
+    Uses TTL cache to minimize API calls while keeping data fresh.
+    """
+    try:
+        global settings
+        if settings is None:
+            settings = get_settings()
+
+        vix_symbol = settings.vix_symbol
+        cache_key = f"vix_quote:{vix_symbol}"
+
+        # Check cache first
+        cached_vix = await cache_manager.get(cache_key)
+        if cached_vix is not None:
+            try:
+                vix_value = float(cached_vix)
+                logger.debug(f"VIX from cache: {vix_value:.2f}")
+                return vix_value
+            except (ValueError, TypeError) as e:
+                logger.warning(f"Invalid cached VIX value: {e}")
+                # Fall through to fetch fresh
+
+        # Fetch from OpenAlgo
+        quotes = await async_client.get_quotes(symbols=[vix_symbol])
+        if not quotes or "data" not in quotes:
+            logger.warning(f"No VIX data available for {vix_symbol}")
+            return None
+
+        vix_data = quotes["data"].get(vix_symbol, {})
+        vix_value = vix_data.get("last_price")
+
+        if vix_value is None:
+            logger.warning(f"VIX last_price missing for {vix_symbol}")
+            return None
+
+        try:
+            vix_float = float(vix_value)
+
+            # Cache the value
+            await cache_manager.set(
+                cache_key, str(vix_float), ttl=settings.vix_cache_ttl_seconds
+            )
+
+            logger.debug(f"VIX fetched and cached: {vix_float:.2f}")
+            return vix_float
+
+        except (ValueError, TypeError) as e:
+            logger.error(f"Invalid VIX value from OpenAlgo: {vix_value}, error: {e}")
+            return None
+
+    except Exception as e:
+        logger.error(f"VIX fetch failed: {e}")
+        return None
 
 
 async def validate_rss_feed(url: str, timeout: int = 5) -> bool:
@@ -179,7 +241,9 @@ class TradingOrchestrator:
 
             try:
                 await asyncio.wait_for(
-                    asyncio.gather(ta_task, sentiment_task, volatility_task, market_data_task),
+                    asyncio.gather(
+                        ta_task, sentiment_task, volatility_task, market_data_task
+                    ),
                     timeout=0.08,
                 )
             except TimeoutError:
@@ -274,7 +338,10 @@ class TradingOrchestrator:
                         timestamp=datetime.datetime.now(datetime.UTC),
                         indicators={ind.name: ind.value for ind in indicators},
                         confidence=strength,
-                        metadata={"scan_type": "ta", "source": StrengthSource.TECHNICAL_ANALYSIS.value},
+                        metadata={
+                            "scan_type": "ta",
+                            "source": StrengthSource.TECHNICAL_ANALYSIS.value,
+                        },
                     )
                     await db.async_create_signal(signal)
 
@@ -390,9 +457,12 @@ class TradingOrchestrator:
             historical_data_objs = [
                 HistoricalData(
                     timestamp=datetime.datetime.fromisoformat(item["timestamp"]),
-                    open=item["open"], high=item["high"],
-                    low=item["low"], close=item["close"],
-                    volume=item["volume"], interval=timeframe,
+                    open=item["open"],
+                    high=item["high"],
+                    low=item["low"],
+                    close=item["close"],
+                    volume=item["volume"],
+                    interval=timeframe,
                 )
                 for item in historical_data_raw["data"]
             ]
@@ -407,19 +477,19 @@ class TradingOrchestrator:
             from .ta import calculate_atr, calculate_vwap
             from .models import SignalType
 
-            df = pd.DataFrame({
-                "timestamp": [h.timestamp for h in historical_data_objs],
-                "open": [h.open for h in historical_data_objs],
-                "high": [h.high for h in historical_data_objs],
-                "low": [h.low for h in historical_data_objs],
-                "close": [h.close for h in historical_data_objs],
-                "volume": [h.volume for h in historical_data_objs],
-            })
+            df = pd.DataFrame(
+                {
+                    "timestamp": [h.timestamp for h in historical_data_objs],
+                    "open": [h.open for h in historical_data_objs],
+                    "high": [h.high for h in historical_data_objs],
+                    "low": [h.low for h in historical_data_objs],
+                    "close": [h.close for h in historical_data_objs],
+                    "volume": [h.volume for h in historical_data_objs],
+                }
+            )
 
             atr_series = calculate_atr(df, period=14)
-            current_atr = (
-                atr_series.iloc[-1] if not pd.isna(atr_series.iloc[-1]) else 0
-            )
+            current_atr = atr_series.iloc[-1] if not pd.isna(atr_series.iloc[-1]) else 0
 
             current_price = df["close"].iloc[-1]
             atr_pct = (current_atr / current_price * 100) if current_price > 0 else 0
@@ -433,8 +503,10 @@ class TradingOrchestrator:
 
             hurst_exponent = self._calculate_hurst_exponent(df["close"].values)
             regime = (
-                "trending" if hurst_exponent is not None and hurst_exponent > 0.5
-                else "mean_reverting" if hurst_exponent is not None
+                "trending"
+                if hurst_exponent is not None and hurst_exponent > 0.5
+                else "mean_reverting"
+                if hurst_exponent is not None
                 else "unknown"
             )
 
@@ -463,9 +535,7 @@ class TradingOrchestrator:
                     "atr_pct": float(atr_pct),
                     "vwap": float(current_vwap),
                     "hurst_exponent": (
-                        float(hurst_exponent)
-                        if hurst_exponent is not None
-                        else 0.5
+                        float(hurst_exponent) if hurst_exponent is not None else 0.5
                     ),
                 },
                 confidence=signal_strength,
@@ -475,9 +545,7 @@ class TradingOrchestrator:
                     "regime": regime,
                     "atr_pct": float(atr_pct),
                     "hurst": (
-                        float(hurst_exponent)
-                        if hurst_exponent is not None
-                        else 0.5
+                        float(hurst_exponent) if hurst_exponent is not None else 0.5
                     ),
                 },
             )
@@ -496,7 +564,8 @@ class TradingOrchestrator:
                 )
 
     def _calculate_hurst_exponent(
-        self, close_prices: np.ndarray,
+        self,
+        close_prices: np.ndarray,
     ) -> float | None:
         """Hurst exponent via R/S analysis.
 
@@ -589,6 +658,10 @@ class TradingOrchestrator:
             if funds_data and funds_data.get("data"):
                 funds_model = self._create_funds_model(funds_data["data"])
                 await db.async_store_funds(funds_model)
+
+            # Fetch and update VIX level (within 80ms window)
+            vix_level = await _fetch_cached_vix()
+            rules_engine.set_vix_level(vix_level)
 
         except Exception as e:
             logger.error(f"Market data update failed: {e}")
@@ -771,10 +844,10 @@ class TradingOrchestrator:
             if len(recent_signals) < 3:
                 # Track CMP chain rejection
                 record_cmp_chain_rejection("insufficient_signals")
-                
+
                 # Increment counter
                 self._insufficient_signals_count += 1
-                
+
                 # Check for session state change
                 current_session_state = rules_engine.session_state.value
                 session_changed = self._last_session_state != current_session_state
@@ -782,11 +855,14 @@ class TradingOrchestrator:
                     self._last_session_state = current_session_state
                     # Reset counter on session state change
                     self._insufficient_signals_count = 1
-                
+
                 # Periodic warning log to prevent noise (every 60 seconds)
                 current_time = datetime.datetime.now(datetime.UTC).timestamp()
-                if (current_time - self._last_insufficient_signals_warning_time >= 
-                    self._insufficient_signals_warning_interval or session_changed):
+                if (
+                    current_time - self._last_insufficient_signals_warning_time
+                    >= self._insufficient_signals_warning_interval
+                    or session_changed
+                ):
                     logger.warning(
                         f"Insufficient signals for CMP strategy: "
                         f"{len(recent_signals)} signals "
@@ -856,7 +932,7 @@ class TradingOrchestrator:
                     product_type=current_positions.product_type,
                     status="OPEN",
                     entry_time=datetime.datetime.now(datetime.UTC),
-                    metadata={"source": "position_conversion"}
+                    metadata={"source": "position_conversion"},
                 )
                 current_trades.append(trade)
 

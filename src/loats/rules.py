@@ -49,6 +49,11 @@ class CMPRulesEngine:
         self.session_state = TradingSession.PRE_OPEN
         self.last_session_update = datetime.datetime.now(datetime.UTC)
 
+        # VIX state management
+        self._vix_level: float | None = None  # None = unknown/failed
+        self._vix_timestamp: datetime.datetime | None = None  # Last update time
+        self._vix_initialized = False  # Whether VIX has been set at least once
+
     def get_current_session(
         self, current_time: datetime.datetime | None = None
     ) -> TradingSession:
@@ -175,15 +180,116 @@ class CMPRulesEngine:
 
         return float(adx) if not pd.isna(adx) else 25.0
 
-    def get_vix_level(self) -> float:
+    def set_vix_level(self, vix: float | None) -> None:
         """
-        Get current VIX level (simulated for now).
+        Set VIX level with timestamp tracking.
 
-        In production, this would fetch from market data.
-        For testing, we'll use a reasonable default.
+        Args:
+            vix: VIX level (float) or None (if feed unavailable)
+
+        This method should be called by the orchestrator market-data task
+        every cycle when the feed is live. Setting None indicates feed failure.
         """
-        # TODO: Implement actual VIX data fetching
-        return 18.5  # Default neutral value
+        self._vix_level = vix
+        self._vix_timestamp = datetime.datetime.now(datetime.UTC)
+        if vix is not None:
+            self._vix_initialized = True
+            logger.debug(f"VIX level updated: {vix:.2f}")
+        else:
+            logger.warning("VIX feed unavailable - set_vix_level called with None")
+
+    def get_vix_level(self) -> float | None:
+        """
+        Get current VIX level.
+
+        Returns:
+            VIX level as float, or None if unknown/stale/unavailable
+
+        Checks for stale data based on configured threshold.
+        """
+        if self._vix_level is None:
+            return None
+
+        # Check if data is stale
+        if self._vix_timestamp is None:
+            logger.warning("VIX timestamp missing - treating as unknown")
+            return None
+
+        current_time = datetime.datetime.now(datetime.UTC)
+        age_seconds = (current_time - self._vix_timestamp).total_seconds()
+
+        if age_seconds > settings.vix_stale_threshold_seconds:
+            logger.warning(
+                f"VIX data stale (age: {age_seconds:.1f}s > "
+                f"threshold: {settings.vix_stale_threshold_seconds}s) "
+                f"- treating as unknown"
+            )
+            return None
+
+        return self._vix_level
+
+    def check_vix_gate(self, direction: str) -> bool:
+        """
+        Check VIX gate with symmetric fail-safe.
+
+        Args:
+            direction: "BUY" or "SELL"
+
+        Returns:
+            True if gate passes, False if blocked
+
+        Gating rules:
+        - VIX > 15 required for SELL
+        - VIX < 15 required for BUY
+        - Unknown/stale VIX blocks BOTH directions (symmetric fail-safe)
+        - No fake numbers - explicit None handling
+        """
+        vix = self.get_vix_level()
+
+        if vix is None:
+            fail_mode = settings.vix_fail_mode
+
+            if fail_mode == "block_all":
+                logger.warning(
+                    "VIX unknown/no-feed/stale-feed - gate blocked "
+                    "(symmetric fail-safe) "
+                    f"direction={direction}, fail_mode={fail_mode}"
+                )
+                return False  # Both BUY and SELL blocked
+            elif fail_mode == "block_buy":
+                # Only block BUY, allow SELL through
+                if direction == "BUY":
+                    logger.warning(
+                        "VIX unknown/no-feed/stale-feed - BUY gate blocked "
+                        f"fail_mode={fail_mode}"
+                    )
+                    return False
+                else:
+                    # SELL passes even without VIX
+                    logger.debug(
+                        "VIX unknown/no-feed/stale-feed - SELL allowed "
+                        f"fail_mode={fail_mode}"
+                    )
+                    return True
+            else:
+                logger.error(
+                    f"Invalid vix_fail_mode: {fail_mode}, "
+                    "defaulting to block_all"
+                )
+                return False
+
+        # VIX available - apply directional gating
+        if direction == "SELL":
+            passes = vix > 15
+            logger.debug(f"VIX gate SELL: VIX={vix:.2f}, passes={passes}")
+            return passes
+        elif direction == "BUY":
+            passes = vix < 15
+            logger.debug(f"VIX gate BUY: VIX={vix:.2f}, passes={passes}")
+            return passes
+        else:
+            logger.error(f"Invalid direction for VIX gate: {direction}")
+            return False
 
     def apply_gating_rules(
         self,
@@ -209,27 +315,26 @@ class CMPRulesEngine:
         # Calculate indicators
         iv_rank = self.calculate_iv_rank(historical_data)
         adx = self.calculate_adx(historical_data)
-        vix = self.get_vix_level()
 
         # Apply gating rules based on signal type
         if signal.signal_type == SignalType.SELL:
             # SELL rules: IV-rank > 40 / ADX < 25 / VIX > 15
             iv_pass = iv_rank > 40
             adx_pass = adx < 25
-            vix_pass = vix > 15
+            vix_pass = self.check_vix_gate("SELL")
 
             if iv_pass and adx_pass and vix_pass:
                 return True, {
                     "iv_rank": iv_rank,
                     "adx": adx,
-                    "vix": vix,
+                    "vix": self.get_vix_level(),
                     "reason": "gating_passed",
                 }
             else:
                 return False, {
                     "iv_rank": iv_rank,
                     "adx": adx,
-                    "vix": vix,
+                    "vix": self.get_vix_level(),
                     "reason": "gating_failed",
                     "iv_pass": iv_pass,
                     "adx_pass": adx_pass,
@@ -240,20 +345,20 @@ class CMPRulesEngine:
             # BUY rules: IV-rank < 60 / ADX > 25 / VIX < 15
             iv_pass = iv_rank < 60
             adx_pass = adx > 25
-            vix_pass = vix < 15
+            vix_pass = self.check_vix_gate("BUY")
 
             if iv_pass and adx_pass and vix_pass:
                 return True, {
                     "iv_rank": iv_rank,
                     "adx": adx,
-                    "vix": vix,
+                    "vix": self.get_vix_level(),
                     "reason": "gating_passed",
                 }
             else:
                 return False, {
                     "iv_rank": iv_rank,
                     "adx": adx,
-                    "vix": vix,
+                    "vix": self.get_vix_level(),
                     "reason": "gating_failed",
                     "iv_pass": iv_pass,
                     "adx_pass": adx_pass,
@@ -265,7 +370,7 @@ class CMPRulesEngine:
             return True, {
                 "iv_rank": iv_rank,
                 "adx": adx,
-                "vix": vix,
+                "vix": self.get_vix_level(),
                 "reason": "neutral_signal",
             }
 

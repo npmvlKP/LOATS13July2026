@@ -34,6 +34,18 @@ HEALTH_CHECKS = {
         "command": ["python", "-m", "pytest", "tests/test_trade_decision.py", "-k", "source", "-v"],
         "timeout": 30,
     },
+    "HC-18": {
+        "name": "VIX Integration Wired",
+        "description": "Verify VIX integration is wired with symmetric fail-safe (TODO-12)",
+        "command": ["python", "-m", "pytest", "tests/test_vix_integration.py", "-v"],
+        "timeout": 30,
+    },
+    "HC-25": {
+        "name": "No 18.5 VIX Fallback",
+        "description": "Verify no bare 18.5 VIX fallback remains (TODO-12)",
+        "command": ["python", "-m", "pytest", "tests/test_vix_integration.py::TestVIXNo18_5Fallback", "-v"],
+        "timeout": 15,
+    },
 }
 
 def run_health_check(check_id: str, check_config: dict) -> dict:

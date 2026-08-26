@@ -110,6 +110,18 @@ class Settings(BaseSettings):
     # Metrics Configuration
     metrics_port: int = Field(8001, description="Port for Prometheus metrics server")
 
+    # VIX Configuration
+    vix_symbol: str = Field("INDIAVIX", description="Symbol for India VIX index")
+    vix_cache_ttl_seconds: int = Field(
+        30, description="TTL for VIX cache in seconds (30-60 recommended)"
+    )
+    vix_fail_mode: Literal["block_all", "block_buy"] = Field(
+        "block_all", description="VIX fail-safe mode: block_all or block_buy"
+    )
+    vix_stale_threshold_seconds: int = Field(
+        60, description="Threshold for considering VIX data stale (seconds)"
+    )
+
     @field_validator("max_order_value", "max_total_exposure", "circuit_limit_pct")
     @classmethod
     def validate_decimals(cls, v: Decimal) -> Decimal:
@@ -158,6 +170,22 @@ class Settings(BaseSettings):
         """Validate request timeout."""
         if v <= 0:
             raise ValueError("Request timeout must be positive")
+        return v
+
+    @field_validator("vix_cache_ttl_seconds", "vix_stale_threshold_seconds")
+    @classmethod
+    def validate_vix_timeouts(cls, v: int) -> int:
+        """Validate VIX timeout settings."""
+        if v <= 0:
+            raise ValueError("VIX timeout values must be positive")
+        if v < 30 or v > 60:
+            # Warning only - allow values outside recommended range
+            import warnings
+
+            warnings.warn(
+                f"VIX cache TTL {v}s outside recommended range (30-60s)",
+                stacklevel=2,
+            )
         return v
 
     @field_validator("openalgo_api_key")
