@@ -16,7 +16,7 @@ from .alerts import alerts
 from .config import get_settings
 from .database import db
 from .loats_logging import get_logger
-from .metrics import record_cycle_time
+from .metrics import record_cycle_time, record_cmp_chain_rejection
 from .models import HistoricalData, OptionContract, QuoteData, Signal
 from .openalgo import KillSwitchError, async_client
 from .rules import rules_engine
@@ -100,6 +100,11 @@ class TradingOrchestrator:
         self._shutdown_event = asyncio.Event()
         self._cycle_task: asyncio.Task[None] | None = None
         self._last_alert_time = 0.0
+        # CMP chain rejection tracking
+        self._last_insufficient_signals_warning_time = 0.0
+        self._insufficient_signals_count = 0
+        self._last_session_state = ""
+        self._insufficient_signals_warning_interval = 60.0  # Log every 60 seconds
 
     async def initialize(self) -> None:
         """Initialize the orchestrator."""
@@ -764,10 +769,30 @@ class TradingOrchestrator:
             recent_signals = [s for s in all_signals if s.timestamp >= cutoff_time]
 
             if len(recent_signals) < 3:
-                logger.debug(
-                    f"Insufficient signals for CMP strategy: "
-                    f"{len(recent_signals)} signals"
-                )
+                # Track CMP chain rejection
+                record_cmp_chain_rejection("insufficient_signals")
+                
+                # Increment counter
+                self._insufficient_signals_count += 1
+                
+                # Check for session state change
+                current_session_state = rules_engine.session_state.value
+                session_changed = self._last_session_state != current_session_state
+                if session_changed:
+                    self._last_session_state = current_session_state
+                    # Reset counter on session state change
+                    self._insufficient_signals_count = 1
+                
+                # Periodic warning log to prevent noise (every 60 seconds)
+                current_time = datetime.datetime.now(datetime.UTC).timestamp()
+                if (current_time - self._last_insufficient_signals_warning_time >= 
+                    self._insufficient_signals_warning_interval or session_changed):
+                    logger.warning(
+                        f"Insufficient signals for CMP strategy: "
+                        f"{len(recent_signals)} signals "
+                        f"(rejected {self._insufficient_signals_count} times since last session change)"
+                    )
+                    self._last_insufficient_signals_warning_time = current_time
                 return
 
             # Get historical data for gating rules

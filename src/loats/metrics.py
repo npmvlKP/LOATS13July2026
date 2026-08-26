@@ -100,6 +100,8 @@ class MetricsManager:
             "max_seconds": 0.0,
             "target_compliance_count": 0,
         }
+        # Add CMP chain rejection tracking
+        self.cmp_chain_rejections: dict[str, int] = {}
 
         # Lightweight stub objects mimicking Prometheus metrics API used in tests.
         # Avoid importing unittest.mock in production code.
@@ -108,6 +110,7 @@ class MetricsManager:
         self.signals_generated_counter = _MetricFactory(self._record_signal_via_mock)
         self.kill_switch_status = _SimpleSetter(self._set_kill_switch_via_mock)
         self.circuit_breaker_status = _MetricFactory(self._set_circuit_breaker_via_mock)
+        self.cmp_chain_rejections_counter = _MetricFactory(self._track_cmp_rejection_via_mock)
 
         self._server_started = False
         self._initialized = True
@@ -168,6 +171,14 @@ class MetricsManager:
             self.system_status["circuit_breaker_status"][component] = bool(value)
         except Exception as e:
             logger.warning(f"Failed to set circuit breaker via mock: {e}")
+    def _track_cmp_rejection_via_mock(self, reason: str) -> None:
+        """Track CMP chain rejection via mock interface."""
+        try:
+            if reason not in self.cmp_chain_rejections:
+                self.cmp_chain_rejections[reason] = 0
+            self.cmp_chain_rejections[reason] += 1
+        except Exception as e:
+            logger.warning(f"Failed to track CMP rejection via mock: {e}")
 
     def reset_for_testing(self) -> None:
         """Reset the metrics manager state for testing purposes."""
@@ -260,6 +271,10 @@ class MetricsManager:
                         if self.cycle_time_stats["count"] > 0
                         else 0.0
                     ),
+                },
+                "cmp_chain_rejections": {
+                    "total_by_reason": self.cmp_chain_rejections,
+                    "total": sum(self.cmp_chain_rejections.values()),
                 },
             }
         except Exception as e:
@@ -376,6 +391,16 @@ def set_circuit_breaker_status(
         (manager or metrics).circuit_breaker_status.labels(component=component).set(
             1 if open_status else 0
         )
+    except Exception:  # nosec B110
+        # Silently handle metrics errors to not interfere with application flow
+        pass
+
+def record_cmp_chain_rejection(
+    reason: str, manager: "MetricsManager | None" = None
+) -> None:
+    """Record CMP chain rejection event with reason label."""
+    try:
+        (manager or metrics).cmp_chain_rejections_counter.labels(reason=reason).inc()
     except Exception:  # nosec B110
         # Silently handle metrics errors to not interfere with application flow
         pass
