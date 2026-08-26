@@ -54,6 +54,9 @@ class Settings(BaseSettings):
     sentiment_threshold: float = Field(
         0.05, description="Sentiment threshold for signal generation"
     )
+    composite_strength_threshold: float = Field(
+        0.5, description="Minimum composite strength threshold for trade decisions"
+    )
     request_timeout: float = Field(30.0, description="Request timeout in seconds")
 
     # OpenAlgo Configuration
@@ -65,10 +68,6 @@ class Settings(BaseSettings):
     )
     openalgo_mode: Literal["ANALYZE", "LIVE"] = Field(
         "ANALYZE", description="OpenAlgo mode (ANALYZE only until all gates pass)"
-    )
-    analyzer_routing_enabled: bool = Field(
-        False,
-        description="Enable routing to Analyzer service (default False to prevent default-on fabrication)",
     )
     analyzer_routing_enabled: bool = Field(
         False,
@@ -164,12 +163,12 @@ class Settings(BaseSettings):
             raise ValueError("Scan intervals must be positive")
         return v
 
-    @field_validator("sentiment_threshold")
+    @field_validator("sentiment_threshold", "composite_strength_threshold")
     @classmethod
-    def validate_sentiment_threshold(cls, v: float) -> float:
-        """Validate sentiment threshold."""
+    def validate_threshold(cls, v: float) -> float:
+        """Validate threshold values."""
         if not (0 <= v <= 1):
-            raise ValueError("Sentiment threshold must be between 0 and 1")
+            raise ValueError("Threshold must be between 0 and 1")
         return v
 
     @field_validator("request_timeout")

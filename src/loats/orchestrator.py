@@ -255,7 +255,6 @@ class TradingOrchestrator:
                         task.cancel()
 
             # Execute sequential operations
-            await self._execute_signal_generation()
             await self._execute_risk_management()
 
             # Execute CMP strategy (only if trading is allowed in current session)
@@ -674,94 +673,6 @@ class TradingOrchestrator:
             if duration > 0.02:  # 20ms budget for market data update
                 logger.warning(
                     f"Market data update exceeded budget: {duration * 1000:.2f}ms"
-                )
-
-    async def _execute_signal_generation(self) -> None:
-        """Generate combined signals with performance monitoring."""
-        start_time = datetime.datetime.now(datetime.UTC)
-
-        try:
-            # Lazy load settings to avoid import-time failures
-            global settings
-            if settings is None:
-                settings = get_settings()
-
-            symbol = settings.default_symbol
-
-            # Get latest signals
-            ta_signals = await db.async_get_latest_signals(
-                symbol, limit=1, scan_type="ta"
-            )
-            sentiment_signals = await db.async_get_latest_signals(
-                symbol, limit=1, scan_type="sentiment"
-            )
-
-            # Get current price
-            quotes = await self._safe_get_quotes([symbol])
-            if not quotes:
-                return
-
-            quote_data = quotes.get("data", {}).get(symbol, {})
-            current_price = quote_data.get("last_price", 0)
-
-            # Calculate combined strength
-            ta_strength = ta_signals[0].strength if ta_signals else 0
-            sentiment_strength = (
-                sentiment_signals[0].strength if sentiment_signals else 0
-            )
-            combined_strength = (ta_strength + sentiment_strength) / 2
-
-            # Determine signal type
-            if combined_strength > 0.6:
-                signal_type = "BUY"
-            elif combined_strength < 0.4:
-                signal_type = "SELL"
-            else:
-                signal_type = "NEUTRAL"
-
-            # Create combined signal
-            indicators: dict[str, float] = {}
-            if ta_signals:
-                indicators.update(ta_signals[0].indicators)
-            if sentiment_signals:
-                indicators.update(
-                    {
-                        "sentiment_score": sentiment_signals[0].indicators.get(
-                            "sentiment_score", 0.0
-                        )
-                    }
-                )
-
-            from .models import SignalType
-
-            signal = Signal(
-                symbol=symbol,
-                signal_type=SignalType(signal_type),
-                strength=combined_strength,
-                timestamp=datetime.datetime.now(datetime.UTC),
-                indicators=indicators,
-                confidence=combined_strength,
-                metadata={
-                    "scan_type": "combined",
-                    "source": StrengthSource.PRICE_ACTION.value,
-                    "ta_strength": ta_strength,
-                    "sentiment_strength": sentiment_strength,
-                    "current_price": current_price,
-                },
-            )
-            await db.async_create_signal(signal)
-
-        except Exception as e:
-            logger.error(f"Signal generation failed: {e}")
-            raise
-
-        finally:
-            duration = (
-                datetime.datetime.now(datetime.UTC) - start_time
-            ).total_seconds()
-            if duration > 0.01:  # 10ms budget for signal generation
-                logger.warning(
-                    f"Signal generation exceeded budget: {duration * 1000:.2f}ms"
                 )
 
     async def _execute_risk_management(self) -> None:

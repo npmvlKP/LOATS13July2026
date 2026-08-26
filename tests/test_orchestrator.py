@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
 Comprehensive test suite for orchestrator.py module.
 
@@ -258,14 +258,9 @@ class TestTradingOrchestrator(unittest.IsolatedAsyncioTestCase):
                 ) as mock_market:
                     with patch.object(
                         self.orchestrator,
-                        "_execute_signal_generation",
+                        "_execute_risk_management",
                         new_callable=AsyncMock,
-                    ) as mock_signal:
-                        with patch.object(
-                            self.orchestrator,
-                            "_execute_risk_management",
-                            new_callable=AsyncMock,
-                        ) as mock_risk:
+                    ) as mock_risk:
                             # Mock CMP strategy: real implementation performs
                             # httpx network I/O via _safe_get_history. Unit
                             # tests must not hit the network; an abandoned
@@ -742,3 +737,5 @@ class TestTradingOrchestrator(unittest.IsolatedAsyncioTestCase):
 if __name__ == "__main__":
     # Run the tests
     unittest.main(verbosity=2)
+
+

@@ -12,6 +12,16 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+# Set test environment variables BEFORE importing any loats modules.
+# database.py creates a module-level singleton that calls get_settings(),
+# which requires OPENALGO_API_KEY. pytest_configure runs too late
+# (after conftest imports), so env vars must be set here at module scope.
+os.environ.setdefault("ENVIRONMENT", "test")
+os.environ.setdefault("OPENALGO_API_KEY", "test_api_key")
+os.environ.setdefault("OPENALGO_BASE_URL", "https://test.openalgo.com")
+os.environ.setdefault("TELEGRAM_BOT_TOKEN", "test_bot_token")
+os.environ.setdefault("TELEGRAM_CHAT_ID", "123456789")
+
 from loats.database import Database
 from loats.models import (
     HistoricalData,
@@ -160,13 +170,18 @@ def sample_historical_data() -> list[HistoricalData]:
 
 
 def pytest_configure(config: pytest.Config) -> None:
-    """Pytest configuration hook."""
-    os.environ["ENVIRONMENT"] = "test"
-    # Set test environment variables directly instead of writing to disk
-    os.environ["OPENALGO_API_KEY"] = "test_api_key"
-    os.environ["OPENALGO_BASE_URL"] = "https://test.openalgo.com"
-    os.environ["TELEGRAM_BOT_TOKEN"] = "test_bot_token"
-    os.environ["TELEGRAM_CHAT_ID"] = "123456789"
+    """Pytest configuration hook.
+
+    Env vars are now set at conftest module-scope (above the loats imports)
+    to prevent import-time Settings() validation failures.  The assignments
+    below are kept as a defensive backstop using setdefault so they never
+    accidentally overwrite values injected by a CI pipeline or tox config.
+    """
+    os.environ.setdefault("ENVIRONMENT", "test")
+    os.environ.setdefault("OPENALGO_API_KEY", "test_api_key")
+    os.environ.setdefault("OPENALGO_BASE_URL", "https://test.openalgo.com")
+    os.environ.setdefault("TELEGRAM_BOT_TOKEN", "test_bot_token")
+    os.environ.setdefault("TELEGRAM_CHAT_ID", "123456789")
 
 
 @pytest.fixture(autouse=True, scope="function")

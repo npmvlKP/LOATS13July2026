@@ -167,14 +167,6 @@ class TradingScheduler:
             name="Sentiment Analysis Scan",
             replace_existing=True,
         )
-        # Signal generation (every 30 seconds)
-        self.scheduler.add_job(
-            self.run_signal_generation,
-            IntervalTrigger(seconds=settings.signal_scan_interval),
-            id="signal_generation",
-            name="Signal Generation",
-            replace_existing=True,
-        )
         # Market status checks (every 1 minute)
         self.scheduler.add_job(
             self.check_market_status,
@@ -202,7 +194,6 @@ class TradingScheduler:
                 # Run initial scans
                 await self.run_ta_scan()
                 await self.run_sentiment_scan()
-                await self.run_signal_generation()
             except Exception:
                 logger.exception("Failed start scheduler")
                 raise
@@ -456,20 +447,6 @@ class TradingScheduler:
             ).total_seconds()
             logger.info("Sentiment analysis scan completed %.2fms", duration * 1000)
 
-    async def run_signal_generation(self) -> None:
-        """Run signal generation scan."""
-        task_id = f"signal_generation_{datetime.datetime.now(datetime.UTC).isoformat()}"
-        try:
-            task = asyncio.create_task(self._signal_generation_task())
-            self.scan_tasks[task_id] = task
-            await task
-        except asyncio.CancelledError:
-            logger.info("Signal generation task cancelled: %s", task_id)
-        except Exception:
-            logger.exception("Signal generation task failed: %s", task_id)
-        finally:
-            self.scan_tasks.pop(task_id, None)
-
     @openalgo_circuit_breaker_retry_async
     async def _safe_get_position_book(self) -> dict[str, Any] | None:
         """Get position book retry circuit breaker protection."""
@@ -487,162 +464,6 @@ class TradingScheduler:
         except Exception:
             logger.error("Failed get funds after retries")
             raise
-
-    @track_job("signal_generation")
-    async def _signal_generation_task(self) -> None:
-        """Signal generation task."""
-        start_time = datetime.datetime.now(datetime.UTC)
-        logger.info("Starting signal generation scan")
-        try:
-            self._check_kill_switch()
-            symbol = settings.default_symbol
-            ta_signals = await self.db.async_get_latest_signals(
-                symbol, limit=1, scan_type="ta"
-            )
-            sentiment_signals = await self.db.async_get_latest_signals(
-                symbol, limit=1, scan_type="sentiment"
-            )
-
-            quotes = await self._safe_get_quotes([symbol])
-            if quotes is None:
-                logger.warning("Skipping signal generation, unable fetch quotes")
-                return
-
-            # Validate quote dict shape on entry (R5-F-09)
-            if not quotes.get("data"):
-                logger.warning("Skipping signal generation, quotes data missing")
-                return
-
-            quote_data = quotes.get("data", {}).get(symbol, {})
-            if not quote_data:
-                logger.warning(
-                    "Skipping signal generation, quote data for symbol missing"
-                )
-                return
-
-            # Validate required quote fields
-            required_fields = ["last_price", "open", "high", "low", "close", "volume"]
-            missing_fields = [f for f in required_fields if f not in quote_data]
-            if missing_fields:
-                logger.warning(
-                    "Skipping signal generation, "
-                    f"missing quote fields: {missing_fields}"
-                )
-                return
-
-            current_price = quote_data.get("last_price", 0)
-
-            position_data = await self._safe_get_position_book()
-            funds_data = await self._safe_get_funds()
-
-            if position_data and position_data.get("data"):
-                positions = position_data.get("data", [])
-                for pos in positions:
-                    pos_model = Position(
-                        symbol=pos.get("symbol", ""),
-                        quantity=pos.get("quantity", 0),
-                        average_price=pos.get("average_price", 0.0),
-                        last_price=pos.get("last_price", 0.0),
-                        pnl=pos.get("pnl", 0.0),
-                        product_type=pos.get("product_type", "MIS"),
-                        buy_quantity=pos.get("buy_quantity", 0),
-                        sell_quantity=pos.get("sell_quantity", 0),
-                    )
-                    await self.db.async_store_position(pos_model)
-
-            if funds_data and funds_data.get("data"):
-                funds = funds_data.get("data", {})
-                funds_model = FundsData(
-                    available_cash=funds.get("available_cash", 0.0),
-                    utilized_margin=funds.get("utilized_margin", 0.0),
-                    available_margin=funds.get("available_margin", 0.0),
-                    total_equity=funds.get("total_equity", 0.0),
-                    timestamp=datetime.datetime.now(datetime.UTC),
-                )
-                await self.db.async_store_funds(funds_model)
-
-            ta_strength = ta_signals[0].strength if ta_signals else 0
-            sentiment_strength = (
-                sentiment_signals[0].strength if sentiment_signals else 0
-            )
-
-            combined_strength = (ta_strength + sentiment_strength) / 2
-
-            if combined_strength > 0.6:
-                signal_type = SignalType.BUY
-            elif combined_strength < 0.4:
-                signal_type = SignalType.SELL
-            else:
-                signal_type = SignalType.NEUTRAL
-
-            indicators: dict[str, float] = {}
-            if ta_signals:
-                indicators.update(ta_signals[0].indicators)
-            if sentiment_signals:
-                indicators.update(
-                    {
-                        "sentiment_score": sentiment_signals[0].indicators.get(
-                            "sentiment_score", 0.0
-                        )
-                    }
-                )
-
-            metadata = {
-                "scan_type": "combined",
-                "ta_strength": ta_strength,
-                "sentiment_strength": sentiment_strength,
-                "current_price": current_price,
-                "position_size": (
-                    position_data.get("data", [{}])[0].get("quantity", 0)
-                    if (position_data and position_data.get("data"))
-                    else 0
-                ),
-                "available_funds": (
-                    funds_data.get("data", {}).get("available_cash", 0)
-                    if (funds_data and funds_data.get("data"))
-                    else 0
-                ),
-            }
-
-            signal = Signal(
-                symbol=symbol,
-                signal_type=signal_type,
-                strength=combined_strength,
-                timestamp=datetime.datetime.now(datetime.UTC),
-                indicators=indicators,
-                confidence=combined_strength,
-                metadata=metadata,
-            )
-            await self.db.async_create_signal(signal)
-            logger.info(
-                "Combined signal generated: %s, strength %.2f",
-                signal_type,
-                combined_strength,
-            )
-
-            quote = QuoteData(
-                symbol=symbol,
-                last_price=quote_data.get("last_price", 0),
-                open=quote_data.get("open", 0),
-                high=quote_data.get("high", 0),
-                low=quote_data.get("low", 0),
-                close=quote_data.get("close", 0),
-                volume=quote_data.get("volume", 0),
-                timestamp=datetime.datetime.now(datetime.UTC),
-                change=quote_data.get("change", 0),
-                change_percent=quote_data.get("change_percent", 0),
-            )
-            await self.db.async_store_quote(quote)
-        except KillSwitchError:
-            logger.warning("Kill switch active - signal generation aborted")
-            raise
-        except Exception:
-            logger.exception("Signal generation scan failed")
-        finally:
-            duration = (
-                datetime.datetime.now(datetime.UTC) - start_time
-            ).total_seconds()
-            logger.info("Signal generation scan completed %.2fms", duration * 1000)
 
     async def check_market_status(self) -> None:
         """Check market status handle open/close events."""
@@ -666,7 +487,7 @@ class TradingScheduler:
             logger.debug("Checking market status")
             if not self.is_market_open():
                 logger.debug("Market closed")
-                for job_id in ["ta_scan", "sentiment_scan", "signal_generation"]:
+                for job_id in ["ta_scan", "sentiment_scan"]:
                     if self.scheduler.get_job(job_id):
                         try:
                             self.scheduler.remove_job(job_id)
@@ -688,13 +509,6 @@ class TradingScheduler:
                     IntervalTrigger(seconds=settings.sentiment_scan_interval),
                     id="sentiment_scan",
                     name="Sentiment Analysis Scan",
-                )
-            if not self.scheduler.get_job("signal_generation"):
-                self.scheduler.add_job(
-                    self.run_signal_generation,
-                    IntervalTrigger(seconds=settings.signal_scan_interval),
-                    id="signal_generation",
-                    name="Signal Generation",
                 )
         except Exception:
             logger.exception("Market status check failed")
@@ -741,8 +555,6 @@ class TradingScheduler:
                 await self.run_ta_scan()
             elif job_id == "sentiment_scan":
                 await self.run_sentiment_scan()
-            elif job_id == "signal_generation":
-                await self.run_signal_generation()
             elif job_id == "market_status_check":
                 await self.check_market_status()
             elif job_id == "data_cleanup":
@@ -782,3 +594,4 @@ class TradingScheduler:
 # Export default instance and provide backward-compatible alias
 scheduler = TradingScheduler()
 Scheduler = TradingScheduler  # Backward compatibility alias
+
