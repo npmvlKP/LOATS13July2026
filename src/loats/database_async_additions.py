@@ -619,6 +619,52 @@ async def _async_record_trade_decision(
     - Database commit only after successful JSONL write
     - Ensures audit trail integrity across restarts
     """
+
+async def async_record_ratchet_event(
+    self: Database, 
+    order_id: str, 
+    old_sl: float, 
+    new_sl: float, 
+    current_price: float,
+) -> None:
+    """
+    Record a ratchet event for trailing stop adjustments.
+
+    Args:
+        order_id: ID of the order being modified.
+        old_sl: Old stop-loss price.
+        new_sl: New stop-loss price.
+        current_price: Current market price.
+
+    Dual-Write Guarantee:
+    - JSONL write occurs first
+    - Database commit only after successful JSONL write
+    - Ensures audit trail integrity across restarts
+    """
+    event = {
+        "event_type": "ratchet_event",
+        "order_id": order_id,
+        "old_sl": old_sl,
+        "new_sl": new_sl,
+        "current_price": current_price,
+        "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
+    }
+
+    # Write to JSONL audit log
+    try:
+        with open(self.audit_log_path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(event) + "\n")
+    except Exception as e:
+        logger.error(f"Failed to write ratchet event to JSONL: {e}")
+
+    # Persist to SQLite database
+    try:
+        await asyncio.to_thread(self._store_ratchet_event, event)
+    except Exception as e:
+        logger.error(f"Failed to store ratchet event to database: {e}")
+
+    logger.debug(f"Recorded ratchet event for order {order_id}: {old_sl} -> {new_sl}")
+    """
     decision_dict = decision.model_dump()
     await self._async_log_audit(
         action="ROUTE_TO_ANALYZER",

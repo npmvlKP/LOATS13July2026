@@ -822,6 +822,13 @@ class TradingOrchestrator:
 
             # Get current positions
             current_positions = await asyncio.to_thread(db.get_position, symbol=symbol)
+            
+            # Add trailing stop update to risk step
+            if settings.enable_trailing_stops:
+                try:
+                    await update_trailing_stops()
+                except Exception as e:
+                    logger.error(f"Error in trailing stop update: {e}")
 
             # Convert Position to list of Trades for TradeDecisionEngine
             current_trades = []
@@ -1105,3 +1112,109 @@ async def stop_orchestrator() -> None:
 async def get_cycle_stats() -> dict[str, Any]:
     """Get orchestrator cycle statistics."""
     return orchestrator.get_cycle_stats()
+
+async def update_trailing_stops() -> None:
+    """
+    Update trailing stops for all open positions.
+    
+    This function implements the runtime driver for trailing stop updates
+    as required by TODO-14 (F7-H-04 / CMP Rule 12).
+    
+    Enforces Rule-7: ≤25 modifications per cycle.
+    Runs as part of the orchestrator risk step with <1ms budget.
+    """
+    try:
+        from .trailing_stop import trailing_stop_engine
+        from .rules import rules_engine
+        
+        # Get all open positions from OpenAlgo position book
+        position_book_data = await async_client.get_position_book()
+        
+        if not position_book_data or "data" not in position_book_data:
+            return
+        
+        positions_data = position_book_data.get("data", [])
+        
+        if not positions_data:
+            return
+        
+        # Enforce Rule-7: ≤25 modifications per cycle
+        modification_counter = rules_engine.get_modification_counter()
+        max_modifications = 25
+        modifications_this_cycle = 0
+        
+        # Process each position with trailing stop configuration
+        for position_data in positions_data:
+            try:
+                symbol = position_data.get("symbol", "")
+                if not symbol:
+                    continue
+                
+                # Get position from database to check for trailing config
+                db_position = await asyncio.to_thread(db.get_position, symbol)
+                
+                if not db_position or not db_position.trailing_config:
+                    continue
+                
+                # Get current price for the symbol
+                quotes = await async_client.get_quotes(symbols=[symbol])
+                if not quotes or "data" not in quotes:
+                    logger.warning(f"No quote data available for {symbol}")
+                    continue
+                
+                quote_data = quotes.get("data", {}).get(symbol, {})
+                current_price = quote_data.get("last_price", 0)
+                
+                if current_price <= 0:
+                    logger.warning(f"Invalid price {current_price} for {symbol}")
+                    continue
+                
+                # Update trailing stop using the engine
+                old_config = db_position.trailing_config.copy()
+                updated_config, was_modified = trailing_stop_engine.update_trailing_stop(
+                    db_position.trailing_config,
+                    current_price
+                )
+                
+                # Only persist if configuration was modified
+                if was_modified:
+                    # Enforce Rule-7: ≤25 modifications per cycle
+                    if modifications_this_cycle >= max_modifications:
+                        logger.warning(f"Rule-7 limit reached ({max_modifications} modifications). Skipping further updates.")
+                        break
+                    
+                    # Modify order via OpenAlgo
+                    await async_client.modify_order(
+                        order_id=db_position.order_id,
+                        trigger_price=updated_config.get("trigger_price"),
+                        order_type="SL-M"
+                    )
+                    
+                    # Record ratchet event for audit
+                    await db.async_record_ratchet_event(
+                        order_id=db_position.order_id,
+                        old_sl=old_config.get("trigger_price", 0),
+                        new_sl=updated_config.get("trigger_price", 0),
+                        current_price=current_price,
+                    )
+                    
+                    # Update position in database with new trailing config
+                    db_position.trailing_config = updated_config
+                    await asyncio.to_thread(db.store_position, db_position)
+                    
+                    # Increment modification counter
+                    rules_engine.increment_modification_counter()
+                    modifications_this_cycle += 1
+                    
+                    logger.debug(
+                        f"Updated trailing stop for {symbol}: "
+                        f"old_level={old_config.get('trigger_price', 'N/A')} -> "
+                        f"new_level={updated_config.get('trigger_price', 'N/A')}"
+                    )
+                
+            except Exception as e:
+                logger.error(f"Error updating trailing stop for {position_data.get('symbol', 'unknown')}: {e}")
+                continue
+                
+    except Exception as e:
+        logger.error(f"Trailing stop update failed: {e}")

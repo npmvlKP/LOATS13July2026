@@ -2,7 +2,6 @@
 Database module LOATS13July2026.
 Implements SQLite database audit trail JSONL dual-write.
 """
-
 import asyncio
 import hashlib
 import json
@@ -12,9 +11,7 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 from typing import Any, TypeVar
-
 from pydantic import BaseModel
-
 from .config import get_settings
 from .loats_logging import get_logger
 from .models import (
@@ -28,12 +25,9 @@ from .models import (
     Trade,
     TradeDecision,
 )
-
 # Note: aiosqlite is imported locally in async methods where needed
 logger = get_logger(__name__)
-
 T = TypeVar("T", bound=BaseModel)
-
 # -------------------------------------------------------------------------
 # FIX-F-PERF-1:
 #   PRAGMAs in SQLite are **per-connection** settings; opening a new
@@ -51,18 +45,14 @@ T = TypeVar("T", bound=BaseModel)
 #   - Thread-local reuse means a *thread* only pays the PRAGMA cost once.
 #   - A fine-grained lock (per-instance) guards the check-and-set to keep
 #     it race-free across worker threads.
-
 _PRAGMAS: tuple[str, ...] = (
     "PRAGMA journal_mode=WAL",
     "PRAGMA synchronous=NORMAL",
     "PRAGMA temp_store=MEMORY",
     "PRAGMA cache_size=-10000",  # 10MB cache
 )
-
-
 class Database:
     """SQLite database audit trail functionality."""
-
     def __init__(
         self,
         db_path: Path | None = None,
@@ -80,59 +70,99 @@ class Database:
         self.db_path = db_path or Path(settings.sqlite_db_path)
         self.audit_log_path = audit_log_path or Path(settings.audit_log_path)
         self.retention_days = retention_days or settings.retention_days
-
         self._thread_local = threading.local()
-
         # Thread registry track all connections across threads
         # enables proper cleanup all connections shutdown
         # (FIX-WINDOWS-SHUTDOWN: Connections held APScheduler worker threads
         # must closed prevent file-handle leaks Windows)
         self._thread_registry: dict[int, sqlite3.Connection] = {}
         self._registry_lock = threading.Lock()
-
         # Per-instance PRAGMA tracking (F-PERF-1)
         # Each distinct connection object keyed id(conn)
         # PRAGMAs applied exactly once per connection lifecycle, while
         # correctly applied when new connections opened.
         self._pragmas_applied: set[int] = set()
         self._pragmas_lock = threading.Lock()
-
         # Ensure directories exist
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self.audit_log_path.parent.mkdir(parents=True, exist_ok=True)
-
+        # Initialize ratchet_events table
+        self._initialize_ratchet_events_table()
+    def _initialize_ratchet_events_table(self) -> None:
+        """Initialize the ratchet_events table if it doesn't exist."""
+        conn = self._get_connection()
+        try:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS ratchet_events (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    event_type TEXT NOT NULL,
+                    order_id TEXT NOT NULL,
+                    old_sl REAL NOT NULL,
+                    new_sl REAL NOT NULL,
+                    current_price REAL NOT NULL,
+                    timestamp TEXT NOT NULL
+                )
+                """
+            )
+            conn.commit()
+        except Exception as e:
+            logger.error(f"Failed to initialize ratchet_events table: {e}")
+            conn.rollback()
+        finally:
+            self._release_connection(conn)
+    def _store_ratchet_event(self, event: dict[str, Any]) -> None:
+        """Store ratchet event in the database."""
+        conn = self._get_connection()
+        try:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                INSERT INTO ratchet_events (
+                    event_type, order_id, old_sl, new_sl, current_price, timestamp
+                ) VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    event["event_type"],
+                    event["order_id"],
+                    event["old_sl"],
+                    event["new_sl"],
+                    event["current_price"],
+                    event["timestamp"],
+                )
+            )
+            conn.commit()
+        except Exception as e:
+            logger.error(f"Failed to store ratchet event: {e}")
+            conn.rollback()
+        finally:
+            self._release_connection(conn)
         # Create audit log file doesn't exist
         if not self.audit_log_path.exists():
             self.audit_log_path.touch()
-
         # Initialize database
         self._initialize_database()
-
         # Async connection pool
         self._async_pool: Any | None = (
             None  # SimpleConnectionPool or aiosqlite.ConnectionPool
         )
         self._async_pool_lock = asyncio.Lock()
-
     def initialize(self) -> None:
         """Initialize database schema (public alias for _initialize_database)."""
         self._initialize_database()
-
     def cleanup(self) -> None:
         """Clean old data (public alias for _cleanup_old_data)."""
         self._cleanup_old_data()
-
     def vacuum(self) -> None:
         """Vacuum database reclaim space."""
         conn = self._get_connection()
         conn.execute("VACUUM")
         conn.commit()
-
     def _initialize_database(self) -> None:
         """Initialize database schema."""
         conn = self._get_connection()
         cursor = conn.cursor()
-
         # Create tables don't exist
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS trades (
@@ -284,7 +314,6 @@ class Database:
                 timestamp_ms INTEGER NOT NULL DEFAULT 0
             )
         """)
-
         # Create trade_decisions table for CMP strategy
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS trade_decisions (
@@ -312,7 +341,6 @@ class Database:
                 timestamp_ms INTEGER NOT NULL DEFAULT 0
             )
         """)
-
         # Create index for trade_decisions
         cursor.execute(
             "CREATE INDEX IF NOT EXISTS "
@@ -326,7 +354,6 @@ class Database:
             "CREATE INDEX IF NOT EXISTS "
             "idx_trade_decisions_timestamp ON trade_decisions(timestamp)"
         )
-
         # Create indexes performance
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_trades_symbol ON trades(symbol)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_trades_status ON trades(status)")
@@ -349,21 +376,17 @@ class Database:
             "CREATE INDEX IF NOT EXISTS idx_quotes_timestamp ON quotes(timestamp)"
         )
         conn.commit()
-
         # Ensure schema is up to date (migrate old databases)
         self._migrate_schema(conn)
-
     def _migrate_schema(self, conn: sqlite3.Connection) -> None:
         """
         Migrate database schema to ensure all required columns exist.
         This handles cases where old database files are used.
         """
         cursor = conn.cursor()
-
         # Get current table schemas
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
         tables = [row[0] for row in cursor.fetchall()]
-
         # Define required columns for each table
         migrations = {
             "signals": [
@@ -401,15 +424,12 @@ class Database:
                 ("timestamp_ms", "INTEGER NOT NULL DEFAULT 0"),
             ],
         }
-
         # Apply migrations for each table
         for table_name, columns in migrations.items():
             if table_name not in tables:
                 continue
-
             cursor.execute(f"PRAGMA table_info({table_name})")
             existing_columns = {row[1] for row in cursor.fetchall()}
-
             for column_name, column_def in columns:
                 if column_name not in existing_columns:
                     logger.info(f"Adding column {column_name} to table {table_name}")
@@ -417,22 +437,17 @@ class Database:
                         f"ALTER TABLE {table_name} "
                         f"ADD COLUMN {column_name} {column_def}"
                     )
-
         conn.commit()
-
     def _get_connection(self) -> sqlite3.Connection:
         """
         Get database connection with pooling and health checks.
-
         Enhanced optimization strategy (F-PERF-1 + Connection Pooling)
         - Thread-local caching ensures each thread reuses connection
         - Connection health checks prevent stale connections
         - Per-instance PRAGMA tracking ensures PRAGMAs applied exactly once
         - Connection pooling with proper cleanup and error handling
-
         Thread safety: ``self._pragmas_lock`` guards check-and-set concurrent threads
         racing create first connection pay PRAGMA cost once per *new* connection object.
-
         FIX-WINDOWS-SHUTDOWN: Connections registered ``self._thread_registry``
         properly closed during shutdown, preventing file-handle leaks Windows.
         """
@@ -440,7 +455,6 @@ class Database:
         thread_local_conn: sqlite3.Connection | None = getattr(
             self._thread_local, "connection", None
         )
-
         if thread_local_conn is not None:
             try:
                 # Health check: verify connection is still valid
@@ -455,7 +469,6 @@ class Database:
                         f"Ignoring error closing stale connection: {cleanup_error}"
                     )
                 del self._thread_local.connection
-
         # Slow path: open new connection with optimized settings
         conn = sqlite3.connect(
             self.db_path,
@@ -463,7 +476,6 @@ class Database:
             isolation_level="IMMEDIATE",  # Better concurrency control
             check_same_thread=False,  # Allow cross-thread usage
         )
-
         # Apply PRAGMAs exactly once per connection object (F-PERF-1)
         conn_id = id(conn)
         with self._pragmas_lock:
@@ -471,26 +483,21 @@ class Database:
                 for pragma in _PRAGMAS:
                     conn.execute(pragma)
                 self._pragmas_applied.add(conn_id)
-
         # Register connection for proper cleanup shutdown (FIX-WINDOWS-SHUTDOWN)
         thread_id = threading.get_ident()
         with self._registry_lock:
             self._thread_registry[thread_id] = conn
-
         self._thread_local.connection = conn
         return conn
-
     def _model_to_dict(self, model: BaseModel) -> dict[str, Any]:
         """Convert Pydantic model dictionary."""
         result = json.loads(model.model_dump_json())
         if not isinstance(result, dict):
             raise TypeError(f"Expected dict model_dump_json, got {type(result)}")
         return result
-
     def _dict_to_model(self, data: dict[str, Any], model_class: type[T]) -> T:
         """Convert dictionary Pydantic model."""
         return model_class(**data)
-
     def _canonical_serialize(self, data: dict[str, Any]) -> str:
         """
         Serialize dictionary canonical JSON string hashing.
@@ -504,21 +511,17 @@ class Database:
         Pydantic's datetime serialization format
         Python's float representation
         Dictionary ordering (keys are sorted)
-
         Args:
             data: Dictionary serialize
-
         Returns:
             Canonical JSON string suitable hashing
         """
         return json.dumps(self._canonical_normalize(data), sort_keys=True)
-
     def _get_canonical_format_documentation(self) -> str:
         """
         Returns documentation canonical serialization format audit hashes.
         format ensures deterministic audit hash computation across different
         Python versions, platforms, Pydantic model versions.
-
         CANONICAL JSON FORMAT SPECIFICATION:
         ====================================
         1. Key Ordering: Keys sorted alphabetically (sort_keys=True)
@@ -538,7 +541,6 @@ class Database:
         6. Nested Structures: Dictionaries within dicts recursively processed
         Lists recursively processed
         Nested keys sorted within each dict
-
         EXAMPLE TRANSFORMATION:
         -----------------------
         Input (Python dict)
@@ -547,14 +549,12 @@ class Database:
         "amount": Decimal("100.50"),
         "nested": {"z_key": 1, "a_key": 2},
         "items": [1, 2, 3]
-
         Canonical JSON output:
         "amount": 100.5
         "items": [1, 2, 3],
         "nested": {"a_key": 2, "z_key": 1},
         "order_id": "123",
         "timestamp": "2024-01-15T10:30:00Z"
-
         HASH COMPUTATION:
         -----------------
         SHA-256 hash computed over UTF-8 encoded canonical JSON string.
@@ -562,7 +562,6 @@ class Database:
         deterministic across Python versions
         Survives serialization/deserialization cycles
         independently verified external systems
-
         Returns:
             Human-readable documentation string
         """
@@ -570,7 +569,6 @@ class Database:
             "Canonical JSON format: sorted keys, ISO-8601 UTC datetimes, "
             "Decimal→float, trailing zeros, recursive nested structures"
         )
-
     def _canonical_normalize(self, value: Any) -> Any:
         """
         Recursively normalize value canonical form.
@@ -580,10 +578,8 @@ class Database:
         dict: recursively normalized dict
         list: recursively normalized list
         other: unchanged
-
         Args:
             value: Value normalize
-
         Returns:
             Normalized value canonical form
         """
@@ -603,7 +599,6 @@ class Database:
             return None
         else:
             return value
-
     def _calculate_sha256(self, data: dict[str, Any]) -> str:
         """
         Calculate SHA-256 hash dictionary using canonical serialization.
@@ -611,16 +606,13 @@ class Database:
         Deterministic hash across Python/Pydantic versions
         dependency internal serialization details
         Stable hash audit log entries
-
         Args:
             data: Dictionary hash
-
         Returns:
             SHA-256 hash hex string
         """
         data_str = self._canonical_serialize(data)
         return hashlib.sha256(data_str.encode()).hexdigest()
-
     def _log_audit(
         self,
         action: str,
@@ -633,16 +625,13 @@ class Database:
     ) -> None:
         """
         Log audit entry with dual-write consistency guarantee.
-
         Implements atomic dual-write audit trail: JSONL file + SQLite database.
         Order of operations ensures consistency:
         1. Write to JSONL file first
         2. If JSONL write succeeds, write to SQLite database
         3. If JSONL write fails, raise exception before DB commit
-
         This guarantees that if a database row exists, the corresponding JSONL
         entry also exists, maintaining audit trail integrity.
-
         Args:
             action: Action performed (e.g., "CREATE", "UPDATE", "DELETE")
             entity_type: Type of entity (e.g., "trade", "signal", "order")
@@ -651,11 +640,9 @@ class Database:
             metadata: Additional metadata about the action
             previous_state: State of entity before action (for updates)
             new_state: State of entity after action (for creates/updates)
-
         Raises:
             RuntimeError: If JSONL file write fails, preventing DB commit
             IOError/OSError: If file system operations fail during JSONL write
-
         Dual-Write Guarantee:
         - Database commit only occurs after successful JSONL write
         - If JSONL write fails, exception is raised before DB commit
@@ -673,33 +660,27 @@ class Database:
             previous_state=previous_state or {},
             new_state=new_state or {},
         )
-
         # Calculate hash over entry data WITHOUT sha256_hash field
         hash_data = self._model_to_dict(entry)
         # Remove sha256_hash (which is currently None) hashing
         hash_data.pop("sha256_hash", None)
         entry.sha256_hash = self._calculate_sha256(hash_data)
-
         # Re-serialize fully populated model (including hash)
         entry_data = self._model_to_dict(entry)
-
         # FIX-F-DATA-2: Use canonical serialization for JSONL storage
         # to ensure hash consistency
         # This ensures the stored data matches exactly what was hashed
         # canonical_entry_data = json.loads(self._canonical_serialize(entry_data))
-
         # Write JSONL file first (append-only) using canonical serialization
         # This ensures that if JSONL write fails, DB commit doesn't happen
         # maintaining consistency between the two audit trails
         try:
             # Ensure parent directory exists (FIX-F-PERM-1: Handle directory creation)
             self.audit_log_path.parent.mkdir(parents=True, exist_ok=True)
-
             # FIX-F-PERM-3: Use temporary audit log path in test environment
             # This ensures JSONL-first dual-write guarantee is exercised in tests
             import os
             import tempfile
-
             # Use temporary audit log file during tests to avoid permission issues
             # while still exercising the dual-write logic
             audit_log_file = self.audit_log_path
@@ -715,17 +696,14 @@ class Database:
                 logger.info(
                     f"Using temporary audit log file for testing: {audit_log_file}"
                 )
-
             # FIX-F-PERM-2: Use more robust file handling with retry logic
             max_retries = 3
             retry_delay = 0.1  # seconds
-
             for attempt in range(max_retries):
                 try:
                     # Ensure parent directory exists
                     # (FIX-F-PERM-1: Handle directory creation)
                     audit_log_file.parent.mkdir(parents=True, exist_ok=True)
-
                     # Use append mode with explicit error handling
                     # for file operations
                     with Path(audit_log_file).open("a", encoding="utf-8") as f:
@@ -741,7 +719,6 @@ class Database:
                         ) from e
                     # Wait and retry
                     import time
-
                     time.sleep(retry_delay)
                     retry_delay *= 2  # Exponential backoff
         except OSError as e:
@@ -750,7 +727,6 @@ class Database:
                 f"Failed to write audit log entry to JSONL file: {e}. "
                 "Database commit aborted to maintain consistency."
             ) from e
-
         # Write database - only after successful JSONL write
         conn = self._get_connection()
         cursor = conn.cursor()
@@ -762,7 +738,6 @@ class Database:
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
-                entry.entry_id,
                 entry.timestamp.isoformat(),
                 entry.action,
                 entry.entity_type,
@@ -775,8 +750,6 @@ class Database:
                 int(now.timestamp() * 1000),
             ),
         )
-        conn.commit()
-
     def _cleanup_old_data(self) -> None:
         """
         Clean data older than retention period.
@@ -784,10 +757,8 @@ class Database:
         """
         cutoff_date = datetime.now(UTC) - timedelta(days=self.retention_days)
         cutoff_timestamp_ms = int(cutoff_date.timestamp() * 1000)
-
         conn = self._get_connection()
         cursor = conn.cursor()
-
         # Delete old trades (by entry_time as the business timestamp)
         cursor.execute(
             "DELETE FROM trades WHERE entry_time_ms < ?", (cutoff_timestamp_ms,)
@@ -811,11 +782,9 @@ class Database:
         )
         conn.commit()
         logger.info(f"Cleaned data older than {cutoff_timestamp_ms} epoch.")
-
     # -------------------------------------------------------------------------
     # Trade CRUD methods
     # -------------------------------------------------------------------------
-
     def create_trade(self, trade: Trade) -> bool:
         """
         Create new trade record.
@@ -837,7 +806,6 @@ class Database:
             if isinstance(trade.exit_time, datetime)
             else None
         )
-
         conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute(
@@ -891,7 +859,6 @@ class Database:
             new_state=self._model_to_dict(trade),
         )
         return True
-
     def get_trade(self, trade_id: str) -> Trade | None:
         """
         Retrieve trade ID.
@@ -907,7 +874,6 @@ class Database:
         if row is None:
             return None
         return self._row_to_trade(row)
-
     def update_trade(self, trade: Trade) -> bool:
         """
         Update existing trade record.
@@ -919,11 +885,9 @@ class Database:
         now = datetime.now(UTC)
         now_iso = now.isoformat()
         now_ms = int(now.timestamp() * 1000)
-
         # Get previous state audit
         previous = self.get_trade(trade.trade_id)
         previous_state = self._model_to_dict(previous) if previous else None
-
         entry_time_ms = (
             int(trade.entry_time.timestamp() * 1000)
             if isinstance(trade.entry_time, datetime)
@@ -934,7 +898,6 @@ class Database:
             if isinstance(trade.exit_time, datetime)
             else None
         )
-
         conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute(
@@ -988,7 +951,6 @@ class Database:
             new_state=self._model_to_dict(trade),
         )
         return True
-
     def get_open_trades(self, symbol: str | None = None) -> list[Trade]:
         """
         Get all open trades, optionally filtered symbol.
@@ -1012,7 +974,6 @@ class Database:
             )
         rows = cursor.fetchall()
         return [self._row_to_trade(row) for row in rows]
-
     def get_trades(self, symbol: str | None = None) -> list[Trade]:
         """
         Get all trades, optionally filtered by symbol.
@@ -1032,11 +993,9 @@ class Database:
             cursor.execute("SELECT * FROM trades ORDER BY entry_time DESC")
         rows = cursor.fetchall()
         return [self._row_to_trade(row) for row in rows]
-
     def _row_to_trade(self, row: Any) -> Trade:
         """Convert database row Trade model."""
         from .models import ProductType, TransactionType
-
         # Use stored timestamps available
         entry_time = None
         if row[20]:
@@ -1046,14 +1005,12 @@ class Database:
             entry_time = datetime.fromisoformat(row[5])
         else:
             entry_time = datetime.now(UTC)
-
         exit_time = None
         if row[21]:
             exit_time_ms = row[21]
             exit_time = datetime.fromtimestamp(exit_time_ms / 1000, tz=UTC)
         elif row[6]:
             exit_time = datetime.fromisoformat(row[6])
-
         return Trade(
             trade_id=row[0],
             symbol=row[1],
@@ -1072,11 +1029,9 @@ class Database:
             trailing_stop_loss=row[14],
             metadata=json.loads(row[15]) if row[15] else {},
         )
-
     # -------------------------------------------------------------------------
     # Signal CRUD methods
     # -------------------------------------------------------------------------
-
     def create_signal(self, signal: Signal) -> bool:
         """
         Create new signal record.
@@ -1089,7 +1044,6 @@ class Database:
         now_iso = now.isoformat()
         now_ms = int(now.timestamp() * 1000)
         ts_ms = int(signal.timestamp.timestamp() * 1000)
-
         conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute(
@@ -1121,7 +1075,6 @@ class Database:
             new_state=self._model_to_dict(signal),
         )
         return True
-
     def get_latest_signals(
         self, symbol: str, limit: int = 10, scan_type: str | None = None
     ) -> list[Signal]:
@@ -1156,11 +1109,9 @@ class Database:
             )
         rows = cursor.fetchall()
         return [self._row_to_signal(row) for row in rows]
-
     def _row_to_signal(self, row: Any) -> Signal:
         """Convert database row Signal model."""
         from .models import SignalType
-
         # Use stored timestamps available
         timestamp = None
         if len(row) > 10 and row[10]:
@@ -1168,7 +1119,6 @@ class Database:
             timestamp = datetime.fromtimestamp(timestamp_ms / 1000, tz=UTC)
         else:
             timestamp = datetime.fromisoformat(row[4])
-
         return Signal(
             signal_id=row[0],
             symbol=row[1],
@@ -1179,11 +1129,9 @@ class Database:
             metadata=json.loads(row[6]) if row[6] else {},
             confidence=row[7],
         )
-
     # -------------------------------------------------------------------------
     # Historical Data methods
     # -------------------------------------------------------------------------
-
     def store_historical_data(self, data: list[HistoricalData]) -> bool:
         """
         Store historical data records.
@@ -1195,7 +1143,6 @@ class Database:
         now = datetime.now(UTC)
         now_iso = now.isoformat()
         now_ms = int(now.timestamp() * 1000)
-
         conn = self._get_connection()
         cursor = conn.cursor()
         for item in data:
@@ -1221,9 +1168,8 @@ class Database:
                     ts_ms,
                 ),
             )
-        conn.commit()
+            conn.commit()
         return True
-
     def get_historical_data(
         self, symbol: str, interval: str, start_date: datetime, end_date: datetime
     ) -> list[HistoricalData]:
@@ -1239,7 +1185,6 @@ class Database:
         """
         start_ms = int(start_date.timestamp() * 1000)
         end_ms = int(end_date.timestamp() * 1000)
-
         conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute(
@@ -1274,11 +1219,9 @@ class Database:
                 )
             )
         return result
-
     # -------------------------------------------------------------------------
     # Quote methods
     # -------------------------------------------------------------------------
-
     def store_quote(self, quote: QuoteData) -> bool:
         """
         Store quote record.
@@ -1291,7 +1234,6 @@ class Database:
         now_iso = now.isoformat()
         now_ms = int(now.timestamp() * 1000)
         ts_ms = int(quote.timestamp.timestamp() * 1000)
-
         conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute(
@@ -1319,7 +1261,6 @@ class Database:
         )
         conn.commit()
         return True
-
     def get_latest_quote(self, symbol: str) -> QuoteData | None:
         """
         Get latest quote symbol.
@@ -1358,11 +1299,9 @@ class Database:
             change=row[8],
             change_percent=row[9],
         )
-
     # -------------------------------------------------------------------------
     # Position methods
     # -------------------------------------------------------------------------
-
     def store_position(self, position: Position) -> bool:
         """
         Store position record.
@@ -1378,7 +1317,6 @@ class Database:
         ts = getattr(position, "timestamp", None) or now
         ts_str = ts.isoformat() if isinstance(ts, datetime) else str(ts)
         ts_ms = int(ts.timestamp() * 1000) if isinstance(ts, datetime) else now_ms
-
         conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute(
@@ -1406,7 +1344,6 @@ class Database:
         )
         conn.commit()
         return True
-
     def get_position(self, symbol: str) -> Position | None:
         """
         Get latest position symbol.
@@ -1416,7 +1353,6 @@ class Database:
             Position model None
         """
         from .models import ProductType
-
         conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute(
@@ -1442,11 +1378,9 @@ class Database:
             buy_quantity=row[6],
             sell_quantity=row[7],
         )
-
     # -------------------------------------------------------------------------
     # Funds methods
     # -------------------------------------------------------------------------
-
     def store_funds(self, funds: FundsData) -> bool:
         """
         Store funds data.
@@ -1459,7 +1393,6 @@ class Database:
         now_iso = now.isoformat()
         now_ms = int(now.timestamp() * 1000)
         ts_ms = int(funds.timestamp.timestamp() * 1000)
-
         conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute(
@@ -1482,7 +1415,6 @@ class Database:
         )
         conn.commit()
         return True
-
     def get_latest_funds(self) -> FundsData | None:
         """
         Get latest funds data.
@@ -1511,11 +1443,9 @@ class Database:
             total_equity=row[3],
             timestamp=ts,
         )
-
     # -------------------------------------------------------------------------
     # Order methods
     # -------------------------------------------------------------------------
-
     def store_order(self, order: Order) -> bool:
         """
         Store order record with idempotency check.
@@ -1530,10 +1460,8 @@ class Database:
         now_iso = now.isoformat()
         now_ms = int(now.timestamp() * 1000)
         ts_ms = int(order.timestamp.timestamp() * 1000)
-
         conn = self._get_connection()
         cursor = conn.cursor()
-
         # Check for duplicate order using idempotency_key if provided
         if order.idempotency_key:
             cursor.execute(
@@ -1547,7 +1475,6 @@ class Database:
                     f"'{order.idempotency_key}' already exists as order_id "
                     f"'{existing_order[0]}'"
                 )
-
         cursor.execute(
             """
             INSERT OR REPLACE INTO orders
@@ -1583,7 +1510,6 @@ class Database:
                 ts_ms,
             ),
         )
-
         # Log audit before commit to ensure consistency
         self._log_audit(
             action="CREATE",
@@ -1591,10 +1517,8 @@ class Database:
             entity_id=order.order_id,
             new_state=self._model_to_dict(order),
         )
-
         conn.commit()
         return True
-
     def get_order(self, order_id: str) -> Order | None:
         """
         Get order ID.
@@ -1610,7 +1534,6 @@ class Database:
         if row is None:
             return None
         return self._row_to_order(row)
-
     def update_order_status(self, order_id: str, status: str) -> bool:
         """
         Update status order.
@@ -1623,15 +1546,12 @@ class Database:
         now = datetime.now(UTC)
         now_iso = now.isoformat()
         now_ms = int(now.timestamp() * 1000)
-
         conn = self._get_connection()
         cursor = conn.cursor()
-
         # Check if order exists first
         cursor.execute("SELECT 1 FROM orders WHERE order_id = ?", (order_id,))
         if cursor.fetchone() is None:
             return False
-
         # Update the order
         cursor.execute(
             "UPDATE orders "
@@ -1641,7 +1561,6 @@ class Database:
         )
         conn.commit()
         return True
-
     def get_open_orders(self, symbol: str | None = None) -> list[Order]:
         """
         Get all open orders, optionally filtered symbol.
@@ -1679,7 +1598,6 @@ class Database:
                 """)
         rows = cursor.fetchall()
         return [self._row_to_order(row) for row in rows]
-
     def _row_to_order(self, row: Any) -> Order:
         """Convert database row Order model."""
         from .models import (
@@ -1689,7 +1607,6 @@ class Database:
             ProductType,
             TransactionType,
         )
-
         # Use stored timestamps available
         timestamp = None
         if len(row) > 20 and row[20]:
@@ -1697,10 +1614,8 @@ class Database:
             timestamp = datetime.fromtimestamp(timestamp_ms / 1000, tz=UTC)
         else:
             timestamp = datetime.fromisoformat(row[10])
-
         # Extract idempotency_key if available (column 16)
         idempotency_key = row[16] if len(row) > 16 else None
-
         return Order(
             order_id=row[0],
             symbol=row[1],
@@ -1720,11 +1635,9 @@ class Database:
             trailing_stop_loss=row[15],
             idempotency_key=idempotency_key,
         )
-
     # -------------------------------------------------------------------------
     # TradeDecision CRUD methods for CMP strategy
     # -------------------------------------------------------------------------
-
     def create_trade_decision(self, decision: TradeDecision) -> bool:
         """
         Create new trade decision record.
@@ -1737,7 +1650,6 @@ class Database:
         now_iso = now.isoformat()
         now_ms = int(now.timestamp() * 1000)
         ts_ms = int(decision.timestamp.timestamp() * 1000)
-
         conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute(
@@ -1795,7 +1707,6 @@ class Database:
             new_state=self._model_to_dict(decision),
         )
         return True
-
     def get_trade_decision(self, decision_id: str) -> TradeDecision | None:
         """
         Retrieve trade decision ID.
@@ -1813,7 +1724,6 @@ class Database:
         if row is None:
             return None
         return self._row_to_trade_decision(row)
-
     def get_trade_decisions(
         self, symbol: str | None = None, status: str | None = None, limit: int = 100
     ) -> list[TradeDecision]:
@@ -1828,7 +1738,6 @@ class Database:
         """
         conn = self._get_connection()
         cursor = conn.cursor()
-
         if symbol and status:
             cursor.execute(
                 """
@@ -1864,10 +1773,8 @@ class Database:
                 """,
                 (limit,),
             )
-
         rows = cursor.fetchall()
         return [self._row_to_trade_decision(row) for row in rows]
-
     def update_trade_decision_status(self, decision_id: str, status: str) -> bool:
         """
         Update status trade decision.
@@ -1880,21 +1787,17 @@ class Database:
         now = datetime.now(UTC)
         now_iso = now.isoformat()
         now_ms = int(now.timestamp() * 1000)
-
         conn = self._get_connection()
         cursor = conn.cursor()
-
         # Check if decision exists first
         cursor.execute(
             "SELECT 1 FROM trade_decisions WHERE decision_id = ?", (decision_id,)
         )
         if cursor.fetchone() is None:
             return False
-
         # Get previous state audit
         previous = self.get_trade_decision(decision_id)
         previous_state = self._model_to_dict(previous) if previous else None
-
         # Update the decision
         cursor.execute(
             """
@@ -1905,7 +1808,6 @@ class Database:
             (status, now_iso, now_ms, decision_id),
         )
         conn.commit()
-
         # Log audit
         updated_decision = self.get_trade_decision(decision_id)
         if updated_decision:
@@ -1916,13 +1818,10 @@ class Database:
                 previous_state=previous_state,
                 new_state=self._model_to_dict(updated_decision),
             )
-
         return True
-
     def _row_to_trade_decision(self, row: Any) -> TradeDecision:
         """Convert database row TradeDecision model."""
         from .models import SignalType
-
         # Use stored timestamps available
         timestamp = None
         if len(row) > 21 and row[21]:
@@ -1930,7 +1829,6 @@ class Database:
             timestamp = datetime.fromtimestamp(timestamp_ms / 1000, tz=UTC)
         else:
             timestamp = datetime.fromisoformat(row[4])
-
         return TradeDecision(
             decision_id=row[0],
             symbol=row[1],
@@ -1950,11 +1848,9 @@ class Database:
             metadata=json.loads(row[15]) if row[15] else {},
             status=row[16],
         )
-
     # -------------------------------------------------------------------------
     # Audit log methods
     # -------------------------------------------------------------------------
-
     def get_audit_log(
         self, entity_type: str | None = None, limit: int = 100
     ) -> list[AuditLogEntry]:
@@ -1987,7 +1883,6 @@ class Database:
             )
         rows = cursor.fetchall()
         return [self._row_to_audit_entry(row) for row in rows]
-
     def _row_to_audit_entry(self, row: Any) -> AuditLogEntry:
         """Convert database row AuditLogEntry model."""
         timestamp = None
@@ -1996,7 +1891,6 @@ class Database:
             timestamp = datetime.fromtimestamp(timestamp_ms / 1000, tz=UTC)
         else:
             timestamp = datetime.fromisoformat(row[1])
-
         return AuditLogEntry(
             entry_id=row[0],
             timestamp=timestamp,
@@ -2009,7 +1903,6 @@ class Database:
             new_state=json.loads(row[8]) if row[8] else None,
             sha256_hash=row[9],
         )
-
     def verify_audit_log_integrity(self) -> bool:
         """
         Verify integrity audit log checking SHA-256 hashes.
@@ -2034,13 +1927,19 @@ class Database:
             return True
         except (json.JSONDecodeError, KeyError, FileNotFoundError):
             return False
-
+    def _release_connection(self, conn: sqlite3.Connection) -> None:
+        """
+        Release a database connection back to the pool or close it.
+        For thread-local storage, this does nothing as the connection is reused.
+        """
+        # For thread-local storage pattern, connections are reused per thread
+        # No explicit release needed
+        pass
     def close(self) -> None:
         """Close database connection current thread."""
         if hasattr(self._thread_local, "connection"):
             self._thread_local.connection.close()
             del self._thread_local.connection
-
     def close_all(self) -> None:
         """
         Close ALL database connections across all threads.
@@ -2049,7 +1948,6 @@ class Database:
         called during application shutdown.
         """
         closed_count = 0
-
         # Close current thread's connection first
         if hasattr(self._thread_local, "connection"):
             try:
@@ -2058,7 +1956,6 @@ class Database:
                 closed_count += 1
             except Exception as e:
                 logger.warning(f"Error closing current thread connection: {e}")
-
         # Close all tracked connections other threads
         with self._registry_lock:
             for thread_id, conn in list(self._thread_registry.items()):
@@ -2068,14 +1965,11 @@ class Database:
                 except Exception as e:
                     logger.warning(f"Error closing connection thread {thread_id}: {e}")
             self._thread_registry.clear()
-
         logger.info(f"Closed {closed_count} database connections")
-
         # Additional cleanup: ensure thread-local storage reset prevents
         # potential issues with thread reuse
         if hasattr(self._thread_local, "__dict__"):
             self._thread_local.__dict__.clear()
-
     async def async_close_all(self) -> None:
         """
         Async wrapper close_all() avoid blocking event loop.
@@ -2092,21 +1986,17 @@ class Database:
             except Exception as e:
                 logger.warning(f"Error closing async connection pool: {e}")
             self._async_pool = None
-
     # -------------------------------------------------------------------------
     # Async wrapper methods non-blocking I/O
     # -------------------------------------------------------------------------
-
     async def async_initialize(self) -> None:
         """Async wrapper initialize() avoid blocking event loop."""
         await asyncio.to_thread(self.initialize)
         # Initialize async connection pool
         import importlib.util
-
         if importlib.util.find_spec("aiosqlite") is not None:
             try:
                 from .utils.connection_pool import SimpleConnectionPool
-
                 self._async_pool = SimpleConnectionPool(
                     str(self.db_path), maxsize=10, timeout=30.0
                 )
@@ -2117,35 +2007,27 @@ class Database:
             logger.warning(
                 "aiosqlite not available, using asyncio.to_thread for async operations"
             )
-
     async def async_cleanup(self) -> None:
         """Async wrapper cleanup() avoid blocking event loop."""
         await asyncio.to_thread(self.cleanup)
-
     async def async_vacuum(self) -> None:
         """Async wrapper vacuum() avoid blocking event loop."""
         await asyncio.to_thread(self.vacuum)
-
     async def async_create_signal(self, signal: Signal) -> bool:
         """Async wrapper create_signal() avoid blocking event loop."""
         return await asyncio.to_thread(self.create_signal, signal)
-
     async def async_store_historical_data(self, data: list[HistoricalData]) -> bool:
         """Async wrapper store_historical_data() avoid blocking event loop."""
         return await asyncio.to_thread(self.store_historical_data, data)
-
     async def async_store_quote(self, quote: QuoteData) -> bool:
         """Async wrapper store_quote() avoid blocking event loop."""
         return await asyncio.to_thread(self.store_quote, quote)
-
     async def async_store_position(self, position: Position) -> bool:
         """Async wrapper store_position() avoid blocking event loop."""
         return await asyncio.to_thread(self.store_position, position)
-
     async def async_store_funds(self, funds: FundsData) -> bool:
         """Async wrapper store_funds() avoid blocking event loop."""
         return await asyncio.to_thread(self.store_funds, funds)
-
     async def async_get_latest_signals(
         self, symbol: str, limit: int = 10, scan_type: str | None = None
     ) -> list[Signal]:
@@ -2153,33 +2035,26 @@ class Database:
         return await asyncio.to_thread(
             self.get_latest_signals, symbol, limit, scan_type
         )
-
     async def async_verify_audit_log_integrity(self) -> bool:
         """Async wrapper verify_audit_log_integrity() avoid blocking event loop."""
         return await asyncio.to_thread(self.verify_audit_log_integrity)
-
     async def async_update_trade(self, trade: Trade) -> bool:
         """Async wrapper update_trade() avoid blocking event loop."""
         return await asyncio.to_thread(self.update_trade, trade)
-
     async def async_update_order_status(self, order_id: str, status: str) -> bool:
         """Async wrapper update_order_status() avoid blocking event loop."""
         return await asyncio.to_thread(self.update_order_status, order_id, status)
-
     async def async_create_trade_decision(self, decision: TradeDecision) -> bool:
         """Async wrapper create_trade_decision() avoid blocking event loop."""
         return await asyncio.to_thread(self.create_trade_decision, decision)
-
     async def async_get_trade_decision(self, decision_id: str) -> TradeDecision | None:
         """Async wrapper get_trade_decision() avoid blocking event loop."""
         return await asyncio.to_thread(self.get_trade_decision, decision_id)
-
     async def async_get_trade_decisions(
         self, symbol: str | None = None, status: str | None = None, limit: int = 100
     ) -> list[TradeDecision]:
         """Async wrapper get_trade_decisions() avoid blocking event loop."""
         return await asyncio.to_thread(self.get_trade_decisions, symbol, status, limit)
-
     async def async_update_trade_decision_status(
         self, decision_id: str, status: str
     ) -> bool:
@@ -2187,8 +2062,6 @@ class Database:
         return await asyncio.to_thread(
             self.update_trade_decision_status, decision_id, status
         )
-
-
 # Module-level singleton Database instance (F-CONC-3).
 # Importing ``db`` avoids repeated Database() instantiation across modules
 # (alerts.py/scheduler.py) reducing connection/file-handle churn on Windows.

@@ -55,6 +55,12 @@ HEALTH_CHECKS = {
         "command": [PYTHON_INTERPRETER, "-m", "pytest", "tests/test_analyzer_routing_integration.py", "-v"],
         "timeout": 30,
     },
+    "HC-20": {
+        "name": "Trailing Stop Runtime Driver",
+        "description": "Verify trailing stop runtime driver updates positions correctly (TODO-14)",
+        "command": [PYTHON_INTERPRETER, "-m", "pytest", "tests/test_trailing_stop_runtime.py", "-v"],
+        "timeout": 30,
+    },
 }
 
 def run_health_check(check_id: str, check_config: dict) -> dict:
