@@ -82,7 +82,6 @@ print("G5  Known Source Issues (non-blocking)")
 print("  [INFO] orchestrator.py:456-466  HistoricalData missing 'symbol' field")
 print("  [INFO] orchestrator.py:821-893  CMP happy path needs trade_decision mock")
 print("  [INFO] HC-12: tests/test_e2e_cmp_chain.py missing (pre-existing)")
-print("  [INFO] HC-13: not defined in fr7_health_check.py (pre-existing)")
 
 print("\n" + "=" * 60)
 print(f"RESULT:  {PASS} PASS  |  {FAIL} FAIL")

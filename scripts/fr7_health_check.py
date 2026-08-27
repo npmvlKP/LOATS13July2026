@@ -25,6 +25,12 @@ HEALTH_CHECKS = {
         "command": [PYTHON_INTERPRETER, "-m", "pytest", "tests/test_e2e_cmp_chain.py", "-v", "--tb=short"],
         "timeout": 60,
     },
+    "HC-13": {
+        "name": "Per-Module Coverage Enforcement",
+        "description": "Verify floor-mapped modules meet >=80% coverage threshold (TODO-15)",
+        "command": [PYTHON_INTERPRETER, "scripts/check_per_module_coverage.py"],
+        "timeout": 30,
+    },
     "HC-15": {
         "name": "Math & Aggregate Validation",
         "description": "Validate composite strength calculations and aggregation math",
