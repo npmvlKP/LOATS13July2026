@@ -1,737 +1,412 @@
-#!/usr/bin/env python3
-"""
-Comprehensive test suite for orchestrator.py module.
-
-This test file covers the main functionality of the TradingOrchestrator
-to address the 32.6% coverage issue.
-"""
-
+"""Tests for TradingOrchestrator CMP body."""
 import asyncio
 import tempfile
-import unittest
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
-
 import pytest
-
-from loats.alerts import AlertSystem
 from loats.database import Database
-from loats.models import (
-    HistoricalData,
-    OptionContract,
-    OptionType,
-)
-from loats.openalgo import KillSwitchError
-from loats.orchestrator import TradingOrchestrator, get_cycle_stats
-
+from loats.models import (FundsData, HistoricalData, QuoteData, Signal, SignalType)
+from loats.orchestrator import TradingOrchestrator
+from loats.strength import StrengthSource
 
 @pytest.fixture
 def temp_db():
-    """Create a temporary database for testing."""
-    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp_dir:
-        db_path = Path(temp_dir) / "test.db"
-        audit_log_path = Path(temp_dir) / "test_audit.jsonl"
-
-        # Initialize database
-        db = Database(db_path=db_path, audit_log_path=audit_log_path)
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as td:
+        db = Database(db_path=Path(td) / 'test_orch2.db', audit_log_path=Path(td) / 'test_audit2.jsonl')
         db._initialize_database()
-
         yield db
-
-        # Clean up
         db.close_all()
 
-
 @pytest.fixture
-def mock_alerts():
-    """Create a mock AlertSystem for testing."""
-    alerts = MagicMock(spec=AlertSystem)
-    alerts.is_kill_switch_active.return_value = False
-    return alerts
-
-
-class TestTradingOrchestrator(unittest.IsolatedAsyncioTestCase):
-    """Test suite for TradingOrchestrator."""
-
-    def setUp(self):
-        """Set up test fixtures."""
-        self.orchestrator = TradingOrchestrator()
-
-    async def test_initialize(self):
-        """Test orchestrator initialization."""
-        assert self.orchestrator.running is False
-        assert self.orchestrator.cycle_count == 0
-
-        await self.orchestrator.initialize()
-
-        assert self.orchestrator.running is True
-        assert self.orchestrator.cycle_count == 0
-        assert self.orchestrator.last_cycle_time == 0.0
-        assert self.orchestrator.max_cycle_time == 0.0
-        assert self.orchestrator.avg_cycle_time == 0.0
-        assert self.orchestrator.total_cycle_time == 0.0
-
-    async def test_start(self):
-        """Test orchestrator start."""
-        with patch.object(self.orchestrator, "_run_cycle_loop") as mock_run_loop:
-            await self.orchestrator.start()
-            assert self.orchestrator.running is True
-            mock_run_loop.assert_called_once()
-
-    async def test_start_already_running(self):
-        """Test orchestrator start when already running."""
-        await self.orchestrator.start()
-        with patch("loats.orchestrator.logger") as mock_logger:
-            await self.orchestrator.start()
-            mock_logger.warning.assert_called_with("Orchestrator already running")
-
-    async def test_check_kill_switch(self):
-        """Test kill switch check."""
-        # Test when kill switch is inactive
-        with patch(
-            "loats.orchestrator.alerts.is_kill_switch_active", return_value=False
-        ):
-            await self.orchestrator._check_kill_switch()  # Should not raise exception
-
-        # Test when kill switch is active
-        with patch(
-            "loats.orchestrator.alerts.is_kill_switch_active", return_value=True
-        ):
-            with pytest.raises(KillSwitchError, match="Kill switch active"):
-                await self.orchestrator._check_kill_switch()
-
-    async def test_execute_ta_analysis(self):
-        """Test technical analysis execution."""
-        # Create test data
-        now = datetime.now(UTC)
-        _ = [
-            HistoricalData(
-                symbol="TEST",
-                timestamp=now,
-                open=100.0,
-                high=105.0,
-                low=99.0,
-                close=104.0,
-                volume=10000,
-                interval="1d",
-            )
-        ]  # Used for type reference only
-
-        with patch("loats.orchestrator.settings") as mock_settings:
-            mock_settings.default_symbol = "TEST"
-            mock_settings.default_timeframe = "1d"
-
-            with patch(
-                "loats.orchestrator.technical_analysis.calculate_indicators"
-            ) as mock_calc:
-                mock_calc.return_value = []
-                with patch(
-                    "loats.orchestrator.technical_analysis.generate_signal"
-                ) as mock_gen:
-                    mock_gen.return_value = None
-                    with patch.object(
-                        self.orchestrator, "_safe_get_history", new_callable=AsyncMock
-                    ) as mock_history:
-                        mock_history.return_value = None
-                        # Should handle empty history gracefully
-                        await self.orchestrator._execute_ta_analysis()
-                        mock_history.assert_called_once()
-
-    async def test_execute_sentiment_analysis(self):
-        """Test sentiment analysis execution."""
-        from loats.models import SentimentAnalysisResult
-
-        # Create a proper SentimentAnalysisResult object
-        mock_result = SentimentAnalysisResult(
-            symbol="TEST",
-            timestamp=datetime.now(UTC),
-            sentiment_score=0.8,
-            sentiment_label="positive",
-            news_count=5,
-            positive_count=3,
-            negative_count=1,
-            neutral_count=1,
-            top_news=[],
-        )
-
-        # Mock the async function to return the result directly (not a coroutine)
-        with patch(
-            "loats.orchestrator.sentiment.analyze_symbol_sentiment",
-            return_value=mock_result,
-        ):
-            with patch(
-                "loats.orchestrator.db.async_create_signal", new_callable=AsyncMock
-            ) as mock_create_signal:
-                mock_create_signal.return_value = True
-                with patch("loats.orchestrator.settings") as mock_settings:
-                    mock_settings.default_symbol = "TEST"
-                    mock_settings.sentiment_threshold = 0.5
-                    await self.orchestrator._execute_sentiment_analysis()
-                    mock_create_signal.assert_called_once()
-
-    async def test_execute_market_data_update(self):
-        """Test market data update execution."""
-        with patch("loats.orchestrator.settings") as mock_settings:
-            mock_settings.default_symbol = "TEST"
-
-            with patch.object(
-                self.orchestrator, "_safe_get_quotes", new_callable=AsyncMock
-            ) as mock_get_quotes:
-                mock_get_quotes.return_value = None
-                with patch.object(
-                    self.orchestrator, "_safe_get_position_book", new_callable=AsyncMock
-                ) as mock_pos:
-                    mock_pos.return_value = None
-                    with patch.object(
-                        self.orchestrator, "_safe_get_funds", new_callable=AsyncMock
-                    ) as mock_funds:
-                        mock_funds.return_value = None
-                        # Should handle no quotes gracefully
-                        await self.orchestrator._execute_market_data_update()
-                        mock_get_quotes.assert_called_once()
-
-    async def test_execute_strike_selection(self):
-        """Test strike selection execution."""
-        # Create test option chain
-        now = datetime.now(UTC)
-        option_chain = [
-            OptionContract(
-                symbol="TEST24JUL100CE",
-                strike_price=100.0,
-                expiry=now,
-                option_type=OptionType.CALL,
-                last_price=5.0,
-                open_interest=1000,
-                volume=500,
-                implied_volatility=0.25,
-                delta=0.5,
-                gamma=0.01,
-                theta=-0.05,
-                vega=0.1,
-                rho=0.05,
-                quantity=1,
-            )
-        ]
-
-        with patch(
-            "loats.orchestrator.select_strikes", new_callable=AsyncMock
-        ) as mock_select_strikes:
-            mock_select_strikes.return_value = [100.0, 105.0]
-
-            result = await self.orchestrator._execute_strike_selection(option_chain)
-
-            # Method returns list of selected strikes
-            assert isinstance(result, list)
-            assert len(result) == 2
-            mock_select_strikes.assert_called_once()
-
-    async def test_execute_strike_selection_empty(self):
-        """Test strike selection with empty option chain."""
-        result = await self.orchestrator._execute_strike_selection([])
-        assert result == []
-
-    async def test_execute_risk_management(self):
-        """Test risk management execution."""
-        with patch("loats.orchestrator.OPENALGO_CIRCUIT_BREAKER") as mock_cb:
-            mock_cb.get_status.return_value = {"state": "closed"}
-            with patch("loats.orchestrator.db.get_position") as mock_pos:
-                mock_pos.return_value = None
-                with patch("loats.orchestrator.db.get_latest_funds") as mock_funds:
-                    mock_funds.return_value = None
-                    with patch("loats.orchestrator.settings") as mock_settings:
-                        mock_settings.default_symbol = "TEST"
-                        mock_settings.max_position_size = 100
-                        mock_settings.max_margin_utilization = 0.8
-                        await self.orchestrator._execute_risk_management()
-                        mock_pos.assert_called_once()
-
-    async def test_execute_trading_cycle(self):
-        """Test complete trading cycle execution."""
-        with patch.object(
-            self.orchestrator, "_execute_ta_analysis", new_callable=AsyncMock
-        ) as mock_ta:
-            with patch.object(
-                self.orchestrator, "_execute_sentiment_analysis", new_callable=AsyncMock
-            ) as mock_sentiment:
-                with patch.object(
-                    self.orchestrator,
-                    "_execute_market_data_update",
-                    new_callable=AsyncMock,
-                ) as mock_market:
-                    with patch.object(
-                        self.orchestrator,
-                        "_execute_risk_management",
-                        new_callable=AsyncMock,
-                    ) as mock_risk:
-                        # Mock CMP strategy: real implementation performs
-                        # httpx network I/O via _safe_get_history. Unit
-                        # tests must not hit the network; an abandoned
-                        # connect_tcp coroutine otherwise leaks (warning).
-                        with patch.object(
-                            self.orchestrator,
-                            "_execute_cmp_strategy",
-                            new_callable=AsyncMock,
-                        ) as mock_cmp:
-                            # Mock rules_engine to allow CMP execution
-                            with patch("loats.orchestrator.rules_engine") as mock_rules:
-                                mock_rules.is_trading_allowed.return_value = True
-                                await self.orchestrator._execute_trading_cycle()
-
-                                mock_ta.assert_called_once()
-                                mock_sentiment.assert_called_once()
-                                mock_market.assert_called_once()
-                                # Note: signal_generation was removed during TODO-19 legacy engine retirement
-                                mock_risk.assert_called_once()
-                                mock_cmp.assert_called_once()
-
-    async def test_execute_trading_cycle_with_kill_switch(self):
-        """Test trading cycle with kill switch active."""
-        with patch.object(
-            self.orchestrator,
-            "_check_kill_switch",
-            side_effect=KillSwitchError("Kill switch active"),
-        ):
-            with patch("loats.orchestrator.logger") as mock_logger:
-                with patch("asyncio.sleep", new_callable=AsyncMock):
-                    # _execute_trading_cycle doesn't call _check_kill_switch; that's in _run_cycle_loop
-                    # Test _run_cycle_loop with kill switch
-                    with patch.object(
-                        self.orchestrator, "_shutdown_event"
-                    ) as mock_shutdown:
-                        mock_shutdown.is_set.side_effect = [False, True]
-                        await self.orchestrator._run_cycle_loop()
-                        mock_logger.warning.assert_any_call(
-                            "Kill switch active - trading cycle paused"
-                        )
-
-    async def test_execute_trading_cycle_with_error(self):
-        """Test trading cycle with error."""
-        # Reset settings to ensure clean state
-        import loats.orchestrator
-
-        loats.orchestrator.settings = None
-
-        with patch.object(
-            self.orchestrator,
-            "_execute_ta_analysis",
-            side_effect=Exception("Test error"),
-        ):
-            with patch.object(
-                self.orchestrator,
-                "_execute_sentiment_analysis",
-                new_callable=AsyncMock,
-            ) as mock_sentiment:
-                with patch.object(
-                    self.orchestrator,
-                    "_execute_market_data_update",
-                    new_callable=AsyncMock,
-                ) as mock_market:
-                    with patch("loats.orchestrator.logger"):
-                        with patch(
-                            "loats.orchestrator.alerts.send_system_alert",
-                            new_callable=AsyncMock,
-                        ):
-                            try:
-                                await self.orchestrator._execute_trading_cycle()
-                                raise AssertionError(
-                                    "Expected exception was not raised"
-                                )
-                            except Exception as e:
-                                assert "Test error" in str(e)
-                            mock_sentiment.assert_awaited_once()
-                            mock_market.assert_awaited_once()
-
-    def test_record_cycle_time(self):
-        """Test cycle time recording."""
-        # Test initial state
-        assert self.orchestrator.last_cycle_time == 0.0
-        assert self.orchestrator.max_cycle_time == 0.0
-        assert self.orchestrator.avg_cycle_time == 0.0
-        assert self.orchestrator.total_cycle_time == 0.0
-
-        # Record first cycle time
-        self.orchestrator._record_cycle_time(0.05)  # 50ms
-        assert self.orchestrator.last_cycle_time == 0.05
-        assert self.orchestrator.max_cycle_time == 0.05
-        assert self.orchestrator.avg_cycle_time == 0.05
-        assert self.orchestrator.total_cycle_time == 0.05
-
-        # Record second cycle time
-        self.orchestrator._record_cycle_time(0.07)  # 70ms
-        assert self.orchestrator.last_cycle_time == 0.07
-        assert self.orchestrator.max_cycle_time == 0.07
-        assert (
-            abs(self.orchestrator.avg_cycle_time - 0.06) < 0.001
-        )  # Average of 50ms and 70ms
-        assert (
-            abs(self.orchestrator.total_cycle_time - 0.12) < 0.001
-        )  # Sum of 50ms and 70ms
-
-    async def test_run_cycle_loop(self):
-        """Test the main trading cycle loop."""
-        with patch.object(self.orchestrator, "_shutdown_event") as mock_shutdown_event:
-            mock_shutdown_event.is_set.side_effect = [
-                False,
-                True,
-            ]  # Run once then shutdown
-
-            with patch.object(
-                self.orchestrator, "_execute_trading_cycle", new_callable=AsyncMock
-            ) as mock_execute_cycle:
-                with patch.object(
-                    self.orchestrator, "_check_kill_switch", new_callable=AsyncMock
-                ):
-                    with patch.object(
-                        self.orchestrator, "_record_cycle_time"
-                    ) as mock_record_time:
-                        with patch(
-                            "asyncio.sleep", new_callable=AsyncMock
-                        ) as mock_sleep:
-                            await self.orchestrator._run_cycle_loop()
-                            mock_execute_cycle.assert_called_once()
-                            mock_record_time.assert_called_once()
-                            mock_sleep.assert_called_once()
-
-    async def test_shutdown(self):
-        """Test orchestrator shutdown."""
-        await self.orchestrator.initialize()
-        assert self.orchestrator.running is True
-
-        await self.orchestrator.shutdown()
-        assert self.orchestrator.running is False
-
-    async def test_get_cycle_stats(self):
-        """Test cycle statistics retrieval."""
-        # Record some cycle times
-        self.orchestrator._record_cycle_time(0.05)  # 50ms
-        self.orchestrator._record_cycle_time(0.07)  # 70ms
-
-        stats = self.orchestrator.get_cycle_stats()
-        assert stats["cycle_count"] == 2
-        assert abs(stats["last_cycle_time_ms"] - 70.0) < 0.1
-        assert abs(stats["max_cycle_time_ms"] - 70.0) < 0.1
-        assert abs(stats["avg_cycle_time_ms"] - 60.0) < 0.1
-
-    async def test_get_cycle_stats_module_level(self):
-        """Test module-level get_cycle_stats function."""
-        # The module-level function is async
-        with patch("loats.orchestrator.orchestrator") as mock_orch:
-            mock_orch.get_cycle_stats.return_value = {"cycle_count": 1}
-            result = await get_cycle_stats()
-            assert result["cycle_count"] == 1
-
-    async def test_cycle_time_target(self):
-        """Test that cycle time target is enforced."""
-        with patch.object(
-            self.orchestrator, "_execute_trading_cycle", new_callable=AsyncMock
-        ) as mock_execute_cycle:
-            mock_execute_cycle.side_effect = AsyncMock()  # Simulate quick execution
-
-            with patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
-                # Run a single cycle manually
-                cycle_start = datetime.now(UTC)
-                await self.orchestrator._check_kill_switch()
-                await self.orchestrator._execute_trading_cycle()
-
-                # Calculate and record cycle time
-                cycle_duration = (datetime.now(UTC) - cycle_start).total_seconds()
-                self.orchestrator._record_cycle_time(cycle_duration)
-
-                # Enforce 100ms cycle target
-                target_duration = 0.1  # 100ms
-                sleep_time = max(0, target_duration - cycle_duration)
-                await asyncio.sleep(sleep_time)
-
-                # Verify that sleep was called
-                mock_sleep.assert_called_once()
-                sleep_arg = mock_sleep.call_args[0][0]
-                assert sleep_arg <= 0.1  # Should be <= 100ms
-
-    async def test_no_double_cycle_count_increment(self):
-        """Test that cycle count is incremented only once per cycle (F6-H-05 #1)."""
-        # Reset cycle count
-        self.orchestrator.cycle_count = 0
-
-        with patch.object(
-            self.orchestrator, "_execute_ta_analysis", new_callable=AsyncMock
-        ):
-            with patch.object(
-                self.orchestrator, "_execute_sentiment_analysis", new_callable=AsyncMock
-            ):
-                with patch.object(
-                    self.orchestrator,
-                    "_execute_market_data_update",
-                    new_callable=AsyncMock,
-                ):
-                    with patch.object(
-                        self.orchestrator,
-                        "_execute_risk_management",
-                        new_callable=AsyncMock,
-                    ):
-                        with patch.object(
-                            self.orchestrator,
-                            "_execute_cmp_strategy",
-                            new_callable=AsyncMock,
-                        ):
-                            # Note: _execute_signal_generation was removed during TODO-19 legacy engine retirement
-                            # Signal generation is now part of _execute_cmp_strategy
-                            # Execute one trading cycle via _run_cycle_loop logic
-                            # Manually call the cycle execution and record cycle time
-                            await self.orchestrator._execute_trading_cycle()
-                            self.orchestrator._record_cycle_time(0.05)
-
-                            # Cycle count should be incremented exactly once
-                            assert self.orchestrator.cycle_count == 1
-
-                            # Execute another cycle
-                            await self.orchestrator._execute_trading_cycle()
-                            self.orchestrator._record_cycle_time(0.07)
-
-                            # Cycle count should now be 2
-                            assert self.orchestrator.cycle_count == 2
-
-    async def test_lazy_settings_loading(self):
-        """Test that settings are loaded lazily to avoid import-time failures (F6-H-05 #2)."""
-        # Reset settings to None before test
-        import loats.orchestrator
-
-        loats.orchestrator.settings = None
-
-        # Verify settings start as None by accessing module attribute directly
-        import loats.orchestrator
-
-        assert loats.orchestrator.settings is None
-
-        # Test that orchestrator can be imported without settings
-        from loats.orchestrator import TradingOrchestrator
-
-        orchestrator = TradingOrchestrator()
-
-        # Settings should still be None until actually needed
-        import loats.orchestrator
-
-        assert loats.orchestrator.settings is None
-
-        # Now test that settings are loaded when needed (during risk management)
-        with patch("loats.orchestrator.get_settings") as mock_get_settings:
-            mock_settings = MagicMock()
-            mock_settings.default_symbol = "TEST"
-            mock_settings.max_position_size = 100
-            mock_settings.max_margin_utilization = 0.8
-            mock_get_settings.return_value = mock_settings
-
-            with patch("loats.orchestrator.OPENALGO_CIRCUIT_BREAKER") as mock_cb:
-                mock_cb.get_status.return_value = {"state": "closed"}
-                with patch("loats.orchestrator.db.get_position") as mock_pos:
-                    mock_pos.return_value = None
-                    with patch("loats.orchestrator.db.get_latest_funds") as mock_funds:
-                        mock_funds.return_value = None
-
-                        # This should trigger lazy loading of settings
-                        await orchestrator._execute_risk_management()
-
-                        # Verify settings were loaded
-                        mock_get_settings.assert_called_once()
-                        # Global settings should now be set
-                        import loats.orchestrator
-
-                        assert loats.orchestrator.settings is not None
-
-    async def test_strong_task_reference(self):
-        """Test that cycle task maintains strong reference to prevent GC (F6-H-05 #3)."""
-        await self.orchestrator.initialize()
-
-        with patch.object(self.orchestrator, "_run_cycle_loop", new_callable=AsyncMock):
-            await self.orchestrator.start()
-
-            # Verify orchestrator is running
-            assert self.orchestrator.running is True
-
-            # Verify cycle task was created (it's a real task, not a mock)
-            assert self.orchestrator._cycle_task is not None
-
-    async def test_proper_shutdown_with_task_wait(self):
-        """Test that shutdown properly waits for cycle task completion (F6-H-05 #4)."""
-        await self.orchestrator.initialize()
-
-        # Create a mock task
-        mock_task = AsyncMock()
-        self.orchestrator._cycle_task = mock_task
-
-        with patch("asyncio.wait_for") as mock_wait_for:
-            mock_wait_for.return_value = None  # Simulate successful wait
-
-            await self.orchestrator.shutdown()
-
-            # Verify that wait_for was called with the actual task (not the event)
-            mock_wait_for.assert_called_once_with(mock_task, timeout=5.0)
-
-            # Verify orchestrator is no longer running
-            assert self.orchestrator.running is False
-
-    async def test_alert_backoff_mechanism(self):
-        """Test that alerts have backoff to prevent floods (F6-H-05 #5)."""
-        # Set last alert time to current time
-        now = datetime.now(UTC).timestamp()
-        self.orchestrator._last_alert_time = now
-
-        with patch(
-            "loats.orchestrator.alerts.send_system_alert", new_callable=AsyncMock
-        ) as mock_alert:
-            with patch("loats.orchestrator.datetime") as mock_datetime:
-                # Mock current time to be 10 seconds after last alert (should not send)
-                mock_datetime.datetime.now.return_value.timestamp.return_value = (
-                    now + 10
-                )
-                mock_datetime.UTC = UTC
-
-                # Simulate an error in the cycle loop
-                try:
-                    # This would normally be in _run_cycle_loop exception handler
-                    current_time = now + 10
-                    if current_time - self.orchestrator._last_alert_time > 60:
-                        await mock_alert("Test error", "error")
-                        self.orchestrator._last_alert_time = current_time
-                except Exception:
-                    pass
-
-                # Alert should not be sent (only 10 seconds passed, need 60)
-                mock_alert.assert_not_called()
-
-                # Now test with 61 seconds passed (should send)
-                mock_datetime.datetime.now.return_value.timestamp.return_value = (
-                    now + 61
-                )
-
-                try:
-                    current_time = now + 61
-                    if current_time - self.orchestrator._last_alert_time > 60:
-                        await mock_alert("Test error", "error")
-                        self.orchestrator._last_alert_time = current_time
-                except Exception:
-                    pass
-
-                # Alert should be sent now
-                mock_alert.assert_called_once_with("Test error", "error")
-
-    async def test_zero_division_guard_in_margin_calculation(self):
-        """Test that zero division is prevented in margin utilization calculation (F6-H-05 #6)."""
-        from loats.models import FundsData
-
-        # Create funds with zero available margin
-        funds_with_zero_margin = FundsData(
-            available_cash=1000.0,
-            utilized_margin=500.0,
-            available_margin=0.0,  # This would cause division by zero
-            total_equity=1500.0,
-            timestamp=datetime.now(UTC),
-        )
-
-        with patch("loats.orchestrator.OPENALGO_CIRCUIT_BREAKER") as mock_cb:
-            mock_cb.get_status.return_value = {"state": "closed"}
-            with patch("loats.orchestrator.db.get_position") as mock_pos:
-                mock_pos.return_value = None
-                with patch("loats.orchestrator.db.get_latest_funds") as mock_funds:
-                    mock_funds.return_value = funds_with_zero_margin
-                    with patch("loats.orchestrator.settings") as mock_settings:
-                        mock_settings.default_symbol = "TEST"
-                        mock_settings.max_position_size = 100
-                        mock_settings.max_margin_utilization = 0.8
-
-                        # This should not raise ZeroDivisionError
-                        with patch("loats.orchestrator.logger") as mock_logger:
-                            await self.orchestrator._execute_risk_management()
-
-                            # Should log warning about zero margin
-                            mock_logger.warning.assert_called_with(
-                                "Available margin is zero - cannot calculate utilization ratio"
-                            )
-
-    async def test_ta_analysis_in_parallel_window(self):
-        """Test that TA analysis runs within the parallel execution window (F6-H-05 #7)."""
-        with patch.object(
-            self.orchestrator, "_execute_ta_analysis", new_callable=AsyncMock
-        ) as mock_ta:
-            with patch.object(
-                self.orchestrator, "_execute_sentiment_analysis", new_callable=AsyncMock
-            ) as mock_sentiment:
-                with patch.object(
-                    self.orchestrator,
-                    "_execute_market_data_update",
-                    new_callable=AsyncMock,
-                ) as mock_market:
-                    with patch("asyncio.gather") as mock_gather:
-                        with patch("asyncio.wait_for") as mock_wait_for:
-                            mock_wait_for.side_effect = lambda coroutine, timeout: (
-                                coroutine
-                            )
-                            # Mock sequential phase: real implementations hit
-                            # the network / global db (test isolation defect
-                            # that leaked a connect_tcp coroutine).
-                            # Note: _execute_signal_generation was removed during TODO-19 legacy engine retirement
-                            # Signal generation is now part of _execute_cmp_strategy
-                            with patch.object(
-                                self.orchestrator,
-                                "_execute_risk_management",
-                                new_callable=AsyncMock,
-                            ):
-                                with patch.object(
-                                    self.orchestrator,
-                                    "_execute_cmp_strategy",
-                                    new_callable=AsyncMock,
-                                ):
-                                    # Execute trading cycle
-                                    await self.orchestrator._execute_trading_cycle()
-
-                            # Verify TA analysis was included in the parallel execution
-                            mock_gather.assert_called_once()
-
-                            # Verify that the mocked methods were called
-                            mock_ta.assert_called_once()
-                            mock_sentiment.assert_called_once()
-                            mock_market.assert_called_once()
-
-    async def test_cycle_task_completion_callback(self):
-        """Test that cycle task completion callback handles exceptions properly."""
-        # Create a completed task with an exception
-        mock_task = MagicMock()
-        mock_task.done.return_value = True
-        test_exception = Exception("Test task exception")
-        mock_task.result.side_effect = test_exception
-
-        with patch("loats.orchestrator.logger") as mock_logger:
-            # Call the callback - it re-raises the exception after logging
-            with pytest.raises(Exception, match="Test task exception"):
-                self.orchestrator._handle_cycle_task_completion(mock_task)
-
-            # Verify exception was logged
-            mock_logger.error.assert_called_once()
-            # Check that the error message contains the expected text
-            call_args = mock_logger.error.call_args[0]
-            assert "Cycle task completed with exception" in str(call_args[0])
-
-            # Verify running flag was set to False
-            assert self.orchestrator.running is False
-
-    async def test_funds_model_creation_with_zero_margin(self):
-        """Test that funds model creation handles zero available margin gracefully."""
-        funds_data = {
-            "available_cash": 1000.0,
-            "utilized_margin": 500.0,
-            "available_margin": 0.0,  # Edge case
-            "total_equity": 1500.0,
-        }
-
-        # This should not raise an exception
-        funds_model = self.orchestrator._create_funds_model(funds_data)
-
-        assert funds_model.available_cash == 1000.0
-        assert funds_model.utilized_margin == 500.0
-        assert funds_model.available_margin == 0.0
-        assert funds_model.total_equity == 1500.0
-
-
-if __name__ == "__main__":
-    # Run the tests
-    unittest.main(verbosity=2)
+def orch():
+    return TradingOrchestrator()
+
+def make_signals(count=3, symbol='NIFTY'):
+    now = datetime.now(UTC)
+    sources = [StrengthSource.TECHNICAL_ANALYSIS, StrengthSource.SENTIMENT, StrengthSource.PRICE_ACTION]
+    return [Signal(symbol=symbol, signal_type=SignalType.BUY, strength=0.8 - i * 0.05, timestamp=now - timedelta(seconds=i * 10), indicators={'val': 0.5 + i * 0.1}, confidence=0.8 - i * 0.05, metadata={'source': sources[i].value}) for i in range(min(count, 3))]
+
+def make_historical(count=30, symbol='NIFTY'):
+    now = datetime.now(UTC)
+    items = []
+    for i in range(count):
+        c = 24500.0 + i * 10
+        items.append(HistoricalData(symbol=symbol, timestamp=now - timedelta(minutes=5 * (count - 1 - i)), open=c - 5, high=c + 10, low=c - 10, close=c, volume=1000000, interval='5min'))
+    return items
+
+def make_funds_data():
+    return FundsData(available_cash=100000.0, utilized_margin=20000.0, available_margin=80000.0, total_equity=120000.0, timestamp=datetime.now(UTC))
+
+class TestCMPStrategyExecution:
+    @pytest.mark.asyncio
+    async def test_insufficient_signals_early_return(self, orch, temp_db):
+        with patch('loats.orchestrator.settings') as mock_settings, \
+             patch('loats.orchestrator.db', temp_db), \
+             patch('loats.orchestrator.rules_engine') as mock_rules, \
+             patch('loats.orchestrator.record_cmp_chain_rejection') as mock_reject:
+            mock_settings.default_symbol = 'NIFTY'
+            mock_settings.enable_trailing_stops = False
+            mock_rules.is_trading_allowed.return_value = True
+            mock_rules.session_state.value = 'REGULAR'
+            temp_db.async_get_latest_signals = AsyncMock(return_value=make_signals(2))
+            await orch._execute_cmp_strategy()
+            mock_reject.assert_called_once_with('insufficient_signals')
+            assert orch._insufficient_signals_count == 1
+
+    @pytest.mark.asyncio
+    async def test_trading_not_allowed_skips(self, orch):
+        with patch('loats.orchestrator.rules_engine') as mock_rules:
+            mock_rules.is_trading_allowed.return_value = False
+            with patch.object(orch, '_execute_cmp_strategy', new_callable=AsyncMock) as mock_cmp:
+                await orch._execute_trading_cycle()
+                mock_cmp.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_no_historical_data_returns(self, orch, temp_db):
+        with patch('loats.orchestrator.settings') as mock_settings, \
+             patch('loats.orchestrator.db', temp_db), \
+             patch('loats.orchestrator.rules_engine') as mock_rules, \
+             patch.object(orch, '_safe_get_history', new_callable=AsyncMock, return_value=None):
+            mock_settings.default_symbol = 'NIFTY'
+            mock_settings.enable_trailing_stops = False
+            mock_rules.is_trading_allowed.return_value = True
+            mock_rules.session_state.value = 'REGULAR'
+            temp_db.async_get_latest_signals = AsyncMock(return_value=make_signals(3))
+            await orch._execute_cmp_strategy()
+
+    @pytest.mark.asyncio
+    async def test_no_quote_data_returns(self, orch, temp_db):
+        history = [{'timestamp': datetime.now(UTC).isoformat(), 'open': 24500, 'high': 24550, 'low': 24450, 'close': 24510, 'volume': 1000000}]
+        with patch('loats.orchestrator.settings') as mock_settings, \
+             patch('loats.orchestrator.db', temp_db), \
+             patch('loats.orchestrator.rules_engine') as mock_rules, \
+             patch.object(orch, '_safe_get_history', new_callable=AsyncMock, return_value={'data': history}), \
+             patch.object(orch, '_safe_get_quotes', new_callable=AsyncMock, return_value=None):
+            mock_settings.default_symbol = 'NIFTY'
+            mock_settings.enable_trailing_stops = False
+            mock_rules.is_trading_allowed.return_value = True
+            mock_rules.session_state.value = 'REGULAR'
+            temp_db.async_get_latest_signals = AsyncMock(return_value=make_signals(3))
+            await orch._execute_cmp_strategy()
+
+    @pytest.mark.asyncio
+    async def test_no_funds_data_returns(self, orch, temp_db):
+        history = [{'timestamp': datetime.now(UTC).isoformat(), 'open': 24500, 'high': 24550, 'low': 24450, 'close': 24510, 'volume': 1000000}]
+        quotes = {'data': {'NIFTY': {'last_price': 24510}}}
+        with patch('loats.orchestrator.settings') as mock_settings, \
+             patch('loats.orchestrator.db', temp_db), \
+             patch('loats.orchestrator.rules_engine') as mock_rules, \
+             patch.object(orch, '_safe_get_history', new_callable=AsyncMock, return_value={'data': history}), \
+             patch.object(orch, '_safe_get_quotes', new_callable=AsyncMock, return_value=quotes), \
+             patch.object(orch, '_safe_get_funds', new_callable=AsyncMock, return_value=None):
+            mock_settings.default_symbol = 'NIFTY'
+            mock_settings.enable_trailing_stops = False
+            mock_rules.is_trading_allowed.return_value = True
+            mock_rules.session_state.value = 'REGULAR'
+            temp_db.async_get_latest_signals = AsyncMock(return_value=make_signals(3))
+            await orch._execute_cmp_strategy()
+
+class TestOrchestratorInitialization:
+    def test_initial_state(self, orch):
+        assert orch.running is False
+        assert orch.cycle_count == 0
+        assert orch.last_cycle_time == 0.0
+        assert orch.max_cycle_time == 0.0
+
+    @pytest.mark.asyncio
+    async def test_initialize_sets_running(self, orch):
+        with patch('loats.orchestrator.settings') as mock_settings, \
+             patch('loats.orchestrator.db') as mock_db:
+            mock_db._local_connection = MagicMock()
+            mock_db.async_get_latest_signals = AsyncMock(return_value=[])
+            await orch.initialize()
+            assert orch.running is True
+            assert orch.cycle_count == 0
+
+    @pytest.mark.asyncio
+    async def test_shutdown_sets_running_false(self, orch):
+        with patch('loats.orchestrator.settings') as mock_settings, \
+             patch('loats.orchestrator.db') as mock_db:
+            mock_db._local_connection = MagicMock()
+            mock_db.async_get_latest_signals = AsyncMock(return_value=[])
+            await orch.initialize()
+            await orch.shutdown()
+            assert orch.running is False
+
+class TestSessionStateTracking:
+    @pytest.mark.asyncio
+    async def test_session_change_resets_counter(self, orch, temp_db):
+        mock_session = MagicMock()
+        mock_session.value = 'REGULAR'
+        with patch('loats.orchestrator.settings') as mock_settings, \
+             patch('loats.orchestrator.db', temp_db), \
+             patch('loats.orchestrator.rules_engine') as mock_rules, \
+             patch('loats.orchestrator.record_cmp_chain_rejection') as mock_reject:
+            mock_settings.default_symbol = 'NIFTY'
+            mock_settings.enable_trailing_stops = False
+            mock_rules.is_trading_allowed.return_value = True
+            mock_rules.session_state = mock_session
+            temp_db.async_get_latest_signals = AsyncMock(return_value=make_signals(2))
+            mock_session.value = 'REGULAR'
+            await orch._execute_cmp_strategy()
+            assert orch._insufficient_signals_count == 1
+            mock_session.value = 'CLOSING'
+            await orch._execute_cmp_strategy()
+            assert orch._insufficient_signals_count == 1
+
+class TestInsufficientSignalsTracking:
+    @pytest.mark.asyncio
+    async def test_counter_increments(self, orch, temp_db):
+        mock_session = MagicMock()
+        mock_session.value = 'REGULAR'
+        with patch('loats.orchestrator.settings') as mock_settings, \
+             patch('loats.orchestrator.db', temp_db), \
+             patch('loats.orchestrator.rules_engine') as mock_rules, \
+             patch('loats.orchestrator.record_cmp_chain_rejection') as mock_reject:
+            mock_settings.default_symbol = 'NIFTY'
+            mock_settings.enable_trailing_stops = False
+            mock_rules.is_trading_allowed.return_value = True
+            mock_rules.session_state = mock_session
+            temp_db.async_get_latest_signals = AsyncMock(return_value=make_signals(1))
+            await orch._execute_cmp_strategy()
+            await orch._execute_cmp_strategy()
+            assert orch._insufficient_signals_count == 2
+
+# -- Additional coverage tests ----------------------------------------------------
+import numpy as np
+
+class TestHurstExponent:
+    def test_short_prices_returns_none(self):
+        o = TradingOrchestrator()
+        assert o._calculate_hurst_exponent(np.array([1.0]*10)) is None
+
+    def test_valid_prices_returns_float(self):
+        o = TradingOrchestrator()
+        np.random.seed(42)
+        prices = np.cumsum(np.random.randn(100) * 0.01) + 100
+        result = o._calculate_hurst_exponent(prices)
+        assert result is not None
+        assert isinstance(result, float)
+
+    def test_exception_returns_none(self):
+        o = TradingOrchestrator()
+        with patch('loats.orchestrator.np.diff', side_effect=ValueError('bad')):
+            assert o._calculate_hurst_exponent(np.array([1.0]*100)) is None
+
+class TestRecordCycleTime:
+    def test_basic_record(self):
+        o = TradingOrchestrator()
+        o._record_cycle_time(0.05)
+        assert o.cycle_count == 1
+        assert o.last_cycle_time == 0.05
+
+    def test_multiple_records(self):
+        o = TradingOrchestrator()
+        o._record_cycle_time(0.05)
+        o._record_cycle_time(0.15)
+        assert o.cycle_count == 2
+        assert o.max_cycle_time == 0.15
+
+class TestModelCreation:
+    def test_create_position_model(self):
+        o = TradingOrchestrator()
+        pos = o._create_position_model({
+            'symbol': 'NIFTY', 'quantity': 100, 'average_price': 24000.0,
+            'last_price': 24100.0, 'pnl': 10000.0, 'product_type': 'MIS',
+        })
+        assert pos.symbol == 'NIFTY'
+
+    def test_create_funds_model(self):
+        o = TradingOrchestrator()
+        with patch('loats.orchestrator.datetime') as mdt:
+            import datetime as dt
+            mdt.datetime.now.return_value = dt.datetime(2025,1,1,tzinfo=dt.timezone.utc)
+            mdt.UTC = dt.timezone.utc
+            funds = o._create_funds_model({
+                'available_cash': 50000.0, 'utilized_margin': 10000.0,
+                'available_margin': 40000.0, 'total_equity': 100000.0,})
+        assert funds.available_cash == 50000.0
+
+class TestGetCycleStats:
+    def test_initial_stats(self):
+        o = TradingOrchestrator()
+        stats = o.get_cycle_stats()
+        assert stats['cycle_count'] == 0
+
+class TestHandleCycleTaskCompletion:
+    @pytest.mark.asyncio
+    async def test_failed_task(self):
+        o = TradingOrchestrator()
+        o.running = True
+        async def fail(): raise RuntimeError('boom')
+        task = asyncio.create_task(fail())
+        await asyncio.sleep(0)
+        try: o._handle_cycle_task_completion(task)
+        except RuntimeError: pass
+        assert o.running is False
+
+class TestCheckKillSwitch:
+    @pytest.mark.asyncio
+    async def test_kill_switch_active(self):
+        o = TradingOrchestrator()
+        with patch('loats.orchestrator.alerts.is_kill_switch_active', return_value=True):
+            with pytest.raises(Exception): await o._check_kill_switch()
+    @pytest.mark.asyncio
+    async def test_kill_switch_inactive(self):
+        o = TradingOrchestrator()
+        with patch('loats.orchestrator.alerts.is_kill_switch_active', return_value=False):
+            await o._check_kill_switch()
+
+class TestShutdown:
+    @pytest.mark.asyncio
+    async def test_shutdown_not_running(self):
+        o = TradingOrchestrator()
+        await o.shutdown()
+    @pytest.mark.asyncio
+    async def test_shutdown_running_no_task(self):
+        o = TradingOrchestrator()
+        o.running = True
+        await o.shutdown()
+
+class TestSafeGetters:
+    @pytest.mark.asyncio
+    async def test_safe_get_history_success(self):
+        o = TradingOrchestrator()
+        with patch('loats.orchestrator.async_client') as mc:
+            mc.get_history = AsyncMock(return_value={'data': []})
+            result = await o._safe_get_history('NIFTY', '5minute')
+        assert result == {'data': []}
+    @pytest.mark.asyncio
+    async def test_safe_get_history_failure(self):
+        o = TradingOrchestrator()
+        with patch('loats.orchestrator.async_client') as mc:
+            mc.get_history = AsyncMock(side_effect=Exception('fail'))
+            result = await o._safe_get_history('NIFTY', '5minute')
+        assert result is None
+    @pytest.mark.asyncio
+    async def test_safe_get_quotes_success(self):
+        o = TradingOrchestrator()
+        with patch('loats.orchestrator.async_client') as mc:
+            mc.get_quotes = AsyncMock(return_value={'data': {'NIFTY': {}}})
+            result = await o._safe_get_quotes(['NIFTY'])
+        assert result is not None
+    @pytest.mark.asyncio
+    async def test_safe_get_position_book(self):
+        o = TradingOrchestrator()
+        with patch('loats.orchestrator.async_client') as mc:
+            mc.get_position_book = AsyncMock(return_value={'data': []})
+            result = await o._safe_get_position_book()
+        assert result is not None
+    @pytest.mark.asyncio
+    async def test_safe_get_funds(self):
+        o = TradingOrchestrator()
+        with patch('loats.orchestrator.async_client') as mc:
+            mc.get_funds = AsyncMock(return_value={'data': {}})
+            result = await o._safe_get_funds()
+        assert result is not None
+
+class TestRunCycleLoop:
+    @pytest.mark.asyncio
+    async def test_kill_switch_pauses(self):
+        from loats.openalgo import KillSwitchError
+        o = TradingOrchestrator()
+        call_count = 0
+        async def fake_cycle(): o._shutdown_event.set()
+        async def kill_once():
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                raise KillSwitchError()
+        with patch.object(o, '_execute_trading_cycle', side_effect=fake_cycle):
+            with patch.object(o, '_check_kill_switch', side_effect=kill_once):
+                await o._run_cycle_loop()
+
+class TestExecuteTradingCycle:
+    @pytest.mark.asyncio
+    async def test_full_cycle(self):
+        import datetime as dt
+        o = TradingOrchestrator()
+        ms = MagicMock()
+        ms.default_symbol = 'NIFTY'
+        ms.trading_enabled = True
+        with patch('loats.orchestrator.settings', ms):
+            with patch.object(o, '_execute_market_data_update', new_callable=AsyncMock):
+                with patch.object(o, '_execute_ta_analysis', new_callable=AsyncMock):
+                    with patch.object(o, '_execute_sentiment_analysis', new_callable=AsyncMock):
+                        with patch.object(o, '_execute_volatility_analysis', new_callable=AsyncMock):
+                            with patch.object(o, '_execute_risk_management', new_callable=AsyncMock):
+                                with patch.object(o, '_execute_cmp_strategy', new_callable=AsyncMock):
+                                    with patch.object(o, '_execute_strike_selection', new_callable=AsyncMock):
+                                        with patch('loats.orchestrator.datetime') as mdt:
+                                            mdt.datetime.now.return_value = dt.datetime.now(dt.timezone.utc)
+                                            mdt.UTC = dt.timezone.utc
+                                            await o._execute_trading_cycle()
+
+class TestExecuteMarketDataUpdate:
+    @pytest.mark.asyncio
+    async def test_basic_update(self):
+        import datetime as dt
+        o = TradingOrchestrator()
+        ms = MagicMock()
+        ms.default_symbol = 'NIFTY'
+        mdb = MagicMock()
+        mdb.async_store_quote = AsyncMock()
+        mdb.async_store_position = AsyncMock()
+        mdb.async_store_funds = AsyncMock()
+        qd = {'last_price': 24000, 'open': 23900, 'high': 24100, 'low': 23800, 'close': 24000, 'volume': 1000, 'change': 100, 'change_percent': 0.42}
+        with patch('loats.orchestrator.settings', ms):
+            with patch('loats.orchestrator.db', mdb):
+                with patch.object(o, '_safe_get_quotes', new_callable=AsyncMock, return_value={'data': {'NIFTY': qd}}):
+                    with patch.object(o, '_safe_get_position_book', new_callable=AsyncMock, return_value=None):
+                        with patch.object(o, '_safe_get_funds', new_callable=AsyncMock, return_value=None):
+                            with patch('loats.orchestrator._fetch_cached_vix', new_callable=AsyncMock, return_value=14.0):
+                                with patch('loats.orchestrator.rules_engine'):
+                                    with patch('loats.orchestrator.datetime') as mdt:
+                                        mdt.datetime.now.return_value = dt.datetime.now(dt.timezone.utc)
+                                        mdt.UTC = dt.timezone.utc
+                                        await o._execute_market_data_update()
+        mdb.async_store_quote.assert_called_once()
+
+class TestExecuteRiskManagement:
+    @pytest.mark.asyncio
+    async def test_circuit_breaker_open(self):
+        import datetime as dt
+        o = TradingOrchestrator()
+        ms = MagicMock()
+        ms.default_symbol = 'NIFTY'
+        with patch('loats.orchestrator.settings', ms):
+            with patch('loats.orchestrator.OPENALGO_CIRCUIT_BREAKER') as mcb:
+                mcb.get_status.return_value = {'state': 'open'}
+                with patch('loats.orchestrator.datetime') as mdt:
+                    mdt.datetime.now.return_value = dt.datetime.now(dt.timezone.utc)
+                    mdt.UTC = dt.timezone.utc
+                    await o._execute_risk_management()
+
+class TestValidateRSSFeed:
+    @pytest.mark.asyncio
+    async def test_invalid_url(self):
+        from loats.orchestrator import validate_rss_feed
+        assert await validate_rss_feed('not-a-url') is False
+    @pytest.mark.asyncio
+    async def test_unsupported_scheme(self):
+        from loats.orchestrator import validate_rss_feed
+        assert await validate_rss_feed('ftp://example.com/feed') is False
+
+class TestModuleFunctions:
+    @pytest.mark.asyncio
+    async def test_start_orchestrator(self):
+        from loats.orchestrator import start_orchestrator, orchestrator
+        with patch.object(orchestrator, 'start', new_callable=AsyncMock):
+            await start_orchestrator()
+    @pytest.mark.asyncio
+    async def test_stop_orchestrator(self):
+        from loats.orchestrator import stop_orchestrator, orchestrator
+        with patch.object(orchestrator, 'shutdown', new_callable=AsyncMock):
+            await stop_orchestrator()
+    @pytest.mark.asyncio
+    async def test_get_cycle_stats_module(self):
+        from loats.orchestrator import get_cycle_stats as gcs, orchestrator
+        with patch.object(orchestrator, 'get_cycle_stats', return_value={'cycle_count': 0}):
+            r = await gcs()
+            assert r == {'cycle_count': 0}

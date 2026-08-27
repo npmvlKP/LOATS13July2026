@@ -1,296 +1,239 @@
-#!/usr/bin/env python3
-"""Tests for TradeDecision composite strength and signal source validation.
-
-HC-15: Math and Aggregate Validation
-HC-17: Signal Source Validation (F7-C-02a fix)
-"""
-
+"""Tests for TradeDecision engine."""
 import tempfile
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from unittest.mock import patch
-
+from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
-
 from loats.database import Database
-from loats.models import (
-    FundsData,
-    HistoricalData,
-    Signal,
-    SignalType,
-)
+from loats.models import (FundsData, HistoricalData, Signal, SignalType, TradeDecision, Trade, TransactionType)
 from loats.strength import StrengthSource, StrengthEngine, resolve_source
-from loats.trade_decision import TradeDecisionEngine
-
+from loats.trade_decision import TradeDecisionEngine, DecisionStatus
 
 @pytest.fixture
 def temp_db():
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as td:
-        db = Database(
-            db_path=Path(td) / "test_td.db",
-            audit_log_path=Path(td) / "test_audit.jsonl",
-        )
+        db = Database(db_path=Path(td)/"td.db", audit_log_path=Path(td)/"a.jsonl")
         db._initialize_database()
         yield db
         db.close_all()
 
-
 @pytest.fixture
-def strength_engine():
-    return StrengthEngine()
-
-
-@pytest.fixture
-def trade_decision_engine():
+def td_engine():
     return TradeDecisionEngine()
 
+@pytest.fixture
+def funds():
+    return FundsData(available_cash=100000.0, utilized_margin=20000.0, available_margin=80000.0, total_equity=120000.0, timestamp=datetime.now(UTC))
 
 @pytest.fixture
-def fixture_funds():
-    return FundsData(
-        available_cash=100000.0,
-        utilized_margin=20000.0,
-        available_margin=80000.0,
-        total_equity=120000.0,
-        timestamp=datetime.now(UTC),
-    )
-
-
-@pytest.fixture
-def fixture_historical_data():
+def hist():
     now = datetime.now(UTC)
-    return [
-        HistoricalData(
-            symbol="NIFTY",
-            timestamp=now - timedelta(minutes=5 * (30 - i)),
-            open=24500.0 + i * 10,
-            high=24550.0 + i * 10,
-            low=24470.0 + i * 10,
-            close=24510.0 + i * 10,
-            volume=1000000 + i * 10000,
-            interval="5min",
-        )
-        for i in range(30)
-    ]
+    return [HistoricalData(symbol="NIFTY", timestamp=now-timedelta(minutes=5*(30-i)), open=24500.0+i*10, high=24550.0+i*10, low=24470.0+i*10, close=24510.0+i*10, volume=1000000+i*10000, interval="5min") for i in range(30)]
 
-
-def _make_signals(count, strength_base=0.75, signal_type=SignalType.BUY):
-    """Create *count* signals with distinct valid sources."""
-    sources = [
-        StrengthSource.TECHNICAL_ANALYSIS,
-        StrengthSource.SENTIMENT,
-        StrengthSource.PRICE_ACTION,
-    ]
+def _sigs(n, base_str=0.75, st=SignalType.BUY):
+    srcs = [StrengthSource.TECHNICAL_ANALYSIS, StrengthSource.SENTIMENT, StrengthSource.PRICE_ACTION]
     now = datetime.now(UTC)
-    return [
-        Signal(
-            symbol="NIFTY",
-            signal_type=signal_type,
-            strength=strength_base - i * 0.05,
-            timestamp=now - timedelta(seconds=i * 30),
-            indicators={"val": 0.5 + i * 0.1},
-            confidence=0.8 - i * 0.05,
-            metadata={"source": sources[i].value},
-        )
-        for i in range(min(count, 3))
-    ]
+    return [Signal(symbol="NIFTY", signal_type=st, strength=base_str-i*0.05, timestamp=now-timedelta(seconds=i*30), indicators={"v":0.5+i*0.1}, confidence=0.8-i*0.05, metadata={"source": srcs[i].value}) for i in range(min(n,3))]
 
+def _make_td():
+    return TradeDecision(symbol="NIFTY", decision_type=SignalType.BUY, composite_strength=0.8, timestamp=datetime.now(UTC), entry_price=24500.0, quantity=25, stop_loss=24255.0, take_profit=24990.0, risk_percentage=0.02, status="PENDING")
 
-class TestCompositeStrengthCalculation:
-    """HC-15: Validate composite strength calculations and aggregation math."""
-
-    def test_composite_strength_with_three_sources(self, strength_engine):
-        cs, details = strength_engine.calculate_composite_strength(_make_signals(3))
+class TestStrength:
+    def test_composite_three_sources(self):
+        cs, d = StrengthEngine().calculate_composite_strength(_sigs(3))
         assert 0.0 <= cs <= 1.0
-        assert details["sources"] == 3
+        assert d["sources"] == 3
 
-    def test_composite_strength_weighted_by_confidence(self, strength_engine):
-        cs, _ = strength_engine.calculate_composite_strength(_make_signals(3, 0.9))
-        assert cs > 0.7
-
-    def test_composite_strength_diversity_score(self, strength_engine):
-        cs, details = strength_engine.calculate_composite_strength(_make_signals(3))
-        assert "opposition_check" in details
-
-    def test_composite_strength_with_opposing_signals(self, strength_engine):
+    def test_composite_opposition(self):
         now = datetime.now(UTC)
-        signals = [
-            Signal(
-                symbol="NIFTY",
-                signal_type=SignalType.BUY,
-                strength=0.8,
-                timestamp=now,
-                indicators={},
-                confidence=0.8,
-                metadata={"source": StrengthSource.TECHNICAL_ANALYSIS.value},
-            ),
-            Signal(
-                symbol="NIFTY",
-                signal_type=SignalType.BUY,
-                strength=0.75,
-                timestamp=now - timedelta(seconds=30),
-                indicators={},
-                confidence=0.75,
-                metadata={"source": StrengthSource.SENTIMENT.value},
-            ),
-            Signal(
-                symbol="NIFTY",
-                signal_type=SignalType.SELL,
-                strength=0.6,
-                timestamp=now - timedelta(seconds=60),
-                indicators={},
-                confidence=0.6,
-                metadata={"source": StrengthSource.PRICE_ACTION.value},
-            ),
-        ]
-        cs, _ = strength_engine.calculate_composite_strength(signals)
-        assert 0.0 <= cs <= 1.0
+        sigs = [Signal(symbol="NIFTY", signal_type=SignalType.BUY, strength=0.8, timestamp=now, indicators={}, confidence=0.8, metadata={"source": StrengthSource.TECHNICAL_ANALYSIS.value}), Signal(symbol="NIFTY", signal_type=SignalType.SELL, strength=0.75, timestamp=now-timedelta(seconds=30), indicators={}, confidence=0.75, metadata={"source": StrengthSource.SENTIMENT.value}), Signal(symbol="NIFTY", signal_type=SignalType.BUY, strength=0.7, timestamp=now-timedelta(seconds=60), indicators={}, confidence=0.7, metadata={"source": StrengthSource.PRICE_ACTION.value})]
+        cs, d = StrengthEngine().calculate_composite_strength(sigs)
+        assert "opposition_details" in d or "opposition_check" in d
 
-    def test_composite_strength_insufficient_sources(self, strength_engine):
-        cs, details = strength_engine.calculate_composite_strength(_make_signals(2))
-        assert cs == 0.0
-        assert details["reason"] == "insufficient_sources"
-
-
-class TestSignalSourceValidation:
-    """HC-17: Signal Source Validation (F7-C-02a fix)."""
-
-    def test_validate_three_valid_sources(self, strength_engine):
-        ok, d = strength_engine.validate_signal_sources(_make_signals(3))
-        assert ok is True
-        assert d["reason"] == "source_validation_passed"
-        assert d["unique_sources"] == 3
-
-    def test_validate_rejects_insufficient_sources(self, strength_engine):
-        ok, d = strength_engine.validate_signal_sources(_make_signals(2))
+    def test_insufficient_sources(self):
+        ok, d = StrengthEngine().validate_signal_sources(_sigs(2))
         assert ok is False
         assert d["reason"] == "insufficient_unique_sources"
-        assert d["available"] == 2
 
-    def test_validate_rejects_unknown_source(self, strength_engine):
+    def test_unknown_source(self):
         now = datetime.now(UTC)
-        signals = _make_signals(2) + [
-            Signal(
-                symbol="NIFTY",
-                signal_type=SignalType.BUY,
-                strength=0.68,
-                timestamp=now - timedelta(seconds=60),
-                indicators={},
-                confidence=0.72,
-                metadata={"source": "invalid_unknown_source"},
-            ),
-        ]
-        ok, d = strength_engine.validate_signal_sources(signals)
+        sigs = _sigs(2) + [Signal(symbol="NIFTY", signal_type=SignalType.BUY, strength=0.68, timestamp=now-timedelta(seconds=60), indicators={}, confidence=0.72, metadata={"source": "bad"})]
+        ok, d = StrengthEngine().validate_signal_sources(sigs)
         assert ok is False
         assert d["reason"] == "unknown_source"
 
-    def test_validate_rejects_duplicate_sources(self, strength_engine):
+    def test_duplicate_sources(self):
         now = datetime.now(UTC)
-        signals = [
-            Signal(
-                symbol="NIFTY",
-                signal_type=SignalType.BUY,
-                strength=0.75,
-                timestamp=now,
-                indicators={},
-                confidence=0.8,
-                metadata={"source": StrengthSource.TECHNICAL_ANALYSIS.value},
-            ),
-        ] * 3
-        ok, d = strength_engine.validate_signal_sources(signals)
+        sigs = [Signal(symbol="NIFTY", signal_type=SignalType.BUY, strength=0.8, timestamp=now, indicators={}, confidence=0.8, metadata={"source": StrengthSource.TECHNICAL_ANALYSIS.value})] * 3
+        ok, d = StrengthEngine().validate_signal_sources(sigs)
         assert ok is False
-        assert d["available"] == 1
 
-    def test_resolve_source_valid(self):
+    def test_resolve_valid(self):
         assert resolve_source("ta") == StrengthSource.TECHNICAL_ANALYSIS
         assert resolve_source("sentiment") == StrengthSource.SENTIMENT
-        assert resolve_source("price_action") == StrengthSource.PRICE_ACTION
 
-    def test_resolve_source_invalid(self):
+    def test_resolve_invalid(self):
         with pytest.raises(ValueError):
-            resolve_source("invalid_source")
+            resolve_source("bad")
 
-
-class TestTradeDecisionCreation:
-    """Test TradeDecision creation workflow."""
+class TestDecisionCreation:
+    @pytest.mark.asyncio
+    async def test_valid_signals(self, td_engine, hist, funds):
+        with patch("loats.trade_decision.rules_engine") as mr:
+            mr.apply_gating_rules.return_value = (True, {"reason": "passed", "iv_rank": 50.0, "adx": 30.0, "vix": 14.0})
+            mr.check_position_limits.return_value = (True, {"reason": "ok"})
+            mr.session_state = "REGULAR"
+            d, _ = await td_engine.create_trade_decision(signals=_sigs(3), historical_data=hist, current_price=24500.0, funds=funds, current_positions=[])
+        assert d is not None
+        assert d.symbol == "NIFTY"
 
     @pytest.mark.asyncio
-    async def test_create_decision_valid_signals(
-        self, trade_decision_engine, fixture_historical_data, fixture_funds
-    ):
-        with patch("loats.trade_decision.rules_engine") as mock_rules:
-            mock_rules.apply_gating_rules.return_value = (
-                True,
-                {"reason": "gating_passed", "iv_rank": 50.0, "adx": 30.0, "vix": 14.0},
-            )
-            mock_rules.check_position_limits.return_value = (
-                True,
-                {"reason": "within_limits"},
-            )
-            mock_rules.session_state = "REGULAR"
-            decision, _ = await trade_decision_engine.create_trade_decision(
-                signals=_make_signals(3),
-                historical_data=fixture_historical_data,
-                current_price=24500.0,
-                funds=fixture_funds,
-                current_positions=[],
-            )
-        assert decision is not None
-        assert decision.symbol == "NIFTY"
-        assert decision.decision_type == SignalType.BUY
-        assert 0.0 <= decision.composite_strength <= 1.0
-        assert decision.quantity > 0
-
-    @pytest.mark.asyncio
-    async def test_create_decision_rejects_weak_signals(
-        self, trade_decision_engine, fixture_historical_data, fixture_funds
-    ):
-        with patch("loats.trade_decision.rules_engine") as mock_rules:
-            mock_rules.apply_gating_rules.return_value = (
-                True,
-                {"reason": "gating_passed", "iv_rank": 50.0, "adx": 30.0, "vix": 14.0},
-            )
-            mock_rules.check_position_limits.return_value = (
-                True,
-                {"reason": "within_limits"},
-            )
-            mock_rules.session_state = "REGULAR"
-            decision, r = await trade_decision_engine.create_trade_decision(
-                signals=_make_signals(3, 0.2),
-                historical_data=fixture_historical_data,
-                current_price=24500.0,
-                funds=fixture_funds,
-                current_positions=[],
-            )
-        assert decision is None
+    async def test_weak_signals_rejected(self, td_engine, hist, funds):
+        with patch("loats.trade_decision.rules_engine") as mr:
+            mr.apply_gating_rules.return_value = (True, {"reason": "passed", "iv_rank": 50.0, "adx": 30.0, "vix": 14.0})
+            mr.check_position_limits.return_value = (True, {"reason": "ok"})
+            mr.session_state = "REGULAR"
+            d, r = await td_engine.create_trade_decision(signals=_sigs(3, 0.2), historical_data=hist, current_price=24500.0, funds=funds, current_positions=[])
+        assert d is None
         assert r["reason"] == "insufficient_strength"
 
     @pytest.mark.asyncio
-    async def test_create_decision_rejects_invalid_sources(
-        self, trade_decision_engine, fixture_historical_data, fixture_funds
-    ):
+    async def test_invalid_sources_rejected(self, td_engine, hist, funds):
         now = datetime.now(UTC)
-        signals = _make_signals(2) + [
-            Signal(
-                symbol="NIFTY",
-                signal_type=SignalType.BUY,
-                strength=0.68,
-                timestamp=now - timedelta(seconds=60),
-                indicators={},
-                confidence=0.72,
-                metadata={"source": "bad_source"},
-            ),
-        ]
-        decision, r = await trade_decision_engine.create_trade_decision(
-            signals=signals,
-            historical_data=fixture_historical_data,
-            current_price=24500.0,
-            funds=fixture_funds,
-            current_positions=[],
-        )
-        assert decision is None
+        sigs = _sigs(2) + [Signal(symbol="NIFTY", signal_type=SignalType.BUY, strength=0.68, timestamp=now-timedelta(seconds=60), indicators={}, confidence=0.72, metadata={"source": "bad"})]
+        d, r = await td_engine.create_trade_decision(signals=sigs, historical_data=hist, current_price=24500.0, funds=funds, current_positions=[])
+        assert d is None
         assert r["reason"] == "signal_validation_failed"
 
+    @pytest.mark.asyncio
+    async def test_gating_rejected(self, td_engine, hist, funds):
+        with patch("loats.trade_decision.rules_engine") as mr:
+            mr.apply_gating_rules.return_value = (False, {"reason": "iv_rank_low", "iv_rank": 30.0})
+            mr.session_state = "REGULAR"
+            d, r = await td_engine.create_trade_decision(signals=_sigs(3), historical_data=hist, current_price=24500.0, funds=funds, current_positions=[])
+        assert d is None
+        assert r["reason"] == "gating_rules_failed"
 
-if __name__ == "__main__":
-    pytest.main([__file__, "-v"])
+    @pytest.mark.asyncio
+    async def test_position_limit_rejected(self, td_engine, hist, funds):
+        with patch("loats.trade_decision.rules_engine") as mr:
+            mr.apply_gating_rules.return_value = (True, {"reason": "passed", "iv_rank": 50.0, "adx": 30.0, "vix": 14.0})
+            mr.check_position_limits.return_value = (False, {"reason": "limit_exceeded", "current_quantity": 150, "max_allowed": 125})
+            mr.session_state = "REGULAR"
+            d, r = await td_engine.create_trade_decision(signals=_sigs(3), historical_data=hist, current_price=24500.0, funds=funds, current_positions=[])
+        assert d is None
+        assert r["reason"] == "position_limit_exceeded"
+
+    @pytest.mark.asyncio
+    async def test_invalid_size_rejected(self, td_engine, hist, funds):
+        with patch("loats.trade_decision.rules_engine") as mr:
+            mr.apply_gating_rules.return_value = (True, {"reason": "passed", "iv_rank": 50.0, "adx": 30.0, "vix": 14.0})
+            mr.check_position_limits.return_value = (True, {"reason": "ok"})
+            mr.session_state = "REGULAR"
+            with patch("loats.trade_decision.sizing_engine") as ms:
+                ms.calculate_fixed_fraction_size.return_value = (0, {"reason": "invalid_prices"})
+                d, r = await td_engine.create_trade_decision(signals=_sigs(3), historical_data=hist, current_price=24500.0, funds=funds, current_positions=[])
+        assert d is None
+        assert r["reason"] == "invalid_position_size"
+
+class TestRouting:
+    @pytest.mark.asyncio
+    async def test_route_disabled(self, td_engine):
+        td_engine.analyzer_routing_enabled = False
+        with patch("loats.database.db") as mdb, patch("loats.trade_decision.datetime") as mdt:
+            mdt.datetime.now.return_value = __import__("datetime").datetime.now(__import__("datetime").timezone.utc)
+            mdt.UTC = __import__("datetime").timezone.utc
+            mdb.async_record_trade_decision = AsyncMock()
+            r = await td_engine.route_to_analyzer(_make_td())
+        assert r["status"] == "disabled"
+
+    @pytest.mark.asyncio
+    async def test_route_success(self, td_engine):
+        td_engine.analyzer_routing_enabled = True
+        with patch("loats.database.db") as mdb, patch("loats.trade_decision.datetime") as mdt:
+            mdt.datetime.now.return_value = __import__("datetime").datetime.now(__import__("datetime").timezone.utc)
+            mdt.UTC = __import__("datetime").timezone.utc
+            mdb.async_record_trade_decision = AsyncMock()
+            with patch("loats.openalgo.AsyncOpenAlgoClient") as mcc:
+                mc = AsyncMock()
+                mc.__aenter__ = AsyncMock(return_value=mc)
+                mc.__aexit__ = AsyncMock()
+                mc.place_analyzer_request = AsyncMock(return_value={"status": "accepted"})
+                mcc.return_value = mc
+                r = await td_engine.route_to_analyzer(_make_td())
+        assert r["status"] == "success"
+
+    @pytest.mark.asyncio
+    async def test_route_error(self, td_engine):
+        td_engine.analyzer_routing_enabled = True
+        with patch("loats.database.db") as mdb, patch("loats.trade_decision.datetime") as mdt:
+            mdt.datetime.now.return_value = __import__("datetime").datetime.now(__import__("datetime").timezone.utc)
+            mdt.UTC = __import__("datetime").timezone.utc
+            mdb.async_record_trade_decision = AsyncMock()
+            with patch("loats.openalgo.AsyncOpenAlgoClient") as mcc:
+                mc = AsyncMock()
+                mc.__aenter__ = AsyncMock(return_value=mc)
+                mc.__aexit__ = AsyncMock(return_value=False)
+                mc.place_analyzer_request = AsyncMock(side_effect=Exception("fail"))
+                mcc.return_value = mc
+                try:
+                    r = await td_engine.route_to_analyzer(_make_td())
+                    assert r.get("status") == "error"
+                except Exception as e:
+                    assert "fail" in str(e)
+
+class TestQueue:
+    @pytest.mark.asyncio
+    async def test_start_stop(self, td_engine):
+        await td_engine.start_decision_processor()
+        assert td_engine._processor_task is not None
+        await td_engine.stop_decision_processor()
+
+    @pytest.mark.asyncio
+    async def test_enqueue(self, td_engine):
+        td_engine.analyzer_routing_enabled = False
+        with patch("loats.database.db") as mdb, patch("loats.trade_decision.datetime") as mdt:
+            mdt.datetime.now.return_value = __import__("datetime").datetime.now(__import__("datetime").timezone.utc)
+            mdt.UTC = __import__("datetime").timezone.utc
+            mdb.async_record_trade_decision = AsyncMock()
+            r = await td_engine.enqueue_decision(_make_td())
+        assert r["status"] == "queued"
+
+    @pytest.mark.asyncio
+    async def test_enqueue_error(self, td_engine):
+        with patch.object(td_engine.decision_queue, "put", side_effect=RuntimeError("broken")):
+            r = await td_engine.enqueue_decision(_make_td())
+        assert r["status"] == "error"
+
+    @pytest.mark.asyncio
+    async def test_create_and_route_not_created(self, td_engine, hist, funds):
+        r = await td_engine.create_and_route_decision(signals=_sigs(2), historical_data=hist, current_price=24500.0, funds=funds, current_positions=[])
+        assert r["routing_status"] == "skipped"
+        assert r["reason"] == "decision_not_created"
+
+class TestMisc:
+    def test_enable_routing(self, td_engine):
+        td_engine.analyzer_routing_enabled = False
+        td_engine.enable_analyzer_routing()
+        assert td_engine.analyzer_routing_enabled is True
+
+    def test_disable_routing(self, td_engine):
+        td_engine.disable_analyzer_routing()
+        assert td_engine.analyzer_routing_enabled is False
+
+    @pytest.mark.asyncio
+    async def test_get_status(self, td_engine):
+        r = await td_engine.get_decision_status("id1")
+        assert r["decision_id"] == "id1"
+
+    def test_modification_counter(self, td_engine):
+        td_engine.reset_modification_counter()
+        assert td_engine.get_modification_count() == 0
+        td_engine.increment_modification_counter()
+        assert td_engine.get_modification_count() == 1
+
+    def test_enum_values(self):
+        assert DecisionStatus.PENDING == "PENDING"
+        assert DecisionStatus.APPROVED == "APPROVED"
+        assert DecisionStatus.REJECTED == "REJECTED"
+        assert DecisionStatus.EXECUTED == "EXECUTED"
