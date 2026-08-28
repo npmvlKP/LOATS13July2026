@@ -1,10 +1,14 @@
 import asyncio
 import datetime as dt
 from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
+
 from loats.orchestrator import (
-    TradingOrchestrator, validate_rss_feed,
-    _fetch_cached_vix, update_trailing_stops,
+    TradingOrchestrator,
+    _fetch_cached_vix,
+    update_trailing_stops,
+    validate_rss_feed,
 )
 
 
@@ -133,7 +137,7 @@ class TestExecuteTAAnalysis:
     async def test_with_history_no_signal(self):
         o = TradingOrchestrator()
         ms = MagicMock(); ms.default_symbol = 'NIFTY'; ms.default_timeframe = '5minute'
-        ts = dt.datetime(2025,1,1,10,0,tzinfo=dt.timezone.utc)
+        ts = dt.datetime(2025,1,1,10,0,tzinfo=dt.UTC)
         raw = {'data': [{'timestamp': ts.isoformat(), 'open': 100, 'high': 101, 'low': 99, 'close': 100, 'volume': 1000}]}
         with patch('loats.orchestrator.settings', ms):
             with patch.object(o, '_safe_get_history', new_callable=AsyncMock, return_value=raw):
@@ -147,7 +151,7 @@ class TestExecuteTAAnalysis:
     async def test_with_signal(self):
         o = TradingOrchestrator()
         ms = MagicMock(); ms.default_symbol = 'NIFTY'; ms.default_timeframe = '5minute'
-        ts = dt.datetime(2025,1,1,10,0,tzinfo=dt.timezone.utc)
+        ts = dt.datetime(2025,1,1,10,0,tzinfo=dt.UTC)
         raw = {'data': [{'timestamp': ts.isoformat(), 'open': 100, 'high': 101, 'low': 99, 'close': 100, 'volume': 1000}]}
         mi = MagicMock(); mi.name = 'rsi'; mi.value = 70.0
         with patch('loats.orchestrator.settings', ms):
@@ -177,8 +181,8 @@ class TestRiskManagementAdditional:
                     with patch('loats.orchestrator.alerts') as ma:
                         ma.send_alert = AsyncMock()
                         with patch('loats.orchestrator.datetime') as mdt:
-                            mdt.datetime.now.return_value = dt.datetime.now(dt.timezone.utc)
-                            mdt.UTC = dt.timezone.utc
+                            mdt.datetime.now.return_value = dt.datetime.now(dt.UTC)
+                            mdt.UTC = dt.UTC
                             await o._execute_risk_management()
                             ma.send_alert.assert_called_once()
     @pytest.mark.asyncio
@@ -195,8 +199,8 @@ class TestRiskManagementAdditional:
                     with patch('loats.orchestrator.alerts') as ma:
                         ma.send_alert = AsyncMock()
                         with patch('loats.orchestrator.datetime') as mdt:
-                            mdt.datetime.now.return_value = dt.datetime.now(dt.timezone.utc)
-                            mdt.UTC = dt.timezone.utc
+                            mdt.datetime.now.return_value = dt.datetime.now(dt.UTC)
+                            mdt.UTC = dt.UTC
                             await o._execute_risk_management()
                             ma.send_alert.assert_called_once()
     @pytest.mark.asyncio
@@ -211,8 +215,8 @@ class TestRiskManagementAdditional:
                     mdb.get_position = MagicMock(return_value=None)
                     mdb.get_latest_funds = MagicMock(return_value=mock_funds)
                     with patch('loats.orchestrator.datetime') as mdt:
-                        mdt.datetime.now.return_value = dt.datetime.now(dt.timezone.utc)
-                        mdt.UTC = dt.timezone.utc
+                        mdt.datetime.now.return_value = dt.datetime.now(dt.UTC)
+                        mdt.UTC = dt.UTC
                         await o._execute_risk_management()
 
 
@@ -260,8 +264,8 @@ class TestExecuteStrikeSelection:
         chain = [OptionContract(symbol=f'NIFTY24000{i}CE', strike_price=24000+i*100, expiry=dt.datetime(2025,2,1), option_type='CE', last_price=100.0, open_interest=1000, volume=500) for i in range(5)]
         with patch('loats.orchestrator.select_strikes', new_callable=AsyncMock, return_value=[24000.0, 24100.0, 24200.0]):
             with patch('loats.orchestrator.datetime') as mdt:
-                mdt.datetime.now.return_value = dt.datetime.now(dt.timezone.utc)
-                mdt.UTC = dt.timezone.utc
+                mdt.datetime.now.return_value = dt.datetime.now(dt.UTC)
+                mdt.UTC = dt.UTC
                 result = await o._execute_strike_selection(chain)
         assert result == [24000.0, 24100.0, 24200.0]
     @pytest.mark.asyncio
@@ -272,8 +276,8 @@ class TestExecuteStrikeSelection:
         async def slow_select(**kw): await asyncio.sleep(1)
         with patch('loats.orchestrator.select_strikes', side_effect=slow_select):
             with patch('loats.orchestrator.datetime') as mdt:
-                mdt.datetime.now.return_value = dt.datetime.now(dt.timezone.utc)
-                mdt.UTC = dt.timezone.utc
+                mdt.datetime.now.return_value = dt.datetime.now(dt.UTC)
+                mdt.UTC = dt.UTC
                 result = await o._execute_strike_selection(chain)
         assert len(result) > 0
 
@@ -334,8 +338,8 @@ class TestMarketDataUpdateWithPositions:
                             with patch('loats.orchestrator._fetch_cached_vix', new_callable=AsyncMock, return_value=14.0):
                                 with patch('loats.orchestrator.rules_engine'):
                                     with patch('loats.orchestrator.datetime') as mdt:
-                                        mdt.datetime.now.return_value = dt.datetime.now(dt.timezone.utc)
-                                        mdt.UTC = dt.timezone.utc
+                                        mdt.datetime.now.return_value = dt.datetime.now(dt.UTC)
+                                        mdt.UTC = dt.UTC
                                         await o._execute_market_data_update()
         mdb.async_store_position.assert_called_once()
         mdb.async_store_funds.assert_called_once()

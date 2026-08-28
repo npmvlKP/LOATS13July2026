@@ -91,8 +91,6 @@ max-complexity = 20
 [tool.ruff.lint]
 select = ["E", "F", "W", "C90", "I", "N", "UP", "B", "A", "C4", "DTZ", "EXE", "FA", "ICN", "INP", "PIE", "T20", "PTH", "PGH", "RUF"]
 ignore = [
-    "E402",
-    "I001",
     "PTH123",
     "E231",
     "E225",
@@ -108,7 +106,6 @@ ignore = [
     "N818",
     "INP001",
     "PIE790",
-    "PGH003",
     "T201",
     "UP015",
     "B007",

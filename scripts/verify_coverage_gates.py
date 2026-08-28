@@ -11,7 +11,9 @@ Validates:
     4. Aggregate 4-module coverage >= 80%.
 """
 
-import ast, json, sys
+import ast
+import json
+import sys
 from pathlib import Path
 
 PASS = FAIL = 0
@@ -44,7 +46,7 @@ for tf in ["tests/test_trailing_stop.py", "tests/test_trade_decision.py",
 
 # G2
 print("G2  Temp File Cleanup")
-temps = list(Path(".").glob("_*.py"))
+temps = list(Path().glob("_*.py"))
 gate("No _*.py temp files in root", len(temps) == 0,
      f"found {[t.name for t in temps]}" if temps else "clean")
 

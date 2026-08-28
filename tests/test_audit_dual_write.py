@@ -11,13 +11,11 @@ Acceptance:
 """
 
 import json
-from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
 
 from loats.database import Database
-from loats.models import AuditLogEntry
 
 
 def test_audit_dual_write_with_injectable_path(tmp_path):
@@ -134,7 +132,7 @@ def test_audit_dual_write_with_injectable_path(tmp_path):
 
     # Final assertion: test completed without bypass
     print(
-        f"\n✓ TODO-20 verified: dual-write guarantee exercised without PYTEST_CURRENT_TEST bypass"
+        "\n✓ TODO-20 verified: dual-write guarantee exercised without PYTEST_CURRENT_TEST bypass"
     )
     print(f"  - SQLite row exists at: {db_path}")
     print(f"  - JSONL line exists at: {audit_log_path}")

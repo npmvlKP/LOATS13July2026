@@ -1,7 +1,8 @@
 """Tests for walk-forward window slicing and no look-ahead."""
 from datetime import UTC, datetime, timedelta
-import pytest
+
 from loats.models import HistoricalData
+
 
 def make_ohlc(symbol, base, count, mins=5):
     now = datetime.now(UTC)

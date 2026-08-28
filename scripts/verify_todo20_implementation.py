@@ -11,10 +11,10 @@ Usage:
     python scripts/verify_todo20_implementation.py
 """
 
-import json
 import subprocess
 import sys
 from pathlib import Path
+
 
 def run_command(cmd, cwd=None):
     """Run a command and return output."""

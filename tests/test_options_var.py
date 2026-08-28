@@ -1,10 +1,35 @@
 from datetime import UTC, datetime
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
 import numpy as np
 import pytest
 from scipy.stats import norm
-from loats.models import Greeks, OptionContract, OptionType, Trade, TransactionType, ProductType, VaRResult
-from loats.options import (ExpiredContractError, OptionsAnalysis, OptionsEngine, analysis, calculate_greeks, calculate_historical_var, calculate_implied_volatility, calculate_var, calculate_parametric_var, calculate_monte_carlo_var, calculate_portfolio_var, calculate_option_portfolio_var, calculate_comprehensive_var_analysis, options)
+
+from loats.models import (
+    Greeks,
+    OptionContract,
+    OptionType,
+    Trade,
+    TransactionType,
+    VaRResult,
+)
+from loats.options import (
+    ExpiredContractError,
+    OptionsAnalysis,
+    OptionsEngine,
+    analysis,
+    calculate_comprehensive_var_analysis,
+    calculate_greeks,
+    calculate_historical_var,
+    calculate_implied_volatility,
+    calculate_monte_carlo_var,
+    calculate_option_portfolio_var,
+    calculate_parametric_var,
+    calculate_portfolio_var,
+    calculate_var,
+    options,
+)
+
 
 class TestVaRNormal:
     def test_parametric_matches_analytic(self):

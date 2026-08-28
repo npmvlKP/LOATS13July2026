@@ -4,11 +4,14 @@ import tempfile
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
+
 from loats.database import Database
-from loats.models import (FundsData, HistoricalData, QuoteData, Signal, SignalType)
+from loats.models import FundsData, HistoricalData, Signal, SignalType
 from loats.orchestrator import TradingOrchestrator
 from loats.strength import StrengthSource
+
 
 @pytest.fixture
 def temp_db():
@@ -176,6 +179,7 @@ class TestInsufficientSignalsTracking:
 # -- Additional coverage tests ----------------------------------------------------
 import numpy as np
 
+
 class TestHurstExponent:
     def test_short_prices_returns_none(self):
         o = TradingOrchestrator()
@@ -221,8 +225,8 @@ class TestModelCreation:
         o = TradingOrchestrator()
         with patch('loats.orchestrator.datetime') as mdt:
             import datetime as dt
-            mdt.datetime.now.return_value = dt.datetime(2025,1,1,tzinfo=dt.timezone.utc)
-            mdt.UTC = dt.timezone.utc
+            mdt.datetime.now.return_value = dt.datetime(2025,1,1,tzinfo=dt.UTC)
+            mdt.UTC = dt.UTC
             funds = o._create_funds_model({
                 'available_cash': 50000.0, 'utilized_margin': 10000.0,
                 'available_margin': 40000.0, 'total_equity': 100000.0,})
@@ -339,8 +343,8 @@ class TestExecuteTradingCycle:
                                 with patch.object(o, '_execute_cmp_strategy', new_callable=AsyncMock):
                                     with patch.object(o, '_execute_strike_selection', new_callable=AsyncMock):
                                         with patch('loats.orchestrator.datetime') as mdt:
-                                            mdt.datetime.now.return_value = dt.datetime.now(dt.timezone.utc)
-                                            mdt.UTC = dt.timezone.utc
+                                            mdt.datetime.now.return_value = dt.datetime.now(dt.UTC)
+                                            mdt.UTC = dt.UTC
                                             await o._execute_trading_cycle()
 
 class TestExecuteMarketDataUpdate:
@@ -363,8 +367,8 @@ class TestExecuteMarketDataUpdate:
                             with patch('loats.orchestrator._fetch_cached_vix', new_callable=AsyncMock, return_value=14.0):
                                 with patch('loats.orchestrator.rules_engine'):
                                     with patch('loats.orchestrator.datetime') as mdt:
-                                        mdt.datetime.now.return_value = dt.datetime.now(dt.timezone.utc)
-                                        mdt.UTC = dt.timezone.utc
+                                        mdt.datetime.now.return_value = dt.datetime.now(dt.UTC)
+                                        mdt.UTC = dt.UTC
                                         await o._execute_market_data_update()
         mdb.async_store_quote.assert_called_once()
 
@@ -379,8 +383,8 @@ class TestExecuteRiskManagement:
             with patch('loats.orchestrator.OPENALGO_CIRCUIT_BREAKER') as mcb:
                 mcb.get_status.return_value = {'state': 'open'}
                 with patch('loats.orchestrator.datetime') as mdt:
-                    mdt.datetime.now.return_value = dt.datetime.now(dt.timezone.utc)
-                    mdt.UTC = dt.timezone.utc
+                    mdt.datetime.now.return_value = dt.datetime.now(dt.UTC)
+                    mdt.UTC = dt.UTC
                     await o._execute_risk_management()
 
 class TestValidateRSSFeed:
@@ -396,17 +400,18 @@ class TestValidateRSSFeed:
 class TestModuleFunctions:
     @pytest.mark.asyncio
     async def test_start_orchestrator(self):
-        from loats.orchestrator import start_orchestrator, orchestrator
+        from loats.orchestrator import orchestrator, start_orchestrator
         with patch.object(orchestrator, 'start', new_callable=AsyncMock):
             await start_orchestrator()
     @pytest.mark.asyncio
     async def test_stop_orchestrator(self):
-        from loats.orchestrator import stop_orchestrator, orchestrator
+        from loats.orchestrator import orchestrator, stop_orchestrator
         with patch.object(orchestrator, 'shutdown', new_callable=AsyncMock):
             await stop_orchestrator()
     @pytest.mark.asyncio
     async def test_get_cycle_stats_module(self):
-        from loats.orchestrator import get_cycle_stats as gcs, orchestrator
+        from loats.orchestrator import get_cycle_stats as gcs
+        from loats.orchestrator import orchestrator
         with patch.object(orchestrator, 'get_cycle_stats', return_value={'cycle_count': 0}):
             r = await gcs()
             assert r == {'cycle_count': 0}

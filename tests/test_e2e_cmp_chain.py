@@ -14,8 +14,8 @@ import pytest
 
 from loats.database import Database
 from loats.models import (
-    HistoricalData,
     FundsData,
+    HistoricalData,
     QuoteData,
     Signal,
     SignalType,

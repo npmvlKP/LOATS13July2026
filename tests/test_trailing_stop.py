@@ -1,9 +1,26 @@
 from unittest.mock import patch
+
 """Tests for trailing_stop module."""
 from datetime import UTC, datetime
+
 import pytest
-from loats.models import Order, OrderStatus, OrderType, OrderVariety, ProductType, Trade, TransactionType
-from loats.trailing_stop import TrailingStopEngine, TrailingStopStatus, TrailingStopType, trailing_stop_engine
+
+from loats.models import (
+    Order,
+    OrderStatus,
+    OrderType,
+    OrderVariety,
+    ProductType,
+    Trade,
+    TransactionType,
+)
+from loats.trailing_stop import (
+    TrailingStopEngine,
+    TrailingStopStatus,
+    TrailingStopType,
+    trailing_stop_engine,
+)
+
 
 def _make_trade(symbol="NIFTY", qty=100, entry=18400.0, side=TransactionType.BUY):
     return Trade(symbol=symbol, quantity=qty, entry_price=entry, entry_time=datetime.now(UTC), transaction_type=side, product_type=ProductType.MIS, stop_loss=entry * 0.99)
@@ -475,7 +492,14 @@ class TestDeadCodePaths:
 
 class TestModifySLMOrder:
     def test_modify_slm_success(self):
-        from loats.models import Order, OrderType, OrderVariety, TransactionType, ProductType, OrderStatus
+        from loats.models import (
+            Order,
+            OrderStatus,
+            OrderType,
+            OrderVariety,
+            ProductType,
+            TransactionType,
+        )
         e = TrailingStopEngine()
         now = datetime.now(UTC)
         order = Order(order_id='ord1', symbol='NIFTY', quantity=25, order_type=OrderType.SL_M,
@@ -492,7 +516,14 @@ class TestModifySLMOrder:
                 pass  # source bug: model_dump() includes price, then price= passed again
 
     def test_modify_slm_wrong_type_raises(self):
-        from loats.models import Order, OrderType, OrderVariety, TransactionType, ProductType, OrderStatus
+        from loats.models import (
+            Order,
+            OrderStatus,
+            OrderType,
+            OrderVariety,
+            ProductType,
+            TransactionType,
+        )
         e = TrailingStopEngine()
         now = datetime.now(UTC)
         order = Order(order_id='ord1', symbol='NIFTY', quantity=25, order_type=OrderType.MARKET,

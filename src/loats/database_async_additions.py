@@ -1,26 +1,32 @@
 # --- Imports ---
-from datetime import datetime, timezone as UTC
-from typing import Any, Optional
 import json
+from datetime import datetime
+from datetime import timezone as UTC
+from typing import Any
+
 from loats.database import Database
 from loats.models import (
+    AuditLogEntry as AuditLog,
+)
+from loats.models import (
+    FundsData as Funds,
+)
+from loats.models import (
+    HistoricalData,
+    Order,
+    Position,
+    QuoteData,
     Signal,
     SignalType,
-    QuoteData,
-    Position,
-    FundsData as Funds,
-    HistoricalData,
     Trade,
-    Order,
     TradeDecision,
-    AuditLogEntry as AuditLog,
 )
 
 # --- Module Initialization ---
 # Ensure all methods are defined and exposed
 AIOSQLITE_AVAILABLE = False
 try:
-    import aiosqlite
+    import aiosqlite as _aiosqlite  # type: ignore[no-redef] - checked for availability
     AIOSQLITE_AVAILABLE = True
 except ImportError:
     pass
@@ -743,15 +749,12 @@ async def _async_store_funds(self: Database, funds: Funds) -> bool:
     return True
 """Async database operations for LOATS13July2026 using aiosqlite. This module extends the Database class with true async I/O capabilities."""
 
-import asyncio
-import importlib.util
-import json
-from datetime import UTC, datetime
-from typing import Any
-from .database import Database
-from .models import (
-    AuditLogEntry,
-    FundsData,
+import importlib.util  # noqa: E402
+from datetime import UTC  # noqa: E402
+from typing import Any  # noqa: E402
+
+from .database import Database  # noqa: E402
+from .models import (  # noqa: E402
     HistoricalData,
     Position,
     QuoteData,
@@ -759,7 +762,6 @@ from .models import (
     Trade,
     TradeDecision,
 )
-
 
 
 async def _async_create_signal(self: Database, signal: Signal) -> bool:
@@ -882,7 +884,7 @@ async def _async_log_audit(self: Database, action: str, entity_type: str, entity
 
 def extend_database_class() -> None:
     """Extend the Database class with async methods."""
-    from .database import Database
+    from .database import Database  # noqa: E402
     # Add core async methods
     if not hasattr(Database, "_async_create_signal"):
         Database._async_create_signal = _async_create_signal  # type: ignore[attr-defined]
@@ -928,7 +930,7 @@ async def _async_log_audit(self: Database, audit: AuditLog) -> bool:
 # Update extend_database_class to include all methods
 def extend_database_class() -> None:
     """Extend the Database class with async methods."""
-    from .database import Database
+    from .database import Database  # noqa: E402
     # Add all async methods
     for method_name in [
         "_async_create_signal",

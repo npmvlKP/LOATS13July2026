@@ -58,7 +58,7 @@ for tf in test_files:
 
 # G2
 print("\n--- G2  Temp File Cleanup ---")
-temps = list(Path(".").glob("_*.py"))
+temps = list(Path().glob("_*.py"))
 gate(
     "No _*.py temp files in root",
     len(temps) == 0,
@@ -80,7 +80,7 @@ cmd = [
     "--no-header",
 ]
 print(f"  Running: {' '.join(cmd[3:8])} ...")
-result = subprocess.run(cmd, capture_output=True, text=True, timeout=120, cwd=Path("."))
+result = subprocess.run(cmd, capture_output=True, text=True, timeout=120, cwd=Path())
 
 # Parse test result
 lines = result.stdout.splitlines()

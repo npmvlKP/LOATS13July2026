@@ -222,7 +222,7 @@ class TestNSEHolidays:
         )
         # Verify we can't modify it
         with pytest.raises(AttributeError):
-            NSE_HOLIDAYS.add(datetime.date(2026, 1, 1))  # type: ignore
+            NSE_HOLIDAYS.add(datetime.date(2026, 1, 1))  # type: ignore[attr-defined]
 
     def test_minimum_holiday_count(self):
         """Verify at least 50 holidays are defined across 3 years."""

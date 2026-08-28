@@ -8,6 +8,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+
 def main():
     # Use system Python 3.12 interpreter with pip-audit module
     # This bypasses all PATH and venv issues

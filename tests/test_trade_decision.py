@@ -2,12 +2,15 @@
 import tempfile
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
+
 import pytest
+
 from loats.database import Database
-from loats.models import (FundsData, HistoricalData, Signal, SignalType, TradeDecision, Trade, TransactionType)
-from loats.strength import StrengthSource, StrengthEngine, resolve_source
-from loats.trade_decision import TradeDecisionEngine, DecisionStatus
+from loats.models import FundsData, HistoricalData, Signal, SignalType, TradeDecision
+from loats.strength import StrengthEngine, StrengthSource, resolve_source
+from loats.trade_decision import DecisionStatus, TradeDecisionEngine
+
 
 @pytest.fixture
 def temp_db():
