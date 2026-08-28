@@ -101,6 +101,11 @@ $null
 [100%]
 0.21.0
 pytest_final*.log
+bandit-report.json
+pip-audit-core-report.json
+results.json
+coverage_floor_map.json
+opencode.json
 
 # Node.js modules
 node_modules/
@@ -114,3 +119,6 @@ pyvenv.cfg
 # Forensic review docs (generated)
 FORENSIC_REVIEW.md
 FORMENSIC_REVIEW.md
+
+# Archived audit scripts
+reports/archived-audit/
