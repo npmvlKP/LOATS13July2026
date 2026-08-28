@@ -93,6 +93,12 @@ HEALTH_CHECKS = {
         "command": UV_PREFIX + ["scripts/verify_todo24_external.py"],
         "timeout": 30,
     },
+    "HC-29": {
+        "name": "P1/P5 Phase-Gate Evidence Verification",
+        "description": "Verify P1 ANALYZE round-trip latency evidence collected; P5 blocked on TODO-13 (TODO-25 / F7-L-05)",
+        "command": [PYTHON_INTERPRETER, "scripts/verify_todo25_external.py"],
+        "timeout": 30,
+    },
 }
 
 def run_health_check(check_id: str, check_config: dict) -> dict:
