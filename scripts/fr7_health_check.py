@@ -87,6 +87,12 @@ HEALTH_CHECKS = {
         "command": UV_PREFIX + ["scripts/verify_todo23_external.py"],
         "timeout": 15,
     },
+    "HC-28": {
+        "name": "Exit Semantics Verification",
+        "description": "Verify check_per_module_coverage.py exit semantics, no fallthrough to exit 0 (TODO-24)",
+        "command": UV_PREFIX + ["scripts/verify_todo24_external.py"],
+        "timeout": 30,
+    },
 }
 
 def run_health_check(check_id: str, check_config: dict) -> dict:
