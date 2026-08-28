@@ -9,6 +9,7 @@ Usage:
 
 import argparse
 import json
+import shutil
 import subprocess
 import sys
 from datetime import datetime
@@ -16,55 +17,62 @@ from pathlib import Path
 
 # Get the current Python interpreter to ensure subprocess uses the same one
 PYTHON_INTERPRETER = sys.executable
+UV_PREFIX = ["uv", "run"] if shutil.which("uv") else [PYTHON_INTERPRETER, "-m"]
 
 # Health check definitions
 HEALTH_CHECKS = {
     "HC-12": {
         "name": "CMP Chain Integration Test",
         "description": "End-to-end test for CMP chain signal flow to TradeDecision creation",
-        "command": [PYTHON_INTERPRETER, "-m", "pytest", "tests/test_e2e_cmp_chain.py", "-v", "--tb=short"],
+        "command": UV_PREFIX + ["pytest", "tests/test_e2e_cmp_chain.py", "-v", "--tb=short"],
         "timeout": 60,
     },
     "HC-13": {
         "name": "Per-Module Coverage Enforcement",
         "description": "Verify floor-mapped modules meet >=80% coverage threshold (TODO-15)",
-        "command": [PYTHON_INTERPRETER, "scripts/check_per_module_coverage.py"],
+        "command": UV_PREFIX + ["scripts/check_per_module_coverage.py"],
         "timeout": 30,
     },
     "HC-15": {
         "name": "Math & Aggregate Validation",
         "description": "Validate composite strength calculations and aggregation math",
-        "command": [PYTHON_INTERPRETER, "-m", "pytest", "tests/test_trade_decision.py", "-k", "composite", "-v"],
+        "command": UV_PREFIX + ["pytest", "tests/test_trade_decision.py", "-k", "composite", "-v"],
         "timeout": 30,
     },
     "HC-17": {
         "name": "Signal Source Validation",
         "description": "Validate signal source tagging and enum validation (F7-C-02a fix)",
-        "command": [PYTHON_INTERPRETER, "-m", "pytest", "tests/test_trade_decision.py", "-k", "source", "-v"],
+        "command": UV_PREFIX + ["pytest", "tests/test_trade_decision.py", "-k", "source", "-v"],
         "timeout": 30,
     },
     "HC-18": {
         "name": "VIX Integration Wired",
         "description": "Verify VIX integration is wired with symmetric fail-safe (TODO-12)",
-        "command": [PYTHON_INTERPRETER, "-m", "pytest", "tests/test_vix_integration.py", "-v"],
+        "command": UV_PREFIX + ["pytest", "tests/test_vix_integration.py", "-v"],
         "timeout": 30,
     },
     "HC-25": {
         "name": "No 18.5 VIX Fallback",
         "description": "Verify no bare 18.5 VIX fallback remains (TODO-12)",
-        "command": [PYTHON_INTERPRETER, "-m", "pytest", "tests/test_vix_integration.py::TestVIXNo18_5Fallback", "-v"],
+        "command": UV_PREFIX + ["pytest", "tests/test_vix_integration.py::TestVIXNo18_5Fallback", "-v"],
         "timeout": 15,
     },
     "HC-19": {
         "name": "Real Analyzer Routing",
         "description": "Verify real Analyzer routing with audit persistence (TODO-13)",
-        "command": [PYTHON_INTERPRETER, "-m", "pytest", "tests/test_analyzer_routing_integration.py", "-v"],
+        "command": UV_PREFIX + ["pytest", "tests/test_analyzer_routing_integration.py", "-v"],
         "timeout": 30,
     },
     "HC-20": {
         "name": "Trailing Stop Runtime Driver",
         "description": "Verify trailing stop runtime driver updates positions correctly (TODO-14)",
-        "command": [PYTHON_INTERPRETER, "-m", "pytest", "tests/test_trailing_stop_runtime.py", "-v"],
+        "command": UV_PREFIX + ["pytest", "tests/test_trailing_stop_runtime.py", "-v"],
+        "timeout": 30,
+    },
+    "HC-22": {
+        "name": "Audit Dual-Write Guarantee",
+        "description": "Verify audit dual-write without PYTEST_CURRENT_TEST bypass (TODO-20)",
+        "command": UV_PREFIX + ["pytest", "tests/test_audit_dual_write.py", "-v"],
         "timeout": 30,
     },
 }

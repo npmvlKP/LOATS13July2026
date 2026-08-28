@@ -677,25 +677,6 @@ class Database:
         try:
             # Ensure parent directory exists (FIX-F-PERM-1: Handle directory creation)
             self.audit_log_path.parent.mkdir(parents=True, exist_ok=True)
-            # FIX-F-PERM-3: Use temporary audit log path in test environment
-            # This ensures JSONL-first dual-write guarantee is exercised in tests
-            import os
-            import tempfile
-            # Use temporary audit log file during tests to avoid permission issues
-            # while still exercising the dual-write logic
-            audit_log_file = self.audit_log_path
-            if os.environ.get("PYTEST_CURRENT_TEST"):
-                # Create a temporary file in the system temp directory for testing.
-                # This ensures the dual-write guarantee is tested without
-                # production path issues.
-                temp_dir = Path(tempfile.gettempdir()) / "loats_test_audit_logs"
-                temp_dir.mkdir(parents=True, exist_ok=True)
-                audit_log_file = (
-                    temp_dir / f"test_audit_{entity_type}_{entity_id}.jsonl"
-                )
-                logger.info(
-                    f"Using temporary audit log file for testing: {audit_log_file}"
-                )
             # FIX-F-PERM-2: Use more robust file handling with retry logic
             max_retries = 3
             retry_delay = 0.1  # seconds
@@ -703,10 +684,10 @@ class Database:
                 try:
                     # Ensure parent directory exists
                     # (FIX-F-PERM-1: Handle directory creation)
-                    audit_log_file.parent.mkdir(parents=True, exist_ok=True)
+                    self.audit_log_path.parent.mkdir(parents=True, exist_ok=True)
                     # Use append mode with explicit error handling
                     # for file operations
-                    with Path(audit_log_file).open("a", encoding="utf-8") as f:
+                    with Path(self.audit_log_path).open("a", encoding="utf-8") as f:
                         f.write(self._canonical_serialize(entry_data) + "\n")
                     break  # Success, exit retry loop
                 except PermissionError as e:
@@ -738,6 +719,7 @@ class Database:
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
+                entry.entry_id,
                 entry.timestamp.isoformat(),
                 entry.action,
                 entry.entity_type,
