@@ -77,9 +77,10 @@ class StrengthEngine:
             StrengthSource.SENTIMENT: 0.3,
             StrengthSource.PRICE_ACTION: 0.2,
             StrengthSource.VOLATILITY: 0.1,
-            StrengthSource.FUNDAMENTAL: 0.1,
-            StrengthSource.MACHINE_LEARNING: 0.3,
-            StrengthSource.OPTIONS_FLOW: 0.2,
+            # NOTE: FUNDAMENTAL, MACHINE_LEARNING, OPTIONS_FLOW removed (TODO-23)
+            # These sources are enumerated in StrengthSource enum but have no
+            # production signal producers. When producers are added, restore
+            # appropriate weights. See: 23Aug2026-Investigator FR.md F7-L-03
         }
 
         self.min_sources = 3

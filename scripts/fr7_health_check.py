@@ -81,6 +81,12 @@ HEALTH_CHECKS = {
         "command": [PYTHON_INTERPRETER, "-c", "import subprocess; result = subprocess.run(['git', 'ls-files'], capture_output=True, text=True); files = result.stdout.strip().split('\\n'); root_files = [f for f in files if '/' not in f]; junk = [f for f in root_files if f in ['$null', '[100%]', '0.21.0'] or f.endswith(('bandit-report.json', 'pip-audit-core-report.json', 'results.json', 'coverage_floor_map.json', 'opencode.json')) or f.endswith(('final_lint_report.txt', 'orchestrator_files.txt', 'ruff_errors.txt', 'ruff_errors_final.txt', 'ruff_errors_updated.txt', 'test.txt', 'test_content.txt', 'test_direct_push.txt', 'lwts4oa.md', 'pytest_output.txt'))]; print(f'Root files: {len(root_files)}, Junk: {junk}'); exit(1 if junk else 0)"],
         "timeout": 15,
     },
+    "HC-27": {
+        "name": "Dead Weight Removal",
+        "description": "Verify FUNDAMENTAL/MACHINE_LEARNING/OPTIONS_FLOW removed from source_weights (TODO-23)",
+        "command": UV_PREFIX + ["scripts/verify_todo23_external.py"],
+        "timeout": 15,
+    },
 }
 
 def run_health_check(check_id: str, check_config: dict) -> dict:
