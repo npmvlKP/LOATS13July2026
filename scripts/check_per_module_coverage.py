@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Script to check per-module coverage against a floor map.
-Enforces ≥80% coverage for floor-mapped modules; others are informational.
+Enforces ≥80% coverage threshold for floor-mapped modules; others are informational.
 This script reads coverage.json and coverage_floor_map.json.
 """
 
