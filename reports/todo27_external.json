@@ -1,0 +1,259 @@
+{
+  "total": 42,
+  "passed": 42,
+  "failed": 0,
+  "checks": [
+    {
+      "suite": "(a) vollib \u2192 hand-rolled options_math",
+      "name": "options_math.py exists",
+      "ok": true,
+      "detail": "G:\\.OA\\LOATS-13July2026\\LOATS13July2026\\src\\loats\\options_math.py"
+    },
+    {
+      "suite": "(a) vollib \u2192 hand-rolled options_math",
+      "name": "options_math parity vs Hull/vollib",
+      "ok": true,
+      "detail": "delta=0.5216016340 gamma=0.0655453773 vega=0.1210524275 price=12.1115814350"
+    },
+    {
+      "suite": "(a) vollib \u2192 hand-rolled options_math",
+      "name": "options.py does NOT import vollib",
+      "ok": true,
+      "detail": "clean"
+    },
+    {
+      "suite": "(a) vollib \u2192 hand-rolled options_math",
+      "name": "options.py imports from options_math",
+      "ok": true,
+      "detail": "found"
+    },
+    {
+      "suite": "(a) vollib \u2192 hand-rolled options_math",
+      "name": "pyproject.toml drops vollib",
+      "ok": true,
+      "detail": "removed"
+    },
+    {
+      "suite": "(a) vollib \u2192 hand-rolled options_math",
+      "name": "pyproject.toml drops ta (also checked in a)",
+      "ok": true,
+      "detail": "removed"
+    },
+    {
+      "suite": "(a) vollib \u2192 hand-rolled options_math",
+      "name": "pyproject mypy override for vollib removed",
+      "ok": true,
+      "detail": "removed"
+    },
+    {
+      "suite": "(a) vollib \u2192 hand-rolled options_math",
+      "name": "requirements-core.txt drops vollib",
+      "ok": true,
+      "detail": "removed"
+    },
+    {
+      "suite": "(a) vollib \u2192 hand-rolled options_math",
+      "name": "requirements-core.txt drops ta",
+      "ok": true,
+      "detail": "removed"
+    },
+    {
+      "suite": "(b) ta drop-or-adopt",
+      "name": "src/loats/ta.py does NOT import ta library",
+      "ok": true,
+      "detail": "clean"
+    },
+    {
+      "suite": "(b) ta drop-or-adopt",
+      "name": "src/loats/ta.py has custom indicators",
+      "ok": true,
+      "detail": "found"
+    },
+    {
+      "suite": "(b) ta drop-or-adopt",
+      "name": "No src imports ta library",
+      "ok": true,
+      "detail": "none"
+    },
+    {
+      "suite": "(b) ta drop-or-adopt",
+      "name": "pyproject.toml ta declared? (should be False)",
+      "ok": true,
+      "detail": "removed"
+    },
+    {
+      "suite": "(c) bounded decision queue",
+      "name": "settings.py has decision_queue_maxsize",
+      "ok": true,
+      "detail": "found"
+    },
+    {
+      "suite": "(c) bounded decision queue",
+      "name": "settings has validator for maxsize",
+      "ok": true,
+      "detail": "found"
+    },
+    {
+      "suite": "(c) bounded decision queue",
+      "name": "settings default maxsize 100",
+      "ok": true,
+      "detail": "found"
+    },
+    {
+      "suite": "(c) bounded decision queue",
+      "name": "trade_decision uses Queue(maxsize=)",
+      "ok": true,
+      "detail": "found"
+    },
+    {
+      "suite": "(c) bounded decision queue",
+      "name": "trade_decision has backpressure (put_nowait+QueueFull)",
+      "ok": true,
+      "detail": "found"
+    },
+    {
+      "suite": "(c) bounded decision queue",
+      "name": "trade_decision has get_queue_stats()",
+      "ok": true,
+      "detail": "found"
+    },
+    {
+      "suite": "(c) bounded decision queue",
+      "name": "trade_decision rejects with queue_full",
+      "ok": true,
+      "detail": "found"
+    },
+    {
+      "suite": "(c) bounded decision queue",
+      "name": "runtime settings.decision_queue_maxsize == 100",
+      "ok": true,
+      "detail": "got 100"
+    },
+    {
+      "suite": "(c) bounded decision queue",
+      "name": "runtime engine Queue maxsize=2",
+      "ok": true,
+      "detail": "got 2"
+    },
+    {
+      "suite": "(c) bounded decision queue",
+      "name": "runtime engine is bounded (maxsize != 0)",
+      "ok": true,
+      "detail": "bounded"
+    },
+    {
+      "suite": "(c) bounded decision queue",
+      "name": "runtime default engine uses settings maxsize",
+      "ok": true,
+      "detail": "engine=100 settings=100"
+    },
+    {
+      "suite": "(c) bounded decision queue",
+      "name": "live bounded queue backpressure (2 queued, 3rd rejected)",
+      "ok": true,
+      "detail": "r1=queued r2=queued r3=rejected/queue_full qsize=2"
+    },
+    {
+      "suite": "(c) bounded decision queue",
+      "name": "get_queue_stats returns expected keys",
+      "ok": true,
+      "detail": "{'queue_size': 0, 'queue_maxsize': 5, 'queue_full': False, 'queue_empty': True}"
+    },
+    {
+      "suite": "(d) bloombergquint re-validation",
+      "name": "settings.py default rss_feeds does NOT contain bloombergquint URL",
+      "ok": true,
+      "detail": "clean"
+    },
+    {
+      "suite": "(d) bloombergquint re-validation",
+      "name": "settings.py contains livemint replacement",
+      "ok": true,
+      "detail": "found"
+    },
+    {
+      "suite": "(d) bloombergquint re-validation",
+      "name": "settings.py has rss_feeds field",
+      "ok": true,
+      "detail": "found"
+    },
+    {
+      "suite": "(d) bloombergquint re-validation",
+      "name": "orchestrator uses settings.rss_feeds",
+      "ok": true,
+      "detail": "found"
+    },
+    {
+      "suite": "(d) bloombergquint re-validation",
+      "name": "orchestrator hardcoded bloombergquint removed",
+      "ok": true,
+      "detail": "clean"
+    },
+    {
+      "suite": "(d) bloombergquint re-validation",
+      "name": "orchestrator has validate_rss_feed",
+      "ok": true,
+      "detail": "found"
+    },
+    {
+      "suite": "(d) bloombergquint re-validation",
+      "name": "scheduler uses settings.rss_feeds",
+      "ok": true,
+      "detail": "found"
+    },
+    {
+      "suite": "(d) bloombergquint re-validation",
+      "name": "scheduler hardcoded bloombergquint removed",
+      "ok": true,
+      "detail": "clean"
+    },
+    {
+      "suite": "(d) bloombergquint re-validation",
+      "name": "scheduler validates feeds (validate_rss_feed)",
+      "ok": true,
+      "detail": "found"
+    },
+    {
+      "suite": "(d) bloombergquint re-validation",
+      "name": ".env.example documents RSS_FEEDS",
+      "ok": true,
+      "detail": "found"
+    },
+    {
+      "suite": "(d) bloombergquint re-validation",
+      "name": ".env.example RSS_FEEDS value does NOT contain bloombergquint",
+      "ok": true,
+      "detail": "clean"
+    },
+    {
+      "suite": "(d) bloombergquint re-validation",
+      "name": ".env.example documents DECISION_QUEUE_MAXSIZE",
+      "ok": true,
+      "detail": "found"
+    },
+    {
+      "suite": "(d) bloombergquint re-validation",
+      "name": "runtime rss_feeds has >=2 entries",
+      "ok": true,
+      "detail": "got 3: ['https://economictimes.indiatimes.com/markets/rssfeeds/1977021501.cms', 'https://www.moneycontrol.com/rss/latestnews.xml', 'https://www.livemint.com/rss/markets']"
+    },
+    {
+      "suite": "(d) bloombergquint re-validation",
+      "name": "runtime rss_feeds does NOT contain bloombergquint",
+      "ok": true,
+      "detail": "clean"
+    },
+    {
+      "suite": "(d) bloombergquint re-validation",
+      "name": "runtime rss_feeds contains livemint",
+      "ok": true,
+      "detail": "found"
+    },
+    {
+      "suite": "(d) bloombergquint re-validation",
+      "name": "runtime rss_feeds all http/https",
+      "ok": true,
+      "detail": "['https://economictimes.indiatimes.com/markets/rssfeeds/1977021501.cms', 'https://www.moneycontrol.com/rss/latestnews.xml', 'https://www.livemint.com/rss/markets']"
+    }
+  ]
+}

@@ -3,7 +3,7 @@
 from decimal import Decimal
 from functools import lru_cache
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -132,6 +132,20 @@ class Settings(BaseSettings):
         60, description="Threshold for considering VIX data stale (seconds)"
     )
 
+    # Decision Queue Configuration (TODO-27c bounded queue + backpressure)
+    decision_queue_maxsize: int = Field(
+        100,
+        description="Max size for TradeDecision queue (bounded)",
+    )
+    rss_feeds: list[str] = Field(
+        default=[
+            "https://economictimes.indiatimes.com/markets/rssfeeds/1977021501.cms",
+            "https://www.moneycontrol.com/rss/latestnews.xml",
+            "https://www.livemint.com/rss/markets",
+        ],
+        description="Validated RSS feeds (bloombergquint removed)",
+    )
+
     @field_validator("max_order_value", "max_total_exposure", "circuit_limit_pct")
     @classmethod
     def validate_decimals(cls, v: Decimal) -> Decimal:
@@ -196,6 +210,37 @@ class Settings(BaseSettings):
                 f"VIX cache TTL {v}s outside recommended range (30-60s)",
                 stacklevel=2,
             )
+        return v
+
+    @field_validator("decision_queue_maxsize")
+    @classmethod
+    def validate_decision_queue_maxsize(cls, v: int) -> int:
+        """Validate decision queue maxsize (bounded queue backpressure)."""
+        if v <= 0:
+            raise ValueError("decision_queue_maxsize must be positive")
+        if v > 10000:
+            raise ValueError("decision_queue_maxsize exceeds sane limit (10000)")
+        return v
+
+    @field_validator("rss_feeds", mode="before")
+    @classmethod
+    def parse_rss_feeds(cls, v: Any) -> Any:
+        """Parse rss_feeds from env var JSON or comma-separated string."""
+        if isinstance(v, str):
+            stripped = v.strip()
+            if not stripped:
+                return []
+            if stripped.startswith("["):
+                try:
+                    import json
+
+                    parsed = json.loads(stripped)
+                    if isinstance(parsed, list):
+                        return parsed
+                except Exception:
+                    pass
+            # Fallback: comma-separated
+            return [s.strip() for s in stripped.split(",") if s.strip()]
         return v
 
     @field_validator("openalgo_api_key")

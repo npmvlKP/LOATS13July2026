@@ -40,12 +40,23 @@ class DecisionStatus(StrEnum):
 class TradeDecisionEngine:
     """CMP Trade Decision Engine with Analyzer routing."""
 
-    def __init__(self) -> None:
-        """Initialize TradeDecisionEngine."""
-        settings = get_settings()
-        self.decision_queue = asyncio.Queue()
-        self.analyzer_routing_enabled = settings.analyzer_routing_enabled
+    def __init__(self, maxsize: int | None = None) -> None:
+        """Initialize TradeDecisionEngine.
+
+        Args:
+            maxsize: Optional queue maxsize override (for testing).
+                     If None, uses settings.decision_queue_maxsize.
+                     Bounded queue prevents unbounded memory growth if
+                     enqueues outpace the lazy processor (TODO-27c).
+        """
+        cfg = get_settings()
+        queue_maxsize = maxsize if maxsize is not None else cfg.decision_queue_maxsize
+        self.decision_queue: asyncio.Queue[TradeDecision] = asyncio.Queue(
+            maxsize=queue_maxsize
+        )
+        self.analyzer_routing_enabled = cfg.analyzer_routing_enabled
         self.decision_timeout = datetime.timedelta(minutes=5)
+        self._processor_task: asyncio.Task[None] | None = None
 
     async def create_trade_decision(
         self,
@@ -309,7 +320,16 @@ class TradeDecisionEngine:
 
         # Persist decision + routing outcome to audit trail (always, even when disabled)
         try:
-            await db.async_record_trade_decision(trade_decision, response)
+            # Prefer async_record_trade_decision (decision+response) if available,
+            # else fallback to async_create_trade_decision (decision only).
+            # The DB extension registers _async_record_trade_decision; the
+            # public wrapper may be async_record_trade_decision or
+            # async_create_trade_decision depending on migration state.
+            record_fn = getattr(db, "async_record_trade_decision", None)
+            if record_fn is not None:
+                await record_fn(trade_decision, response)
+            else:
+                await db.async_create_trade_decision(trade_decision)
             logger.debug(
                 f"Persisted decision {trade_decision.decision_id} "
                 f"routing outcome to audit trail"
@@ -349,13 +369,40 @@ class TradeDecisionEngine:
                 await asyncio.sleep(1.0)
 
     async def enqueue_decision(self, trade_decision: TradeDecision) -> dict[str, Any]:
-        """Add TradeDecision to processing queue."""
+        """Add TradeDecision to processing queue with backpressure.
+
+        Uses bounded queue (asyncio.Queue(maxsize=N)) to prevent unbounded
+        memory growth when enqueues outpace the lazy processor
+        (TODO-27c). If the queue is full, the decision is rejected
+        immediately with queue_full status instead of blocking the
+        orchestrator cycle indefinitely.
+
+        Returns:
+            dict with status queued / rejected(queue_full) / error.
+        """
         try:
-            await self.decision_queue.put(trade_decision)
+            # Backpressure: non-blocking put; reject if full
+            self.decision_queue.put_nowait(trade_decision)
             return {
                 "status": "queued",
                 "decision_id": trade_decision.decision_id,
                 "queue_size": self.decision_queue.qsize(),
+                "queue_maxsize": self.decision_queue.maxsize,
+                "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
+            }
+        except asyncio.QueueFull:
+            logger.warning(
+                "Decision queue full — rejecting decision %s (size=%d, maxsize=%d)",
+                trade_decision.decision_id,
+                self.decision_queue.qsize(),
+                self.decision_queue.maxsize,
+            )
+            return {
+                "status": "rejected",
+                "reason": "queue_full",
+                "decision_id": trade_decision.decision_id,
+                "queue_size": self.decision_queue.qsize(),
+                "queue_maxsize": self.decision_queue.maxsize,
                 "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
             }
         except Exception as e:
@@ -367,19 +414,24 @@ class TradeDecisionEngine:
                 "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
             }
 
+    def get_queue_stats(self) -> dict[str, Any]:
+        """Return current queue depth and capacity for monitoring."""
+        return {
+            "queue_size": self.decision_queue.qsize(),
+            "queue_maxsize": self.decision_queue.maxsize,
+            "queue_full": self.decision_queue.full(),
+            "queue_empty": self.decision_queue.empty(),
+        }
+
     async def start_decision_processor(self) -> None:
         """Start the decision processing task."""
-        if (
-            not hasattr(self, "_processor_task")
-            or self._processor_task is None
-            or self._processor_task.done()
-        ):
+        if self._processor_task is None or self._processor_task.done():
             self._processor_task = asyncio.create_task(self.process_decision_queue())
             logger.info("Started TradeDecision processor")
 
     async def stop_decision_processor(self) -> None:
         """Stop the decision processing task."""
-        if hasattr(self, "_processor_task") and self._processor_task:
+        if self._processor_task is not None:
             self._processor_task.cancel()
             try:
                 await self._processor_task

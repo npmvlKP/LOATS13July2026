@@ -5,8 +5,14 @@ Tests for options module.
 from datetime import datetime
 
 import pytest
-from vollib.black_scholes import black_scholes
-from vollib.black_scholes.implied_volatility import implied_volatility
+
+# vollib replaced by hand-rolled options_math (TODO-27a). Keep vollib
+# fallback for environments where vollib is still installed but not required.
+try:
+    from loats.options_math import black_scholes, implied_volatility
+except ImportError:  # pragma: no cover - legacy fallback
+    from vollib.black_scholes import black_scholes  # type: ignore[import-not-found]
+    from vollib.black_scholes.implied_volatility import implied_volatility  # type: ignore[import-not-found]
 
 from loats.models import Greeks, OptionContract, OptionType
 from loats.options import (

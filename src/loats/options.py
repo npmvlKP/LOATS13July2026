@@ -9,12 +9,21 @@ from typing import Any
 import numpy as np
 from scipy.optimize import brentq, newton
 from scipy.stats import norm
-from vollib.black_scholes import black_scholes
-from vollib.black_scholes.greeks.analytical import delta, gamma, rho, theta, vega
-from vollib.ref_python.black_scholes.implied_volatility import implied_volatility
 
 from .loats_logging import get_logger
 from .models import Greeks, OptionContract, OptionType, Trade, VaRResult
+
+# Hand-rolled Black-Scholes replaces deprecated vollib (TODO-27a).
+# See options_math.py for formulas and vollib parity tests.
+from .options_math import (
+    black_scholes,
+    delta,
+    gamma,
+    implied_volatility,
+    rho,
+    theta,
+    vega,
+)
 
 logger = get_logger(__name__)
 
