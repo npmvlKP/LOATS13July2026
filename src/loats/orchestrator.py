@@ -366,11 +366,12 @@ class TradingOrchestrator:
                 settings = get_settings()
 
             symbol = settings.default_symbol
-            rss_feeds = [
-                "https://economictimes.indiatimes.com/markets/rssfeeds/1977021501.cms",
-                "https://www.moneycontrol.com/rss/latestnews.xml",
-                "https://www.bloombergquint.com/markets-feed",
-            ]
+            # RSS feeds are now configurable via settings.rss_feeds
+            # BloombergQuint feed (https://www.bloombergquint.com/markets-feed)
+            # was removed as defunct (TODO-27d). Replaced with Livemint markets
+            # feed after validation (ET + Moneycontrol remain). Validate at runtime
+            # to tolerate transient failures and keep sentiment pipeline resilient.
+            rss_feeds = get_settings().rss_feeds
 
             # Validate RSS feeds and filter out invalid ones
             valid_feeds = []
@@ -1117,10 +1118,10 @@ async def get_cycle_stats() -> dict[str, Any]:
 async def update_trailing_stops() -> None:
     """
     Update trailing stops for all open positions.
-    
+
     This function implements the runtime driver for trailing stop updates
     as required by TODO-14 (F7-H-04 / CMP Rule 12).
-    
+
     Enforces Rule-7: ≤25 modifications per cycle.
     Runs as part of the orchestrator risk step with <1ms budget.
     """
@@ -1140,7 +1141,6 @@ async def update_trailing_stops() -> None:
             return
 
         # Enforce Rule-7: ≤25 modifications per cycle
-        modification_counter = rules_engine.get_modification_counter()
         max_modifications = 25
         modifications_this_cycle = 0
 
@@ -1172,16 +1172,21 @@ async def update_trailing_stops() -> None:
 
                 # Update trailing stop using the engine
                 old_config = db_position.trailing_config.copy()
-                updated_config, was_modified = trailing_stop_engine.update_trailing_stop(
-                    db_position.trailing_config,
-                    current_price
+                updated_config, was_modified = (
+                    trailing_stop_engine.update_trailing_stop(
+                        db_position.trailing_config,
+                        current_price,
+                    )
                 )
 
                 # Only persist if configuration was modified
                 if was_modified:
                     # Enforce Rule-7: ≤25 modifications per cycle
                     if modifications_this_cycle >= max_modifications:
-                        logger.warning(f"Rule-7 limit reached ({max_modifications} modifications). Skipping further updates.")
+                        logger.warning(
+                            f"Rule-7 limit reached ({max_modifications} "
+                            f"modifications). Skipping further updates."
+                        )
                         break
 
                     # Modify order via OpenAlgo
@@ -1214,7 +1219,10 @@ async def update_trailing_stops() -> None:
                     )
 
             except Exception as e:
-                logger.error(f"Error updating trailing stop for {position_data.get('symbol', 'unknown')}: {e}")
+                logger.error(
+                    f"Error updating trailing stop for "
+                    f"{position_data.get('symbol', 'unknown')}: {e}"
+                )
                 continue
 
     except Exception as e:

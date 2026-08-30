@@ -204,9 +204,40 @@ class TestQueue:
 
     @pytest.mark.asyncio
     async def test_enqueue_error(self, td_engine):
-        with patch.object(td_engine.decision_queue, "put", side_effect=RuntimeError("broken")):
+        with patch.object(td_engine.decision_queue, "put_nowait", side_effect=RuntimeError("broken")):
             r = await td_engine.enqueue_decision(_make_td())
         assert r["status"] == "error"
+
+    @pytest.mark.asyncio
+    async def test_enqueue_backpressure_full(self, td_engine):
+        # Fill the bounded queue to maxsize, next enqueue should be rejected with queue_full
+        small_engine = TradeDecisionEngine(maxsize=2)
+        # Fill
+        for _ in range(2):
+            res = await small_engine.enqueue_decision(_make_td())
+            assert res["status"] == "queued"
+        assert small_engine.decision_queue.full() is True
+        # Next should be rejected, not blocked
+        res_full = await small_engine.enqueue_decision(_make_td())
+        assert res_full["status"] == "rejected"
+        assert res_full["reason"] == "queue_full"
+        assert res_full["queue_maxsize"] == 2
+        # Stats reflect bounded state
+        stats = small_engine.get_queue_stats()
+        assert stats["queue_size"] == 2
+        assert stats["queue_maxsize"] == 2
+        assert stats["queue_full"] is True
+
+    @pytest.mark.asyncio
+    async def test_queue_stats_and_maxsize(self, td_engine):
+        stats = td_engine.get_queue_stats()
+        assert "queue_size" in stats
+        assert "queue_maxsize" in stats
+        assert stats["queue_maxsize"] == td_engine.decision_queue.maxsize
+        # Default from settings should be 100 (bounded)
+        assert stats["queue_maxsize"] == 100
+        # Verify queue is bounded (not unbounded maxsize=0)
+        assert td_engine.decision_queue.maxsize > 0
 
     @pytest.mark.asyncio
     async def test_create_and_route_not_created(self, td_engine, hist, funds):

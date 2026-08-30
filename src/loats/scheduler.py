@@ -402,12 +402,24 @@ class TradingScheduler:
         try:
             self._check_kill_switch()
             symbol = settings.default_symbol
-            rss_feeds = [
-                "https://economictimes.indiatimes.com/markets/rssfeeds/1977021501.cms",
-                "https://www.moneycontrol.com/rss/latestnews.xml",
-                "https://www.bloombergquint.com/markets-feed",
-            ]
-            result = await sentiment.analyze_symbol_sentiment(symbol, rss_feeds)
+            # RSS feeds configurable via settings.rss_feeds (TODO-27d).
+            # BloombergQuint feed removed as defunct (404 / non-RSS).
+            # Replaced with Livemint markets feed; validated at runtime.
+            rss_feeds = settings.rss_feeds
+            # Runtime validation mirrors orchestrator to keep pipeline resilient
+            # against transient feed failures.
+            from .orchestrator import validate_rss_feed
+
+            valid_feeds: list[str] = []
+            for feed_url in rss_feeds:
+                if await validate_rss_feed(feed_url):
+                    valid_feeds.append(feed_url)
+                else:
+                    logger.warning("Skipping invalid RSS feed: %s", feed_url)
+            if not valid_feeds:
+                logger.warning("No valid RSS feeds available for sentiment scan")
+                return
+            result = await sentiment.analyze_symbol_sentiment(symbol, valid_feeds)
             metadata = {
                 "scan_type": "sentiment",
                 "news_count": result.news_count,
