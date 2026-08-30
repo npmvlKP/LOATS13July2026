@@ -1,770 +1,33 @@
-# --- Imports ---
+"""Async additions for the Database class.
+
+This module extends the Database class with async methods using aiosqlite.
+All methods are monkey-patched onto the Database class during initialization.
+"""
+
 import json
-from datetime import datetime
-from datetime import timezone as UTC
-from typing import Any
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Any
 
-from loats.database import Database
-from loats.models import (
-    AuditLogEntry as AuditLog,
-)
-from loats.models import (
-    FundsData as Funds,
-)
-from loats.models import (
-    HistoricalData,
-    Order,
-    Position,
-    QuoteData,
-    Signal,
-    SignalType,
-    Trade,
-    TradeDecision,
-)
+if TYPE_CHECKING:
+    from .database import Database
 
-# --- Module Initialization ---
-# Ensure all methods are defined and exposed
-AIOSQLITE_AVAILABLE = False
 try:
-    import aiosqlite as _aiosqlite  # type: ignore[no-redef] - checked for availability
+    import aiosqlite
+
     AIOSQLITE_AVAILABLE = True
 except ImportError:
-    pass
-# --- Extension Function ---
-def extend_database_class() -> None:
-    """Extend the Database class with async methods."""
-    from .database import Database
-    # Add all async methods
-    for method_name in [
-        "_async_create_signal",
-        "_async_store_historical_data",
-        "_async_store_position",
-        "_async_store_funds",
-        "_async_get_latest_signals",
-        "_async_update_trade",
-        "_async_update_order_status",
-        "_async_record_trade_decision",
-        "_async_log_audit",
-        "_async_store_quote",
-    ]:
-        if hasattr(Database, method_name):
-            continue
-        if method_name == "_async_create_signal":
-            _add_wrapper_method(Database, method_name, _async_create_signal)
-        elif method_name == "_async_store_historical_data":
-            _add_wrapper_method(Database, method_name, _async_store_historical_data)
-        elif method_name == "_async_store_position":
-            _add_wrapper_method(Database, method_name, _async_store_position)
-        elif method_name == "_async_store_funds":
-            _add_wrapper_method(Database, method_name, _async_store_funds)
-        elif method_name == "_async_get_latest_signals":
-            _add_wrapper_method(Database, method_name, _async_get_latest_signals)
-        elif method_name == "_async_update_trade":
-            _add_wrapper_method(Database, method_name, _async_update_trade)
-        elif method_name == "_async_update_order_status":
-            _add_wrapper_method(Database, method_name, _async_update_order_status)
-        elif method_name == "_async_record_trade_decision":
-            _add_wrapper_method(Database, method_name, _async_record_trade_decision)
-        elif method_name == "_async_log_audit":
-            _add_wrapper_method(Database, method_name, _async_log_audit)
-        elif method_name == "_async_store_quote":
-            _add_wrapper_method(Database, method_name, _async_store_quote)
+    AIOSQLITE_AVAILABLE = False
 
-
-async def _async_record_trade_decision(self: Database, decision: TradeDecision) -> bool:
-    """True async implementation using aiosqlite."""
-    if (
-        not AIOSQLITE_AVAILABLE
-        or not hasattr(self, "_async_pool")
-        or self._async_pool is None
-    ):
-        return False
-    now = datetime.now(UTC)
-    now_iso = now.isoformat()
-    now_ms = int(now.timestamp() * 1000)
-    ts_ms = int(decision.timestamp.timestamp() * 1000)
-    conn = await self._async_pool.acquire()
-    try:
-        async with conn.cursor() as cursor:
-            await cursor.execute(
-                """                INSERT INTO trade_decisions                (decision_id, symbol, decision_type, quantity, price, timestamp, created_at, created_at_ms, timestamp_ms)                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)                """,
-                (
-                    decision.decision_id,
-                    decision.symbol,
-                    decision.decision_type,
-                    decision.quantity,
-                    decision.price,
-                    decision.timestamp.isoformat(),
-                    now_iso,
-                    now_ms,
-                    ts_ms,
-                ),
-            )
-        await conn.commit()
-    finally:
-        await self._async_pool.release(conn)
-    return True
-
-async def _async_log_audit(self: Database, audit: AuditLog) -> bool:
-    """True async implementation using aiosqlite."""
-    if (
-        not AIOSQLITE_AVAILABLE
-        or not hasattr(self, "_async_pool")
-        or self._async_pool is None
-    ):
-        return False
-    now = datetime.now(UTC)
-    now_iso = now.isoformat()
-    now_ms = int(now.timestamp() * 1000)
-    ts_ms = int(audit.timestamp.timestamp() * 1000)
-    conn = await self._async_pool.acquire()
-    try:
-        async with conn.cursor() as cursor:
-            await cursor.execute(
-                """                INSERT INTO audit_log                (action, entity_type, entity_id, details, timestamp, created_at, created_at_ms, timestamp_ms)                VALUES (?, ?, ?, ?, ?, ?, ?, ?)                """,
-                (
-                    audit.action,
-                    audit.entity_type,
-                    audit.entity_id,
-                    json.dumps(audit.details),
-                    audit.timestamp.isoformat(),
-                    now_iso,
-                    now_ms,
-                    ts_ms,
-                ),
-            )
-        await conn.commit()
-    finally:
-        await self._async_pool.release(conn)
-    return True
-async def _async_update_trade(self: Database, trade: Trade) -> bool:
-    """True async implementation using aiosqlite."""
-    if (
-        not AIOSQLITE_AVAILABLE
-        or not hasattr(self, "_async_pool")
-        or self._async_pool is None
-    ):
-        return False
-    now = datetime.now(UTC)
-    now_iso = now.isoformat()
-    now_ms = int(now.timestamp() * 1000)
-    ts_ms = int(trade.timestamp.timestamp() * 1000)
-    conn = await self._async_pool.acquire()
-    try:
-        async with conn.cursor() as cursor:
-            await cursor.execute(
-
-
-
-
-
-
-                """                INSERT OR REPLACE INTO trades                (trade_id, symbol, quantity, price, side, status, timestamp, created_at, created_at_ms, timestamp_ms)                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)                """,
-                (
-                    trade.trade_id,
-                    trade.symbol,
-                    trade.quantity,
-                    trade.price,
-                    trade.side,
-                    trade.status,
-                    trade.timestamp.isoformat(),
-                    now_iso,
-                    now_ms,
-                    ts_ms,
-                ),
-            )
-        await conn.commit()
-    finally:
-        await self._async_pool.release(conn)
-    return True
-
-async def _async_update_order_status(self: Database, order: Order) -> bool:
-    """True async implementation using aiosqlite."""
-    if (
-        not AIOSQLITE_AVAILABLE
-        or not hasattr(self, "_async_pool")
-        or self._async_pool is None
-    ):
-        return False
-    now = datetime.now(UTC)
-    now_iso = now.isoformat()
-    now_ms = int(now.timestamp() * 1000)
-    ts_ms = int(order.timestamp.timestamp() * 1000)
-    conn = await self._async_pool.acquire()
-    try:
-        async with conn.cursor() as cursor:
-            await cursor.execute(
-                """                INSERT OR REPLACE INTO orders                (order_id, symbol, quantity, price, side, status, timestamp, created_at, created_at_ms, timestamp_ms)                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)                """,
-                (
-                    order.order_id,
-                    order.symbol,
-                    order.quantity,
-                    order.price,
-                    order.side,
-                    order.status,
-                    order.timestamp.isoformat(),
-                    now_iso,
-                    now_ms,
-                    ts_ms,
-                ),
-            )
-        await conn.commit()
-    finally:
-        await self._async_pool.release(conn)
-    return True
-async def _async_store_funds(self: Database, funds: Funds) -> bool:
-    """True async implementation using aiosqlite."""
-    if (
-        not AIOSQLITE_AVAILABLE
-        or not hasattr(self, "_async_pool")
-        or self._async_pool is None
-    ):
-        return False
-    now = datetime.now(UTC)
-    now_iso = now.isoformat()
-    now_ms = int(now.timestamp() * 1000)
-    ts_ms = int(funds.timestamp.timestamp() * 1000)
-    conn = await self._async_pool.acquire()
-    try:
-        async with conn.cursor() as cursor:
-            await cursor.execute(
-                """                INSERT OR REPLACE INTO funds                (symbol, balance, available, timestamp, created_at, created_at_ms, timestamp_ms)                VALUES (?, ?, ?, ?, ?, ?, ?)                """,
-                (
-                    funds.symbol,
-                    funds.balance,
-                    funds.available,
-                    funds.timestamp.isoformat(),
-                    now_iso,
-                    now_ms,
-                    ts_ms,
-                ),
-            )
-        await conn.commit()
-    finally:
-        await self._async_pool.release(conn)
-    return True
-
-async def _async_get_latest_signals(self: Database, scan_type: str, limit: int = 10) -> list[Signal]:
-    """True async implementation using aiosqlite."""
-    if (
-        not AIOSQLITE_AVAILABLE
-        or not hasattr(self, "_async_pool")
-        or self._async_pool is None
-    ):
-        return []
-    conn = await self._async_pool.acquire()
-    try:
-        async with conn.cursor() as cursor:
-            await cursor.execute(
-                """                SELECT signal_id, symbol, signal_type, strength, timestamp, indicators, metadata, confidence                FROM signals                WHERE scan_type = ?                ORDER BY timestamp DESC                LIMIT ?                """,
-                (scan_type, limit),
-            )
-            rows = await cursor.fetchall()
-        return [_signal_from_row(row) for row in rows]
-    finally:
-        await self._async_pool.release(conn)
-async def _async_store_quote(self: Database, quote: QuoteData) -> bool:
-    """True async implementation using aiosqlite."""
-    if (
-        not AIOSQLITE_AVAILABLE
-        or not hasattr(self, "_async_pool")
-        or self._async_pool is None
-    ):
-        return False
-    now = datetime.now(UTC)
-    now_iso = now.isoformat()
-    now_ms = int(now.timestamp() * 1000)
-    ts_ms = int(quote.timestamp.timestamp() * 1000)
-    conn = await self._async_pool.acquire()
-    try:
-        async with conn.cursor() as cursor:
-            await cursor.execute(
-                """                INSERT OR REPLACE INTO quotes                (symbol, last_price, open, high, low, close, volume, timestamp, created_at, created_at_ms, timestamp_ms)                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)                """,
-                (
-                    quote.symbol,
-                    quote.last_price,
-                    quote.open,
-                    quote.high,
-                    quote.low,
-                    quote.close,
-                    quote.volume,
-                    quote.timestamp.isoformat(),
-                    now_iso,
-                    now_ms,
-                    ts_ms,
-                ),
-            )
-        await conn.commit()
-    finally:
-        await self._async_pool.release(conn)
-    return True
-
-async def _async_store_position(self: Database, position: Position) -> bool:
-    """True async implementation using aiosqlite."""
-    if (
-        not AIOSQLITE_AVAILABLE
-        or not hasattr(self, "_async_pool")
-        or self._async_pool is None
-    ):
-        return False
-    now = datetime.now(UTC)
-    now_iso = now.isoformat()
-    now_ms = int(now.timestamp() * 1000)
-    ts_ms = int(position.timestamp.timestamp() * 1000)
-    conn = await self._async_pool.acquire()
-    try:
-        async with conn.cursor() as cursor:
-            await cursor.execute(
-                """                INSERT OR REPLACE INTO positions                (symbol, quantity, average_price, last_price, pnl, product_type, buy_quantity, sell_quantity, timestamp, created_at, created_at_ms, timestamp_ms)                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)                """,
-                (
-                    position.symbol,
-                    position.quantity,
-                    getattr(position, 'average_price', 0),
-                    getattr(position, 'last_price', 0),
-                    getattr(position, 'pnl', 0),
-                    getattr(position, 'product_type', None),
-                    getattr(position, 'buy_quantity', 0),
-                    getattr(position, 'sell_quantity', 0),
-                    position.timestamp.isoformat(),
-                    now_iso,
-                    now_ms,
-                    ts_ms,
-                ),
-            )
-        await conn.commit()
-    finally:
-        await self._async_pool.release(conn)
-    return True
-async def _async_store_position(self: Database, position: Position) -> bool:
-    """True async implementation using aiosqlite."""
-    if (
-        not AIOSQLITE_AVAILABLE
-        or not hasattr(self, "_async_pool")
-        or self._async_pool is None
-    ):
-        return False
-    now = datetime.now(UTC)
-    now_iso = now.isoformat()
-    now_ms = int(now.timestamp() * 1000)
-    ts_ms = int(position.timestamp.timestamp() * 1000)
-    conn = await self._async_pool.acquire()
-    try:
-        async with conn.cursor() as cursor:
-            await cursor.execute(
-                """                INSERT OR REPLACE INTO positions                (symbol, quantity, avg_price, timestamp, created_at, created_at_ms, timestamp_ms)                VALUES (?, ?, ?, ?, ?, ?, ?)                """,
-                (
-                    position.symbol,
-                    position.quantity,
-                    position.avg_price,
-                    position.timestamp.isoformat(),
-                    now_iso,
-                    now_ms,
-                    ts_ms,
-                ),
-            )
-        await conn.commit()
-    finally:
-        await self._async_pool.release(conn)
-    return True
-# --- Async Methods ---
-async def _async_create_signal(self: Database, signal: Signal) -> bool:
-    """True async implementation using aiosqlite."""
-    if (
-        not AIOSQLITE_AVAILABLE
-        or not hasattr(self, "_async_pool")
-        or self._async_pool is None
-    ):
-        return False
-    now = datetime.now(UTC)
-    now_iso = now.isoformat()
-    now_ms = int(now.timestamp() * 1000)
-    ts_ms = int(signal.timestamp.timestamp() * 1000)
-    conn = await self._async_pool.acquire()
-    try:
-        async with conn.cursor() as cursor:
-            await cursor.execute(
-                """                INSERT INTO signals                (signal_id, symbol, signal_type, strength, timestamp, indicators, metadata, confidence, scan_type, created_at, created_at_ms, timestamp_ms)                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)                """,
-                (
-                    signal.signal_id,
-                    signal.symbol,
-                    signal.signal_type.value,
-                    signal.strength,
-                    signal.timestamp.isoformat(),
-                    json.dumps(signal.indicators),
-                    json.dumps(signal.metadata) if signal.metadata else None,
-                    signal.confidence,
-                    signal.scan_type,
-                    now_iso,
-                    now_ms,
-                    ts_ms,
-                ),
-            )
-        await conn.commit()
-    finally:
-        await self._async_pool.release(conn)
-    return True
-
-async def _async_store_historical_data(self: Database, data: HistoricalData) -> bool:
-    """True async implementation using aiosqlite."""
-    if (
-        not AIOSQLITE_AVAILABLE
-        or not hasattr(self, "_async_pool")
-        or self._async_pool is None
-    ):
-        return False
-    now = datetime.now(UTC)
-    now_iso = now.isoformat()
-    now_ms = int(now.timestamp() * 1000)
-    ts_ms = int(data.timestamp.timestamp() * 1000)
-    conn = await self._async_pool.acquire()
-    try:
-        async with conn.cursor() as cursor:
-            await cursor.execute(
-                """                INSERT INTO historical_data                (symbol, timestamp, open, high, low, close, volume, created_at, created_at_ms, timestamp_ms)                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)                """,
-                (
-                    data.symbol,
-                    data.timestamp.isoformat(),
-                    data.open,
-                    data.high,
-                    data.low,
-                    data.close,
-                    data.volume,
-                    now_iso,
-                    now_ms,
-                    ts_ms,
-                ),
-            )
-        await conn.commit()
-    finally:
-        await self._async_pool.release(conn)
-    return True
-# --- Helper Functions ---
-def _signal_from_row(self: Database, row) -> Signal:
-    """Convert a SQLite row to a Signal object."""
-    return Signal(
-        signal_id=row[0],
-        symbol=row[1],
-        signal_type=SignalType(row[2]),
-        strength=row[3],
-        timestamp=datetime.fromisoformat(row[4]),
-        indicators=json.loads(row[5]),
-        metadata=json.loads(row[6]) if row[6] else None,
-        confidence=row[7],
-    )
-
-def _model_to_dict(self: Database, model: Any) -> dict:
-    """Convert a model object to a dictionary."""
-    return model.__dict__
-
-def _add_wrapper_method(cls: type[Database], name: str, method: Any) -> None:
-    """Add a wrapper method to the Database class if it doesn't exist."""
-    if not hasattr(cls, name):
-        setattr(cls, name, method)
-        method_obj = getattr(cls, name)
-        if hasattr(method_obj, "_is_optimized"):
-            method_obj._is_optimized = True
-        else:
-            # Add the attribute dynamically - MyPy can't track this
-            object.__setattr__(method_obj, "_is_optimized", True)
-def _add_wrapper_method(cls: type[Database], name: str, method: Any) -> None:
-    """Add a wrapper method to the Database class if it doesn't exist."""
-    if not hasattr(cls, name):
-        setattr(cls, name, method)
-        method_obj = getattr(cls, name)
-        if hasattr(method_obj, "_is_optimized"):
-            method_obj._is_optimized = True
-        else:
-            # Add the attribute dynamically - MyPy can't track this
-            object.__setattr__(method_obj, "_is_optimized", True)
-async def _async_store_historical_data(self: Database, data: HistoricalData) -> bool:
-    """True async implementation using aiosqlite."""
-    if (
-        not AIOSQLITE_AVAILABLE
-        or not hasattr(self, "_async_pool")
-        or self._async_pool is None
-    ):
-        return False
-    now = datetime.now(UTC)
-    now_iso = now.isoformat()
-    now_ms = int(now.timestamp() * 1000)
-    ts_ms = int(data.timestamp.timestamp() * 1000)
-    conn = await self._async_pool.acquire()
-    try:
-        async with conn.cursor() as cursor:
-            await cursor.execute(
-                """                INSERT INTO historical_data                (symbol, timestamp, open, high, low, close, volume, created_at, created_at_ms, timestamp_ms)                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)                """,
-                (
-                    data.symbol,
-                    data.timestamp.isoformat(),
-                    data.open,
-                    data.high,
-                    data.low,
-                    data.close,
-                    data.volume,
-                    now_iso,
-                    now_ms,
-                    ts_ms,
-                ),
-            )
-        await conn.commit()
-    finally:
-        await self._async_pool.release(conn)
-    return True
-async def _async_create_signal(self: Database, signal: Signal) -> bool:
-    """True async implementation using aiosqlite."""
-    if (
-        not AIOSQLITE_AVAILABLE
-        or not hasattr(self, "_async_pool")
-        or self._async_pool is None
-    ):
-        return False
-    now = datetime.now(UTC)
-    now_iso = now.isoformat()
-    now_ms = int(now.timestamp() * 1000)
-    ts_ms = int(signal.timestamp.timestamp() * 1000)
-    conn = await self._async_pool.acquire()
-    try:
-        async with conn.cursor() as cursor:
-            await cursor.execute(
-                """                INSERT INTO signals                (signal_id, symbol, signal_type, strength, timestamp, indicators, metadata, confidence, scan_type, created_at, created_at_ms, timestamp_ms)                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)                """,
-                (
-                    signal.signal_id,
-                    signal.symbol,
-                    signal.signal_type.value,
-                    signal.strength,
-                    signal.timestamp.isoformat(),
-                    json.dumps(signal.indicators),
-                    json.dumps(signal.metadata) if signal.metadata else None,
-                    signal.confidence,
-                    signal.scan_type,
-                    now_iso,
-                    now_ms,
-                    ts_ms,
-                ),
-            )
-        await conn.commit()
-    finally:
-        await self._async_pool.release(conn)
-    return True
-async def _async_store_quote(self: Database, quote: QuoteData) -> bool:
-    """True async implementation using aiosqlite."""
-    if (
-        not AIOSQLITE_AVAILABLE
-        or not hasattr(self, "_async_pool")
-        or self._async_pool is None
-    ):
-        return False
-    now = datetime.now(UTC)
-    now_iso = now.isoformat()
-    now_ms = int(now.timestamp() * 1000)
-    ts_ms = int(quote.timestamp.timestamp() * 1000)
-    conn = await self._async_pool.acquire()
-    try:
-        async with conn.cursor() as cursor:
-            await cursor.execute(
-                """                INSERT OR REPLACE INTO quotes                (symbol, last_price, open, high, low, close, volume, timestamp, created_at, created_at_ms, timestamp_ms)                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)                """,
-                (
-                    quote.symbol,
-                    quote.last_price,
-                    quote.open,
-                    quote.high,
-                    quote.low,
-                    quote.close,
-                    quote.volume,
-                    quote.timestamp.isoformat(),
-                    now_iso,
-                    now_ms,
-                    ts_ms,
-                ),
-            )
-        await conn.commit()
-    finally:
-        await self._async_pool.release(conn)
-    return True
-def _model_to_dict(self: Database, model: Any) -> dict:
-    """Convert a model object to a dictionary."""
-    return model.__dict__
-def _signal_from_row(self: Database, row) -> Signal:
-    """Convert a SQLite row to a Signal object."""
-    return Signal(
-        signal_id=row[0],
-        symbol=row[1],
-        signal_type=SignalType(row[2]),
-        strength=row[3],
-        timestamp=datetime.fromisoformat(row[4]),
-        indicators=json.loads(row[5]),
-        metadata=json.loads(row[6]) if row[6] else None,
-        confidence=row[7],
-    )
-async def _async_record_trade_decision(self: Database, decision: TradeDecision) -> bool:
-    """True async implementation using aiosqlite."""
-    if (
-        not AIOSQLITE_AVAILABLE
-        or not hasattr(self, "_async_pool")
-        or self._async_pool is None
-    ):
-        return False
-    now = datetime.now(UTC)
-    now_iso = now.isoformat()
-    now_ms = int(now.timestamp() * 1000)
-    ts_ms = int(decision.timestamp.timestamp() * 1000)
-    conn = await self._async_pool.acquire()
-    try:
-        async with conn.cursor() as cursor:
-            await cursor.execute(
-                """                INSERT INTO trade_decisions                (decision_id, symbol, decision_type, quantity, price, timestamp, created_at, created_at_ms, timestamp_ms)                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)                """,
-                (
-                    decision.decision_id,
-                    decision.symbol,
-                    decision.decision_type,
-                    decision.quantity,
-                    decision.price,
-                    decision.timestamp.isoformat(),
-                    now_iso,
-                    now_ms,
-                    ts_ms,
-                ),
-            )
-        await conn.commit()
-    finally:
-        await self._async_pool.release(conn)
-    return True
-async def _async_update_order_status(self: Database, order: Order) -> bool:
-    """True async implementation using aiosqlite."""
-    if (
-        not AIOSQLITE_AVAILABLE
-        or not hasattr(self, "_async_pool")
-        or self._async_pool is None
-    ):
-        return False
-    now = datetime.now(UTC)
-    now_iso = now.isoformat()
-    now_ms = int(now.timestamp() * 1000)
-    ts_ms = int(order.timestamp.timestamp() * 1000)
-    conn = await self._async_pool.acquire()
-    try:
-        async with conn.cursor() as cursor:
-            await cursor.execute(
-                """                INSERT OR REPLACE INTO orders                (order_id, symbol, quantity, price, side, status, timestamp, created_at, created_at_ms, timestamp_ms)                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)                """,
-                (
-                    order.order_id,
-                    order.symbol,
-                    order.quantity,
-                    order.price,
-                    order.side,
-                    order.status,
-                    order.timestamp.isoformat(),
-                    now_iso,
-                    now_ms,
-                    ts_ms,
-                ),
-            )
-        await conn.commit()
-    finally:
-        await self._async_pool.release(conn)
-    return True
-async def _async_update_trade(self: Database, trade: Trade) -> bool:
-    """True async implementation using aiosqlite."""
-    if (
-        not AIOSQLITE_AVAILABLE
-        or not hasattr(self, "_async_pool")
-        or self._async_pool is None
-    ):
-        return False
-    now = datetime.now(UTC)
-    now_iso = now.isoformat()
-    now_ms = int(now.timestamp() * 1000)
-    ts_ms = int(trade.timestamp.timestamp() * 1000)
-    conn = await self._async_pool.acquire()
-    try:
-        async with conn.cursor() as cursor:
-            await cursor.execute(
-                """                INSERT OR REPLACE INTO trades                (trade_id, symbol, quantity, price, side, status, timestamp, created_at, created_at_ms, timestamp_ms)                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)                """,
-                (
-                    trade.trade_id,
-                    trade.symbol,
-                    trade.quantity,
-                    trade.price,
-                    trade.side,
-                    trade.status,
-                    trade.timestamp.isoformat(),
-                    now_iso,
-                    now_ms,
-                    ts_ms,
-                ),
-            )
-        await conn.commit()
-    finally:
-        await self._async_pool.release(conn)
-    return True
-async def _async_get_latest_signals(self: Database, scan_type: str, limit: int = 10) -> list[Signal]:
-    """True async implementation using aiosqlite."""
-    if (
-        not AIOSQLITE_AVAILABLE
-        or not hasattr(self, "_async_pool")
-        or self._async_pool is None
-    ):
-        return []
-    conn = await self._async_pool.acquire()
-    try:
-        async with conn.cursor() as cursor:
-            await cursor.execute(
-                """                SELECT signal_id, symbol, signal_type, strength, timestamp, indicators, metadata, confidence                FROM signals                WHERE scan_type = ?                ORDER BY timestamp DESC                LIMIT ?                """,
-                (scan_type, limit),
-            )
-            rows = await cursor.fetchall()
-        return [_signal_from_row(row) for row in rows]
-    finally:
-        await self._async_pool.release(conn)
-async def _async_store_funds(self: Database, funds: Funds) -> bool:
-    """True async implementation using aiosqlite."""
-    if (
-        not AIOSQLITE_AVAILABLE
-        or not hasattr(self, "_async_pool")
-        or self._async_pool is None
-    ):
-        return False
-    now = datetime.now(UTC)
-    now_iso = now.isoformat()
-    now_ms = int(now.timestamp() * 1000)
-    ts_ms = int(funds.timestamp.timestamp() * 1000)
-    conn = await self._async_pool.acquire()
-    try:
-        async with conn.cursor() as cursor:
-            await cursor.execute(
-                """                INSERT OR REPLACE INTO funds                (symbol, balance, available, timestamp, created_at, created_at_ms, timestamp_ms)                VALUES (?, ?, ?, ?, ?, ?, ?)                """,
-                (
-                    funds.symbol,
-                    funds.balance,
-                    funds.available,
-                    funds.timestamp.isoformat(),
-                    now_iso,
-                    now_ms,
-                    ts_ms,
-                ),
-            )
-        await conn.commit()
-    finally:
-        await self._async_pool.release(conn)
-    return True
-"""Async database operations for LOATS13July2026 using aiosqlite. This module extends the Database class with true async I/O capabilities."""
-
-import importlib.util  # noqa: E402
-from datetime import UTC  # noqa: E402
-from typing import Any  # noqa: E402
-
-from .database import Database  # noqa: E402
-from .models import (  # noqa: E402
+from .models import (
+    FundsData,
     HistoricalData,
     Position,
-    QuoteData,
     Signal,
-    Trade,
     TradeDecision,
 )
 
 
-async def _async_create_signal(self: Database, signal: Signal) -> bool:
+async def _async_create_signal(self: "Database", signal: Signal) -> bool:
     """True async implementation using aiosqlite."""
     if (
         not AIOSQLITE_AVAILABLE
@@ -772,24 +35,28 @@ async def _async_create_signal(self: Database, signal: Signal) -> bool:
         or self._async_pool is None
     ):
         return False
+
     now = datetime.now(UTC)
     now_iso = now.isoformat()
     now_ms = int(now.timestamp() * 1000)
     ts_ms = int(signal.timestamp.timestamp() * 1000)
+
     conn = await self._async_pool.acquire()
     try:
         async with conn.cursor() as cursor:
             await cursor.execute(
-                """                INSERT INTO signals                (signal_id, symbol, signal_type, strength, timestamp,                 indicators, metadata, confidence, created_at, created_at_ms,                 timestamp_ms)                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)                """,
+                """INSERT INTO signals
+                (symbol, signal_type, strength, timestamp, indicators,
+                 confidence, metadata, created_at, created_at_ms, timestamp_ms)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
-                    signal.signal_id,
                     signal.symbol,
                     signal.signal_type.value,
-                    signal.strength,
+                    float(signal.strength),
                     signal.timestamp.isoformat(),
                     json.dumps(signal.indicators),
-                    json.dumps(signal.metadata) if signal.metadata else None,
-                    signal.confidence,
+                    float(signal.confidence),
+                    json.dumps(signal.metadata),
                     now_iso,
                     now_ms,
                     ts_ms,
@@ -798,52 +65,244 @@ async def _async_create_signal(self: Database, signal: Signal) -> bool:
         await conn.commit()
     finally:
         await self._async_pool.release(conn)
-    # Async audit logging
-    await _async_log_audit(
-        self,
-        action="CREATE",
-        entity_type="signal",
-        entity_id=signal.signal_id,
-        new_state=self._model_to_dict(signal),
-    )
     return True
-# Check for aiosqlite availability
-AIOSQLITE_AVAILABLE = importlib.util.find_spec("aiosqlite") is not None
 
 
-
-
-async def _async_store_historical_data(self: Database, data: list[HistoricalData]) -> bool:
-    """True async implementation using aiosqlite."""
+async def _async_store_historical_data(self: "Database", data: list[HistoricalData]) -> bool:
+    """True async implementation using aiosqlite for bulk insert."""
     if (
         not AIOSQLITE_AVAILABLE
         or not hasattr(self, "_async_pool")
         or self._async_pool is None
     ):
         return False
+
     now = datetime.now(UTC)
     now_iso = now.isoformat()
     now_ms = int(now.timestamp() * 1000)
+
     conn = await self._async_pool.acquire()
     try:
         async with conn.cursor() as cursor:
+            # Use executemany for bulk insert
+            records = []
             for item in data:
                 ts_ms = int(item.timestamp.timestamp() * 1000)
-                await cursor.execute(
-                    """                    INSERT OR REPLACE INTO historical_data                    (symbol, timestamp, open, high, low, close, volume,                     interval, created_at, created_at_ms, timestamp_ms)                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)                    """,
+                records.append(
                     (
                         item.symbol,
                         item.timestamp.isoformat(),
-                        item.open,
-                        item.high,
-                        item.low,
-                        item.close,
-                        item.volume,
+                        float(item.open),
+                        float(item.high),
+                        float(item.low),
+                        float(item.close),
+                        int(item.volume),
                         item.interval,
                         now_iso,
                         now_ms,
                         ts_ms,
-                    ),
+                    )
+                )
+
+            await cursor.executemany(
+                """INSERT OR REPLACE INTO historical_data
+                (symbol, timestamp, open, high, low, close, volume, interval,
+                 created_at, created_at_ms, timestamp_ms)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                records,
+            )
+        await conn.commit()
+    finally:
+        await self._async_pool.release(conn)
+    return True
+
+
+async def _async_store_position(self: "Database", position: Position) -> bool:
+    """True async implementation using aiosqlite."""
+    if (
+        not AIOSQLITE_AVAILABLE
+        or not hasattr(self, "_async_pool")
+        or self._async_pool is None
+    ):
+        return False
+
+    now = datetime.now(UTC)
+    now_iso = now.isoformat()
+    now_ms = int(now.timestamp() * 1000)
+    ts_ms = int(position.timestamp.timestamp() * 1000)
+
+    conn = await self._async_pool.acquire()
+    try:
+        async with conn.cursor() as cursor:
+            await cursor.execute(
+                """INSERT OR REPLACE INTO positions
+                (symbol, quantity, avg_price, timestamp, created_at, created_at_ms, timestamp_ms)
+                VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    position.symbol,
+                    float(position.quantity),
+                    float(position.avg_price),
+                    position.timestamp.isoformat(),
+                    now_iso,
+                    now_ms,
+                    ts_ms,
+                ),
+            )
+        await conn.commit()
+    finally:
+        await self._async_pool.release(conn)
+    return True
+
+
+async def _async_store_funds(self: "Database", funds: FundsData) -> bool:
+    """True async implementation using aiosqlite."""
+    if (
+        not AIOSQLITE_AVAILABLE
+        or not hasattr(self, "_async_pool")
+        or self._async_pool is None
+    ):
+        return False
+
+    now = datetime.now(UTC)
+    now_iso = now.isoformat()
+    now_ms = int(now.timestamp() * 1000)
+    ts_ms = int(funds.timestamp.timestamp() * 1000)
+
+    conn = await self._async_pool.acquire()
+    try:
+        async with conn.cursor() as cursor:
+            await cursor.execute(
+                """INSERT OR REPLACE INTO funds
+                (total, available, timestamp, created_at, created_at_ms, timestamp_ms)
+                VALUES (?, ?, ?, ?, ?, ?)""",
+                (
+                    float(funds.total),
+                    float(funds.available),
+                    funds.timestamp.isoformat(),
+                    now_iso,
+                    now_ms,
+                    ts_ms,
+                ),
+            )
+        await conn.commit()
+    finally:
+        await self._async_pool.release(conn)
+    return True
+
+
+async def _async_get_latest_signals(
+    self: "Database", limit: int = 10, minutes_ago: int = 5
+) -> list[Signal]:
+    """True async implementation using aiosqlite."""
+    if (
+        not AIOSQLITE_AVAILABLE
+        or not hasattr(self, "_async_pool")
+        or self._async_pool is None
+    ):
+        return []
+
+    cutoff_ms = int((datetime.now(UTC).timestamp() - minutes_ago * 60) * 1000)
+
+    conn = await self._async_pool.acquire()
+    try:
+        async with conn.cursor() as cursor:
+            await cursor.execute(
+                """SELECT symbol, signal_type, strength, timestamp, indicators,
+                          confidence, metadata, timestamp_ms
+                   FROM signals
+                   WHERE timestamp_ms >= ?
+                   ORDER BY timestamp_ms DESC
+                   LIMIT ?""",
+                (cutoff_ms, limit),
+            )
+            rows = await cursor.fetchall()
+
+        signals = []
+        for row in rows:
+            if row[7]:
+                ts_ms = row[7]
+                ts = datetime.fromtimestamp(ts_ms / 1000, tz=UTC)
+            else:
+                ts = datetime.fromisoformat(row[3])
+
+            signals.append(
+                Signal(
+                    symbol=row[0],
+                    signal_type=row[1],
+                    strength=row[2],
+                    timestamp=ts,
+                    indicators=json.loads(row[4]) if row[4] else {},
+                    confidence=row[5],
+                    metadata=json.loads(row[6]) if row[6] else {},
+                )
+            )
+        return signals
+    finally:
+        await self._async_pool.release(conn)
+
+
+async def _async_update_trade(
+    self: "Database", trade_id: str, status: str, filled_qty: int, filled_price: float
+) -> bool:
+    """True async implementation using aiosqlite."""
+    if (
+        not AIOSQLITE_AVAILABLE
+        or not hasattr(self, "_async_pool")
+        or self._async_pool is None
+    ):
+        return False
+
+    now = datetime.now(UTC)
+    now_iso = now.isoformat()
+    now_ms = int(now.timestamp() * 1000)
+
+    conn = await self._async_pool.acquire()
+    try:
+        async with conn.cursor() as cursor:
+            await cursor.execute(
+                """UPDATE trades
+                SET status = ?, filled_qty = ?, filled_price = ?,
+                    updated_at = ?, updated_at_ms = ?
+                WHERE id = ?""",
+                (status, filled_qty, filled_price, now_iso, now_ms, trade_id),
+            )
+        await conn.commit()
+    finally:
+        await self._async_pool.release(conn)
+    return True
+
+
+async def _async_update_order_status(
+    self: "Database", order_id: str, status: str, filled_qty: int | None = None
+) -> bool:
+    """True async implementation using aiosqlite."""
+    if (
+        not AIOSQLITE_AVAILABLE
+        or not hasattr(self, "_async_pool")
+        or self._async_pool is None
+    ):
+        return False
+
+    now = datetime.now(UTC)
+    now_iso = now.isoformat()
+    now_ms = int(now.timestamp() * 1000)
+
+    conn = await self._async_pool.acquire()
+    try:
+        async with conn.cursor() as cursor:
+            if filled_qty is not None:
+                await cursor.execute(
+                    """UPDATE orders
+                    SET status = ?, filled_qty = ?, updated_at = ?, updated_at_ms = ?
+                    WHERE id = ?""",
+                    (status, filled_qty, now_iso, now_ms, order_id),
+                )
+            else:
+                await cursor.execute(
+                    """UPDATE orders
+                    SET status = ?, updated_at = ?, updated_at_ms = ?
+                    WHERE id = ?""",
+                    (status, now_iso, now_ms, order_id),
                 )
         await conn.commit()
     finally:
@@ -851,7 +310,52 @@ async def _async_store_historical_data(self: Database, data: list[HistoricalData
     return True
 
 
-async def _async_log_audit(self: Database, action: str, entity_type: str, entity_id: str, **kwargs) -> None:
+async def _async_record_trade_decision(
+    self: "Database", decision: TradeDecision
+) -> bool:
+    """True async implementation using aiosqlite."""
+    if (
+        not AIOSQLITE_AVAILABLE
+        or not hasattr(self, "_async_pool")
+        or self._async_pool is None
+    ):
+        return False
+
+    now = datetime.now(UTC)
+    now_iso = now.isoformat()
+    now_ms = int(now.timestamp() * 1000)
+    ts_ms = int(decision.timestamp.timestamp() * 1000)
+
+    conn = await self._async_pool.acquire()
+    try:
+        async with conn.cursor() as cursor:
+            await cursor.execute(
+                """INSERT OR REPLACE INTO trade_decisions
+                (decision_id, symbol, decision_type, confidence, strength,
+                 timestamp, metadata, created_at, created_at_ms, timestamp_ms)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    decision.decision_id,
+                    decision.symbol,
+                    decision.decision_type.value,
+                    float(decision.confidence),
+                    float(decision.strength),
+                    decision.timestamp.isoformat(),
+                    json.dumps(decision.metadata),
+                    now_iso,
+                    now_ms,
+                    ts_ms,
+                ),
+            )
+        await conn.commit()
+    finally:
+        await self._async_pool.release(conn)
+    return True
+
+
+async def _async_log_audit(
+    self: "Database", action: str, entity_type: str, entity_id: str, **kwargs: Any
+) -> None:
     """True async implementation using aiosqlite."""
     if (
         not AIOSQLITE_AVAILABLE
@@ -859,14 +363,18 @@ async def _async_log_audit(self: Database, action: str, entity_type: str, entity
         or self._async_pool is None
     ):
         return
+
     now = datetime.now(UTC)
     now_iso = now.isoformat()
     now_ms = int(now.timestamp() * 1000)
+
     conn = await self._async_pool.acquire()
     try:
         async with conn.cursor() as cursor:
             await cursor.execute(
-                """                INSERT INTO audit_log                (action, entity_type, entity_id, user, metadata, created_at, created_at_ms)                VALUES (?, ?, ?, ?, ?, ?, ?)                """,
+                """INSERT INTO audit_log
+                (action, entity_type, entity_id, user, metadata, created_at, created_at_ms)
+                VALUES (?, ?, ?, ?, ?, ?, ?)""",
                 (
                     action,
                     entity_type,
@@ -882,55 +390,82 @@ async def _async_log_audit(self: Database, action: str, entity_type: str, entity
         await self._async_pool.release(conn)
 
 
-def extend_database_class() -> None:
-    """Extend the Database class with async methods."""
-    from .database import Database  # noqa: E402
-    # Add core async methods
-    if not hasattr(Database, "_async_create_signal"):
-        Database._async_create_signal = _async_create_signal  # type: ignore[attr-defined]
-        Database._async_store_historical_data = _async_store_historical_data  # type: ignore[attr-defined]
-
-# Initialize the extension
-extend_database_class()
-
-
-async def _async_log_audit(self: Database, audit: AuditLog) -> bool:
-    """True async implementation using aiosqlite."""
+async def _async_get_historical_data(
+    self: "Database", symbol: str, start_time: datetime | None = None
+) -> list[HistoricalData]:
+    """True async implementation using aiosqlite to fetch historical data."""
     if (
         not AIOSQLITE_AVAILABLE
         or not hasattr(self, "_async_pool")
         or self._async_pool is None
     ):
-        return False
-    now = datetime.now(UTC)
-    now_iso = now.isoformat()
-    now_ms = int(now.timestamp() * 1000)
-    ts_ms = int(audit.timestamp.timestamp() * 1000)
+        return []
+
     conn = await self._async_pool.acquire()
     try:
         async with conn.cursor() as cursor:
-            await cursor.execute(
-                """                INSERT INTO audit_log                (action, entity_type, entity_id, details, timestamp, created_at, created_at_ms, timestamp_ms)                VALUES (?, ?, ?, ?, ?, ?, ?, ?)                """,
-                (
-                    audit.action,
-                    audit.entity_type,
-                    audit.entity_id,
-                    json.dumps(audit.details),
-                    audit.timestamp.isoformat(),
-                    now_iso,
-                    now_ms,
-                    ts_ms,
-                ),
+            if start_time:
+                start_ms = int(start_time.timestamp() * 1000)
+                await cursor.execute(
+                    """SELECT symbol, timestamp, open, high, low, close, volume,
+                              interval, timestamp_ms
+                       FROM historical_data
+                       WHERE symbol = ? AND timestamp_ms >= ?
+                       ORDER BY timestamp_ms ASC""",
+                    (symbol, start_ms),
+                )
+            else:
+                await cursor.execute(
+                    """SELECT symbol, timestamp, open, high, low, close, volume,
+                              interval, timestamp_ms
+                       FROM historical_data
+                       WHERE symbol = ?
+                       ORDER BY timestamp_ms ASC""",
+                    (symbol,),
+                )
+
+            rows = await cursor.fetchall()
+
+        data = []
+        for row in rows:
+            if row[8]:
+                ts_ms = row[8]
+                ts = datetime.fromtimestamp(ts_ms / 1000, tz=UTC)
+            else:
+                ts = datetime.fromisoformat(row[1])
+
+            data.append(
+                HistoricalData(
+                    symbol=row[0],
+                    timestamp=ts,
+                    open=row[2],
+                    high=row[3],
+                    low=row[4],
+                    close=row[5],
+                    volume=row[6],
+                    interval=row[7],
+                )
             )
-        await conn.commit()
+        return data
     finally:
         await self._async_pool.release(conn)
-    return True
 
-# Update extend_database_class to include all methods
+
+def _add_wrapper_method(cls: type["Database"], name: str, method: Any) -> None:
+    """Add a wrapper method to the Database class if it doesn't exist."""
+    if not hasattr(cls, name):
+        setattr(cls, name, method)
+        method_obj = getattr(cls, name)
+        if hasattr(method_obj, "_is_optimized"):
+            method_obj._is_optimized = True
+        else:
+            object.__setattr__(method_obj, "_is_optimized", True)
+
+
 def extend_database_class() -> None:
     """Extend the Database class with async methods."""
-    from .database import Database  # noqa: E402
+    from .database import Database
+
     # Add all async methods
     for method_name in [
         "_async_create_signal",
@@ -942,71 +477,30 @@ def extend_database_class() -> None:
         "_async_update_order_status",
         "_async_record_trade_decision",
         "_async_log_audit",
+        "_async_get_historical_data",
+        "async_log_audit",  # Public wrapper for _async_log_audit
+        "async_get_historical_data",  # Public wrapper for _async_get_historical_data
     ]:
         if hasattr(Database, method_name):
             continue
-        if method_name == "_async_create_signal":
-            _add_wrapper_method(Database, method_name, _async_create_signal)
-        elif method_name == "_async_store_historical_data":
-            _add_wrapper_method(Database, method_name, _async_store_historical_data)
-        elif method_name == "_async_store_position":
-            _add_wrapper_method(Database, method_name, _async_store_position)
-        elif method_name == "_async_store_funds":
-            _add_wrapper_method(Database, method_name, _async_store_funds)
-        elif method_name == "_async_get_latest_signals":
-            _add_wrapper_method(Database, method_name, _async_get_latest_signals)
-        elif method_name == "_async_update_trade":
-            _add_wrapper_method(Database, method_name, _async_update_trade)
-        elif method_name == "_async_update_order_status":
-            _add_wrapper_method(Database, method_name, _async_update_order_status)
-        elif method_name == "_async_record_trade_decision":
-            _add_wrapper_method(Database, method_name, _async_record_trade_decision)
-        elif method_name == "_async_log_audit":
-            _add_wrapper_method(Database, method_name, _async_log_audit)
+
+        # Map method names to their implementations
+        method_map = {
+            "_async_create_signal": _async_create_signal,
+            "_async_store_historical_data": _async_store_historical_data,
+            "_async_store_position": _async_store_position,
+            "_async_store_funds": _async_store_funds,
+            "_async_get_latest_signals": _async_get_latest_signals,
+            "_async_update_trade": _async_update_trade,
+            "_async_update_order_status": _async_update_order_status,
+            "_async_record_trade_decision": _async_record_trade_decision,
+            "_async_log_audit": _async_log_audit,
+            "_async_get_historical_data": _async_get_historical_data,
+        }
+
+        if method_name in method_map:
+            _add_wrapper_method(Database, method_name, method_map[method_name])
+
 
 # Initialize the extension
 extend_database_class()
-
-
-async def _async_store_position(self: Database, position: Position) -> bool:
-    """True async implementation using aiosqlite."""
-    if (
-        not AIOSQLITE_AVAILABLE
-        or not hasattr(self, "_async_pool")
-        or self._async_pool is None
-    ):
-        return False
-    now = datetime.now(UTC)
-    now_iso = now.isoformat()
-    now_ms = int(now.timestamp() * 1000)
-    ts_ms = int(position.timestamp.timestamp() * 1000)
-    conn = await self._async_pool.acquire()
-    try:
-        async with conn.cursor() as cursor:
-            await cursor.execute(
-                """                INSERT OR REPLACE INTO positions                (symbol, quantity, avg_price, timestamp, created_at, created_at_ms, timestamp_ms)                VALUES (?, ?, ?, ?, ?, ?, ?)                """,
-                (
-                    position.symbol,
-                    position.quantity,
-                    position.avg_price,
-                    position.timestamp.isoformat(),
-                    now_iso,
-                    now_ms,
-                    ts_ms,
-                ),
-            )
-        await conn.commit()
-    finally:
-        await self._async_pool.release(conn)
-    return True
-
-def _add_wrapper_method(cls: type[Database], name: str, method: Any) -> None:
-    """Add a wrapper method to the Database class if it doesn't exist."""
-    if not hasattr(cls, name):
-        setattr(cls, name, method)
-        method_obj = getattr(cls, name)
-        if hasattr(method_obj, "_is_optimized"):
-            method_obj._is_optimized = True
-        else:
-            # Add the attribute dynamically - MyPy can't track this
-            object.__setattr__(method_obj, "_is_optimized", True)

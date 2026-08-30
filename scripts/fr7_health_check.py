@@ -99,6 +99,12 @@ HEALTH_CHECKS = {
         "command": [PYTHON_INTERPRETER, "scripts/verify_todo25_external.py"],
         "timeout": 30,
     },
+    "HC-30": {
+        "name": "Backtest Sanity Driver Wired",
+        "description": "Verify backtest_sanity.py module exists and is wired into scheduler (TODO-26 / F7-L-06)",
+        "command": [PYTHON_INTERPRETER, "scripts/verify_todo26_external.py"],
+        "timeout": 30,
+    },
 }
 
 def run_health_check(check_id: str, check_config: dict) -> dict:
