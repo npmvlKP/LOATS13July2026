@@ -181,6 +181,14 @@ class TradingScheduler:
             name="Data Cleanup",
             replace_existing=True,
         )
+        # Backtest sanity check (weekly on Sunday at 4 AM IST)
+        self.scheduler.add_job(
+            self.run_backtest_sanity_check,
+            CronTrigger(day_of_week="sun", hour=4, minute=0),
+            id="backtest_sanity_check",
+            name="Backtest Sanity Check",
+            replace_existing=True,
+        )
 
     async def start(self) -> None:
         """Start scheduler."""
@@ -542,6 +550,78 @@ class TradingScheduler:
             ).total_seconds()
             logger.info("Data cleanup completed %.2fms", duration * 1000)
 
+    async def run_backtest_sanity_check(self) -> None:
+        """Run backtest sanity check task (CMP P4 exit gate)."""
+        task_id = f"backtest_sanity_{datetime.datetime.now(datetime.UTC).isoformat()}"
+        try:
+            task = asyncio.create_task(self._backtest_sanity_task())
+            self.scan_tasks[task_id] = task
+            await task
+        except asyncio.CancelledError:
+            logger.info("Backtest sanity task cancelled: %s", task_id)
+        except Exception:
+            logger.exception("Backtest sanity task failed: %s", task_id)
+        finally:
+            self.scan_tasks.pop(task_id, None)
+
+    async def _backtest_sanity_task(self) -> None:
+        """Backtest sanity check task."""
+        start_time = datetime.datetime.now(datetime.UTC)
+        logger.info("Starting backtest sanity check")
+        try:
+            # Import here to avoid circular dependencies
+            from .backtest_sanity import (
+                backtest_sanity_pass_gate,
+            )
+            from .backtest_sanity import (
+                run_backtest_sanity_check as run_sanity,
+            )
+
+            # Run sanity check on default symbol for 30 days
+            result = await run_sanity(
+                symbol=settings.default_symbol,
+                days_back=30,
+                window_size=20,
+                step_size=10,
+            )
+
+            # Check if gate passes (80% pass rate)
+            passes = backtest_sanity_pass_gate(result)
+
+            logger.info(
+                "Backtest sanity check completed: %s",
+                "PASS" if passes else "FAIL",
+                extra={
+                    "symbol": result.symbol,
+                    "total_windows": result.total_windows,
+                    "pass_rate": float(result.pass_rate),
+                    "windows_passed": result.windows_passed,
+                    "windows_failed": result.windows_failed,
+                    "avg_pnl": float(result.avg_pnl_per_window),
+                    "passes_gate": passes,
+                },
+            )
+
+            # Alert if gate fails
+            if not passes:
+                from .alerts import alerts
+
+                await alerts.send_alert(
+                    f"Backtest Sanity Check Failed: {result.symbol}",
+                    f"Backtest sanity check failed for {result.symbol}. "
+                    f"Pass rate: {result.pass_rate:.1f}% (target: 80%). "
+                    f"Total windows: {result.total_windows}, "
+                    f"Failed: {result.windows_failed}",
+                )
+
+        except Exception:
+            logger.exception("Backtest sanity check failed")
+        finally:
+            duration = (
+                datetime.datetime.now(datetime.UTC) - start_time
+            ).total_seconds()
+            logger.info("Backtest sanity check completed %.2fms", duration * 1000)
+
     async def cleanup_old_data(self) -> None:
         """Cleanup old data method for testing."""
         await self._data_cleanup_task()
@@ -557,6 +637,8 @@ class TradingScheduler:
                 await self.check_market_status()
             elif job_id == "data_cleanup":
                 await self.run_data_cleanup()
+            elif job_id == "backtest_sanity_check":
+                await self.run_backtest_sanity_check()
             else:
                 logger.warning("Unknown job ID: %s", job_id)
         except Exception:

@@ -1,0 +1,93 @@
+feat(TODO-26/F7-L-06): Drive backtest_sanity production wiring with run_once support and verification suite
+
+IMPLEMENTATION
+==============
+Wire the CMP P4 "backtest sanity on /history data" exit gate as a fully
+production-callable driver:
+
+- Add `backtest_sanity_check` case to `TradingScheduler.run_once()` so the
+  sanity check can be executed on demand for testing, audits, and recovery.
+- Weekly scheduled job (Sundays at 04:00 IST via CronTrigger) already exists
+  in `scheduler.py` and is now reachable through both paths.
+- HC-30 health-check entry in `scripts/fr7_health_check.py` continues to
+  gate TODO-26 readiness.
+
+ROOT-CAUSE FIXES
+================
+1. calculate_simple_pnl() — Decimal-only finance violation
+   HistoricalData stores OHLC as float. The original code mixed float and
+   Decimal arithmetic, raising `TypeError: unsupported operand type(s) for *:
+   'float' and 'decimal.Decimal'` at runtime. Fixed by converting OHLC values
+   to Decimal before calculation, preserving the project's "Decimal-only
+   finance" principle.
+
+2. Test for unsorted data reached the wrong validation
+   `test_iterator_raises_on_unsorted_data` used the default window_size=20 on
+   a 2-element fixture, so the size check fired before the timestamp sort
+   check. Fixed by passing window_size=2 so the intended no-lookahead path is
+   exercised.
+
+3. Project-root resolution in test suite
+   `Path(__file__).parent.parent.parent` resolved one directory too high in
+   the nested repo layout, causing FileNotFoundError when reading
+   `scheduler.py` and `fr7_health_check.py`. Added a robust
+   `_find_project_root()` helper that walks up until both `src/` and
+   `tests/` markers are found.
+
+FILES CHANGED
+=============
+- src/loats/backtest_sanity.py
+  * Decimal conversion for float OHLC inputs in calculate_simple_pnl()
+
+- src/loats/scheduler.py
+  * Add backtest_sanity_check branch to run_once()
+
+- tests/test_backtest_sanity_production.py (NEW)
+  * 21 production integration tests covering exports, walk-forward iterator,
+    no-lookahead validation, PnL calculation, exit gate, scheduler wiring,
+    and HC-30 health-check integration
+  * Robust project-root resolution
+
+- scripts/comprehensive_verify_todo26.py (NEW)
+  * 10-check comprehensive verification script
+
+- scripts/final_verify_todo26.py (NEW)
+  * 46-check external verification script with color-coded output
+
+- docs/TODO26_FINAL_REPORT.md (NEW)
+  * Complete implementation, architecture, and compliance report
+
+- TODO26_EXECUTIVE_SUMMARY.md (NEW)
+  * Executive summary with compliance matrix and validation commands
+
+- TODO26_VERIFICATION_SUMMARY.md (NEW)
+  * Root-cause analysis and final verification evidence
+
+VERIFICATION
+============
+External verification (scripts/final_verify_todo26.py):
+  Total Checks: 46
+  Passed: 46
+  Failed: 0
+  Pass Rate: 100.0%
+
+Test suite (uv run pytest tests/test_backtest_sanity_production.py -v):
+  21 passed in 4.95s
+
+Health check:
+  python scripts/fr7_health_check.py --only HC-30  -> PASS
+
+IMPACT
+======
+- Zero production callers for backtest_sanity is resolved.
+- CMP P4 exit gate is now reachable via scheduled and on-demand execution.
+- No observable behavior changed for existing scheduler jobs; all changes are
+  additive.
+- Backtest sanity now logs to audit trail and raises alerts when the 80%
+  pass-rate gate fails.
+
+REFERENCES
+==========
+- TODO-26 / F7-L-06: Drive backtest_sanity
+- CMP P4 exit gate: backtest sanity on /history data
+- Health check: HC-30 "Backtest Sanity Driver Wired"
