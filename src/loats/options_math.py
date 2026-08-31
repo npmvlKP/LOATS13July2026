@@ -240,7 +240,7 @@ def implied_volatility(
         f_high = _objective(high)
         if f_low * f_high < 0:
             return float(brentq(_objective, low, high, xtol=tolerance))
-    except Exception:
+    except Exception:  # nosec B110
         pass
 
     # Newton fallback — needs vega as derivative

@@ -182,65 +182,36 @@ class TrailingStopEngine:
             return config, True
 
         # Monotonic ratchet logic for trailing stops
-        if force_adjust or (stop_type == TrailingStopType.RATCHET and current_price > entry_price):
+        if force_adjust or (
+            stop_type == TrailingStopType.RATCHET and current_price > entry_price
+        ):
             # Calculate new trailing stop price
             if is_long:
                 # For long positions, move stop up (higher) with price
-                new_stop_price = current_price - (current_price - entry_price) * self.ratchet_step
+                new_stop_price = (
+                    current_price - (current_price - entry_price) * self.ratchet_step
+                )
                 if new_stop_price > current_stop_price:
                     config["trigger_price"] = new_stop_price
                     config["adjustment_count"] += 1
-                    config["last_adjustment"] = datetime.datetime.now(datetime.UTC).isoformat()
+                    config["last_adjustment"] = datetime.datetime.now(
+                        datetime.UTC
+                    ).isoformat()
                     self._add_to_history(config, "adjusted", current_price)
                     return config, True
             else:
                 # For short positions, move stop down (lower) with price
-                new_stop_price = current_price + (entry_price - current_price) * self.ratchet_step
+                new_stop_price = (
+                    current_price + (entry_price - current_price) * self.ratchet_step
+                )
                 if new_stop_price < current_stop_price:
                     config["trigger_price"] = new_stop_price
                     config["adjustment_count"] += 1
-                    config["last_adjustment"] = datetime.datetime.now(datetime.UTC).isoformat()
+                    config["last_adjustment"] = datetime.datetime.now(
+                        datetime.UTC
+                    ).isoformat()
                     self._add_to_history(config, "adjusted", current_price)
                     return config, True
-
-        return config, False
-        return config, False
-
-        # Update trailing stop based on type
-        if stop_type == TrailingStopType.FIXED:
-            # Fixed trailing stop doesn't move
-            pass
-
-        elif stop_type == TrailingStopType.PERCENTAGE:
-            updated_config, adjusted = self._update_percentage_trailing(
-                config, current_price, is_long
-            )
-            if adjusted:
-                config = updated_config
-
-        elif stop_type == TrailingStopType.ATR:
-            updated_config, adjusted = self._update_atr_trailing(
-                config, current_price, is_long
-            )
-            if adjusted:
-                config = updated_config
-
-        elif stop_type == TrailingStopType.VOLATILITY:
-            updated_config, adjusted = self._update_volatility_trailing(
-                config, current_price, is_long
-            )
-            if adjusted:
-                config = updated_config
-
-        elif stop_type == TrailingStopType.RATCHET:
-            updated_config, adjusted = self._update_ratchet_trailing(
-                config, current_price, is_long
-            )
-            if adjusted:
-                config = updated_config
-
-        # Update current price
-        config["current_price"] = current_price
 
         return config, False
 

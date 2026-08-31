@@ -2,6 +2,7 @@
 Database module LOATS13July2026.
 Implements SQLite database audit trail JSONL dual-write.
 """
+
 import asyncio
 import hashlib
 import json
@@ -10,11 +11,14 @@ import threading
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from pydantic import BaseModel
 
 from .config import get_settings
+
+if TYPE_CHECKING:
+    from .utils.connection_pool import SimpleConnectionPool
 from .loats_logging import get_logger
 from .models import (
     AuditLogEntry,
@@ -54,8 +58,11 @@ _PRAGMAS: tuple[str, ...] = (
     "PRAGMA temp_store=MEMORY",
     "PRAGMA cache_size=-10000",  # 10MB cache
 )
+
+
 class Database:
     """SQLite database audit trail functionality."""
+
     def __init__(
         self,
         db_path: Path | None = None,
@@ -89,8 +96,17 @@ class Database:
         # Ensure directories exist
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self.audit_log_path.parent.mkdir(parents=True, exist_ok=True)
+        # Create audit log file if it doesn't exist
+        if not self.audit_log_path.exists():
+            self.audit_log_path.touch()
+        # Initialize database schema
+        self._initialize_database()
         # Initialize ratchet_events table
         self._initialize_ratchet_events_table()
+        # Async connection pool
+        self._async_pool: SimpleConnectionPool | None = None
+        self._async_pool_lock = asyncio.Lock()
+
     def _initialize_ratchet_events_table(self) -> None:
         """Initialize the ratchet_events table if it doesn't exist."""
         conn = self._get_connection()
@@ -115,6 +131,7 @@ class Database:
             conn.rollback()
         finally:
             self._release_connection(conn)
+
     def _store_ratchet_event(self, event: dict[str, Any]) -> None:
         """Store ratchet event in the database."""
         conn = self._get_connection()
@@ -133,7 +150,7 @@ class Database:
                     event["new_sl"],
                     event["current_price"],
                     event["timestamp"],
-                )
+                ),
             )
             conn.commit()
         except Exception as e:
@@ -141,32 +158,43 @@ class Database:
             conn.rollback()
         finally:
             self._release_connection(conn)
-        # Create audit log file doesn't exist
-        if not self.audit_log_path.exists():
-            self.audit_log_path.touch()
-        # Initialize database
-        self._initialize_database()
-        # Async connection pool
-        self._async_pool: Any | None = (
-            None  # SimpleConnectionPool or aiosqlite.ConnectionPool
-        )
-        self._async_pool_lock = asyncio.Lock()
+
     def initialize(self) -> None:
         """Initialize database schema (public alias for _initialize_database)."""
         self._initialize_database()
+
     def cleanup(self) -> None:
         """Clean old data (public alias for _cleanup_old_data)."""
         self._cleanup_old_data()
+
     def vacuum(self) -> None:
-        """Vacuum database reclaim space."""
-        conn = self._get_connection()
-        conn.execute("VACUUM")
-        conn.commit()
+        """Vacuum database reclaim space.
+
+        VACUUM cannot run inside an explicit transaction.  We therefore open a
+        dedicated autocommit connection for this maintenance operation.
+        """
+        conn = sqlite3.connect(self.db_path, isolation_level=None)
+        try:
+            conn.execute("PRAGMA journal_mode=WAL;")
+            conn.execute("VACUUM")
+        finally:
+            conn.close()
+
     def _initialize_database(self) -> None:
-        """Initialize database schema."""
+        """Initialize database schema (tables, indexes, migrations)."""
         conn = self._get_connection()
         cursor = conn.cursor()
-        # Create tables don't exist
+        self._create_core_tables(cursor)
+        self._create_market_tables(cursor)
+        self._create_position_tables(cursor)
+        self._create_cmp_tables(cursor)
+        self._create_indexes(cursor)
+        conn.commit()
+        # Ensure schema is up to date (migrate old databases)
+        self._migrate_schema(conn)
+
+    def _create_core_tables(self, cursor: sqlite3.Cursor) -> None:
+        """Create trades / signals / audit_log tables if missing."""
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS trades (
                 trade_id TEXT PRIMARY KEY,
@@ -223,6 +251,9 @@ class Database:
                 timestamp_ms INTEGER NOT NULL DEFAULT 0
             )
         """)
+
+    def _create_market_tables(self, cursor: sqlite3.Cursor) -> None:
+        """Create historical_data / quotes tables if missing."""
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS historical_data (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -259,6 +290,9 @@ class Database:
                 UNIQUE(symbol, timestamp)
             )
         """)
+
+    def _create_position_tables(self, cursor: sqlite3.Cursor) -> None:
+        """Create positions / funds / orders tables if missing."""
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS positions (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -317,7 +351,9 @@ class Database:
                 timestamp_ms INTEGER NOT NULL DEFAULT 0
             )
         """)
-        # Create trade_decisions table for CMP strategy
+
+    def _create_cmp_tables(self, cursor: sqlite3.Cursor) -> None:
+        """Create trade_decisions table + indexes for CMP strategy."""
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS trade_decisions (
                 decision_id TEXT PRIMARY KEY,
@@ -357,7 +393,9 @@ class Database:
             "CREATE INDEX IF NOT EXISTS "
             "idx_trade_decisions_timestamp ON trade_decisions(timestamp)"
         )
-        # Create indexes performance
+
+    def _create_indexes(self, cursor: sqlite3.Cursor) -> None:
+        """Create performance indexes on core tables."""
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_trades_symbol ON trades(symbol)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_trades_status ON trades(status)")
         cursor.execute(
@@ -378,9 +416,7 @@ class Database:
         cursor.execute(
             "CREATE INDEX IF NOT EXISTS idx_quotes_timestamp ON quotes(timestamp)"
         )
-        conn.commit()
-        # Ensure schema is up to date (migrate old databases)
-        self._migrate_schema(conn)
+
     def _migrate_schema(self, conn: sqlite3.Connection) -> None:
         """
         Migrate database schema to ensure all required columns exist.
@@ -441,6 +477,7 @@ class Database:
                         f"ADD COLUMN {column_name} {column_def}"
                     )
         conn.commit()
+
     def _get_connection(self) -> sqlite3.Connection:
         """
         Get database connection with pooling and health checks.
@@ -492,15 +529,18 @@ class Database:
             self._thread_registry[thread_id] = conn
         self._thread_local.connection = conn
         return conn
+
     def _model_to_dict(self, model: BaseModel) -> dict[str, Any]:
         """Convert Pydantic model dictionary."""
         result = json.loads(model.model_dump_json())
         if not isinstance(result, dict):
             raise TypeError(f"Expected dict model_dump_json, got {type(result)}")
         return result
+
     def _dict_to_model(self, data: dict[str, Any], model_class: type[T]) -> T:
         """Convert dictionary Pydantic model."""
         return model_class(**data)
+
     def _canonical_serialize(self, data: dict[str, Any]) -> str:
         """
         Serialize dictionary canonical JSON string hashing.
@@ -520,6 +560,7 @@ class Database:
             Canonical JSON string suitable hashing
         """
         return json.dumps(self._canonical_normalize(data), sort_keys=True)
+
     def _get_canonical_format_documentation(self) -> str:
         """
         Returns documentation canonical serialization format audit hashes.
@@ -572,6 +613,7 @@ class Database:
             "Canonical JSON format: sorted keys, ISO-8601 UTC datetimes, "
             "Decimal→float, trailing zeros, recursive nested structures"
         )
+
     def _canonical_normalize(self, value: Any) -> Any:
         """
         Recursively normalize value canonical form.
@@ -602,6 +644,7 @@ class Database:
             return None
         else:
             return value
+
     def _calculate_sha256(self, data: dict[str, Any]) -> str:
         """
         Calculate SHA-256 hash dictionary using canonical serialization.
@@ -616,6 +659,7 @@ class Database:
         """
         data_str = self._canonical_serialize(data)
         return hashlib.sha256(data_str.encode()).hexdigest()
+
     def _log_audit(
         self,
         action: str,
@@ -703,6 +747,7 @@ class Database:
                         ) from e
                     # Wait and retry
                     import time
+
                     time.sleep(retry_delay)
                     retry_delay *= 2  # Exponential backoff
         except OSError as e:
@@ -735,6 +780,28 @@ class Database:
                 int(now.timestamp() * 1000),
             ),
         )
+
+    def log_audit(
+        self,
+        action: str,
+        entity_type: str,
+        entity_id: str,
+        user: str = "system",
+        metadata: dict[str, Any] | None = None,
+        previous_state: dict[str, Any] | None = None,
+        new_state: dict[str, Any] | None = None,
+    ) -> None:
+        """Public synchronous audit-log entry point."""
+        return self._log_audit(
+            action=action,
+            entity_type=entity_type,
+            entity_id=entity_id,
+            user=user,
+            metadata=metadata,
+            previous_state=previous_state,
+            new_state=new_state,
+        )
+
     def _cleanup_old_data(self) -> None:
         """
         Clean data older than retention period.
@@ -767,6 +834,7 @@ class Database:
         )
         conn.commit()
         logger.info(f"Cleaned data older than {cutoff_timestamp_ms} epoch.")
+
     # -------------------------------------------------------------------------
     # Trade CRUD methods
     # -------------------------------------------------------------------------
@@ -844,6 +912,7 @@ class Database:
             new_state=self._model_to_dict(trade),
         )
         return True
+
     def get_trade(self, trade_id: str) -> Trade | None:
         """
         Retrieve trade ID.
@@ -859,6 +928,7 @@ class Database:
         if row is None:
             return None
         return self._row_to_trade(row)
+
     def update_trade(self, trade: Trade) -> bool:
         """
         Update existing trade record.
@@ -936,6 +1006,7 @@ class Database:
             new_state=self._model_to_dict(trade),
         )
         return True
+
     def get_open_trades(self, symbol: str | None = None) -> list[Trade]:
         """
         Get all open trades, optionally filtered symbol.
@@ -959,6 +1030,7 @@ class Database:
             )
         rows = cursor.fetchall()
         return [self._row_to_trade(row) for row in rows]
+
     def get_trades(self, symbol: str | None = None) -> list[Trade]:
         """
         Get all trades, optionally filtered by symbol.
@@ -978,9 +1050,11 @@ class Database:
             cursor.execute("SELECT * FROM trades ORDER BY entry_time DESC")
         rows = cursor.fetchall()
         return [self._row_to_trade(row) for row in rows]
+
     def _row_to_trade(self, row: Any) -> Trade:
         """Convert database row Trade model."""
         from .models import ProductType, TransactionType
+
         # Use stored timestamps available
         entry_time = None
         if row[20]:
@@ -1014,6 +1088,7 @@ class Database:
             trailing_stop_loss=row[14],
             metadata=json.loads(row[15]) if row[15] else {},
         )
+
     # -------------------------------------------------------------------------
     # Signal CRUD methods
     # -------------------------------------------------------------------------
@@ -1060,6 +1135,7 @@ class Database:
             new_state=self._model_to_dict(signal),
         )
         return True
+
     def get_latest_signals(
         self, symbol: str, limit: int = 10, scan_type: str | None = None
     ) -> list[Signal]:
@@ -1094,9 +1170,11 @@ class Database:
             )
         rows = cursor.fetchall()
         return [self._row_to_signal(row) for row in rows]
+
     def _row_to_signal(self, row: Any) -> Signal:
         """Convert database row Signal model."""
         from .models import SignalType
+
         # Use stored timestamps available
         timestamp = None
         if len(row) > 10 and row[10]:
@@ -1114,6 +1192,7 @@ class Database:
             metadata=json.loads(row[6]) if row[6] else {},
             confidence=row[7],
         )
+
     # -------------------------------------------------------------------------
     # Historical Data methods
     # -------------------------------------------------------------------------
@@ -1155,6 +1234,7 @@ class Database:
             )
             conn.commit()
         return True
+
     def get_historical_data(
         self, symbol: str, interval: str, start_date: datetime, end_date: datetime
     ) -> list[HistoricalData]:
@@ -1204,6 +1284,7 @@ class Database:
                 )
             )
         return result
+
     # -------------------------------------------------------------------------
     # Quote methods
     # -------------------------------------------------------------------------
@@ -1246,6 +1327,7 @@ class Database:
         )
         conn.commit()
         return True
+
     def get_latest_quote(self, symbol: str) -> QuoteData | None:
         """
         Get latest quote symbol.
@@ -1284,6 +1366,7 @@ class Database:
             change=row[8],
             change_percent=row[9],
         )
+
     # -------------------------------------------------------------------------
     # Position methods
     # -------------------------------------------------------------------------
@@ -1329,6 +1412,7 @@ class Database:
         )
         conn.commit()
         return True
+
     def get_position(self, symbol: str) -> Position | None:
         """
         Get latest position symbol.
@@ -1338,6 +1422,7 @@ class Database:
             Position model None
         """
         from .models import ProductType
+
         conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute(
@@ -1363,6 +1448,7 @@ class Database:
             buy_quantity=row[6],
             sell_quantity=row[7],
         )
+
     # -------------------------------------------------------------------------
     # Funds methods
     # -------------------------------------------------------------------------
@@ -1400,6 +1486,7 @@ class Database:
         )
         conn.commit()
         return True
+
     def get_latest_funds(self) -> FundsData | None:
         """
         Get latest funds data.
@@ -1428,6 +1515,7 @@ class Database:
             total_equity=row[3],
             timestamp=ts,
         )
+
     # -------------------------------------------------------------------------
     # Order methods
     # -------------------------------------------------------------------------
@@ -1504,6 +1592,7 @@ class Database:
         )
         conn.commit()
         return True
+
     def get_order(self, order_id: str) -> Order | None:
         """
         Get order ID.
@@ -1519,6 +1608,7 @@ class Database:
         if row is None:
             return None
         return self._row_to_order(row)
+
     def update_order_status(self, order_id: str, status: str) -> bool:
         """
         Update status order.
@@ -1546,6 +1636,7 @@ class Database:
         )
         conn.commit()
         return True
+
     def get_open_orders(self, symbol: str | None = None) -> list[Order]:
         """
         Get all open orders, optionally filtered symbol.
@@ -1583,6 +1674,7 @@ class Database:
                 """)
         rows = cursor.fetchall()
         return [self._row_to_order(row) for row in rows]
+
     def _row_to_order(self, row: Any) -> Order:
         """Convert database row Order model."""
         from .models import (
@@ -1592,6 +1684,7 @@ class Database:
             ProductType,
             TransactionType,
         )
+
         # Use stored timestamps available
         timestamp = None
         if len(row) > 20 and row[20]:
@@ -1620,6 +1713,7 @@ class Database:
             trailing_stop_loss=row[15],
             idempotency_key=idempotency_key,
         )
+
     # -------------------------------------------------------------------------
     # TradeDecision CRUD methods for CMP strategy
     # -------------------------------------------------------------------------
@@ -1692,6 +1786,7 @@ class Database:
             new_state=self._model_to_dict(decision),
         )
         return True
+
     def get_trade_decision(self, decision_id: str) -> TradeDecision | None:
         """
         Retrieve trade decision ID.
@@ -1709,6 +1804,7 @@ class Database:
         if row is None:
             return None
         return self._row_to_trade_decision(row)
+
     def get_trade_decisions(
         self, symbol: str | None = None, status: str | None = None, limit: int = 100
     ) -> list[TradeDecision]:
@@ -1760,6 +1856,7 @@ class Database:
             )
         rows = cursor.fetchall()
         return [self._row_to_trade_decision(row) for row in rows]
+
     def update_trade_decision_status(self, decision_id: str, status: str) -> bool:
         """
         Update status trade decision.
@@ -1804,9 +1901,11 @@ class Database:
                 new_state=self._model_to_dict(updated_decision),
             )
         return True
+
     def _row_to_trade_decision(self, row: Any) -> TradeDecision:
         """Convert database row TradeDecision model."""
         from .models import SignalType
+
         # Use stored timestamps available
         timestamp = None
         if len(row) > 21 and row[21]:
@@ -1833,6 +1932,7 @@ class Database:
             metadata=json.loads(row[15]) if row[15] else {},
             status=row[16],
         )
+
     # -------------------------------------------------------------------------
     # Audit log methods
     # -------------------------------------------------------------------------
@@ -1868,6 +1968,7 @@ class Database:
             )
         rows = cursor.fetchall()
         return [self._row_to_audit_entry(row) for row in rows]
+
     def _row_to_audit_entry(self, row: Any) -> AuditLogEntry:
         """Convert database row AuditLogEntry model."""
         timestamp = None
@@ -1888,6 +1989,7 @@ class Database:
             new_state=json.loads(row[8]) if row[8] else None,
             sha256_hash=row[9],
         )
+
     def verify_audit_log_integrity(self) -> bool:
         """
         Verify integrity audit log checking SHA-256 hashes.
@@ -1912,6 +2014,7 @@ class Database:
             return True
         except (json.JSONDecodeError, KeyError, FileNotFoundError):
             return False
+
     def _release_connection(self, conn: sqlite3.Connection) -> None:
         """
         Release a database connection back to the pool or close it.
@@ -1920,11 +2023,13 @@ class Database:
         # For thread-local storage pattern, connections are reused per thread
         # No explicit release needed
         pass
+
     def close(self) -> None:
         """Close database connection current thread."""
         if hasattr(self._thread_local, "connection"):
             self._thread_local.connection.close()
             del self._thread_local.connection
+
     def close_all(self) -> None:
         """
         Close ALL database connections across all threads.
@@ -1955,6 +2060,7 @@ class Database:
         # potential issues with thread reuse
         if hasattr(self._thread_local, "__dict__"):
             self._thread_local.__dict__.clear()
+
     async def async_close_all(self) -> None:
         """
         Async wrapper close_all() avoid blocking event loop.
@@ -1971,6 +2077,7 @@ class Database:
             except Exception as e:
                 logger.warning(f"Error closing async connection pool: {e}")
             self._async_pool = None
+
     # -------------------------------------------------------------------------
     # Async wrapper methods non-blocking I/O
     # -------------------------------------------------------------------------
@@ -1979,9 +2086,11 @@ class Database:
         await asyncio.to_thread(self.initialize)
         # Initialize async connection pool
         import importlib.util
+
         if importlib.util.find_spec("aiosqlite") is not None:
             try:
                 from .utils.connection_pool import SimpleConnectionPool
+
                 self._async_pool = SimpleConnectionPool(
                     str(self.db_path), maxsize=10, timeout=30.0
                 )
@@ -1992,27 +2101,54 @@ class Database:
             logger.warning(
                 "aiosqlite not available, using asyncio.to_thread for async operations"
             )
+
     async def async_cleanup(self) -> None:
         """Async wrapper cleanup() avoid blocking event loop."""
         await asyncio.to_thread(self.cleanup)
+
     async def async_vacuum(self) -> None:
         """Async wrapper vacuum() avoid blocking event loop."""
         await asyncio.to_thread(self.vacuum)
+
     async def async_create_signal(self, signal: Signal) -> bool:
-        """Async wrapper create_signal() avoid blocking event loop."""
+        """Async create signal; prefers aiosqlite pool when available."""
+        if hasattr(self, "_async_pool") and self._async_pool is not None:
+            return bool(await cast("Any", self)._async_create_signal(signal))
         return await asyncio.to_thread(self.create_signal, signal)
+
     async def async_store_historical_data(self, data: list[HistoricalData]) -> bool:
-        """Async wrapper store_historical_data() avoid blocking event loop."""
+        """Async store historical data; prefers aiosqlite pool when available."""
+        if hasattr(self, "_async_pool") and self._async_pool is not None:
+            return bool(await cast("Any", self)._async_store_historical_data(data))
         return await asyncio.to_thread(self.store_historical_data, data)
+
     async def async_store_quote(self, quote: QuoteData) -> bool:
-        """Async wrapper store_quote() avoid blocking event loop."""
+        """Async store quote; prefers aiosqlite pool when available."""
+        if hasattr(self, "_async_pool") and self._async_pool is not None:
+            try:
+                return bool(await cast("Any", self)._async_store_quote(quote))
+            except Exception as e:  # pragma: no cover - fallback safety
+                logger.warning(f"aiosqlite store_quote failed, falling back: {e}")
         return await asyncio.to_thread(self.store_quote, quote)
+
     async def async_store_position(self, position: Position) -> bool:
-        """Async wrapper store_position() avoid blocking event loop."""
+        """Async store position; prefers aiosqlite pool when available."""
+        if hasattr(self, "_async_pool") and self._async_pool is not None:
+            try:
+                return bool(await cast("Any", self)._async_store_position(position))
+            except Exception as e:  # pragma: no cover - fallback safety
+                logger.warning(f"aiosqlite store_position failed, falling back: {e}")
         return await asyncio.to_thread(self.store_position, position)
+
     async def async_store_funds(self, funds: FundsData) -> bool:
-        """Async wrapper store_funds() avoid blocking event loop."""
+        """Async store funds; prefers aiosqlite pool when available."""
+        if hasattr(self, "_async_pool") and self._async_pool is not None:
+            try:
+                return bool(await cast("Any", self)._async_store_funds(funds))
+            except Exception as e:  # pragma: no cover - fallback safety
+                logger.warning(f"aiosqlite store_funds failed, falling back: {e}")
         return await asyncio.to_thread(self.store_funds, funds)
+
     async def async_get_latest_signals(
         self, symbol: str, limit: int = 10, scan_type: str | None = None
     ) -> list[Signal]:
@@ -2020,26 +2156,72 @@ class Database:
         return await asyncio.to_thread(
             self.get_latest_signals, symbol, limit, scan_type
         )
+
+    async def async_get_trade(self, trade_id: str) -> Trade | None:
+        """Async wrapper get_trade() avoid blocking event loop."""
+        return await asyncio.to_thread(self.get_trade, trade_id)
+
     async def async_verify_audit_log_integrity(self) -> bool:
         """Async wrapper verify_audit_log_integrity() avoid blocking event loop."""
         return await asyncio.to_thread(self.verify_audit_log_integrity)
+
     async def async_update_trade(self, trade: Trade) -> bool:
-        """Async wrapper update_trade() avoid blocking event loop."""
+        """Async update trade; prefers aiosqlite pool when available."""
+        if hasattr(self, "_async_pool") and self._async_pool is not None:
+            try:
+                return bool(await cast("Any", self)._async_update_trade(trade))
+            except Exception as e:  # pragma: no cover - fallback safety
+                logger.warning(f"aiosqlite update_trade failed, falling back: {e}")
         return await asyncio.to_thread(self.update_trade, trade)
+
     async def async_update_order_status(self, order_id: str, status: str) -> bool:
-        """Async wrapper update_order_status() avoid blocking event loop."""
+        """Async update order status; prefers aiosqlite pool when available."""
+        if hasattr(self, "_async_pool") and self._async_pool is not None:
+            try:
+                return bool(
+                    await cast("Any", self)._async_update_order_status(order_id, status)
+                )
+            except Exception as e:  # pragma: no cover - fallback safety
+                logger.warning(
+                    f"aiosqlite update_order_status failed, falling back: {e}"
+                )
         return await asyncio.to_thread(self.update_order_status, order_id, status)
+
     async def async_create_trade_decision(self, decision: TradeDecision) -> bool:
-        """Async wrapper create_trade_decision() avoid blocking event loop."""
+        """Async create trade decision; prefers aiosqlite pool when available."""
+        if hasattr(self, "_async_pool") and self._async_pool is not None:
+            try:
+                return bool(
+                    await cast("Any", self)._async_create_trade_decision(decision)
+                )
+            except Exception as e:  # pragma: no cover - fallback safety
+                logger.warning(
+                    f"aiosqlite create_trade_decision failed, falling back: {e}"
+                )
         return await asyncio.to_thread(self.create_trade_decision, decision)
+
+    async def async_get_historical_data(
+        self,
+        symbol: str,
+        interval: str,
+        start_date: datetime,
+        end_date: datetime,
+    ) -> list[HistoricalData]:
+        """Async wrapper get_historical_data() avoid blocking event loop."""
+        return await asyncio.to_thread(
+            self.get_historical_data, symbol, interval, start_date, end_date
+        )
+
     async def async_get_trade_decision(self, decision_id: str) -> TradeDecision | None:
         """Async wrapper get_trade_decision() avoid blocking event loop."""
         return await asyncio.to_thread(self.get_trade_decision, decision_id)
+
     async def async_get_trade_decisions(
         self, symbol: str | None = None, status: str | None = None, limit: int = 100
     ) -> list[TradeDecision]:
         """Async wrapper get_trade_decisions() avoid blocking event loop."""
         return await asyncio.to_thread(self.get_trade_decisions, symbol, status, limit)
+
     async def async_update_trade_decision_status(
         self, decision_id: str, status: str
     ) -> bool:
@@ -2047,6 +2229,30 @@ class Database:
         return await asyncio.to_thread(
             self.update_trade_decision_status, decision_id, status
         )
+
+    async def async_log_audit(
+        self,
+        action: str,
+        entity_type: str,
+        entity_id: str,
+        user: str = "system",
+        metadata: dict[str, Any] | None = None,
+        previous_state: dict[str, Any] | None = None,
+        new_state: dict[str, Any] | None = None,
+    ) -> None:
+        """Async wrapper _log_audit() avoid blocking event loop."""
+        await asyncio.to_thread(
+            self._log_audit,
+            action,
+            entity_type,
+            entity_id,
+            user,
+            metadata,
+            previous_state,
+            new_state,
+        )
+
+
 # Module-level singleton Database instance (F-CONC-3).
 # Importing ``db`` avoids repeated Database() instantiation across modules
 # (alerts.py/scheduler.py) reducing connection/file-handle churn on Windows.

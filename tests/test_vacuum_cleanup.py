@@ -156,6 +156,10 @@ def test_vacuum_and_cleanup_together():
         db.create_trade(old_trade)
         db.create_trade(recent_trade)
 
+        # Release the active connection before VACUUM; VACUUM needs an
+        # exclusive lock and cannot run while another connection holds the DB.
+        db.close_all()
+
         # Test both methods
         try:
             db.vacuum()

@@ -12,13 +12,13 @@ Tests:
 6. Exit gate compliance (80% pass rate)
 """
 
-import asyncio
 import sys
 from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
 
 import pytest
+
 
 def _find_project_root() -> Path:
     """Resolve project root robustly from this test file's location."""
@@ -73,9 +73,9 @@ class TestBacktestSanityModule:
         required_methods = ["__init__", "__iter__", "__next__", "__len__"]
 
         for method in required_methods:
-            assert hasattr(
-                bs.WalkForwardWindowIterator, method
-            ), f"WalkForwardWindowIterator missing method: {method}"
+            assert hasattr(bs.WalkForwardWindowIterator, method), (
+                f"WalkForwardWindowIterator missing method: {method}"
+            )
 
 
 class TestWalkForwardIterator:
@@ -125,7 +125,9 @@ class TestWalkForwardIterator:
         """Test WalkForwardWindowIterator initialization."""
         import loats.backtest_sanity as bs
 
-        iterator = bs.WalkForwardWindowIterator(sample_historical_data, window_size=2, step_size=1)
+        iterator = bs.WalkForwardWindowIterator(
+            sample_historical_data, window_size=2, step_size=1
+        )
 
         assert iterator.window_size == 2
         assert iterator.step_size == 1
@@ -138,17 +140,19 @@ class TestWalkForwardIterator:
         with pytest.raises(ValueError, match="Historical data cannot be empty"):
             bs.WalkForwardWindowIterator([])
 
-    def test_iterator_raises_on_invalid_window_size(self, sample_historical_data: list) -> None:
+    def test_iterator_raises_on_invalid_window_size(
+        self, sample_historical_data: list
+    ) -> None:
         """Test iterator raises ValueError when window_size > len(data)."""
         import loats.backtest_sanity as bs
 
-        with pytest.raises(ValueError, match="Window size .* cannot exceed"):
+        with pytest.raises(ValueError, match=r"Window size .* cannot exceed"):
             bs.WalkForwardWindowIterator(sample_historical_data, window_size=10)
 
     def test_iterator_raises_on_unsorted_data(self) -> None:
         """Test iterator raises ValueError when data is not sorted by timestamp."""
-        from loats.models import HistoricalData
         import loats.backtest_sanity as bs
+        from loats.models import HistoricalData
 
         base_time = datetime(2026, 7, 13, 9, 15, tzinfo=UTC)
 
@@ -184,7 +188,9 @@ class TestWalkForwardIterator:
         """Test WalkForwardWindowIterator produces correct windows."""
         import loats.backtest_sanity as bs
 
-        iterator = bs.WalkForwardWindowIterator(sample_historical_data, window_size=2, step_size=1)
+        iterator = bs.WalkForwardWindowIterator(
+            sample_historical_data, window_size=2, step_size=1
+        )
 
         windows = list(iterator)
 
@@ -208,8 +214,8 @@ class TestNoLookaheadValidation:
 
     def test_validate_no_lookahead_with_sorted_data(self) -> None:
         """Test validate_no_lookahead returns True for sorted data."""
-        from loats.models import HistoricalData
         import loats.backtest_sanity as bs
+        from loats.models import HistoricalData
 
         base_time = datetime(2026, 7, 13, 9, 15, tzinfo=UTC)
 
@@ -240,8 +246,8 @@ class TestNoLookaheadValidation:
 
     def test_validate_no_lookahead_with_unsorted_data(self) -> None:
         """Test validate_no_lookahead returns False for unsorted data."""
-        from loats.models import HistoricalData
         import loats.backtest_sanity as bs
+        from loats.models import HistoricalData
 
         base_time = datetime(2026, 7, 13, 9, 15, tzinfo=UTC)
 
@@ -282,8 +288,8 @@ class TestSimplePnLCalculation:
 
     def test_calculate_simple_pnl_profit(self) -> None:
         """Test PnL calculation for profitable window."""
-        from loats.models import HistoricalData
         import loats.backtest_sanity as bs
+        from loats.models import HistoricalData
 
         base_time = datetime(2026, 7, 13, 9, 15, tzinfo=UTC)
 
@@ -317,8 +323,8 @@ class TestSimplePnLCalculation:
 
     def test_calculate_simple_pnl_loss(self) -> None:
         """Test PnL calculation for loss-making window."""
-        from loats.models import HistoricalData
         import loats.backtest_sanity as bs
+        from loats.models import HistoricalData
 
         base_time = datetime(2026, 7, 13, 9, 15, tzinfo=UTC)
 
@@ -352,8 +358,8 @@ class TestSimplePnLCalculation:
 
     def test_calculate_simple_pnl_single_bar(self) -> None:
         """Test PnL calculation returns 0 for single bar window."""
-        from loats.models import HistoricalData
         import loats.backtest_sanity as bs
+        from loats.models import HistoricalData
 
         window = [
             HistoricalData(
@@ -415,7 +421,9 @@ class TestBacktestSanityPassGate:
         assert bs.backtest_sanity_pass_gate(result, min_pass_rate=Decimal("70")) is True
 
         # Should fail with 80% threshold
-        assert bs.backtest_sanity_pass_gate(result, min_pass_rate=Decimal("80")) is False
+        assert (
+            bs.backtest_sanity_pass_gate(result, min_pass_rate=Decimal("80")) is False
+        )
 
     def test_pass_gate_fails_below_threshold(self) -> None:
         """Test pass gate returns False when pass rate below threshold."""
@@ -448,9 +456,9 @@ class TestSchedulerIntegration:
 
     def test_scheduler_has_weekly_job_registration(self) -> None:
         """Test scheduler registers backtest_sanity as weekly job."""
-        scheduler_code = (
-            PROJECT_ROOT / "src" / "loats" / "scheduler.py"
-        ).read_text(encoding="utf-8", errors="ignore")
+        scheduler_code = (PROJECT_ROOT / "src" / "loats" / "scheduler.py").read_text(
+            encoding="utf-8", errors="ignore"
+        )
 
         # Check for CronTrigger with Sunday schedule
         assert 'CronTrigger(day_of_week="sun"' in scheduler_code
@@ -459,9 +467,9 @@ class TestSchedulerIntegration:
 
     def test_scheduler_run_once_supports_backtest_sanity(self) -> None:
         """Test scheduler.run_once includes backtest_sanity_check case."""
-        scheduler_code = (
-            PROJECT_ROOT / "src" / "loats" / "scheduler.py"
-        ).read_text(encoding="utf-8", errors="ignore")
+        scheduler_code = (PROJECT_ROOT / "src" / "loats" / "scheduler.py").read_text(
+            encoding="utf-8", errors="ignore"
+        )
 
         assert 'job_id == "backtest_sanity_check"' in scheduler_code
         assert "await self.run_backtest_sanity_check()" in scheduler_code

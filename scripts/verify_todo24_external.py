@@ -50,7 +50,9 @@ HEALTH_CHECK_FILE = PROJECT_ROOT / "scripts" / "fr7_health_check.py"
 
 def run_command(cmd: list[str], cwd: Path | None = None) -> tuple[int, str, str]:
     """Run command and return exit code, stdout, stderr."""
-    result = subprocess.run(cmd, capture_output=True, text=True, cwd=cwd or PROJECT_ROOT)
+    result = subprocess.run(
+        cmd, capture_output=True, text=True, cwd=cwd or PROJECT_ROOT
+    )
     return result.returncode, result.stdout, result.stderr
 
 
@@ -88,12 +90,16 @@ def verify_exit_semantics_source() -> bool:
             return False
 
         if exit_1_count < 4:
-            print(f"\nX FAILED: Expected at least 4 sys.exit(1) calls, found {exit_1_count}")
+            print(
+                f"\nX FAILED: Expected at least 4 sys.exit(1) calls, found {exit_1_count}"
+            )
             return False
 
         last_line_num, last_line_text = exit_lines[-1]
         if last_line_num != 177 or "sys.exit(0)" not in last_line_text:
-            print(f"\nX FAILED: Final exit should be sys.exit(0) at line 177, got line {last_line_num}: {last_line_text}")
+            print(
+                f"\nX FAILED: Final exit should be sys.exit(0) at line 177, got line {last_line_num}: {last_line_text}"
+            )
             return False
 
         print("\n  Exit semantics verified:")
@@ -183,7 +189,7 @@ def run_unit_tests() -> bool:
 
 
 def verify_integration_with_health_check() -> bool:
-    """Verify integration with HC-13 health check."""
+    """Verify integration with the FR7 health-check catalogue (G02)."""
     try:
         print("\n=== HEALTH CHECK INTEGRATION VERIFICATION ===")
 
@@ -193,15 +199,20 @@ def verify_integration_with_health_check() -> bool:
 
         content = HEALTH_CHECK_FILE.read_text(encoding="utf-8")
 
-        if "HC-13" not in content or "check_per_module_coverage.py" not in content:
-            print("X FAILED: HC-13 does not reference check_per_module_coverage.py")
+        # Accept both legacy (HC-13) and new grouped catalogue (G02):
+        # both must reference check_per_module_coverage.py with TODO-15.
+        has_gate = ("HC-13" in content) or ('id="G02"' in content)
+        if not has_gate or "check_per_module_coverage.py" not in content:
+            print(
+                "X FAILED: health check does not reference check_per_module_coverage.py (G02/HC-13)"
+            )
             return False
 
         if "TODO-15" not in content:
-            print("X FAILED: HC-13 missing TODO-15 reference")
+            print("X FAILED: coverage gate missing TODO-15 reference")
             return False
 
-        print("  HC-13 properly configured:")
+        print("  Coverage gate (G02, formerly HC-13) properly configured:")
         print("  - References check_per_module_coverage.py")
         print("  - Linked to TODO-15 (folded from TODO-24)")
 
@@ -227,16 +238,24 @@ def verify_no_fallthrough_paths() -> bool:
         all_exit_calls = list(re.finditer(r"sys\.exit\((\d+)\)", content))
 
         if len(all_exit_calls) < 5:
-            print(f"X FAILED: Expected at least 5 sys.exit calls, found {len(all_exit_calls)}")
+            print(
+                f"X FAILED: Expected at least 5 sys.exit calls, found {len(all_exit_calls)}"
+            )
             return False
 
         last_exit = all_exit_calls[-1]
         if last_exit.group(1) != "0":
-            print(f"X FAILED: Last sys.exit is not sys.exit(0), it's sys.exit({last_exit.group(1)})")
+            print(
+                f"X FAILED: Last sys.exit is not sys.exit(0), it's sys.exit({last_exit.group(1)})"
+            )
             return False
 
-        exit_0_positions = [i for i, call in enumerate(all_exit_calls) if call.group(1) == "0"]
-        exit_1_positions = [i for i, call in enumerate(all_exit_calls) if call.group(1) == "1"]
+        exit_0_positions = [
+            i for i, call in enumerate(all_exit_calls) if call.group(1) == "0"
+        ]
+        exit_1_positions = [
+            i for i, call in enumerate(all_exit_calls) if call.group(1) == "1"
+        ]
 
         if exit_1_positions and exit_0_positions:
             if max(exit_1_positions) > min(exit_0_positions):

@@ -410,7 +410,7 @@ class SizingEngine:
         if win_probability is not None and win_probability > 0.6:
             return SizingMethod.KELLY_CRITERION
         elif margin_requirement is not None and margin_requirement > 0.1:
-            return SizingMethod.MARGIN_AWARE
+            return SizingMethod.RISK_PARITY
         elif volatility > 0.05:  # High volatility
             return SizingMethod.VOLATILITY_BASED
         else:

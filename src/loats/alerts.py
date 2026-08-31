@@ -78,10 +78,10 @@ class AlertSystem:
         if self._explicit_db is not None:
             return self._explicit_db
         # Late import to support test-time patching. This allows
-        # `patch("src.loats.alerts.db")` to continue working when no
+        # `patch("loats.alerts.db")` to continue working when no
         # explicit database instance is injected. The import happens at
         # access time rather than module load time.
-        from src.loats.alerts import db as module_db
+        from loats.alerts import db as module_db
 
         return module_db
 

@@ -72,6 +72,26 @@ class OptionsEngine:
         """
         self.risk_free_rate = rate
 
+    def _fallback_greeks(self, option_type: OptionType, sigma: float) -> Greeks:
+        """Return intrinsic-value-only fallback Greeks on numerical error."""
+        if option_type == OptionType.CALL:
+            return Greeks(
+                delta=1.0,
+                gamma=0.0,
+                theta=0.0,
+                vega=0.0,
+                rho=0.0,
+                implied_volatility=sigma,
+            )
+        return Greeks(
+            delta=-1.0,
+            gamma=0.0,
+            theta=0.0,
+            vega=0.0,
+            rho=0.0,
+            implied_volatility=sigma,
+        )
+
     def calculate_greeks(
         self,
         S: float,
@@ -131,8 +151,6 @@ class OptionsEngine:
             delta_val = delta(flag, S, K, t, r, sigma)
             gamma_val = gamma(flag, S, K, t, r, sigma)
             theta_val = theta(flag, S, K, t, r, sigma)
-            if theta_val is None:
-                theta_val = 0.0
             vega_val = vega(flag, S, K, t, r, sigma)
             rho_val = rho(flag, S, K, t, r, sigma)
 
@@ -147,45 +165,11 @@ class OptionsEngine:
         except (ValueError, TypeError, ZeroDivisionError) as e:
             # Fallback for specific numerical errors
             logger.warning(f"Numerical error in Greeks calculation: {e}")
-            if option_type == OptionType.CALL:
-                return Greeks(
-                    delta=1.0 if S > K else 0.0,
-                    gamma=0.0,
-                    theta=0.0,
-                    vega=0.0,
-                    rho=0.0,
-                    implied_volatility=sigma,
-                )
-            else:
-                return Greeks(
-                    delta=-1.0 if S < K else 0.0,
-                    gamma=0.0,
-                    theta=0.0,
-                    vega=0.0,
-                    rho=0.0,
-                    implied_volatility=sigma,
-                )
+            return self._fallback_greeks(option_type, sigma)
         except Exception as e:
             # Catch any other unexpected exceptions and return fallback values
             logger.error(f"Unexpected error in Greeks calculation: {e}")
-            if option_type == OptionType.CALL:
-                return Greeks(
-                    delta=1.0 if S > K else 0.0,
-                    gamma=0.0,
-                    theta=0.0,
-                    vega=0.0,
-                    rho=0.0,
-                    implied_volatility=sigma,
-                )
-            else:
-                return Greeks(
-                    delta=-1.0 if S < K else 0.0,
-                    gamma=0.0,
-                    theta=0.0,
-                    vega=0.0,
-                    rho=0.0,
-                    implied_volatility=sigma,
-                )
+            return self._fallback_greeks(option_type, sigma)
 
     def calculate_implied_volatility(
         self,
@@ -409,8 +393,6 @@ def calculate_greeks(
         gamma_val = gamma(flag, S, K, t, r, sigma)
         vega_val = vega(flag, S, K, t, r, sigma)
         theta_val = theta(flag, S, K, t, r, sigma)
-        if theta_val is None:
-            theta_val = 0.0
         rho_val = rho(flag, S, K, t, r, sigma)
 
         return Greeks(
@@ -720,9 +702,9 @@ def calculate_parametric_var(
 
     # Calculate mean and std dev if not provided
     if mean is None:
-        mean = np.mean(returns)
+        mean = float(np.mean(returns))
     if std_dev is None:
-        std_dev = np.std(returns)
+        std_dev = float(np.std(returns))
 
     # Calculate VaR using inverse normal distribution
     z_score = norm.ppf(1 - confidence_level)
@@ -797,13 +779,14 @@ def calculate_portfolio_var(
     total_portfolio_value = 0.0
 
     for position in positions:
-        if position.entry_price is not None and position.current_price is not None:
+        current_p = position.metadata.get(
+            "current_price", position.exit_price or position.entry_price
+        )
+        if current_p is not None and position.entry_price is not None:
             # Simple daily return calculation
-            daily_return = (
-                position.current_price - position.entry_price
-            ) / position.entry_price
+            daily_return = (current_p - position.entry_price) / position.entry_price
             position_vars.append(daily_return)
-            total_portfolio_value += position.current_price * position.quantity
+            total_portfolio_value += current_p * position.quantity
 
     if not position_vars or total_portfolio_value <= 0:
         return VaRResult(
@@ -813,22 +796,26 @@ def calculate_portfolio_var(
             var_percent=0.0,
             historical_var=0.0,
             method="portfolio",
-            timestamp=datetime.now(datetime.UTC),
+            timestamp=datetime.now(UTC),
         )
 
     # Calculate historical VaR
     historical_var = calculate_var(position_vars, confidence_level)
 
     # Calculate parametric VaR
-    mean_return = np.mean(position_vars)
-    std_return = np.std(position_vars)
+    mean_return = float(np.mean(position_vars))
+    std_return = float(np.std(position_vars))
     parametric_var = calculate_parametric_var(
         position_vars, confidence_level, mean_return, std_return
     )
 
     # Calculate Monte Carlo VaR
     # For portfolio, we use the average return and std dev
-    current_prices = [p.current_price for p in positions if p.current_price is not None]
+    current_prices = [
+        p.metadata.get("current_price", p.exit_price or p.entry_price)
+        for p in positions
+        if p.exit_price is not None or p.entry_price is not None
+    ]
     if len(current_prices) >= 2:
         calculate_monte_carlo_var(current_prices, confidence_level)
 
@@ -844,7 +831,7 @@ def calculate_portfolio_var(
         var_percent=float(var_percent),
         historical_var=float(historical_var),
         method="portfolio_comprehensive",
-        timestamp=datetime.now(datetime.UTC),
+        timestamp=datetime.now(UTC),
     )
 
 
@@ -866,7 +853,7 @@ def calculate_option_portfolio_var(
             var_percent=0.0,
             historical_var=0.0,
             method="options_delta_gamma",
-            timestamp=datetime.datetime.now(datetime.UTC),
+            timestamp=datetime.now(UTC),
         )
 
     # Calculate portfolio Greeks
@@ -889,7 +876,7 @@ def calculate_option_portfolio_var(
             var_percent=0.0,
             historical_var=0.0,
             method="options_delta_gamma",
-            timestamp=datetime.datetime.now(datetime.UTC),
+            timestamp=datetime.now(UTC),
         )
 
     # Estimate underlying volatility (simplified)
@@ -940,7 +927,7 @@ def calculate_comprehensive_var_analysis(
         confidence_levels = [0.95, 0.99]
 
     analysis_results: dict[str, Any] = {
-        "timestamp": datetime.now(datetime.UTC),
+        "timestamp": datetime.now(UTC),
         "confidence_levels": confidence_levels,
         "portfolio_analysis": {},
         "options_analysis": {},

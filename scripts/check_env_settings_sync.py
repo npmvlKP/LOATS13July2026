@@ -42,9 +42,10 @@ def extract_settings_fields(settings_path: Path) -> set[str]:
         content = f.read()
 
     # Find all field definitions in Settings class
-    # Pattern matches: field_name: type = Field(...) or field_name: type = value
-    field_pattern = r"(\w+)\s*:\s*(?:[^=]+=\s*)?Field\("
-    matches = re.findall(field_pattern, content)
+    # Anchored to line start to avoid matching `mode:` inside docstrings
+    # Pattern matches: field_name: type = Field(...) at line start (indented)
+    field_pattern = r"^\s+(\w+)\s*:\s*[^=\n]*=\s*Field\("
+    matches = re.findall(field_pattern, content, re.MULTILINE)
 
     for match in matches:
         fields.add(match)
