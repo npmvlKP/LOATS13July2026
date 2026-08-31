@@ -57,6 +57,7 @@ _PRAGMAS: tuple[str, ...] = (
     "PRAGMA synchronous=NORMAL",
     "PRAGMA temp_store=MEMORY",
     "PRAGMA cache_size=-10000",  # 10MB cache
+    "PRAGMA busy_timeout=30000",  # ms; matches sqlite3.connect(timeout=30)
 )
 
 
@@ -780,6 +781,10 @@ class Database:
                 int(now.timestamp() * 1000),
             ),
         )
+        # Dual-write completion: JSONL already flushed; commit the SQLite row
+        # so the IMMEDIATE transaction does not hold a writer lock for the
+        # lifetime of this thread-local connection (database is locked).
+        conn.commit()
 
     def log_audit(
         self,

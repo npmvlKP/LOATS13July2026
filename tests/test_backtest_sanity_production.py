@@ -476,15 +476,15 @@ class TestSchedulerIntegration:
 
 
 class TestHealthCheckIntegration:
-    """Test health check integration (HC-30)."""
+    """Test health check integration (S05, formerly HC-30)."""
 
     def test_hc30_exists(self) -> None:
-        """Test HC-30 is defined in fr7_health_check.py."""
+        """S05 (legacy HC-30) still gates backtest-sanity wiring."""
         health_check_code = (
             PROJECT_ROOT / "scripts" / "fr7_health_check.py"
         ).read_text(encoding="utf-8", errors="ignore")
 
-        assert '"HC-30"' in health_check_code
-        assert '"Backtest Sanity Driver Wired"' in health_check_code
+        assert 'id="S05"' in health_check_code
+        assert "backtest sanity" in health_check_code.lower()
         assert "TODO-26" in health_check_code or "F7-L-06" in health_check_code
-        assert "verify_todo26_external.py" in health_check_code
+        assert "backtest_sanity.py" in health_check_code
