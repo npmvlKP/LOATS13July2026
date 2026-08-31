@@ -441,13 +441,11 @@ class TradingOrchestrator:
                 settings = get_settings()
 
             symbol = settings.default_symbol
-            timeframe = settings.timeframe
+            timeframe = settings.default_timeframe
 
-            historical_data_raw = await async_client.get_historical_data(
+            historical_data_raw = await async_client.get_history(
                 symbol=symbol,
-                exchange=settings.exchange,
                 interval=timeframe,
-                limit=100,
             )
 
             if not historical_data_raw or not historical_data_raw.get("data"):
@@ -456,6 +454,7 @@ class TradingOrchestrator:
 
             historical_data_objs = [
                 HistoricalData(
+                    symbol=symbol,
                     timestamp=datetime.datetime.fromisoformat(item["timestamp"]),
                     open=item["open"],
                     high=item["high"],
@@ -502,7 +501,9 @@ class TradingOrchestrator:
                 else current_price
             )
 
-            hurst_exponent = self._calculate_hurst_exponent(df["close"].values)
+            hurst_exponent = self._calculate_hurst_exponent(
+                np.asarray(df["close"].values)
+            )
             regime = (
                 "trending"
                 if hurst_exponent is not None and hurst_exponent > 0.5
@@ -875,6 +876,10 @@ class TradingOrchestrator:
                 )
                 return
 
+            # Persist the decision first so the audit trail is complete even if
+            # analyzer routing is disabled or fails.
+            await db.async_create_trade_decision(decision)
+
             # Route TradeDecision to Analyzer
             routing_result = await trade_decision_engine.route_to_analyzer(decision)
 
@@ -884,9 +889,6 @@ class TradingOrchestrator:
                     f"{decision.decision_id}"
                 )
                 logger.debug(f"TradeDecision details: {decision.to_analyzer_payload()}")
-
-                # Store the decision in database
-                await db.async_create_trade_decision(decision)
             else:
                 logger.warning(f"Failed to route CMP TradeDecision: {routing_result}")
 
@@ -1115,6 +1117,7 @@ async def get_cycle_stats() -> dict[str, Any]:
     """Get orchestrator cycle statistics."""
     return orchestrator.get_cycle_stats()
 
+
 async def update_trailing_stops() -> None:
     """
     Update trailing stops for all open positions.
@@ -1154,7 +1157,14 @@ async def update_trailing_stops() -> None:
                 # Get position from database to check for trailing config
                 db_position = await asyncio.to_thread(db.get_position, symbol)
 
-                if not db_position or not db_position.trailing_config:
+                if not db_position:
+                    continue
+
+                # Trailing config and order id are persisted in metadata so
+                # we don't need to extend the Position model with dynamic state.
+                trailing_config = db_position.metadata.get("trailing_config")
+                order_id = db_position.metadata.get("order_id", "")
+                if not trailing_config or not order_id:
                     continue
 
                 # Get current price for the symbol
@@ -1171,10 +1181,10 @@ async def update_trailing_stops() -> None:
                     continue
 
                 # Update trailing stop using the engine
-                old_config = db_position.trailing_config.copy()
+                old_config = trailing_config.copy()
                 updated_config, was_modified = (
                     trailing_stop_engine.update_trailing_stop(
-                        db_position.trailing_config,
+                        trailing_config,
                         current_price,
                     )
                 )
@@ -1191,21 +1201,25 @@ async def update_trailing_stops() -> None:
 
                     # Modify order via OpenAlgo
                     await async_client.modify_order(
-                        order_id=db_position.order_id,
+                        order_id=order_id,
                         trigger_price=updated_config.get("trigger_price"),
-                        order_type="SL-M"
+                        order_type="SL-M",
                     )
 
-                    # Record ratchet event for audit
-                    await db.async_record_ratchet_event(
-                        order_id=db_position.order_id,
-                        old_sl=old_config.get("trigger_price", 0),
-                        new_sl=updated_config.get("trigger_price", 0),
-                        current_price=current_price,
+                    # Record ratchet event for audit via generic async_log_audit
+                    await db.async_log_audit(
+                        action="ratchet_update",
+                        entity_type="order",
+                        entity_id=order_id,
+                        metadata={
+                            "old_sl": old_config.get("trigger_price", 0),
+                            "new_sl": updated_config.get("trigger_price", 0),
+                            "current_price": current_price,
+                        },
                     )
 
                     # Update position in database with new trailing config
-                    db_position.trailing_config = updated_config
+                    db_position.metadata["trailing_config"] = updated_config
                     await asyncio.to_thread(db.store_position, db_position)
 
                     # Increment modification counter

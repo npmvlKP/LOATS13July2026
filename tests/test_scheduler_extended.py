@@ -57,9 +57,9 @@ async def test_is_market_open_before_hours(scheduler):
 async def test_run_once_all_jobs(scheduler):
     scheduler.run_ta_scan = AsyncMock()
     scheduler.run_sentiment_scan = AsyncMock()
-    scheduler.run_signal_generation = AsyncMock()
     scheduler.check_market_status = AsyncMock()
     scheduler.run_data_cleanup = AsyncMock()
+    scheduler.run_backtest_sanity_check = AsyncMock()
 
     await scheduler.run_once("ta_scan")
     scheduler.run_ta_scan.assert_awaited_once()
@@ -67,14 +67,14 @@ async def test_run_once_all_jobs(scheduler):
     await scheduler.run_once("sentiment_scan")
     scheduler.run_sentiment_scan.assert_awaited_once()
 
-    await scheduler.run_once("signal_generation")
-    scheduler.run_signal_generation.assert_awaited_once()
-
     await scheduler.run_once("market_status_check")
     scheduler.check_market_status.assert_awaited_once()
 
     await scheduler.run_once("data_cleanup")
     scheduler.run_data_cleanup.assert_awaited_once()
+
+    await scheduler.run_once("backtest_sanity_check")
+    scheduler.run_backtest_sanity_check.assert_awaited_once()
 
 
 @pytest.mark.asyncio

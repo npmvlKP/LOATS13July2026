@@ -94,9 +94,9 @@ class TestSchedulerCoverage:
 
         await scheduler_instance._add_jobs()
 
-        # Verify that add_job was called for all expected jobs (ta_scan, sentiment_scan, market_status_check, data_cleanup)
-        # Note: signal_generation was removed during TODO-19 legacy engine retirement
-        assert mock_add_job.call_count == 4
+        # _add_jobs registers ta_scan, sentiment_scan, market_status_check,
+        # data_cleanup, and backtest_sanity_check.
+        assert mock_add_job.call_count == 5
 
         # Check that each job was added with correct parameters
         calls = mock_add_job.call_args_list

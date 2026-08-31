@@ -14,7 +14,7 @@ async def test_trailing_stop_runtime_driver_basic():
     """Test basic functionality of trailing stop runtime driver."""
 
     # Create a mock position with trailing stop configuration
-    mock_position = Position(
+    Position(
         symbol="NIFTY",
         quantity=100,
         average_price=18400.0,
@@ -36,13 +36,12 @@ async def test_trailing_stop_runtime_driver_basic():
         "trigger_price": 18450.0,
         "adjustment_count": 0,
         "current_ratchet_level": 0,
-        "transaction_type": TransactionType.BUY
+        "transaction_type": TransactionType.BUY,
     }
 
     # Update the trailing stop
     updated_config, triggered = trailing_stop_engine.update_trailing_stop(
-        trailing_config,
-        18650.0
+        trailing_config, 18650.0
     )
 
     # Debug output
@@ -56,8 +55,7 @@ async def test_trailing_stop_runtime_driver_basic():
     high_price_config["current_price"] = 19000.0  # Much higher
 
     updated_config_high, triggered_high = trailing_stop_engine.update_trailing_stop(
-        high_price_config,
-        19000.0
+        high_price_config, 19000.0
     )
 
     print(f"High price triggered: {triggered_high}")

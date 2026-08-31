@@ -66,8 +66,8 @@ class PerformanceAnalyzer:
         self,
         operation: str,
         func: Callable[..., Coroutine[Any, Any, Any]],
-        *args,
-        **kwargs,
+        *args: Any,
+        **kwargs: Any,
     ) -> tuple[Any, LatencyMeasurement]:
         """Measure latency of an async function."""
         start_time = time.perf_counter()
@@ -104,8 +104,8 @@ class PerformanceAnalyzer:
         self,
         operation: str,
         func: Callable[..., Any],
-        *args,
-        **kwargs,
+        *args: Any,
+        **kwargs: Any,
     ) -> tuple[Any, LatencyMeasurement]:
         """Measure latency of a sync function."""
         start_time = time.perf_counter()
@@ -226,7 +226,7 @@ class DatabasePerformanceAnalyzer:
         """Measure comprehensive database operation latencies."""
 
         # Test async operations
-        async def test_async_create_signal():
+        async def test_async_create_signal() -> bool:
             signal = Signal(
                 signal_id=f"test_{int(time.time() * 1000)}",
                 symbol="NIFTY",
@@ -238,7 +238,7 @@ class DatabasePerformanceAnalyzer:
             )
             return await self.db.async_create_signal(signal)
 
-        async def test_async_store_historical():
+        async def test_async_store_historical() -> bool:
             data = [
                 HistoricalData(
                     symbol="NIFTY",
@@ -253,11 +253,11 @@ class DatabasePerformanceAnalyzer:
             ]
             return await self.db.async_store_historical_data(data)
 
-        async def test_async_get_signals():
+        async def test_async_get_signals() -> list[Signal]:
             return await self.db.async_get_latest_signals("NIFTY", limit=10)
 
         # Test sync operations
-        def test_sync_create_signal():
+        def test_sync_create_signal() -> bool:
             signal = Signal(
                 signal_id=f"test_{int(time.time() * 1000)}",
                 symbol="NIFTY",
@@ -269,7 +269,7 @@ class DatabasePerformanceAnalyzer:
             )
             return self.db.create_signal(signal)
 
-        def test_sync_store_historical():
+        def test_sync_store_historical() -> bool:
             data = [
                 HistoricalData(
                     symbol="NIFTY",
@@ -284,7 +284,7 @@ class DatabasePerformanceAnalyzer:
             ]
             return self.db.store_historical_data(data)
 
-        def test_sync_get_signals():
+        def test_sync_get_signals() -> list[Signal]:
             return self.db.get_latest_signals("NIFTY", limit=10)
 
         # Run measurements
@@ -337,12 +337,12 @@ class DatabasePerformanceAnalyzer:
         # Measure TA calculation
         ta = TechnicalAnalysis()
 
-        async def measure_ta_calculation():
+        async def measure_ta_calculation() -> int:
             indicators = await asyncio.to_thread(ta.calculate_indicators, test_data)
             return len(indicators)
 
         # Measure database operations
-        async def measure_db_operations():
+        async def measure_db_operations() -> int:
             # Store historical data
             await self.db.async_store_historical_data(test_data)
             # Get signals
@@ -442,7 +442,7 @@ async def run_latency_benchmark(db: Database) -> dict[str, Any]:
     logger.info("Starting CMP P1/P5 latency benchmark")
 
     # Test 1: Signal creation and retrieval
-    async def test_signal_round_trip():
+    async def test_signal_round_trip() -> int:
         # Create signal
         signal = Signal(
             signal_id=f"benchmark_{int(time.time() * 1000)}",
@@ -460,7 +460,7 @@ async def run_latency_benchmark(db: Database) -> dict[str, Any]:
         return len(signals)
 
     # Test 2: Historical data processing
-    async def test_historical_processing():
+    async def test_historical_processing() -> int:
         test_data = [
             HistoricalData(
                 symbol="NIFTY",

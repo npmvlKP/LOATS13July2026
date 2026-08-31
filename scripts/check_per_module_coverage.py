@@ -28,7 +28,7 @@ def load_floor_map(floor_map_file: Path) -> dict:
     except (FileNotFoundError, json.JSONDecodeError) as e:
         print(f"Error loading floor map: {e}")
         print(
-            "Floor map is required. Using default fallback (orchestrator, trailing_stop, trade_decision, options ≥80%)."
+            "Floor map is required. Using default fallback (orchestrator, trailing_stop, trade_decision, options >=80%)."
         )
         # Fallback floor map for backward compatibility
         return {

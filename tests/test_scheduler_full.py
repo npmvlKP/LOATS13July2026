@@ -87,41 +87,45 @@ async def test_run_sentiment_scan_success(scheduler):
 
 @pytest.mark.asyncio
 async def test_run_signal_generation_success(scheduler):
+    """Legacy signal-generation engine retired; exercise the orchestration path."""
     with patch("loats.scheduler.async_client", new_callable=AsyncMock) as mock_client:
         db_instance = MagicMock()
-        db_instance.async_get_latest_signals = AsyncMock(
-            return_value=[MagicMock(strength=0.8, indicators={})]
-        )
-        db_instance.async_store_position = AsyncMock(return_value=True)
-        db_instance.async_store_funds = AsyncMock(return_value=True)
         db_instance.async_create_signal = AsyncMock(return_value=True)
         db_instance.async_store_quote = AsyncMock(return_value=True)
+        db_instance.async_store_historical_data = AsyncMock(return_value=True)
         scheduler.db = db_instance
 
-        mock_client.get_quotes.return_value = {
-            "data": {
-                "NIFTY": {
-                    "last_price": 105,
-                    "open": 100,
-                    "high": 110,
-                    "low": 90,
-                    "close": 105,
-                    "volume": 1000,
+        # run_ta_scan now covers signal creation from market data.
+        with patch("loats.scheduler.technical_analysis") as mock_ta:
+            mock_client.get_history.return_value = {
+                "data": [
+                    {
+                        "timestamp": "2026-07-19T10:00:00",
+                        "open": 100,
+                        "high": 110,
+                        "low": 90,
+                        "close": 105,
+                        "volume": 1000,
+                    }
+                ]
+            }
+            mock_client.get_quotes.return_value = {
+                "data": {
+                    "NIFTY": {
+                        "last_price": 105,
+                        "open": 100,
+                        "high": 110,
+                        "low": 90,
+                        "close": 105,
+                        "volume": 1000,
+                    }
                 }
             }
-        }
-        mock_client.get_position_book.return_value = {"data": []}
-        mock_client.get_funds.return_value = {
-            "data": {
-                "available_cash": 100000,
-                "utilized_margin": 0,
-                "available_margin": 100000,
-                "total_equity": 100000,
-            }
-        }
+            mock_ta.calculate_indicators.return_value = []
+            mock_ta.generate_signal.return_value = ("BUY", 0.8)
 
-        await scheduler.run_signal_generation()
-        assert scheduler.db.async_create_signal.called
+            await scheduler.run_ta_scan()
+            assert scheduler.db.async_create_signal.called
 
 
 @pytest.mark.asyncio
@@ -129,7 +133,8 @@ async def test_check_market_status_open(scheduler):
     scheduler.is_market_open = MagicMock(return_value=True)
     scheduler.scheduler.get_job.return_value = None
     await scheduler.check_market_status()
-    assert scheduler.scheduler.add_job.call_count == 3
+    # Market-open path re-adds only ta_scan and sentiment_scan.
+    assert scheduler.scheduler.add_job.call_count == 2
 
 
 @pytest.mark.asyncio

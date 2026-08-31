@@ -23,7 +23,9 @@ import pytest
 class TestCoverageCheckExitSemantics:
     """Test exit code semantics of check_per_module_coverage.py."""
 
-    SCRIPT_PATH = Path(__file__).parent.parent / "scripts" / "check_per_module_coverage.py"
+    SCRIPT_PATH = (
+        Path(__file__).parent.parent / "scripts" / "check_per_module_coverage.py"
+    )
 
     @staticmethod
     def create_coverage_fixture(
@@ -34,7 +36,11 @@ class TestCoverageCheckExitSemantics:
         """Create a temporary coverage.json fixture."""
         coverage_data = {
             "files": {},
-            "totals": {"percent_covered": totals_percent, "num_statements": 1000, "covered_lines": 850},
+            "totals": {
+                "percent_covered": totals_percent,
+                "num_statements": 1000,
+                "covered_lines": 850,
+            },
         }
 
         for module_name, percent in modules.items():
@@ -75,7 +81,9 @@ class TestCoverageCheckExitSemantics:
 
             # Copy fixtures to temp directory
             (tmpdir_path / "coverage.json").write_text(coverage_file.read_text())
-            (tmpdir_path / "coverage_floor_map.json").write_text(floor_map_file.read_text())
+            (tmpdir_path / "coverage_floor_map.json").write_text(
+                floor_map_file.read_text()
+            )
 
             # Run script
             result = subprocess.run(
@@ -90,18 +98,31 @@ class TestCoverageCheckExitSemantics:
     def test_exit_0_all_modules_pass_threshold(self):
         """Test exit code 0 when all floor-mapped modules meet threshold."""
         coverage_file = self.create_coverage_fixture(
-            modules={"orchestrator.py": 85.0, "options.py": 90.0, "trailing_stop.py": 82.0}
+            modules={
+                "orchestrator.py": 85.0,
+                "options.py": 90.0,
+                "trailing_stop.py": 82.0,
+            }
         )
         floor_map_file = self.create_floor_map_fixture(
-            floor_mapped={"orchestrator.py": 80.0, "options.py": 80.0, "trailing_stop.py": 80.0}
+            floor_mapped={
+                "orchestrator.py": 80.0,
+                "options.py": 80.0,
+                "trailing_stop.py": 80.0,
+            }
         )
 
         try:
             result = self._run_script_with_fixtures(coverage_file, floor_map_file)
 
-            assert result.returncode == 0, f"Expected exit 0, got {result.returncode}\nSTDOUT: {result.stdout}\nSTDERR: {result.stderr}"
+            assert result.returncode == 0, (
+                f"Expected exit 0, got {result.returncode}\nSTDOUT: {result.stdout}\nSTDERR: {result.stderr}"
+            )
             assert "PASSED" in result.stdout, "Expected 'PASSED' in output"
-            assert "All floor-mapped modules meet their coverage thresholds" in result.stdout
+            assert (
+                "All floor-mapped modules meet their coverage thresholds"
+                in result.stdout
+            )
         finally:
             coverage_file.unlink(missing_ok=True)
             floor_map_file.unlink(missing_ok=True)
@@ -118,21 +139,30 @@ class TestCoverageCheckExitSemantics:
         try:
             result = self._run_script_with_fixtures(coverage_file, floor_map_file)
 
-            assert result.returncode == 1, f"Expected exit 1, got {result.returncode}\nSTDOUT: {result.stdout}"
+            assert result.returncode == 1, (
+                f"Expected exit 1, got {result.returncode}\nSTDOUT: {result.stdout}"
+            )
             assert "FAILED" in result.stdout, "Expected 'FAILED' in output"
-            assert "BELOW 80%" in result.stdout or "orchestrator.py: 75.0%" in result.stdout
+            assert (
+                "BELOW 80%" in result.stdout
+                or "orchestrator.py: 75.0%" in result.stdout
+            )
         finally:
             coverage_file.unlink(missing_ok=True)
             floor_map_file.unlink(missing_ok=True)
 
     def test_exit_1_missing_coverage_file(self):
         """Test exit code 1 when coverage.json is missing."""
-        floor_map_file = self.create_floor_map_fixture(floor_mapped={"orchestrator.py": 80.0})
+        floor_map_file = self.create_floor_map_fixture(
+            floor_mapped={"orchestrator.py": 80.0}
+        )
 
         try:
             with tempfile.TemporaryDirectory() as tmpdir:
                 tmpdir_path = Path(tmpdir)
-                (tmpdir_path / "coverage_floor_map.json").write_text(floor_map_file.read_text())
+                (tmpdir_path / "coverage_floor_map.json").write_text(
+                    floor_map_file.read_text()
+                )
 
                 result = subprocess.run(
                     [sys.executable, str(self.SCRIPT_PATH)],
@@ -148,13 +178,17 @@ class TestCoverageCheckExitSemantics:
 
     def test_exit_1_invalid_json(self):
         """Test exit code 1 when coverage.json is invalid JSON."""
-        floor_map_file = self.create_floor_map_fixture(floor_mapped={"orchestrator.py": 80.0})
+        floor_map_file = self.create_floor_map_fixture(
+            floor_mapped={"orchestrator.py": 80.0}
+        )
 
         try:
             with tempfile.TemporaryDirectory() as tmpdir:
                 tmpdir_path = Path(tmpdir)
                 (tmpdir_path / "coverage.json").write_text("invalid json {{{")
-                (tmpdir_path / "coverage_floor_map.json").write_text(floor_map_file.read_text())
+                (tmpdir_path / "coverage_floor_map.json").write_text(
+                    floor_map_file.read_text()
+                )
 
                 result = subprocess.run(
                     [sys.executable, str(self.SCRIPT_PATH)],
@@ -171,7 +205,9 @@ class TestCoverageCheckExitSemantics:
     def test_exit_1_no_module_data(self):
         """Test exit code 1 when coverage.json has no module data."""
         coverage_file = Path(tempfile.mktemp(suffix=".json"))
-        coverage_file.write_text(json.dumps({"files": {}, "totals": {"percent_covered": 0}}))
+        coverage_file.write_text(
+            json.dumps({"files": {}, "totals": {"percent_covered": 0}})
+        )
         floor_map_file = self.create_floor_map_fixture(floor_mapped={}, excluded=[])
 
         try:
@@ -195,7 +231,9 @@ class TestCoverageCheckExitSemantics:
             result = self._run_script_with_fixtures(coverage_file, floor_map_file)
 
             # Must exit 0 even if informational warnings exist
-            assert result.returncode == 0, f"Expected exit 0, got {result.returncode}\nSTDOUT: {result.stdout}"
+            assert result.returncode == 0, (
+                f"Expected exit 0, got {result.returncode}\nSTDOUT: {result.stdout}"
+            )
             assert "PASSED" in result.stdout
         finally:
             coverage_file.unlink(missing_ok=True)
@@ -207,7 +245,8 @@ class TestCoverageCheckExitSemantics:
             modules={"orchestrator.py": 85.0, "database_async_additions.py": 0.0}
         )
         floor_map_file = self.create_floor_map_fixture(
-            floor_mapped={"orchestrator.py": 80.0}, excluded=["database_async_additions.py"]
+            floor_mapped={"orchestrator.py": 80.0},
+            excluded=["database_async_additions.py"],
         )
 
         try:
@@ -231,9 +270,13 @@ class TestCoverageCheckExitSemantics:
         try:
             result = self._run_script_with_fixtures(coverage_file, floor_map_file)
 
-            assert result.returncode == 0, "Non-mapped modules should be informational only"
+            assert result.returncode == 0, (
+                "Non-mapped modules should be informational only"
+            )
             assert "PASSED" in result.stdout
-            assert "INFO" in result.stdout, "Should show informational status for non-mapped modules"
+            assert "INFO" in result.stdout, (
+                "Should show informational status for non-mapped modules"
+            )
         finally:
             coverage_file.unlink(missing_ok=True)
             floor_map_file.unlink(missing_ok=True)

@@ -99,7 +99,9 @@ def test_audit_dual_write_with_injectable_path(tmp_path):
     # VERIFY 2: JSONL line exists in injected path
     assert audit_log_path.exists(), "JSONL audit file must exist at injected path"
     jsonl_lines = audit_log_path.read_text(encoding="utf-8").strip().split("\n")
-    assert len(jsonl_lines) == 1, "JSONL must contain exactly one line for one audit entry"
+    assert len(jsonl_lines) == 1, (
+        "JSONL must contain exactly one line for one audit entry"
+    )
 
     jsonl_entry = json.loads(jsonl_lines[0])
 
@@ -114,15 +116,17 @@ def test_audit_dual_write_with_injectable_path(tmp_path):
 
     # VERIFY 3: SHA-256 digest in JSONL matches SQLite row
     jsonl_hash = jsonl_entry["sha256_hash"]
-    assert (
-        jsonl_hash == db_sha256_hash
-    ), "JSONL SHA-256 digest must match SQLite row digest"
+    assert jsonl_hash == db_sha256_hash, (
+        "JSONL SHA-256 digest must match SQLite row digest"
+    )
 
     # VERIFY 4: Digest is valid SHA-256 of canonical serialization
     # Recalculate hash from entry data (excluding sha256_hash itself)
     hash_data = {k: v for k, v in jsonl_entry.items() if k != "sha256_hash"}
     recalculated_hash = db._calculate_sha256(hash_data)
-    assert recalculated_hash == jsonl_hash, "Digest must be valid SHA-256 of canonical serialization"
+    assert recalculated_hash == jsonl_hash, (
+        "Digest must be valid SHA-256 of canonical serialization"
+    )
 
     # VERIFY 5: JSONL-first guarantee - if JSONL write failed, SQLite row wouldn't exist
     # (This is implicit: we already verified both exist, meaning JSONL write succeeded)
@@ -218,13 +222,19 @@ def test_audit_dual_write_consistency_multiple_entries(tmp_path):
     # Verify SQLite has all entries
     conn = db._get_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT COUNT(*) FROM audit_log WHERE entity_type = ?", ("MULTI_TEST",))
+    cursor.execute(
+        "SELECT COUNT(*) FROM audit_log WHERE entity_type = ?", ("MULTI_TEST",)
+    )
     db_count = cursor.fetchone()[0]
-    assert db_count == num_entries, f"SQLite must have {num_entries} entries, got {db_count}"
+    assert db_count == num_entries, (
+        f"SQLite must have {num_entries} entries, got {db_count}"
+    )
 
     # Verify JSONL has all entries
     jsonl_lines = audit_log_path.read_text(encoding="utf-8").strip().split("\n")
-    assert len(jsonl_lines) == num_entries, f"JSONL must have {num_entries} lines, got {len(jsonl_lines)}"
+    assert len(jsonl_lines) == num_entries, (
+        f"JSONL must have {num_entries} lines, got {len(jsonl_lines)}"
+    )
 
     # Verify each entry matches between SQLite and JSONL
     cursor.execute(
@@ -233,10 +243,12 @@ def test_audit_dual_write_consistency_multiple_entries(tmp_path):
     )
     db_rows = cursor.fetchall()
 
-    for (db_entity_id, db_hash), jsonl_line in zip(db_rows, jsonl_lines):
+    for (db_entity_id, db_hash), jsonl_line in zip(db_rows, jsonl_lines, strict=False):
         jsonl_entry = json.loads(jsonl_line)
         assert jsonl_entry["entity_id"] == db_entity_id
         assert jsonl_entry["sha256_hash"] == db_hash
 
     db.close()
-    print(f"\n✓ TODO-20 verified: {num_entries} entries maintain dual-write consistency")
+    print(
+        f"\n✓ TODO-20 verified: {num_entries} entries maintain dual-write consistency"
+    )

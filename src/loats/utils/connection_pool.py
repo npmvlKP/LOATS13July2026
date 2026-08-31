@@ -32,7 +32,11 @@ class SimpleConnectionPool:
                 f"Maximum pool size of {self.maxsize} connections reached"
             )
 
-        conn = await aiosqlite.connect(self.database, timeout=self.timeout)
+        # Use a long busy timeout so that serialized writers on SQLite
+        # (especially on Windows) don't immediately fail with
+        # "database is locked".  WAL mode is also enabled by Database.
+        conn = await aiosqlite.connect(self.database, timeout=max(60.0, self.timeout))
+        await conn.execute("PRAGMA busy_timeout=60000;")
         self._connections_created += 1
         logger.debug(
             f"Created new connection, total connections: {self._connections_created}"

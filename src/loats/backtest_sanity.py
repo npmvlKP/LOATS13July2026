@@ -48,9 +48,7 @@ class BacktestSanityResult(BaseModel):
     total_windows: int = Field(description="Total walk-forward windows")
     total_bars: int = Field(description="Total bars analyzed")
     total_pnl: Decimal = Field(description="Aggregate PnL across all windows")
-    avg_pnl_per_window: Decimal = Field(
-        description="Average PnL per window"
-    )
+    avg_pnl_per_window: Decimal = Field(description="Average PnL per window")
     windows_passed: int = Field(description="Windows passing sanity checks")
     windows_failed: int = Field(description="Windows failing sanity checks")
     pass_rate: Decimal = Field(description="Pass rate as percentage")
@@ -82,8 +80,7 @@ class WalkForwardWindowIterator:
 
         if window_size > len(data):
             raise ValueError(
-                f"Window size ({window_size}) cannot exceed "
-                f"data length ({len(data)})"
+                f"Window size ({window_size}) cannot exceed data length ({len(data)})"
             )
 
         if window_size <= 0 or step_size <= 0:
@@ -92,9 +89,7 @@ class WalkForwardWindowIterator:
         # Verify data is sorted by timestamp (no look-ahead guarantee)
         timestamps = [d.timestamp for d in data]
         if timestamps != sorted(timestamps):
-            raise ValueError(
-                "Historical data must be sorted by timestamp"
-            )
+            raise ValueError("Historical data must be sorted by timestamp")
 
         self.data = data
         self.window_size = window_size
@@ -121,9 +116,7 @@ class WalkForwardWindowIterator:
             raise StopIteration
 
         window_id = self.current_index // self.step_size
-        window = self.data[
-            self.current_index : self.current_index + self.window_size
-        ]
+        window = self.data[self.current_index : self.current_index + self.window_size]
 
         # Critical safety check: verify window is sorted
         window_timestamps = [d.timestamp for d in window]
@@ -168,9 +161,7 @@ def calculate_simple_pnl(window: list[HistoricalData]) -> Decimal:
     # Convert to Decimal explicitly because HistoricalData fields are floats.
     open_price = Decimal(str(first_bar.open))
     close_price = Decimal(str(last_bar.close))
-    pnl = (
-        (close_price - open_price) / open_price * Decimal("100")
-    )
+    pnl = (close_price - open_price) / open_price * Decimal("100")
 
     return pnl
 
@@ -230,32 +221,25 @@ async def run_backtest_sanity_check(
     # Fetch historical data from database
     cutoff_time = datetime.now(UTC) - timedelta(days=days_back)
 
-    # Use the async database to fetch historical data
+    # Use the sync database interface in an async-safe way
     try:
-        history_data = await db.async_get_historical_data(
-            symbol=test_symbol,
-            start_time=cutoff_time,
-        )
-    except (AttributeError, TypeError):
-        # Fallback: use sync interface wrapped in run_sync
-        try:
-            import asyncio
+        import asyncio
 
-            def fetch_sync():
-                return db.get_historical_data(
-                    symbol=test_symbol,
-                    interval="5min",  # Default interval
-                    start_date=cutoff_time,
-                    end_date=datetime.now(UTC),
-                )
-
-            history_data = await asyncio.to_thread(fetch_sync)
-        except Exception as e:
-            logger.error(
-                f"Failed to fetch historical data: {e}",
-                extra={"error": str(e)},
+        def fetch_sync() -> list[HistoricalData]:
+            return db.get_historical_data(
+                symbol=test_symbol,
+                interval="5min",  # Default interval
+                start_date=cutoff_time,
+                end_date=datetime.now(UTC),
             )
-            raise ValueError(f"Cannot fetch historical data: {e}") from e
+
+        history_data = await asyncio.to_thread(fetch_sync)
+    except Exception as e:
+        logger.error(
+            f"Failed to fetch historical data: {e}",
+            extra={"error": str(e)},
+        )
+        raise ValueError(f"Cannot fetch historical data: {e}") from e
 
     if not history_data:
         raise ValueError(f"No historical data found for symbol {test_symbol}")
@@ -324,11 +308,7 @@ async def run_backtest_sanity_check(
             )
 
     # Calculate summary statistics
-    avg_pnl = (
-        total_pnl / Decimal(total_windows)
-        if total_windows > 0
-        else Decimal("0")
-    )
+    avg_pnl = total_pnl / Decimal(total_windows) if total_windows > 0 else Decimal("0")
     pass_rate = (
         (Decimal(windows_passed) / Decimal(total_windows)) * Decimal("100")
         if total_windows > 0

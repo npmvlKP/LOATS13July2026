@@ -271,11 +271,6 @@ class CMPRulesEngine:
                         f"fail_mode={fail_mode}"
                     )
                     return True
-            else:
-                logger.error(
-                    f"Invalid vix_fail_mode: {fail_mode}, defaulting to block_all"
-                )
-                return False
 
         # VIX available - apply directional gating
         if direction == "SELL":
@@ -423,7 +418,7 @@ class CMPRulesEngine:
             return True, {"reason": "insufficient_trade_history"}
 
         # Group trades by source
-        source_trades = {}
+        source_trades: dict[str, list[Trade]] = {}
         for trade in recent_trades:
             source = trade.metadata.get("source", "unknown")
             if source not in source_trades:

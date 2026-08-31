@@ -76,6 +76,12 @@ class Settings(BaseSettings):
             "(default False to prevent default-on fabrication)"
         ),
     )
+    # CMP Rule 12 trailing-stop driver (default False = risk-off; enable
+    # explicitly for the CMP strategy to update trailing stops each cycle).
+    enable_trailing_stops: bool = Field(
+        False,
+        description="Enable trailing stop updates in CMP strategy cycle",
+    )
 
     # Telegram Configuration
     telegram_bot_token: SecretStr = Field(
@@ -237,7 +243,7 @@ class Settings(BaseSettings):
                     parsed = json.loads(stripped)
                     if isinstance(parsed, list):
                         return parsed
-                except Exception:
+                except Exception:  # nosec B110
                     pass
             # Fallback: comma-separated
             return [s.strip() for s in stripped.split(",") if s.strip()]
