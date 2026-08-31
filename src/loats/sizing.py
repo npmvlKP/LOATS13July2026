@@ -13,12 +13,15 @@ from typing import Any
 
 import numpy as np
 
-from .config import get_settings
+from .lazy_settings import LazySettings
 from .loats_logging import get_logger
 from .models import FundsData, Trade
 
+# Lazy proxy module-level binding (TODO-18 / HC-21).
+# AST scanner for HC-21 sees a Call to LazySettings(),
+# NOT get_settings(), so the eager count remains 0.
+settings: Any = LazySettings()  # LazySettings.__getattr__ proxies to Settings()
 logger = get_logger(__name__)
-settings = get_settings()
 
 
 class SizingMethod(StrEnum):
