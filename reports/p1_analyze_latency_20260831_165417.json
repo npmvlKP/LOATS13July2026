@@ -1,0 +1,298 @@
+{
+  "metadata": {
+    "todo_id": "TODO-25",
+    "finding_id": "F7-L-05",
+    "phase_gate": "P1",
+    "description": "Live ANALYZE round-trip latency measurements",
+    "collected_at": "2026-08-31T16:54:18.172198+00:00",
+    "git_commit": "8306345e4de280a3d7bae91ddd88b9b0ca45985e",
+    "python_version": "3.12.7 (tags/v3.12.7:0b05ead, Oct  1 2024, 03:06:41) [MSC v.1941 64 bit (AMD64)]",
+    "fix_version": "2.0 - DB performance optimization (connection pooling, reduced dataset)"
+  },
+  "evidence": {
+    "summary": {
+      "total_samples": 20,
+      "ta_gate": "80.0ms",
+      "db_gate": "20.0ms",
+      "round_trip_gate": "100.0ms"
+    },
+    "ta_statistics": {
+      "min": 2.46,
+      "max": 6.51,
+      "mean": 3.25,
+      "median": 3.0,
+      "p90": 4.0,
+      "p95": 6.51,
+      "p99": 6.51,
+      "std_dev": 0.82
+    },
+    "db_statistics": {
+      "min": 2.51,
+      "max": 104.1,
+      "mean": 11.64,
+      "median": 4.0,
+      "p90": 41.18,
+      "p95": 104.1,
+      "p99": 104.1,
+      "std_dev": 23.36
+    },
+    "round_trip_statistics": {
+      "min": 5.46,
+      "max": 107.1,
+      "mean": 14.89,
+      "median": 7.0,
+      "p90": 44.17,
+      "p95": 107.1,
+      "p99": 107.1,
+      "std_dev": 23.35
+    },
+    "gate_compliance": {
+      "ta_gate_pass_rate": 100.0,
+      "db_gate_pass_rate": 90.0,
+      "round_trip_gate_pass_rate": 95.0,
+      "all_gates_pass_rate": 90.0
+    },
+    "measurements": [
+      {
+        "sample_id": 1,
+        "timestamp": "2026-08-31T16:54:17.891836+00:00",
+        "ta_duration_ms": 6.51,
+        "db_duration_ms": 12.01,
+        "round_trip_ms": 18.52,
+        "ta_indicators_count": 3,
+        "db_signals_count": 0,
+        "passes_ta_gate": true,
+        "passes_db_gate": true,
+        "passes_round_trip_gate": true
+      },
+      {
+        "sample_id": 2,
+        "timestamp": "2026-08-31T16:54:17.898835+00:00",
+        "ta_duration_ms": 3.0,
+        "db_duration_ms": 4.0,
+        "round_trip_ms": 7.0,
+        "ta_indicators_count": 3,
+        "db_signals_count": 0,
+        "passes_ta_gate": true,
+        "passes_db_gate": true,
+        "passes_round_trip_gate": true
+      },
+      {
+        "sample_id": 3,
+        "timestamp": "2026-08-31T16:54:17.905922+00:00",
+        "ta_duration_ms": 3.09,
+        "db_duration_ms": 4.0,
+        "round_trip_ms": 7.09,
+        "ta_indicators_count": 3,
+        "db_signals_count": 0,
+        "passes_ta_gate": true,
+        "passes_db_gate": true,
+        "passes_round_trip_gate": true
+      },
+      {
+        "sample_id": 4,
+        "timestamp": "2026-08-31T16:54:17.916922+00:00",
+        "ta_duration_ms": 3.0,
+        "db_duration_ms": 8.0,
+        "round_trip_ms": 11.0,
+        "ta_indicators_count": 3,
+        "db_signals_count": 0,
+        "passes_ta_gate": true,
+        "passes_db_gate": true,
+        "passes_round_trip_gate": true
+      },
+      {
+        "sample_id": 5,
+        "timestamp": "2026-08-31T16:54:17.923923+00:00",
+        "ta_duration_ms": 3.0,
+        "db_duration_ms": 4.0,
+        "round_trip_ms": 7.0,
+        "ta_indicators_count": 3,
+        "db_signals_count": 0,
+        "passes_ta_gate": true,
+        "passes_db_gate": true,
+        "passes_round_trip_gate": true
+      },
+      {
+        "sample_id": 6,
+        "timestamp": "2026-08-31T16:54:17.929922+00:00",
+        "ta_duration_ms": 3.0,
+        "db_duration_ms": 3.0,
+        "round_trip_ms": 6.0,
+        "ta_indicators_count": 3,
+        "db_signals_count": 0,
+        "passes_ta_gate": true,
+        "passes_db_gate": true,
+        "passes_round_trip_gate": true
+      },
+      {
+        "sample_id": 7,
+        "timestamp": "2026-08-31T16:54:17.939930+00:00",
+        "ta_duration_ms": 3.0,
+        "db_duration_ms": 7.01,
+        "round_trip_ms": 10.01,
+        "ta_indicators_count": 3,
+        "db_signals_count": 0,
+        "passes_ta_gate": true,
+        "passes_db_gate": true,
+        "passes_round_trip_gate": true
+      },
+      {
+        "sample_id": 8,
+        "timestamp": "2026-08-31T16:54:17.945927+00:00",
+        "ta_duration_ms": 3.0,
+        "db_duration_ms": 3.0,
+        "round_trip_ms": 6.0,
+        "ta_indicators_count": 3,
+        "db_signals_count": 0,
+        "passes_ta_gate": true,
+        "passes_db_gate": true,
+        "passes_round_trip_gate": true
+      },
+      {
+        "sample_id": 9,
+        "timestamp": "2026-08-31T16:54:17.957444+00:00",
+        "ta_duration_ms": 3.51,
+        "db_duration_ms": 8.01,
+        "round_trip_ms": 11.52,
+        "ta_indicators_count": 3,
+        "db_signals_count": 0,
+        "passes_ta_gate": true,
+        "passes_db_gate": true,
+        "passes_round_trip_gate": true
+      },
+      {
+        "sample_id": 10,
+        "timestamp": "2026-08-31T16:54:18.064544+00:00",
+        "ta_duration_ms": 3.0,
+        "db_duration_ms": 104.1,
+        "round_trip_ms": 107.1,
+        "ta_indicators_count": 3,
+        "db_signals_count": 0,
+        "passes_ta_gate": true,
+        "passes_db_gate": false,
+        "passes_round_trip_gate": false
+      },
+      {
+        "sample_id": 11,
+        "timestamp": "2026-08-31T16:54:18.071545+00:00",
+        "ta_duration_ms": 4.0,
+        "db_duration_ms": 3.0,
+        "round_trip_ms": 7.0,
+        "ta_indicators_count": 3,
+        "db_signals_count": 0,
+        "passes_ta_gate": true,
+        "passes_db_gate": true,
+        "passes_round_trip_gate": true
+      },
+      {
+        "sample_id": 12,
+        "timestamp": "2026-08-31T16:54:18.077052+00:00",
+        "ta_duration_ms": 3.0,
+        "db_duration_ms": 2.51,
+        "round_trip_ms": 5.51,
+        "ta_indicators_count": 3,
+        "db_signals_count": 0,
+        "passes_ta_gate": true,
+        "passes_db_gate": true,
+        "passes_round_trip_gate": true
+      },
+      {
+        "sample_id": 13,
+        "timestamp": "2026-08-31T16:54:18.083052+00:00",
+        "ta_duration_ms": 3.0,
+        "db_duration_ms": 3.0,
+        "round_trip_ms": 6.0,
+        "ta_indicators_count": 3,
+        "db_signals_count": 0,
+        "passes_ta_gate": true,
+        "passes_db_gate": true,
+        "passes_round_trip_gate": true
+      },
+      {
+        "sample_id": 14,
+        "timestamp": "2026-08-31T16:54:18.093056+00:00",
+        "ta_duration_ms": 3.0,
+        "db_duration_ms": 7.0,
+        "round_trip_ms": 10.0,
+        "ta_indicators_count": 3,
+        "db_signals_count": 0,
+        "passes_ta_gate": true,
+        "passes_db_gate": true,
+        "passes_round_trip_gate": true
+      },
+      {
+        "sample_id": 15,
+        "timestamp": "2026-08-31T16:54:18.099058+00:00",
+        "ta_duration_ms": 3.0,
+        "db_duration_ms": 3.0,
+        "round_trip_ms": 6.0,
+        "ta_indicators_count": 3,
+        "db_signals_count": 0,
+        "passes_ta_gate": true,
+        "passes_db_gate": true,
+        "passes_round_trip_gate": true
+      },
+      {
+        "sample_id": 16,
+        "timestamp": "2026-08-31T16:54:18.104513+00:00",
+        "ta_duration_ms": 2.46,
+        "db_duration_ms": 3.0,
+        "round_trip_ms": 5.46,
+        "ta_indicators_count": 3,
+        "db_signals_count": 0,
+        "passes_ta_gate": true,
+        "passes_db_gate": true,
+        "passes_round_trip_gate": true
+      },
+      {
+        "sample_id": 17,
+        "timestamp": "2026-08-31T16:54:18.111025+00:00",
+        "ta_duration_ms": 3.51,
+        "db_duration_ms": 3.0,
+        "round_trip_ms": 6.51,
+        "ta_indicators_count": 3,
+        "db_signals_count": 0,
+        "passes_ta_gate": true,
+        "passes_db_gate": true,
+        "passes_round_trip_gate": true
+      },
+      {
+        "sample_id": 18,
+        "timestamp": "2026-08-31T16:54:18.117025+00:00",
+        "ta_duration_ms": 3.0,
+        "db_duration_ms": 3.0,
+        "round_trip_ms": 6.0,
+        "ta_indicators_count": 3,
+        "db_signals_count": 0,
+        "passes_ta_gate": true,
+        "passes_db_gate": true,
+        "passes_round_trip_gate": true
+      },
+      {
+        "sample_id": 19,
+        "timestamp": "2026-08-31T16:54:18.127026+00:00",
+        "ta_duration_ms": 3.0,
+        "db_duration_ms": 7.0,
+        "round_trip_ms": 10.0,
+        "ta_indicators_count": 3,
+        "db_signals_count": 0,
+        "passes_ta_gate": true,
+        "passes_db_gate": true,
+        "passes_round_trip_gate": true
+      },
+      {
+        "sample_id": 20,
+        "timestamp": "2026-08-31T16:54:18.171198+00:00",
+        "ta_duration_ms": 3.0,
+        "db_duration_ms": 41.18,
+        "round_trip_ms": 44.17,
+        "ta_indicators_count": 3,
+        "db_signals_count": 0,
+        "passes_ta_gate": true,
+        "passes_db_gate": false,
+        "passes_round_trip_gate": true
+      }
+    ]
+  }
+}
