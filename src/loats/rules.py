@@ -153,8 +153,9 @@ class CMPRulesEngine:
         # Calculate +DM, -DM, and TR
         df["+DM"] = df["high"].diff()
         df["-DM"] = -df["low"].diff()
-        df["+DM"][df["+DM"] < 0] = 0
-        df["-DM"][df["-DM"] < 0] = 0
+        # Clip negatives without chained assignment (pandas Copy-on-Write safe)
+        df["+DM"] = df["+DM"].clip(lower=0)
+        df["-DM"] = df["-DM"].clip(lower=0)
 
         df["TR"] = pd.concat(
             [

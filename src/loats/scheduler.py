@@ -585,9 +585,7 @@ class TradingScheduler:
             from .backtest_sanity import (
                 backtest_sanity_pass_gate,
             )
-            from .backtest_sanity import (
-                run_backtest_sanity_check as run_sanity,
-            )
+            from .backtest_sanity import run_backtest_sanity_check as run_sanity
 
             # Run sanity check on default symbol for 30 days
             result = await run_sanity(
