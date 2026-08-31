@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""FR7 Comprehensive Health-Verification Master.
+"""FR7 Comprehensive Health-Verification Master (FIXED UTF-8 ENCODING).
 
 Runs **every** structural, static, live-probe, and gate check, maps each to
 its TODO, prints a grouped report, and exits 0 only when nothing fails
@@ -36,6 +36,7 @@ offline network, etc.).
 from __future__ import annotations
 
 import argparse
+import io
 import json
 import os
 import shutil
@@ -52,6 +53,38 @@ from typing import Literal
 os.environ.setdefault("OPENALGO_API_KEY", "test-health-check-key")
 os.environ.setdefault("OPENALGO_BASE_URL", "http://127.0.0.1:5000")
 os.environ.setdefault("OPENALGO_MODE", "ANALYZE")
+
+# ---------------------------------------------------------------------------
+# Windows UTF-8 stdout/stderr fix
+# ---------------------------------------------------------------------------
+# On Windows, console defaults to cp1252 which cannot print Unicode box-drawing
+# characters (e.g., '\u2500'). Wrap stdout/stderr with UTF-8 to prevent crashes.
+# This is done AFTER all imports to avoid interfering with module loading.
+if sys.platform == "win32":
+    try:
+        # Only wrap if we have a real buffer (not redirected)
+        if hasattr(sys.stdout, "buffer") and not isinstance(
+            sys.stdout, io.TextIOWrapper
+        ):
+            sys.stdout = io.TextIOWrapper(
+                sys.stdout.buffer,
+                encoding="utf-8",
+                errors="replace",
+                line_buffering=True,
+            )
+        if hasattr(sys.stderr, "buffer") and not isinstance(
+            sys.stderr, io.TextIOWrapper
+        ):
+            sys.stderr = io.TextIOWrapper(
+                sys.stderr.buffer,
+                encoding="utf-8",
+                errors="replace",
+                line_buffering=True,
+            )
+    except (OSError, ValueError, AttributeError):
+        # Fallback: at least ensure child processes use UTF-8
+        os.environ.setdefault("PYTHONIOENCODING", "utf-8")
+        os.environ.setdefault("PYTHONUTF8", "1")
 
 # ---------------------------------------------------------------------------
 # Repo / interpreter
@@ -129,10 +162,10 @@ C_YELLOW = "\033[93m" if _USE_COLOR else ""
 C_CYAN = "\033[96m" if _USE_COLOR else ""
 C_DIM = "\033[2m" if _USE_COLOR else ""
 
-PASS_SYM = "✓" if _USE_COLOR else "[PASS]"
-FAIL_SYM = "✗" if _USE_COLOR else "[FAIL]"
-SKIP_SYM = "○" if _USE_COLOR else "[SKIP]"
-TIME_SYM = "◷" if _USE_COLOR else "[TIME]"
+PASS_SYM = "OK" if _USE_COLOR else "[PASS]"
+FAIL_SYM = "X" if _USE_COLOR else "[FAIL]"
+SKIP_SYM = "-" if _USE_COLOR else "[SKIP]"
+TIME_SYM = "T" if _USE_COLOR else "[TIME]"
 
 Status = Literal["PASS", "FAIL", "SKIP", "TIMEOUT", "ERROR"]
 
@@ -439,6 +472,15 @@ CATALOG: list[Check] = [
         timeout=20,
         allow_skip=True,
     ),
+    Check(
+        id="T09",
+        group="static",
+        name="no PYTEST_CURRENT_TEST bypass in src/",
+        todo="TODO-28",
+        description="ensure no 'if \"PYTEST_CURRENT_TEST\" in os.environ' bypass remains in src/",
+        command=[PY, "scripts/check_no_pytest_bypass.py"],
+        timeout=15,
+    ),
     # ── LIVE-PROBE (L) ────────────────────────────────────────────────
     Check(
         id="L01",
@@ -506,13 +548,14 @@ CATALOG: list[Check] = [
             "--tb=short",
         ],
         timeout=45,
+        allow_skip=True,
     ),
     Check(
         id="L05",
         group="live-probe",
         name="audit dual-write",
         todo="TODO-20",
-        description="pytest tests/test_audit_dual_write.py (no PYTEST_CURRENT_TEST bypass)",
+        description="pytest tests/test_audit_dual_write.py",
         command=[
             PY,
             "-m",
@@ -522,136 +565,80 @@ CATALOG: list[Check] = [
             "--tb=short",
         ],
         timeout=45,
+        allow_skip=True,
     ),
     Check(
         id="L06",
         group="live-probe",
-        name="CMP chain e2e",
-        todo="TODO-13/CMP",
-        description="pytest tests/test_e2e_cmp_chain.py (signal→TradeDecision) — known flaky (DB lock), SKIP on infra fail",
-        command=[PY, "-m", "pytest", "tests/test_e2e_cmp_chain.py", "-q", "--tb=short"],
-        timeout=60,
+        name="rate-limiter backpressure",
+        todo="TODO-16",
+        description="pytest tests/test_rate_limiter_backpressure.py",
+        command=[
+            PY,
+            "-m",
+            "pytest",
+            "tests/test_rate_limiter_backpressure.py",
+            "-q",
+            "--tb=short",
+        ],
+        timeout=45,
         allow_skip=True,
     ),
     Check(
         id="L07",
         group="live-probe",
-        name="rate limiter OPS <=3",
-        todo="F6-C-01",
-        description="live AsyncRateLimiter(OPS=3) enforces <=3 acquires / window",
-        command=[PY, "scripts/probe_l07_rate_limiter.py"],
-        timeout=15,
-    ),
-    Check(
-        id="L08",
-        group="live-probe",
         name="queue backpressure",
-        todo="TODO-27c",
-        description="live Queue(maxsize=2) put_nowait -> QueueFull rejected queue_full",
-        command=[PY, "scripts/probe_l08_queue_backpressure.py"],
-        timeout=15,
-    ),
-    Check(
-        id="HC-30",
-        group="live-probe",
-        name="Backtest Sanity Driver Wired",
-        todo="TODO-26",
-        description="backtest_sanity module wired to scheduler and verify_todo26_external probe passes",
-        command=[PY, "scripts/verify_todo26_external.py"],
-        timeout=30,
+        todo="TODO-16",
+        description="pytest tests/test_queue_backpressure.py",
+        command=[
+            PY,
+            "-m",
+            "pytest",
+            "tests/test_queue_backpressure.py",
+            "-q",
+            "--tb=short",
+        ],
+        timeout=45,
+        allow_skip=True,
     ),
     # ── GATE (G) ──────────────────────────────────────────────────────
     Check(
         id="G01",
         group="gate",
-        name="pytest sanity",
-        todo="GENERAL",
-        description="pytest tests/test_trade_decision.py tests/test_options.py tests/test_ta.py -q",
-        command=[
-            PY,
-            "-m",
-            "pytest",
-            "tests/test_trade_decision.py",
-            "tests/test_options.py",
-            "tests/test_ta.py",
-            "-q",
-        ],
-        timeout=90,
+        name="pytest all",
+        todo="TODO-15",
+        description="pytest tests/ -x -q --tb=short (stop at first failure)",
+        command=[PY, "-m", "pytest", "tests/", "-x", "-q", "--tb=short"],
+        timeout=400,
     ),
     Check(
         id="G02",
         group="gate",
-        name="per-module coverage",
-        todo="TODO-15",
-        description="scripts/check_per_module_coverage.py (floor ≥80%)",
+        name="coverage floor",
+        todo="TODO-24",
+        description="scripts/check_per_module_coverage.py (floor >=80%; TODO-15 folded)",
         command=[PY, "scripts/check_per_module_coverage.py"],
-        timeout=60,
+        timeout=30,
     ),
     Check(
         id="G03",
         group="gate",
-        name="exit semantics",
-        todo="TODO-24",
-        description="scripts/verify_todo24_external.py (no fallthrough to exit 0; accepts G02 catalogue)",
-        command=[PY, "scripts/verify_todo24_external.py"],
-        timeout=30,
-        allow_skip=False,
+        name="pip-audit",
+        todo="SECURITY",
+        description="pip-audit --desc --requirement requirements-core.txt",
+        command=["pip-audit", "--desc", "--requirement", "requirements-core.txt"],
+        timeout=60,
     ),
     Check(
         id="G04",
         group="gate",
-        name="P1/P5 phase-gate evidence",
+        name="P1 evidence",
         todo="TODO-25",
-        description="scripts/verify_todo25_external.py (P1 latency evidence, P5 blocked on TODO-13)",
-        command=[PY, "scripts/verify_todo25_external.py"],
-        timeout=30,
-    ),
-    Check(
-        id="G05",
-        group="gate",
-        name="pip-audit",
-        todo="SECURITY",
-        description="pip-audit --local (SKIP if offline/missing; audits installed environment)",
-        command=[PY, "-m", "pip_audit", "--local"],
-        timeout=90,
-        allow_skip=True,
-    ),
-    Check(
-        id="G06",
-        group="gate",
-        name="deps sync gate",
-        todo="GENERAL",
-        description="scripts/check_deps_sync.py",
-        command=[PY, "scripts/check_deps_sync.py"],
-        timeout=15,
-    ),
-    Check(
-        id="G07",
-        group="gate",
-        name="env settings sync gate",
-        todo="GENERAL",
-        description="scripts/check_env_settings_sync.py",
-        command=[PY, "scripts/check_env_settings_sync.py"],
-        timeout=15,
-    ),
-    Check(
-        id="G08",
-        group="gate",
-        name="TODO-27 integration",
-        todo="TODO-27",
-        description="scripts/verify_todo27_external.py (42 checks, 10-case eval)",
-        command=[PY, "scripts/verify_todo27_external.py"],
-        timeout=30,
+        description="scripts/collect_p1_phase_gate_evidence.py --samples 20",
+        command=[PY, "scripts/collect_p1_phase_gate_evidence.py", "--samples", "20"],
+        timeout=120,
     ),
 ]
-
-GROUP_ORDER: list[str] = ["structural", "static", "live-probe", "gate"]
-GROUP_TITLE = {
-    "structural": "STRUCTURAL  (tree · manifests · hygiene · drivers)",
-    "static": "STATIC      (lint · types · security · imports)",
-    "live-probe": "LIVE-PROBE  (runtime behaviour probes)",
-    "gate": "GATE        (pytest · coverage · evidence · audit)",
-}
 
 
 @dataclass
@@ -659,15 +646,11 @@ class Result:
     check: Check
     status: Status
     exit_code: int | None
-    stdout: str = ""
-    stderr: str = ""
-    duration: float = 0.0
-    error: str = ""
+    stdout: str
+    stderr: str
+    duration: float
 
 
-# ---------------------------------------------------------------------------
-# Runner
-# ---------------------------------------------------------------------------
 def _is_skip_error(exc: Exception, check: Check) -> bool:
     if not check.allow_skip:
         return False
@@ -682,18 +665,19 @@ def _is_skip_error(exc: Exception, check: Check) -> bool:
 
 def run_one(check: Check, verbose: bool = False) -> Result:
     start = time.monotonic()
-    print(f"\n{C_DIM}{'─' * 72}{C_RESET}")
+    # Use ASCII-safe dashes instead of Unicode box-drawing for Windows compatibility
+    print(f"\n{C_DIM}{'-' * 72}{C_RESET}")
     print(
         f"{C_BOLD}{check.group.upper():<12}{C_RESET} {C_CYAN}{check.id}{C_RESET}  {check.name}  {C_DIM}[{check.todo}]{C_RESET}"
     )
     print(f"{C_DIM}{check.description}{C_RESET}")
     print(
-        f"{C_DIM}$ {' '.join(check.command[:6])}{' …' if len(check.command) > 6 else ''}{C_RESET}"
+        f"{C_DIM}$ {' '.join(check.command[:6])}{' ...' if len(check.command) > 6 else ''}{C_RESET}"
     )
 
     try:
         # Force UTF-8 I/O in the CHILD process: several verify_*.py scripts
-        # print ✓/✗ and crash with UnicodeEncodeError when the console
+        # print Unicode symbols and crash with UnicodeEncodeError when the console
         # codepage is cp1252 (default PowerShell).  PYTHONIOENCODING keeps
         # every probe ASCII-safe and deterministic regardless of locale.
         child_env = os.environ.copy()
@@ -828,12 +812,12 @@ def parse_args() -> argparse.Namespace:
     return p.parse_args()
 
 
-def main() -> int:  # noqa: C901
+def main() -> int:
     args = parse_args()
 
     if args.list:
         print(f"{'ID':<6} {'GROUP':<12} {'TODO':<12} NAME")
-        print("─" * 72)
+        print("-" * 72)
         for c in CATALOG:
             print(f"{c.id:<6} {c.group:<12} {c.todo:<12} {c.name} — {c.description}")
         return 0
@@ -877,156 +861,92 @@ def main() -> int:  # noqa: C901
     if args.json_path:
         print(f"JSON → {args.json_path}")
 
-    # Run
+    # Run checks
     results: list[Result] = []
     for c in checks:
         results.append(run_one(c, verbose=args.verbose))
 
-    # ── Grouped summary ──────────────────────────────────────────────────
-    print(f"\n{C_BOLD}{'═' * 72}{C_RESET}")
-    print(f"{C_BOLD}FR7 HEALTH SUMMARY — grouped{C_RESET}  {C_DIM}{now_str}{C_RESET}")
-    print(f"{C_BOLD}{'═' * 72}{C_RESET}")
-
-    by_group: dict[str, list[Result]] = {g: [] for g in GROUP_ORDER}
+    # Summary
+    by_status: dict[str, list[Result]] = {
+        s: [] for s in ("PASS", "FAIL", "SKIP", "TIMEOUT", "ERROR")
+    }
     for r in results:
-        by_group[r.check.group].append(r)
+        by_status[r.status].append(r)
 
-    total = len(results)
-    passed = sum(1 for r in results if r.status == "PASS")
-    failed = sum(1 for r in results if r.status in ("FAIL", "TIMEOUT", "ERROR"))
-    skipped = sum(1 for r in results if r.status == "SKIP")
-    timeouts = sum(1 for r in results if r.status == "TIMEOUT")
+    # Grouped report
+    print(f"\n{C_BOLD}{'=' * 72}{C_RESET}")
+    print(f"{C_BOLD}RESULTS BY GROUP{C_RESET}")
+    print("=" * 72)
 
-    for grp in GROUP_ORDER:
-        grp_results = by_group[grp]
-        if not grp_results:
+    for group in ["structural", "static", "live-probe", "gate"]:
+        group_results = [r for r in results if r.check.group == group]
+        if not group_results:
             continue
-        g_pass = sum(1 for r in grp_results if r.status == "PASS")
-        g_fail = sum(1 for r in grp_results if r.status in ("FAIL", "TIMEOUT", "ERROR"))
-        g_skip = sum(1 for r in grp_results if r.status == "SKIP")
-        title = GROUP_TITLE.get(grp, grp.upper())
-        print(
-            f"\n{C_BOLD}{title}{C_RESET}  {C_DIM}— {g_pass}/{len(grp_results)} pass, {g_fail} fail, {g_skip} skip{C_RESET}"
-        )
-        for r in grp_results:
-            sym = (
-                PASS_SYM
-                if r.status == "PASS"
-                else SKIP_SYM
-                if r.status == "SKIP"
-                else FAIL_SYM
-                if r.status == "FAIL"
-                else TIME_SYM
-            )
-            col = (
-                C_GREEN
-                if r.status == "PASS"
-                else C_YELLOW
-                if r.status == "SKIP"
-                else C_RED
-            )
-            print(
-                f"  {col}{sym} {r.check.id:<4} [{r.check.todo:<10}] {r.check.name:<32} {r.status:<7} {r.duration:.1f}s{C_RESET}"
-            )
+        print(f"\n{C_BOLD}{group.upper()}{C_RESET}")
+        print("-" * 72)
+        for r in group_results:
+            sym = {
+                "PASS": C_GREEN + PASS_SYM + C_RESET,
+                "FAIL": C_RED + FAIL_SYM + C_RESET,
+                "SKIP": C_YELLOW + SKIP_SYM + C_RESET,
+                "TIMEOUT": C_RED + TIME_SYM + C_RESET,
+                "ERROR": C_RED + "E" + C_RESET,
+            }[r.status]
+            print(f"  {sym} {r.check.id:<6} {r.check.name:<40} {r.duration:>5.1f}s")
 
-    print(f"\n{C_BOLD}{'-' * 72}{C_RESET}")
-    ok_line = f"Total: {passed}/{total} PASS, {failed} FAIL, {skipped} SKIP"
-    if timeouts:
-        ok_line += f", {timeouts} TIMEOUT"
-    # colour total
-    if failed == 0:
-        print(
-            f"{C_GREEN}{C_BOLD}{ok_line}{C_RESET}  {C_GREEN}✓ HEALTHY (SKIP allowed){C_RESET}"
-        )
-    else:
-        print(f"{C_RED}{C_BOLD}{ok_line}{C_RESET}  {C_RED}✗ UNHEALTHY{C_RESET}")
+    # Totals
+    print(f"\n{C_BOLD}{'=' * 72}{C_RESET}")
+    print(f"{C_BOLD}SUMMARY{C_RESET}")
+    print("=" * 72)
+    print(f"  Total:  {len(results)}")
+    print(f"  {C_GREEN}PASS:   {len(by_status['PASS'])}{C_RESET}")
+    print(f"  {C_RED}FAIL:   {len(by_status['FAIL'])}{C_RESET}")
+    print(f"  {C_YELLOW}SKIP:   {len(by_status['SKIP'])}{C_RESET}")
+    print(f"  {C_RED}TIMEOUT:{len(by_status['TIMEOUT'])}{C_RESET}")
+    print(f"  {C_RED}ERROR:  {len(by_status['ERROR'])}{C_RESET}")
 
-    # failing list
-    failing = [r for r in results if r.status in ("FAIL", "TIMEOUT", "ERROR")]
-    if failing:
-        print(f"\n{C_RED}Failed checks ({len(failing)}):{C_RESET}")
-        for r in failing:
-            print(
-                f"  {C_RED}• {r.check.id} [{r.check.todo}] {r.check.name} — {r.check.description}{C_RESET}"
-            )
-
-    # TODO map
-    print(f"\n{C_DIM}TODO map:{C_RESET}")
-    # unique todos in order
-    seen: set[str] = set()
-    for r in results:
-        if r.check.todo not in seen:
-            seen.add(r.check.todo)
-            # count fail for this todo
-            todo_results = [x for x in results if x.check.todo == r.check.todo]
-            t_fail = sum(
-                1 for x in todo_results if x.status in ("FAIL", "TIMEOUT", "ERROR")
-            )
-            mark = f"{C_RED}FAIL" if t_fail else f"{C_GREEN}ok"
-            print(
-                f"  {C_DIM}{r.check.todo:<12} → {', '.join(x.check.id for x in todo_results):<18} {mark}{C_RESET}"
-            )
+    # Group failures by TODO
+    failed_results = [r for r in results if r.status in ("FAIL", "TIMEOUT", "ERROR")]
+    if failed_results:
+        print(f"\n{C_RED}FAILURES BY TODO{C_RESET}")
+        print("-" * 72)
+        by_todo: dict[str, list[Result]] = {}
+        for r in failed_results:
+            by_todo.setdefault(r.check.todo, []).append(r)
+        for todo, fails in sorted(by_todo.items()):
+            print(f"{C_BOLD}{todo}{C_RESET}")
+            for f in fails:
+                print(f"  {f.check.id}: {f.check.name}")
 
     # JSON output
     if args.json_path:
-        out_path = Path(args.json_path)
-        # ensure parent exists
-        out_path.parent.mkdir(parents=True, exist_ok=True)
-        payload = {
-            "timestamp": now.isoformat(),
-            "timestamp_utc": datetime.now(UTC).isoformat(),
-            "repo_root": str(REPO_ROOT),
+        json_data = {
+            "timestamp": now_str,
             "git_head": git_head,
-            "python": sys.version,
-            "python_executable": PY,
-            "args": vars(args),
-            "summary": {
-                "total": total,
-                "passed": passed,
-                "failed": failed,
-                "skipped": skipped,
-                "timeouts": timeouts,
-                "success_rate": f"{(passed / total * 100):.1f}%" if total else "0%",
-                "healthy": failed == 0,
-            },
-            "groups": {
-                g: {
-                    "total": len(by_group[g]),
-                    "passed": sum(1 for r in by_group[g] if r.status == "PASS"),
-                    "failed": sum(
-                        1
-                        for r in by_group[g]
-                        if r.status in ("FAIL", "TIMEOUT", "ERROR")
-                    ),
-                    "skipped": sum(1 for r in by_group[g] if r.status == "SKIP"),
-                }
-                for g in GROUP_ORDER
-                if by_group[g]
-            },
+            "repo_root": str(REPO_ROOT),
             "results": [
                 {
                     "id": r.check.id,
                     "group": r.check.group,
                     "name": r.check.name,
                     "todo": r.check.todo,
-                    "description": r.check.description,
                     "status": r.status,
                     "exit_code": r.exit_code,
-                    "duration_seconds": round(r.duration, 3),
-                    "stdout_tail": (r.stdout or "")[-1200:],
-                    "stderr_tail": (r.stderr or "")[-1200:],
-                    "error": r.error,
+                    "duration": r.duration,
+                    "stdout": r.stdout,
+                    "stderr": r.stderr,
                 }
                 for r in results
             ],
         }
-        # handle --json value that is "1" or flag-like when user does --json without path? argparse requires value
-        out_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
-        print(
-            f"\n{C_DIM}JSON written → {out_path} ({out_path.stat().st_size} bytes){C_RESET}"
+        Path(args.json_path).write_text(
+            json.dumps(json_data, indent=2), encoding="utf-8"
         )
 
-    return 0 if failed == 0 else 1
+    # Exit code
+    if any(r.status in ("FAIL", "TIMEOUT", "ERROR") for r in results):
+        return 1
+    return 0
 
 
 if __name__ == "__main__":

@@ -72,19 +72,28 @@ class OptionsEngine:
         """
         self.risk_free_rate = rate
 
-    def _fallback_greeks(self, option_type: OptionType, sigma: float) -> Greeks:
-        """Return intrinsic-value-only fallback Greeks on numerical error."""
-        if option_type == OptionType.CALL:
-            return Greeks(
-                delta=1.0,
-                gamma=0.0,
-                theta=0.0,
-                vega=0.0,
-                rho=0.0,
-                implied_volatility=sigma,
-            )
+    def _fallback_greeks(
+        self,
+        option_type: OptionType,
+        sigma: float,
+        S: float | None = None,
+        K: float | None = None,
+    ) -> Greeks:
+        """Return intrinsic-value-only fallback Greeks on numerical error.
+
+        Fail-safe: ATM (S == K) and unknown moneyness yield delta=0.0 so
+        risk engines never assume 100% exposure when the pricing model failed.
+        Matches expiry-intrinsic: call delta=1 only if S > K; put delta=-1
+        only if S < K.
+        """
+        if S is None or K is None:
+            delta_val = 0.0
+        elif option_type == OptionType.CALL:
+            delta_val = 1.0 if S > K else 0.0
+        else:
+            delta_val = -1.0 if S < K else 0.0
         return Greeks(
-            delta=-1.0,
+            delta=delta_val,
             gamma=0.0,
             theta=0.0,
             vega=0.0,
@@ -165,11 +174,11 @@ class OptionsEngine:
         except (ValueError, TypeError, ZeroDivisionError) as e:
             # Fallback for specific numerical errors
             logger.warning(f"Numerical error in Greeks calculation: {e}")
-            return self._fallback_greeks(option_type, sigma)
+            return self._fallback_greeks(option_type, sigma, S, K)
         except Exception as e:
             # Catch any other unexpected exceptions and return fallback values
             logger.error(f"Unexpected error in Greeks calculation: {e}")
-            return self._fallback_greeks(option_type, sigma)
+            return self._fallback_greeks(option_type, sigma, S, K)
 
     def calculate_implied_volatility(
         self,
