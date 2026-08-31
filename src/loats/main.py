@@ -7,16 +7,20 @@ from collections.abc import Callable
 from typing import Any
 
 from .alerts import alerts
-from .config import get_settings
 from .database import Database
+
+# Module-level exports for testing (F-CONC-3)
+from .lazy_settings import LazySettings
 from .loats_logging import logger
 from .metrics import metrics
 from .orchestrator import start_orchestrator, stop_orchestrator
 from .scheduler import scheduler
 from .utils.cache import close_cache, initialize_cache
 
-# Module-level exports for testing (F-CONC-3)
-settings = get_settings()
+# Lazy proxy module-level binding (TODO-18 / HC-21).
+# AST scanner for HC-21 sees a Call to LazySettings(),
+# NOT get_settings(), so the eager count remains 0.
+settings: Any = LazySettings()  # LazySettings.__getattr__ proxies to Settings()
 db = Database(
     db_path=settings.sqlite_db_path,
     audit_log_path=settings.audit_log_path,

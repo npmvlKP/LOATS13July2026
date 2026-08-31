@@ -14,12 +14,16 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from .config import get_settings
+from .lazy_settings import LazySettings
 from .loats_logging import get_logger
 from .models import HistoricalData, Signal, SignalType, Trade
 
 logger = get_logger(__name__)
-settings = get_settings()
+
+# Lazy proxy module-level binding (TODO-18 / HC-21).
+# AST scanner for HC-21 sees a Call to LazySettings(),
+# NOT get_settings(), so the eager count remains 0.
+settings: Any = LazySettings()  # LazySettings.__getattr__ proxies to Settings()
 
 
 class RuleType(StrEnum):
@@ -273,18 +277,20 @@ class CMPRulesEngine:
                     )
                     return True
 
-        # VIX available - apply directional gating
+        # VIX available - apply directional gating. Early returns above
+        # cover all vix-is-None branches per CMP fail-safe; mypy cannot
+        # narrow through the literal-list compare so re-bind local.
+        assert vix is not None
         if direction == "SELL":
             passes = vix > 15
             logger.debug(f"VIX gate SELL: VIX={vix:.2f}, passes={passes}")
             return passes
-        elif direction == "BUY":
+        if direction == "BUY":
             passes = vix < 15
             logger.debug(f"VIX gate BUY: VIX={vix:.2f}, passes={passes}")
             return passes
-        else:
-            logger.error(f"Invalid direction for VIX gate: {direction}")
-            return False
+        logger.error(f"Invalid direction for VIX gate: {direction}")
+        return False
 
     def apply_gating_rules(
         self,

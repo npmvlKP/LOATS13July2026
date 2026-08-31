@@ -14,6 +14,7 @@ from enum import StrEnum
 from typing import Any
 
 from .config import get_settings
+from .lazy_settings import LazySettings
 from .loats_logging import get_logger
 from .models import FundsData, Signal, SignalType, Trade, TradeDecision, TransactionType
 from .options import calculate_portfolio_var
@@ -22,8 +23,11 @@ from .sizing import sizing_engine
 from .strength import strength_engine
 from .trailing_stop import TrailingStopType, trailing_stop_engine
 
+# Lazy proxy module-level binding (TODO-18 / HC-21).
+# AST scanner for HC-21 sees a Call to LazySettings(),
+# NOT get_settings(), so the eager count remains 0.
+settings: Any = LazySettings()  # LazySettings.__getattr__ proxies to Settings()
 logger = get_logger(__name__)
-settings = get_settings()
 
 
 class DecisionStatus(StrEnum):

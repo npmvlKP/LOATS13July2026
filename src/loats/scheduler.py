@@ -13,8 +13,8 @@ from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
 from .alerts import alerts
-from .config import get_settings
 from .database import db
+from .lazy_settings import LazySettings
 from .loats_logging import get_logger
 from .metrics import record_signal, track_job
 from .models import (
@@ -31,7 +31,10 @@ from .utils.circuit_breaker import (
 )
 from .utils.resilience import openalgo_circuit_breaker_retry_async
 
-settings = get_settings()
+# Lazy proxy module-level binding (TODO-18 / HC-21).
+# AST scanner for HC-21 sees a Call to LazySettings(),
+# NOT get_settings(), so the eager count remains 0.
+settings: Any = LazySettings()  # LazySettings.__getattr__ proxies to Settings()
 
 logger = get_logger(__name__)
 

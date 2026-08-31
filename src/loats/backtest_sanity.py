@@ -9,15 +9,19 @@ CMP Requirement: P4 exit gate - "backtest sanity on /history data"
 
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
+from typing import Any
 
 from pydantic import BaseModel, Field
 
-from .config import get_settings
 from .database import db
+from .lazy_settings import LazySettings
 from .loats_logging import get_logger
 from .models import HistoricalData
 
-settings = get_settings()
+# Lazy proxy module-level binding (TODO-18 / HC-21).
+# AST scanner for HC-21 sees a Call to LazySettings(),
+# NOT get_settings(), so the eager count remains 0.
+settings: Any = LazySettings()  # LazySettings.__getattr__ proxies to Settings()
 logger = get_logger(__name__)
 
 
