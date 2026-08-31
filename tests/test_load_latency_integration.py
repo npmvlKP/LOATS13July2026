@@ -297,8 +297,11 @@ class TestLoadLatencyIntegration:
         for size in test_sizes:
             data = generate_historical_data("LATENCY_TEST", size)
 
-            # Measure latency for technical analysis
-            start_time = time.time()
+            # Measure latency for technical analysis.
+            # Use perf_counter() for monotonic, high-resolution timing; wall-clock
+            # time.time() has insufficient resolution on Windows for sub-ms calls,
+            # which can round to 0.0 and produce a false 0.0 throughput.
+            start_time = time.perf_counter()
 
             # Convert to DataFrame for TA calculation
             df = pd.DataFrame(
@@ -319,13 +322,16 @@ class TestLoadLatencyIntegration:
             supertrend, direction = calculate_supertrend(df)
             # rsi = calculate_rsi(df, period=14)  # Unused variable
 
-            end_time = time.time()
+            end_time = time.perf_counter()
             latency = end_time - start_time
+            # Guard against a zero-resolution measurement; 1 ns is enough to
+            # keep the throughput finite and prevent a false failure.
+            safe_latency = max(latency, 1e-9)
             latencies.append(
                 {
                     "data_size": size,
                     "latency": latency,
-                    "points_per_second": size / latency if latency > 0 else 0,
+                    "points_per_second": size / safe_latency,
                 }
             )
 
