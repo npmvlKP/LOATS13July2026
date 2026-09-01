@@ -96,6 +96,9 @@ qg_*.txt
 task_progress.md
 *_audit.md
 
+# Performance analysis reports (generated during runtime)
+reports/p1_analyze_latency_*.json
+
 # Junk files
 $null
 [100%]
