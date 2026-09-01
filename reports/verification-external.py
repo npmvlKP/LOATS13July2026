@@ -12,16 +12,35 @@ avoids shell quoting by passing every command as a list (shell=False).
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-PY = str(REPO_ROOT / "loatsNEW" / "Scripts" / "python.exe")
 
+
+def _resolve_python() -> str:
+    """Prefer the project venv interpreter, fall back to sys.executable."""
+    candidates = [
+        REPO_ROOT / "loatsNEW" / "Scripts" / "python.exe",
+        REPO_ROOT / ".venv" / "Scripts" / "python.exe",
+        REPO_ROOT / "venv" / "Scripts" / "python.exe",
+    ]
+    for cand in candidates:
+        if cand.exists():
+            return str(cand)
+    return sys.executable
+
+
+PY = _resolve_python()
 REPORT_BANDIT = str(REPO_ROOT / "reports" / "security" / "bandit-20260901.json")
 REPORT_PIP_AUDIT = str(REPO_ROOT / "reports" / "security" / "pip-audit-20260901.json")
 HEALTH_JSON = str(REPO_ROOT / "reports" / "health" / "health-final-20260901.json")
+
+# Ensure reports/security exists for JSON outputs.
+Path(REPORT_BANDIT).parent.mkdir(parents=True, exist_ok=True)
 
 STEPS: list[tuple[str, list[str]]] = [
     (
@@ -42,7 +61,7 @@ STEPS: list[tuple[str, list[str]]] = [
         [PY, str(REPO_ROOT / "scripts" / "verify_todo8_external.py")],
     ),
     (
-        "Pytest full suite (1170 tests, coverage >=80%)",
+        "Pytest full suite (coverage >=80%)",
         [
             PY,
             "-m",
@@ -124,8 +143,18 @@ STEPS: list[tuple[str, list[str]]] = [
 ]
 
 
+def _safe_print(text: str) -> None:
+    """Write to stdout; fall back to ASCII if Windows encoding breaks."""
+    try:
+        print(text)
+    except UnicodeEncodeError:
+        sys.stdout.write(text.encode("ascii", "replace").decode("ascii") + "\n")
+        sys.stdout.flush()
+
+
 def _run(name: str, cmd: list[str]) -> bool:
-    print(f"=== {name} ===")
+    _safe_print(f"=== {name} ===")
+    start = time.perf_counter()
     try:
         result = subprocess.run(
             cmd,
@@ -136,24 +165,26 @@ def _run(name: str, cmd: list[str]) -> bool:
             capture_output=True,
             encoding="utf-8",
             errors="replace",
+            env={**os.environ, "PYTHONIOENCODING": "utf-8"},
         )
     except Exception as e:
-        print(f"EXCEPTION: {e}")
+        _safe_print(f"EXCEPTION: {e}")
         return False
     if result.stdout:
-        print(result.stdout)
+        _safe_print(result.stdout.rstrip())
     if result.stderr:
-        print(result.stderr)
+        _safe_print(result.stderr.rstrip())
+    elapsed = time.perf_counter() - start
     if result.returncode != 0:
-        print(f"FAILED: {name} (exit {result.returncode})")
+        _safe_print(f"FAILED: {name} (exit {result.returncode}, {elapsed:.1f}s)")
         return False
-    print(f"OK: {name}\n")
+    _safe_print(f"OK: {name} ({elapsed:.1f}s)\n")
     return True
 
 
 def main() -> int:
     if not Path(PY).exists():
-        print(f"Project venv python not found at {PY}")
+        _safe_print(f"Project venv python not found at {PY}")
         return 1
     passed = 0
     for name, cmd in STEPS:
@@ -161,7 +192,7 @@ def main() -> int:
             passed += 1
         else:
             break
-    print(f"RESULT: {passed}/{len(STEPS)} steps passed")
+    _safe_print(f"RESULT: {passed}/{len(STEPS)} steps passed")
     return 0 if passed == len(STEPS) else 1
 
 

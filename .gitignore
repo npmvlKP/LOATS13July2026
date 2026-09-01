@@ -99,6 +99,18 @@ task_progress.md
 # Performance analysis reports (generated during runtime)
 reports/p1_analyze_latency_*.json
 
+# Health check intermediate run artifacts (keep health-final-*.json only)
+reports/health/health-fast-*.json
+reports/health/health-full-*.json
+reports/health/health-*.json
+!reports/health/health-final-*.json
+reports/health/bandit.json
+reports/health/coverage.json
+reports/health/fast-fixes.json
+reports/health/pip_audit.json
+reports/health/run*.json
+reports/health/only-probes.json
+
 # Junk files
 $null
 [100%]
