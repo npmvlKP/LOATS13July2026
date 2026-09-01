@@ -15,13 +15,13 @@ Usage:
 import argparse
 import json
 import sys
-from datetime import datetime, UTC
 from pathlib import Path
 from typing import Any
 
 
 class Color:
     """ANSI color codes for terminal output."""
+
     GREEN = "\033[92m"
     RED = "\033[91m"
     YELLOW = "\033[93m"
@@ -99,18 +99,18 @@ def verify_performance_optimization(new_evidence_path: Path) -> dict[str, Any]:
     mean_latency = rt_stats.get("mean", 0)
     if mean_latency < 100.0:
         checks_passed += 1
-        print_check(f"Mean latency < 100ms", True, f"{mean_latency:.2f}ms")
+        print_check("Mean latency < 100ms", True, f"{mean_latency:.2f}ms")
     else:
-        print_check(f"Mean latency < 100ms", False, f"{mean_latency:.2f}ms")
+        print_check("Mean latency < 100ms", False, f"{mean_latency:.2f}ms")
 
     # Check 6: P95 latency reasonable (<200ms)
     checks_total += 1
     p95_latency = rt_stats.get("p95", 0)
     if p95_latency < 200.0:
         checks_passed += 1
-        print_check(f"P95 latency < 200ms", True, f"{p95_latency:.2f}ms")
+        print_check("P95 latency < 200ms", True, f"{p95_latency:.2f}ms")
     else:
-        print_check(f"P95 latency < 200ms", False, f"{p95_latency:.2f}ms")
+        print_check("P95 latency < 200ms", False, f"{p95_latency:.2f}ms")
 
     # Check 7: P99 latency reasonable (<2000ms)
     # NOTE: SQLite WAL checkpoints on Windows cause occasional spikes.
@@ -119,9 +119,9 @@ def verify_performance_optimization(new_evidence_path: Path) -> dict[str, Any]:
     p99_latency = rt_stats.get("p99", 0)
     if p99_latency < 2000.0:
         checks_passed += 1
-        print_check(f"P99 latency < 2000ms", True, f"{p99_latency:.2f}ms")
+        print_check("P99 latency < 2000ms", True, f"{p99_latency:.2f}ms")
     else:
-        print_check(f"P99 latency < 2000ms", False, f"{p99_latency:.2f}ms")
+        print_check("P99 latency < 2000ms", False, f"{p99_latency:.2f}ms")
 
     # Check 8: Std dev reasonable (<150ms)
     # NOTE: High variance from occasional WAL checkpoint delays is expected
@@ -130,9 +130,9 @@ def verify_performance_optimization(new_evidence_path: Path) -> dict[str, Any]:
     std_dev = rt_stats.get("std_dev", 0)
     if std_dev < 150.0:
         checks_passed += 1
-        print_check(f"Standard deviation < 150ms", True, f"{std_dev:.2f}ms")
+        print_check("Standard deviation < 150ms", True, f"{std_dev:.2f}ms")
     else:
-        print_check(f"Standard deviation < 150ms", False, f"{std_dev:.2f}ms")
+        print_check("Standard deviation < 150ms", False, f"{std_dev:.2f}ms")
 
     # Check 9: P1 gate compliance ≥99%
     checks_total += 1
@@ -140,9 +140,9 @@ def verify_performance_optimization(new_evidence_path: Path) -> dict[str, Any]:
     rt_pass_rate = gate_compliance.get("round_trip_gate_pass_rate", 0)
     if rt_pass_rate >= 99.0:
         checks_passed += 1
-        print_check(f"P1 gate compliance ≥99%", True, f"{rt_pass_rate:.2f}%")
+        print_check("P1 gate compliance ≥99%", True, f"{rt_pass_rate:.2f}%")
     else:
-        print_check(f"P1 gate compliance ≥99%", False, f"{rt_pass_rate:.2f}%")
+        print_check("P1 gate compliance ≥99%", False, f"{rt_pass_rate:.2f}%")
 
     return {
         "checks_passed": checks_passed,
@@ -173,30 +173,61 @@ def compare_with_baseline(new_evidence_path: Path, baseline_path: Path) -> None:
     baseline_db = baseline_evidence.get("db_statistics", {})
 
     # Calculate improvements
-    mean_improvement = ((baseline_rt.get("mean", 0) - new_rt.get("mean", 0)) / baseline_rt.get("mean", 1)) * 100
-    p95_improvement = ((baseline_rt.get("p95", 0) - new_rt.get("p95", 0)) / baseline_rt.get("p95", 1)) * 100
-    p99_improvement = ((baseline_rt.get("p99", 0) - new_rt.get("p99", 0)) / baseline_rt.get("p99", 1)) * 100
-    std_dev_improvement = ((baseline_rt.get("std_dev", 0) - new_rt.get("std_dev", 0)) / baseline_rt.get("std_dev", 1)) * 100
+    mean_improvement = (
+        (baseline_rt.get("mean", 0) - new_rt.get("mean", 0))
+        / baseline_rt.get("mean", 1)
+    ) * 100
+    p95_improvement = (
+        (baseline_rt.get("p95", 0) - new_rt.get("p95", 0)) / baseline_rt.get("p95", 1)
+    ) * 100
+    p99_improvement = (
+        (baseline_rt.get("p99", 0) - new_rt.get("p99", 0)) / baseline_rt.get("p99", 1)
+    ) * 100
+    std_dev_improvement = (
+        (baseline_rt.get("std_dev", 0) - new_rt.get("std_dev", 0))
+        / baseline_rt.get("std_dev", 1)
+    ) * 100
 
-    db_mean_improvement = ((baseline_db.get("mean", 0) - new_db.get("mean", 0)) / baseline_db.get("mean", 1)) * 100
+    db_mean_improvement = (
+        (baseline_db.get("mean", 0) - new_db.get("mean", 0))
+        / baseline_db.get("mean", 1)
+    ) * 100
 
     # Print comparison table
     print(f"\n{'Metric':<20} {'Baseline':>15} {'New':>15} {'Improvement':>15}")
     print("-" * 70)
-    print(f"{'Round-trip Mean':<20} {baseline_rt.get('mean', 0):>14.2f}ms {new_rt.get('mean', 0):>14.2f}ms {mean_improvement:>13.1f}%")
-    print(f"{'Round-trip P95':<20} {baseline_rt.get('p95', 0):>14.2f}ms {new_rt.get('p95', 0):>14.2f}ms {p95_improvement:>13.1f}%")
-    print(f"{'Round-trip P99':<20} {baseline_rt.get('p99', 0):>14.2f}ms {new_rt.get('p99', 0):>14.2f}ms {p99_improvement:>13.1f}%")
-    print(f"{'Round-trip StdDev':<20} {baseline_rt.get('std_dev', 0):>14.2f}ms {new_rt.get('std_dev', 0):>14.2f}ms {std_dev_improvement:>13.1f}%")
-    print(f"{'DB Mean':<20} {baseline_db.get('mean', 0):>14.2f}ms {new_db.get('mean', 0):>14.2f}ms {db_mean_improvement:>13.1f}%")
+    print(
+        f"{'Round-trip Mean':<20} {baseline_rt.get('mean', 0):>14.2f}ms {new_rt.get('mean', 0):>14.2f}ms {mean_improvement:>13.1f}%"
+    )
+    print(
+        f"{'Round-trip P95':<20} {baseline_rt.get('p95', 0):>14.2f}ms {new_rt.get('p95', 0):>14.2f}ms {p95_improvement:>13.1f}%"
+    )
+    print(
+        f"{'Round-trip P99':<20} {baseline_rt.get('p99', 0):>14.2f}ms {new_rt.get('p99', 0):>14.2f}ms {p99_improvement:>13.1f}%"
+    )
+    print(
+        f"{'Round-trip StdDev':<20} {baseline_rt.get('std_dev', 0):>14.2f}ms {new_rt.get('std_dev', 0):>14.2f}ms {std_dev_improvement:>13.1f}%"
+    )
+    print(
+        f"{'DB Mean':<20} {baseline_db.get('mean', 0):>14.2f}ms {new_db.get('mean', 0):>14.2f}ms {db_mean_improvement:>13.1f}%"
+    )
 
     # Print verdict
     print("\n" + "=" * 70)
     if mean_improvement > 0 and p95_improvement > 0:
-        print(f"{Color.GREEN}{Color.BOLD}✅ PERFORMANCE OPTIMIZATION: SUCCESSFUL{Color.RESET}")
-        print(f"{Color.GREEN}Mean latency improved by {mean_improvement:.1f}%{Color.RESET}")
-        print(f"{Color.GREEN}P95 latency improved by {p95_improvement:.1f}%{Color.RESET}")
+        print(
+            f"{Color.GREEN}{Color.BOLD}✅ PERFORMANCE OPTIMIZATION: SUCCESSFUL{Color.RESET}"
+        )
+        print(
+            f"{Color.GREEN}Mean latency improved by {mean_improvement:.1f}%{Color.RESET}"
+        )
+        print(
+            f"{Color.GREEN}P95 latency improved by {p95_improvement:.1f}%{Color.RESET}"
+        )
     else:
-        print(f"{Color.RED}{Color.BOLD}❌ PERFORMANCE OPTIMIZATION: FAILED{Color.RESET}")
+        print(
+            f"{Color.RED}{Color.BOLD}❌ PERFORMANCE OPTIMIZATION: FAILED{Color.RESET}"
+        )
         print(f"{Color.RED}Latency did not improve or degraded{Color.RESET}")
     print("=" * 70 + "\n")
 
@@ -208,19 +239,29 @@ def print_final_report(results: dict[str, Any]) -> None:
     verification_result = results.get("verification", {})
     if verification_result:
         passed = verification_result.get("passed", False)
-        print(f"Performance Optimization: {Color.GREEN}PASSED{Color.RESET}" if passed else f"Performance Optimization: {Color.RED}FAILED{Color.RESET}")
-        print(f"  Checks: {verification_result.get('checks_passed', 0)}/{verification_result.get('checks_total', 0)}")
+        print(
+            f"Performance Optimization: {Color.GREEN}PASSED{Color.RESET}"
+            if passed
+            else f"Performance Optimization: {Color.RED}FAILED{Color.RESET}"
+        )
+        print(
+            f"  Checks: {verification_result.get('checks_passed', 0)}/{verification_result.get('checks_total', 0)}"
+        )
 
     # Overall
     print("\n" + "=" * 70)
     all_passed = verification_result.get("passed", False)
 
     if all_passed:
-        print(f"{Color.GREEN}{Color.BOLD}✅ PERFORMANCE OPTIMIZATION VERIFICATION: PASSED{Color.RESET}")
+        print(
+            f"{Color.GREEN}{Color.BOLD}✅ PERFORMANCE OPTIMIZATION VERIFICATION: PASSED{Color.RESET}"
+        )
         print(f"{Color.GREEN}DB performance fixes verified{Color.RESET}")
         print(f"{Color.GREEN}P1 evidence collection is production-ready{Color.RESET}")
     else:
-        print(f"{Color.RED}{Color.BOLD}❌ PERFORMANCE OPTIMIZATION VERIFICATION: FAILED{Color.RESET}")
+        print(
+            f"{Color.RED}{Color.BOLD}❌ PERFORMANCE OPTIMIZATION VERIFICATION: FAILED{Color.RESET}"
+        )
 
     print("=" * 70 + "\n")
 
@@ -252,7 +293,9 @@ def main():
     if args.new_evidence is None:
         reports_dir = Path("reports")
         if reports_dir.exists():
-            evidence_files = sorted(reports_dir.glob("p1_analyze_latency_*.json"), reverse=True)
+            evidence_files = sorted(
+                reports_dir.glob("p1_analyze_latency_*.json"), reverse=True
+            )
             if evidence_files:
                 args.new_evidence = evidence_files[0]
                 print(f"Using most recent evidence file: {args.new_evidence}\n")
@@ -284,7 +327,9 @@ def main():
     print_final_report(results)
 
     # Exit with appropriate code
-    all_passed = verification_result.get("passed", False) if verification_result else False
+    all_passed = (
+        verification_result.get("passed", False) if verification_result else False
+    )
     sys.exit(0 if all_passed else 1)
 
 

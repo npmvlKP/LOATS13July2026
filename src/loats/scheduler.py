@@ -105,26 +105,39 @@ NSE_HOLIDAYS: frozenset[datetime.date] = frozenset(
 )
 
 
+def is_market_open(now: datetime.datetime | None = None) -> bool:
+    """Check whether Indian markets are open for the given timestamp.
+
+    Args:
+        now: Timestamp to evaluate (defaults to current time in settings.timezone).
+
+    Returns:
+        True if the timestamp falls on a weekday, non-holiday, between 9:15
+        and 15:30 IST; otherwise False.
+    """
+    tz = ZoneInfo(settings.timezone)
+    if now is None:
+        now = datetime.datetime.now(tz)
+    elif now.tzinfo is None:
+        now = now.replace(tzinfo=tz)
+
+    if now.weekday() >= 5:
+        return False
+
+    if now.date() in NSE_HOLIDAYS:
+        return False
+
+    market_open_time = now.replace(hour=9, minute=15, second=0, microsecond=0)
+    market_close_time = now.replace(hour=15, minute=30, second=0, microsecond=0)
+    return market_open_time <= now <= market_close_time
+
+
 class TradingScheduler:
     """Scheduler trading scans operations."""
 
     def is_market_open(self) -> bool:
         """Check market open considering IST timezone, weekdays, holidays."""
-        tz = ZoneInfo(settings.timezone)
-        now = datetime.datetime.now(tz)
-        # Check weekday (Monday=0, Sunday=6)
-        # Indian markets open Monday-Friday
-        if now.weekday() >= 5:  # Saturday (5) Sunday (6)
-            return False
-
-        # Indian markets closed on NSE/BSE trading holidays
-        if now.date() in NSE_HOLIDAYS:
-            return False
-
-        # Indian market hours: 9:15 - 15:30 IST
-        market_open_time = now.replace(hour=9, minute=15, second=0, microsecond=0)
-        market_close_time = now.replace(hour=15, minute=30, second=0, microsecond=0)
-        return market_open_time <= now <= market_close_time
+        return is_market_open()
 
     def __init__(self) -> None:
         """Initialize TradingScheduler."""

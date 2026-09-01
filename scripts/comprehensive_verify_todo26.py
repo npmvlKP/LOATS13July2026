@@ -15,12 +15,10 @@ Usage:
     python scripts/comprehensive_verify_todo26.py
 """
 
-import ast
 import re
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any
 
 # Get project root directory
 PROJECT_ROOT = Path(__file__).parent.parent
@@ -64,12 +62,15 @@ def check_module_importable() -> bool:
 
     try:
         # Use python -c to test import
-        exit_code, stdout, stderr = run_command([
-            sys.executable, "-c",
-            f"import sys; sys.path.insert(0, '{PROJECT_ROOT}/src'); "
-            f"import loats.backtest_sanity; "
-            f"print('Module imported successfully')"
-        ])
+        exit_code, stdout, stderr = run_command(
+            [
+                sys.executable,
+                "-c",
+                f"import sys; sys.path.insert(0, '{PROJECT_ROOT}/src'); "
+                f"import loats.backtest_sanity; "
+                f"print('Module imported successfully')",
+            ]
+        )
 
         if exit_code == 0 and "successfully" in stdout:
             print(f"  {CHECK_MARK} Module imports successfully")
@@ -156,7 +157,9 @@ else:
         exit_code, stdout, stderr = run_command([sys.executable, "-c", check_code])
 
         if exit_code == 0:
-            print(f"  {CHECK_MARK} WalkForwardWindowIterator has all {len(required_methods)} methods:")
+            print(
+                f"  {CHECK_MARK} WalkForwardWindowIterator has all {len(required_methods)} methods:"
+            )
             for method in required_methods:
                 print(f"         - {method}")
             return True
@@ -215,7 +218,9 @@ def check_run_once_integration() -> bool:
     # Check for backtest_sanity_check case
     if 'job_id == "backtest_sanity_check"' in scheduler_content:
         print(f"  {CHECK_MARK} run_once() includes backtest_sanity_check case")
-        print(f"         Allows on-demand execution via scheduler.run_once('backtest_sanity_check')")
+        print(
+            "         Allows on-demand execution via scheduler.run_once('backtest_sanity_check')"
+        )
         return True
     else:
         print(f"  {X_MARK} run_once() missing backtest_sanity_check case")
@@ -231,7 +236,9 @@ def check_health_check_integration() -> bool:
         print(f"  {X_MARK} fr7_health_check.py not found")
         return False
 
-    health_check_content = health_check_path.read_text(encoding="utf-8", errors="ignore")
+    health_check_content = health_check_path.read_text(
+        encoding="utf-8", errors="ignore"
+    )
 
     checks = [
         ("HC-30 entry", '"HC-30"'),
@@ -299,8 +306,8 @@ def check_weekly_schedule() -> bool:
 
         # Parse the configuration
         has_sunday = 'day_of_week="sun"' in trigger_config
-        has_hour = 'hour=' in trigger_config
-        has_minute = 'minute=' in trigger_config
+        has_hour = "hour=" in trigger_config
+        has_minute = "minute=" in trigger_config
 
         if has_sunday and has_hour and has_minute:
             print(f"  {CHECK_MARK} Schedule complete (Sunday + hour + minute)")

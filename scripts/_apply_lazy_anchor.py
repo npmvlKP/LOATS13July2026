@@ -17,6 +17,7 @@ WHY
 * Resolves at runtime via ``LazySettings.__getattr__`` proxying
   through ``get_settings()`` to the cached ``Settings()`` instance.
 """
+
 from __future__ import annotations
 
 import re
@@ -70,10 +71,10 @@ def apply(file: Path) -> bool:
         if not seen_non_blank and not stripped:
             continue
         seen_non_blank = True
-        if stripped.startswith('"""') or stripped.startswith("'''"):
+        if stripped.startswith(('"""', "'''")):
             q = '"""' if stripped.startswith('"""') else "'''"
             quote = q
-            rest = stripped[len(q):]
+            rest = stripped[len(q) :]
             if q in rest:
                 after_doc = i + 1
                 continue

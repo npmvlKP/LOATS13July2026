@@ -14,8 +14,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from loats.models import Signal, SignalType  # noqa: E402
-from loats.strength import strength_engine  # noqa: E402
+from loats.models import Signal, SignalType
+from loats.strength import strength_engine
 
 
 def _build(n: int) -> list[Signal]:
@@ -41,8 +41,12 @@ def main() -> int:
     sig4 = _build(4)
     ok3, det3 = strength_engine.validate_signal_sources(sig3)
     ok4, det4 = strength_engine.validate_signal_sources(sig4)
-    print(f"3 valid sources -> ok={ok3} diversity={det3.get('diversity_score')} reason={det3.get('reason')}")
-    print(f"4 valid sources -> ok={ok4} diversity={det4.get('diversity_score')} reason={det4.get('reason')}")
+    print(
+        f"3 valid sources -> ok={ok3} diversity={det3.get('diversity_score')} reason={det3.get('reason')}"
+    )
+    print(
+        f"4 valid sources -> ok={ok4} diversity={det4.get('diversity_score')} reason={det4.get('reason')}"
+    )
     div3 = det3.get("diversity_score")
     div4 = det4.get("diversity_score")
     score_ok = (

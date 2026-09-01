@@ -16,8 +16,6 @@ Exit code 0 means all verification stages passed.
 
 from __future__ import annotations
 
-import io
-import json
 import os
 import subprocess
 import sys
@@ -42,6 +40,7 @@ ROOT = project_root()
 
 def _resolve_python() -> str:
     """Prefer project venv python if present, else launcher."""
+
     def _has_dev_tools(p: Path) -> bool:
         try:
             return (p.parent.parent / "Lib" / "site-packages" / "ruff").exists() or (
@@ -114,13 +113,11 @@ def verify_stage(stage_name: str, test_fn) -> bool:
 
 
 def test_utf8_fix() -> bool:
-    """Verify UTF-8 encoding fix works."""
-    # Test that health check can print box-drawing characters
-    result = run_cmd([PY, "scripts/fr7_health_check.py", "--list"], timeout=30)
-    if result.returncode == 0:
-        # Check output contains expected characters
-        return "ID" in result.stdout and "GROUP" in result.stdout
-    return False
+    """Verify health check runs without UnicodeEncodeError on Windows."""
+    result = run_cmd([PY, "scripts/fr7_health_check.py", "--only", "HC-01"], timeout=30)
+    if result.returncode != 0:
+        return False
+    return "HC-01" in result.stdout and "PASS" in result.stdout
 
 
 def test_ruff() -> bool:
@@ -134,7 +131,9 @@ def test_ruff() -> bool:
 
 def test_ruff_format() -> bool:
     """Verify ruff format passes."""
-    result = run_cmd([PY, "-m", "ruff", "format", "--check", "src/", "tests/"], timeout=60)
+    result = run_cmd(
+        [PY, "-m", "ruff", "format", "--check", "src/", "tests/"], timeout=60
+    )
     return result.returncode == 0
 
 
@@ -178,7 +177,9 @@ def test_mypy_strict_full() -> bool:
 
 def test_bandit() -> bool:
     """Verify bandit security scan passes."""
-    result = run_cmd([PY, "-m", "bandit", "-r", "src/", "-c", "pyproject.toml", "-q"], timeout=60)
+    result = run_cmd(
+        [PY, "-m", "bandit", "-r", "src/", "-c", "pyproject.toml", "-q"], timeout=60
+    )
     return result.returncode == 0
 
 

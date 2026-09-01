@@ -22,11 +22,10 @@ import argparse
 import json
 import subprocess
 import sys
+from dataclasses import dataclass
 from datetime import UTC, datetime
-from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Literal
 
 # Repository root
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -107,7 +106,6 @@ PRODUCTION_CHECKS = [
         command=[PY, "scripts/verify_todo23_external.py"],
         timeout=10,
     ),
-
     # CRITICAL STATIC CHECKS
     ProductionCheck(
         name="T01: Ruff Linting",
@@ -156,7 +154,15 @@ PRODUCTION_CHECKS = [
         category="STATIC",
         critical=True,
         description="No secrets in source code",
-        command=["gitleaks", "detect", "--source", ".", "--config", ".gitleaks.toml", "--no-git"],
+        command=[
+            "gitleaks",
+            "detect",
+            "--source",
+            ".",
+            "--config",
+            ".gitleaks.toml",
+            "--no-git",
+        ],
         timeout=30,
     ),
     ProductionCheck(
@@ -171,14 +177,20 @@ PRODUCTION_CHECKS = [
         ],
         timeout=10,
     ),
-
     # CRITICAL LIVE-PROBE CHECKS
     ProductionCheck(
         name="L04: Trailing Stop Runtime",
         category="LIVE-PROBE",
         critical=True,
         description="Trailing stop engine runtime verification",
-        command=[PY, "-m", "pytest", "tests/test_trailing_stop_runtime.py", "-q", "--tb=short"],
+        command=[
+            PY,
+            "-m",
+            "pytest",
+            "tests/test_trailing_stop_runtime.py",
+            "-q",
+            "--tb=short",
+        ],
         timeout=30,
     ),
     ProductionCheck(
@@ -186,7 +198,14 @@ PRODUCTION_CHECKS = [
         category="LIVE-PROBE",
         critical=True,
         description="Audit logging dual-write verification",
-        command=[PY, "-m", "pytest", "tests/test_audit_dual_write.py", "-q", "--tb=short"],
+        command=[
+            PY,
+            "-m",
+            "pytest",
+            "tests/test_audit_dual_write.py",
+            "-q",
+            "--tb=short",
+        ],
         timeout=30,
     ),
     ProductionCheck(
@@ -205,7 +224,6 @@ PRODUCTION_CHECKS = [
         command=[PY, "scripts/probe_l08_queue_backpressure.py"],
         timeout=30,
     ),
-
     # CRITICAL GATE CHECKS
     ProductionCheck(
         name="G01: Pytest Sanity",
@@ -239,14 +257,21 @@ PRODUCTION_CHECKS = [
         command=[PY, "scripts/verify_todo27_external.py"],
         timeout=30,
     ),
-
     # INFORMATIONAL CHECKS (non-blocking)
     ProductionCheck(
         name="T04: Mypy Strict (Full Source)",
         category="STATIC",
         critical=False,
         description="Type safety on full source (TODO-28 pending)",
-        command=[PY, "-m", "mypy", "src/", "--strict", "--config-file", "pyproject.toml"],
+        command=[
+            PY,
+            "-m",
+            "mypy",
+            "src/",
+            "--strict",
+            "--config-file",
+            "pyproject.toml",
+        ],
         timeout=30,
     ),
     ProductionCheck(
@@ -324,7 +349,7 @@ def run_check(check: ProductionCheck, verbose: bool = False) -> CheckResult:
             duration_seconds=duration,
             stderr=str(e),
             exit_code=1,
-            message=f"Check failed with exception: {str(e)}",
+            message=f"Check failed with exception: {e!s}",
         )
 
 
@@ -348,7 +373,9 @@ def print_result(result: CheckResult, verbose: bool = False) -> None:
     critical_mark = "CRITICAL" if result.check.critical else "INFO"
     status = status_symbols[result.status]
 
-    print(f"  {status} | {result.check.name:<40} | {critical_mark:<10} | {result.duration_seconds:.1f}s")
+    print(
+        f"  {status} | {result.check.name:<40} | {critical_mark:<10} | {result.duration_seconds:.1f}s"
+    )
 
     if verbose:
         if result.stdout.strip():
@@ -358,7 +385,7 @@ def print_result(result: CheckResult, verbose: bool = False) -> None:
                 print(f"  │ {line}")
             if len(stdout_lines) > 5:
                 print(f"  │ ... ({len(stdout_lines) - 5} more lines)")
-            print(f"  └─")
+            print("  └─")
 
         if result.stderr.strip():
             print(f"\n  ┌─ stderr ({len(result.stderr)} chars):")
@@ -367,7 +394,7 @@ def print_result(result: CheckResult, verbose: bool = False) -> None:
                 print(f"  │ {line}")
             if len(stderr_lines) > 5:
                 print(f"  │ ... ({len(stderr_lines) - 5} more lines)")
-            print(f"  └─")
+            print("  └─")
 
 
 def generate_production_report(
@@ -391,14 +418,18 @@ def generate_production_report(
     critical_checks = [r for r in results if r.check.critical]
     critical_passed = sum(1 for r in critical_checks if r.status == CheckStatus.PASS)
     critical_failed = sum(1 for r in critical_checks if r.status == CheckStatus.FAIL)
-    critical_timeout = sum(1 for r in critical_checks if r.status == CheckStatus.TIMEOUT)
+    critical_timeout = sum(
+        1 for r in critical_checks if r.status == CheckStatus.TIMEOUT
+    )
 
     informational_checks = [r for r in results if not r.check.critical]
     informational_passed = sum(
         1 for r in informational_checks if r.status == CheckStatus.PASS
     )
     informational_warnings = sum(
-        1 for r in informational_checks if r.status in (CheckStatus.FAIL, CheckStatus.WARNING, CheckStatus.TIMEOUT)
+        1
+        for r in informational_checks
+        if r.status in (CheckStatus.FAIL, CheckStatus.WARNING, CheckStatus.TIMEOUT)
     )
 
     total_duration = sum(r.duration_seconds for r in results)
@@ -448,10 +479,14 @@ def generate_production_report(
     for category in sorted(by_category.keys()):
         category_results = by_category[category]
         cat_critical = [r for r in category_results if r.check.critical]
-        cat_critical_passed = sum(1 for r in cat_critical if r.status == CheckStatus.PASS)
+        cat_critical_passed = sum(
+            1 for r in cat_critical if r.status == CheckStatus.PASS
+        )
         cat_critical_total = len(cat_critical)
 
-        print(f"\n{category.upper():<20} | CRITICAL: {cat_critical_passed}/{cat_critical_total} PASS")
+        print(
+            f"\n{category.upper():<20} | CRITICAL: {cat_critical_passed}/{cat_critical_total} PASS"
+        )
         print("-" * 80)
 
         for result in category_results:
@@ -471,17 +506,17 @@ def generate_production_report(
     print_header(f"DEPLOYMENT DECISION — {deployment_status}")
 
     if not deployment_approved:
-        print(f"✗ PRODUCTION DEPLOYMENT BLOCKED")
+        print("✗ PRODUCTION DEPLOYMENT BLOCKED")
         print(f"  Critical failures: {critical_failed}")
         print(f"  Critical timeouts: {critical_timeout}")
-        print(f"  Action: Fix all critical failures before deployment")
+        print("  Action: Fix all critical failures before deployment")
     elif informational_warnings > 0:
-        print(f"✓ PRODUCTION DEPLOYMENT APPROVED WITH WARNINGS")
+        print("✓ PRODUCTION DEPLOYMENT APPROVED WITH WARNINGS")
         print(f"  Critical checks: {critical_passed}/{len(critical_checks)} passed")
         print(f"  Informational warnings: {informational_warnings}")
-        print(f"  Action: Review warnings but deployment can proceed")
+        print("  Action: Review warnings but deployment can proceed")
     else:
-        print(f"✓ PRODUCTION DEPLOYMENT APPROVED")
+        print("✓ PRODUCTION DEPLOYMENT APPROVED")
         print(f"  Critical checks: {critical_passed}/{len(critical_checks)} passed")
         print(f"  Total Duration: {total_duration:.1f}s")
 
@@ -519,9 +554,7 @@ def main() -> int:
     parser.add_argument(
         "--verbose", action="store_true", help="Show detailed output for each check"
     )
-    parser.add_argument(
-        "--json", type=str, help="Write JSON report to specified path"
-    )
+    parser.add_argument("--json", type=str, help="Write JSON report to specified path")
     parser.add_argument(
         "--category",
         type=str,
@@ -533,7 +566,9 @@ def main() -> int:
 
     # Select checks to run
     if args.category:
-        checks = [c for c in PRODUCTION_CHECKS if c.category.upper() == args.category.upper()]
+        checks = [
+            c for c in PRODUCTION_CHECKS if c.category.upper() == args.category.upper()
+        ]
     else:
         checks = PRODUCTION_CHECKS
 
@@ -545,7 +580,13 @@ def main() -> int:
         results.append(result)
 
         # Print immediate result
-        status_symbol = "✓" if result.status == CheckStatus.PASS else "✗" if result.status == CheckStatus.FAIL else "○"
+        status_symbol = (
+            "✓"
+            if result.status == CheckStatus.PASS
+            else "✗"
+            if result.status == CheckStatus.FAIL
+            else "○"
+        )
         print(f"  {status_symbol} {check.name} ({result.duration_seconds:.1f}s)")
 
     # Generate and print final report

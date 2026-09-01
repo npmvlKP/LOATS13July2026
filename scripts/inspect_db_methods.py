@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Inspect Database async method signatures and pool type."""
+
 import inspect
 import sys
 import textwrap

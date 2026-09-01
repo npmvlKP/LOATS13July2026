@@ -70,26 +70,36 @@ def stage_1_venv_health() -> tuple[int, int]:
     project_root = Path(__file__).parent.parent
 
     venv_path = project_root / "loatsNEW"
-    checks.append((venv_path.exists(),
-                    f"loatsNEW venv exists",
-                    str(venv_path) if venv_path.exists() else "NOT FOUND"))
+    checks.append(
+        (
+            venv_path.exists(),
+            "loatsNEW venv exists",
+            str(venv_path) if venv_path.exists() else "NOT FOUND",
+        )
+    )
 
     # Only loats13july2026 must be confirmed removed.
     # .venv may be auto-recreated by pip-audit's virtualenv dependency.
     old_path = project_root / "loats13july2026"
-    checks.append((not old_path.exists(),
-                    "Old venv loats13july2026 removed",
-                    "" if not old_path.exists() else f"STILL EXISTS at {old_path}"))
+    checks.append(
+        (
+            not old_path.exists(),
+            "Old venv loats13july2026 removed",
+            "" if not old_path.exists() else f"STILL EXISTS at {old_path}",
+        )
+    )
 
     py_ver = sys.version_info
-    checks.append((py_ver >= (3, 12),
-                    f"Python >= 3.12",
-                    f"{py_ver.major}.{py_ver.minor}.{py_ver.micro}"))
+    checks.append(
+        (
+            py_ver >= (3, 12),
+            "Python >= 3.12",
+            f"{py_ver.major}.{py_ver.minor}.{py_ver.micro}",
+        )
+    )
 
     in_venv = "loatsNEW" in sys.executable
-    checks.append((in_venv,
-                    f"Running from loatsNEW venv",
-                    sys.executable))
+    checks.append((in_venv, "Running from loatsNEW venv", sys.executable))
 
     return run_stage(checks)
 
@@ -128,7 +138,8 @@ def stage_2_dependencies() -> tuple[int, int]:
             checks.append((False, f"{name}: import failed", str(e)))
 
     try:
-        import loats  # noqa: F401
+        import loats
+
         checks.append((True, "loats package: importable", loats.__file__))
     except ImportError as e:
         checks.append((False, "loats package: import failed", str(e)))
@@ -161,8 +172,13 @@ def stage_3_evidence_file() -> tuple[int, int, dict[str, Any]]:
     evidence_files = sorted(reports_dir.glob("p1_analyze_latency_*.json"), reverse=True)
 
     if not evidence_files:
-        checks.append((False, "Evidence file exists",
-                        "No p1_analyze_latency_*.json found in reports/"))
+        checks.append(
+            (
+                False,
+                "Evidence file exists",
+                "No p1_analyze_latency_*.json found in reports/",
+            )
+        )
         p, t = run_stage(checks)
         return p, t, data
 
@@ -182,17 +198,26 @@ def stage_3_evidence_file() -> tuple[int, int, dict[str, Any]]:
         checks.append((key in data, f"Top-level key '{key}' present", ""))
 
     metadata = data.get("metadata", {})
-    for field in ["todo_id", "finding_id", "phase_gate",
-                   "description", "collected_at"]:
+    for field in ["todo_id", "finding_id", "phase_gate", "description", "collected_at"]:
         checks.append((field in metadata, f"Metadata field '{field}' present", ""))
 
     evidence = data.get("evidence", {})
-    for section in ["summary", "ta_statistics", "db_statistics",
-                    "round_trip_statistics", "gate_compliance", "measurements"]:
-        checks.append((section in evidence, f"Evidence section '{section}' present", ""))
+    for section in [
+        "summary",
+        "ta_statistics",
+        "db_statistics",
+        "round_trip_statistics",
+        "gate_compliance",
+        "measurements",
+    ]:
+        checks.append(
+            (section in evidence, f"Evidence section '{section}' present", "")
+        )
 
     measurements = evidence.get("measurements", [])
-    checks.append((len(measurements) >= 50, "Sample count >= 50", f"{len(measurements)} samples"))
+    checks.append(
+        (len(measurements) >= 50, "Sample count >= 50", f"{len(measurements)} samples")
+    )
 
     p, t = run_stage(checks)
     return p, t, data
@@ -220,9 +245,17 @@ def stage_4_gate_compliance(evidence: dict[str, Any]) -> tuple[int, int]:
 
     checks.append((mean <= 100.0, "Mean latency <= 100ms", f"{mean:.2f}ms"))
     checks.append((p95 <= 200.0, "P95 latency <= 200ms", f"{p95:.2f}ms"))
-    checks.append((p99 <= 2000.0, "P99 latency < 2000ms (WAL spikes ok)", f"{p99:.2f}ms"))
+    checks.append(
+        (p99 <= 2000.0, "P99 latency < 2000ms (WAL spikes ok)", f"{p99:.2f}ms")
+    )
     checks.append((ta_rate >= 99.0, "TA gate pass rate >= 99%", f"{ta_rate:.2f}%"))
-    checks.append((rt_rate >= 80.0, "Round-trip gate pass rate >= 80% (P1 gate)", f"{rt_rate:.2f}%"))
+    checks.append(
+        (
+            rt_rate >= 80.0,
+            "Round-trip gate pass rate >= 80% (P1 gate)",
+            f"{rt_rate:.2f}%",
+        )
+    )
 
     return run_stage(checks)
 
@@ -230,12 +263,13 @@ def stage_4_gate_compliance(evidence: dict[str, Any]) -> tuple[int, int]:
 def stage_5_p5_blockage() -> tuple[int, int]:
     header("STAGE 5: P5 BLOCKAGE STATUS")
     checks: list[tuple[bool, str, str]] = [
-        (True, "P5 blocked on TODO-13",
-         "Routing must be real for forward test to mean anything"),
-        (True, "P5 2-week forward test not started",
-         "Waiting for TODO-13 completion"),
-        (True, "P5 preparation documented",
-         "Will begin after TODO-13 lands"),
+        (
+            True,
+            "P5 blocked on TODO-13",
+            "Routing must be real for forward test to mean anything",
+        ),
+        (True, "P5 2-week forward test not started", "Waiting for TODO-13 completion"),
+        (True, "P5 preparation documented", "Will begin after TODO-13 lands"),
     ]
     return run_stage(checks)
 
@@ -256,13 +290,20 @@ def stage_6_health_check() -> tuple[int, int]:
         try:
             result = subprocess.run(
                 [sys.executable, str(hc_script), "--only", "HC-29"],
-                capture_output=True, text=True, timeout=60,
+                capture_output=True,
+                text=True,
+                timeout=60,
                 cwd=str(Path(__file__).parent.parent),
             )
             hc_passed = result.returncode == 0
             detail = "" if hc_passed else f"STDERR: {result.stderr[:200]}"
-            checks.append((hc_passed, "HC-29 execution passed",
-                            detail or f"exit code {result.returncode}"))
+            checks.append(
+                (
+                    hc_passed,
+                    "HC-29 execution passed",
+                    detail or f"exit code {result.returncode}",
+                )
+            )
         except Exception as e:
             checks.append((False, "HC-29 execution passed", str(e)))
 
@@ -271,7 +312,7 @@ def stage_6_health_check() -> tuple[int, int]:
 
 def main() -> None:
     project_root = Path(__file__).parent.parent
-    print(f"TODO-25 (F7-L-05) FINAL VERIFICATION")
+    print("TODO-25 (F7-L-05) FINAL VERIFICATION")
     print(f"Project root: {project_root}")
     print(f"Python: {sys.version}")
     print(f"Executable: {sys.executable}")
@@ -308,7 +349,9 @@ def main() -> None:
     print(f"Total: {total_passed}/{total_checks} checks passed")
     print()
     if all_pass:
-        print(f"{C.G}{C.BD}✅ TODO-25 (F7-L-05) FINAL VERIFICATION: ALL STAGES PASSED{C.X}")
+        print(
+            f"{C.G}{C.BD}✅ TODO-25 (F7-L-05) FINAL VERIFICATION: ALL STAGES PASSED{C.X}"
+        )
         print(f"{C.G}Virtual environment: loatsNEW (healthy, all deps installed){C.X}")
         print(f"{C.G}P1 evidence: collected and validated{C.X}")
         print(f"{C.G}P5 blockage: documented and verified{C.X}")

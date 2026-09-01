@@ -61,6 +61,7 @@ def _sigs(n, base_str=0.75, st=SignalType.BUY):
         StrengthSource.TECHNICAL_ANALYSIS,
         StrengthSource.SENTIMENT,
         StrengthSource.PRICE_ACTION,
+        StrengthSource.VOLATILITY,
     ]
     now = datetime.now(UTC)
     return [
@@ -71,9 +72,9 @@ def _sigs(n, base_str=0.75, st=SignalType.BUY):
             timestamp=now - timedelta(seconds=i * 30),
             indicators={"v": 0.5 + i * 0.1},
             confidence=0.8 - i * 0.05,
-            metadata={"source": srcs[i].value},
+            metadata={"source": srcs[i % len(srcs)].value},
         )
-        for i in range(min(n, 3))
+        for i in range(min(n, len(srcs)))
     ]
 
 
@@ -190,7 +191,7 @@ class TestDecisionCreation:
             mr.check_position_limits.return_value = (True, {"reason": "ok"})
             mr.session_state = "REGULAR"
             d, _ = await td_engine.create_trade_decision(
-                signals=_sigs(3),
+                signals=_sigs(4),
                 historical_data=hist,
                 current_price=24500.0,
                 funds=funds,
@@ -209,7 +210,7 @@ class TestDecisionCreation:
             mr.check_position_limits.return_value = (True, {"reason": "ok"})
             mr.session_state = "REGULAR"
             d, r = await td_engine.create_trade_decision(
-                signals=_sigs(3, 0.2),
+                signals=_sigs(4, 0.2),
                 historical_data=hist,
                 current_price=24500.0,
                 funds=funds,
@@ -251,7 +252,7 @@ class TestDecisionCreation:
             )
             mr.session_state = "REGULAR"
             d, r = await td_engine.create_trade_decision(
-                signals=_sigs(3),
+                signals=_sigs(4),
                 historical_data=hist,
                 current_price=24500.0,
                 funds=funds,
@@ -277,7 +278,7 @@ class TestDecisionCreation:
             )
             mr.session_state = "REGULAR"
             d, r = await td_engine.create_trade_decision(
-                signals=_sigs(3),
+                signals=_sigs(4),
                 historical_data=hist,
                 current_price=24500.0,
                 funds=funds,
@@ -301,7 +302,7 @@ class TestDecisionCreation:
                     {"reason": "invalid_prices"},
                 )
                 d, r = await td_engine.create_trade_decision(
-                    signals=_sigs(3),
+                    signals=_sigs(4),
                     historical_data=hist,
                     current_price=24500.0,
                     funds=funds,
@@ -339,7 +340,7 @@ class TestRouting:
             )
             mdt.UTC = __import__("datetime").timezone.utc
             mdb.async_record_trade_decision = AsyncMock()
-            with patch("loats.openalgo.AsyncOpenAlgoClient") as mcc:
+            with patch("loats.trade_decision.AsyncOpenAlgoClient") as mcc:
                 mc = AsyncMock()
                 mc.__aenter__ = AsyncMock(return_value=mc)
                 mc.__aexit__ = AsyncMock()
@@ -362,7 +363,7 @@ class TestRouting:
             )
             mdt.UTC = __import__("datetime").timezone.utc
             mdb.async_record_trade_decision = AsyncMock()
-            with patch("loats.openalgo.AsyncOpenAlgoClient") as mcc:
+            with patch("loats.trade_decision.AsyncOpenAlgoClient") as mcc:
                 mc = AsyncMock()
                 mc.__aenter__ = AsyncMock(return_value=mc)
                 mc.__aexit__ = AsyncMock(return_value=False)

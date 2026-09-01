@@ -1,0 +1,39 @@
+{
+  "timestamp": "2026-09-01T08:28:55",
+  "python": "3.12.7",
+  "env_key_injected": true,
+  "results": [
+    {
+      "check_id": "HC-14",
+      "name": "OPS limiter: singleton, max_ops=3, 3/10 burst",
+      "todo": "F6-C-01",
+      "status": "PASS",
+      "detail": "identity=True effective=3 settings=3 order=3/10 smart=3/10 (expect 3)",
+      "evidence": []
+    },
+    {
+      "check_id": "HC-15",
+      "name": "source-gate math: 3 distinct -> reject, 4 -> pass",
+      "todo": "TODO-8",
+      "status": "FAIL",
+      "detail": "3-src=source_validation_passed | 4-src=source_validation_passed",
+      "evidence": [
+        "3 distinct sources accepted: True (expect False \u2014 diversity 0.4286)",
+        "4 distinct sources accepted: True (expect True \u2014 diversity 0.5714)"
+      ]
+    },
+    {
+      "check_id": "HC-16",
+      "name": "unknown source string loudly rejected",
+      "todo": "TODO-9",
+      "status": "PASS",
+      "detail": "reason: unknown_source \u2014 expected explicit unknown/invalid rejection; silent TECHNICAL_ANALYSIS collapse fails this check",
+      "evidence": []
+    }
+  ],
+  "summary": {
+    "pass": 2,
+    "fail": 1,
+    "skip": 0
+  }
+}

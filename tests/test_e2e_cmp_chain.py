@@ -134,6 +134,64 @@ def fixture_signals():
 class TestE2ECMPChain:
     """End-to-end CMP chain integration tests."""
 
+    @pytest.fixture
+    def fixture_signals(self):
+        now = datetime.now(UTC)
+        return [
+            Signal(
+                symbol="NIFTY",
+                signal_type=SignalType.BUY,
+                strength=0.75,
+                timestamp=now,
+                indicators={"rsi": 65.0},
+                confidence=0.8,
+                metadata={
+                    "scan_type": "combined",
+                    "source": StrengthSource.TECHNICAL_ANALYSIS.value,
+                    "current_price": 24500.0,
+                },
+            ),
+            Signal(
+                symbol="NIFTY",
+                signal_type=SignalType.BUY,
+                strength=0.7,
+                timestamp=now - timedelta(seconds=30),
+                indicators={"sentiment_score": 0.6},
+                confidence=0.75,
+                metadata={
+                    "scan_type": "combined",
+                    "source": StrengthSource.SENTIMENT.value,
+                    "current_price": 24500.0,
+                },
+            ),
+            Signal(
+                symbol="NIFTY",
+                signal_type=SignalType.BUY,
+                strength=0.68,
+                timestamp=now - timedelta(seconds=60),
+                indicators={"momentum": 0.5},
+                confidence=0.72,
+                metadata={
+                    "scan_type": "combined",
+                    "source": StrengthSource.PRICE_ACTION.value,
+                    "current_price": 24500.0,
+                },
+            ),
+            Signal(
+                symbol="NIFTY",
+                signal_type=SignalType.BUY,
+                strength=0.65,
+                timestamp=now - timedelta(seconds=90),
+                indicators={"vix": 15.0},
+                confidence=0.7,
+                metadata={
+                    "scan_type": "combined",
+                    "source": StrengthSource.VOLATILITY.value,
+                    "current_price": 24500.0,
+                },
+            ),
+        ]
+
     @pytest.mark.asyncio
     async def test_cmp_chain_with_production_signals(
         self,
@@ -147,12 +205,13 @@ class TestE2ECMPChain:
         for signal in fixture_signals:
             await temp_db.async_create_signal(signal)
         stored_signals = await temp_db.async_get_latest_signals("NIFTY", limit=10)
-        assert len(stored_signals) == 3, "All 3 signals should be stored in DB"
+        assert len(stored_signals) == 4, "All 4 signals should be stored in DB"
         sources = {s.metadata.get("source") for s in stored_signals}
         expected_sources = {
             StrengthSource.TECHNICAL_ANALYSIS.value,
             StrengthSource.SENTIMENT.value,
             StrengthSource.PRICE_ACTION.value,
+            StrengthSource.VOLATILITY.value,
         }
         assert sources == expected_sources, (
             "Signal sources must match production enum values"

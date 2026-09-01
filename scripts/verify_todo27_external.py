@@ -579,9 +579,7 @@ def check_bloomberg_feed() -> list[tuple[str, bool, str]]:
             )
         )
         # Check all feeds are http/https
-        all_http = all(
-            f.startswith(("http://", "https://")) for f in feeds
-        )
+        all_http = all(f.startswith(("http://", "https://")) for f in feeds)
         results.append(("runtime rss_feeds all http/https", all_http, str(feeds)))
     except Exception as e:
         results.append(("runtime feed check", False, str(e)))

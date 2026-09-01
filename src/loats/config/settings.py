@@ -97,9 +97,18 @@ class Settings(BaseSettings):
     nifty_lot_size: int = Field(25, description="NIFTY lot size")
     # CMP Rule 7 modification counter ceiling (HC-23). 25 keeps the rule
     # chain within its weekly advance lock-step without over-ratcheting.
+    max_modifications: int = Field(
+        25, description="Maximum allowed Rule 7 modifications per week"
+    )
+    # Backward compatibility alias retained in HC-23 external verification.
     mods: int = Field(25, description="Maximum allowed Rule 7 modifications")
     # CMP Rule 11 position-limit envelope (HC-23). NIFTY = 5 lots, BANKNIFTY
     # = 3 lots (mirrored in rules.check_position_limits).
+    max_nifty_positions: int = Field(5, description="Max open positions (NIFTY)")
+    max_banknifty_positions: int = Field(
+        3, description="Max open positions (BANKNIFTY)"
+    )
+    # Legacy aliases used by production modules/tests.
     max_open_positions: int = Field(5, description="Max open positions (NIFTY)")
     min_open_positions: int = Field(3, description="Min open positions (BANKNIFTY)")
     max_order_value: Decimal = Field(

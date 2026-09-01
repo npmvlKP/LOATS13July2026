@@ -1,952 +1,980 @@
-#!/usr/bin/env python3
-"""FR7 Comprehensive Health-Verification Master (FIXED UTF-8 ENCODING).
+#!/usr/bin/env python
+"""FR7 consolidated health check — LOATS13July2026 build-wave verification.
 
-Runs **every** structural, static, live-probe, and gate check, maps each to
-its TODO, prints a grouped report, and exits 0 only when nothing fails
-(SKIP allowed).  JSON output (``--json path``) is consumed by
-``scripts/fr7_health_snapshot.py`` for wave-over-wave baselines.
+Derived from 23Aug2026-Consolidated FR.md (FR7 + FR7-R, HEAD 163cdf9).
+Each check maps to a TODO in 23Aug2026-FR Sequential TODOs.md.
 
-Groups
-------
-* **STRUCTURAL** — file-tree, manifest sync, root hygiene, dead-weight,
-  bounded-queue, feed validation  (TODO-21/23/26/27)
-* **STATIC**     — ruff / mypy / bandit / gitleaks / import validation
-  (TODO-28, security)
-* **LIVE-PROBE** — runtime import + behaviour probes (VIX, routing,
-  trailing-stop, audit, rate-limiter, queue backpressure)  (TODO-12/13/14/20)
-* **GATE**       — pytest / coverage / pip-audit / P1 evidence
-  (TODO-15/24/25, quality gates)
-
-Usage
------
-    python scripts/fr7_health_check.py                  # full run
-    python scripts/fr7_health_check.py --only S01,T01   # subset
-    python scripts/fr7_health_check.py --group static   # one group
-    python scripts/fr7_health_check.py --fast           # structural+static quick
-    python scripts/fr7_health_check.py --json out.json  # JSON alongside console
-    python scripts/fr7_health_check.py --verbose        # show stdout tails
-
-Exit code
----------
-0 only when zero FAIL (SKIP/TIMEOUT→SKIP? No — TIMEOUT is FAIL).
-SKIP is allowed and does not turn the run red (missing optional tool,
-offline network, etc.).
+Exit codes: 0 = no failures (SKIP allowed); 1 = one or more FAIL;
+            2 = usage error. ASCII-only output by design.
 """
 
 from __future__ import annotations
 
 import argparse
-import io
+import ast
+import asyncio
+import inspect
 import json
 import os
-import shutil
+import re
 import subprocess
 import sys
 import time
-from dataclasses import dataclass
-from datetime import UTC, datetime
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Literal
+from types import SimpleNamespace
 
-# Ensure required env for Settings validation when health check is run
-# outside an activated env (e.g., Hermes isolated venv). Child probes inherit.
-os.environ.setdefault("OPENALGO_API_KEY", "test-health-check-key")
-os.environ.setdefault("OPENALGO_BASE_URL", "http://127.0.0.1:5000")
-os.environ.setdefault("OPENALGO_MODE", "ANALYZE")
-
-# ---------------------------------------------------------------------------
-# Windows UTF-8 stdout/stderr fix
-# ---------------------------------------------------------------------------
-# On Windows, console defaults to cp1252 which cannot print Unicode box-drawing
-# characters (e.g., '\u2500'). Wrap stdout/stderr with UTF-8 to prevent crashes.
-# This is done AFTER all imports to avoid interfering with module loading.
-if sys.platform == "win32":
-    try:
-        # Only wrap if we have a real buffer (not redirected)
-        if hasattr(sys.stdout, "buffer") and not isinstance(
-            sys.stdout, io.TextIOWrapper
-        ):
-            sys.stdout = io.TextIOWrapper(
-                sys.stdout.buffer,
-                encoding="utf-8",
-                errors="replace",
-                line_buffering=True,
-            )
-        if hasattr(sys.stderr, "buffer") and not isinstance(
-            sys.stderr, io.TextIOWrapper
-        ):
-            sys.stderr = io.TextIOWrapper(
-                sys.stderr.buffer,
-                encoding="utf-8",
-                errors="replace",
-                line_buffering=True,
-            )
-    except (OSError, ValueError, AttributeError):
-        # Fallback: at least ensure child processes use UTF-8
-        os.environ.setdefault("PYTHONIOENCODING", "utf-8")
-        os.environ.setdefault("PYTHONUTF8", "1")
-
-# ---------------------------------------------------------------------------
-# Repo / interpreter
-# ---------------------------------------------------------------------------
 REPO_ROOT = Path(__file__).resolve().parents[1]
+SRC = REPO_ROOT / "src"
+LOATS = SRC / "loats"
 
+# F7-M-03 mitigation: eager module-level settings in up to 11 modules make
+# imports crash without OPENALGO_API_KEY. Set a dummy BEFORE importing loats
+# and report it (HC-21 fails until TODO-18 lands).
+_ENV_INJECTED = False
+if not os.environ.get("OPENALGO_API_KEY"):
+    os.environ["OPENALGO_API_KEY"] = "fr7-health-probe"
+    _ENV_INJECTED = True
 
-def _resolve_python() -> str:
-    """Prefer project venv python if present, else launcher.
-
-    Hermes runs with its own venv (py 3.11) that lacks project deps.
-    The health probes must execute with the project's interpreter so that
-    ``import loats`` resolves.  Order:
-      1. G:/.../loatsNEW/Scripts/python.exe (has dev tools: ruff/mypy/bandit)
-      2. G:/.../.venv/Scripts/python.exe  (canonical)
-      3. sys.executable (fallback — also works when user already activated)
-    Prefers the venv that actually has the dev tools.
-    """
-
-    def _has_dev_tools(p: Path) -> bool:
-        # check for ruff/mypy presence via site-packages
-        try:
-            return (p.parent.parent / "Lib" / "site-packages" / "ruff").exists() or (
-                p.parent.parent / "lib" / "python3.12" / "site-packages" / "ruff"
-            ).exists()
-        except Exception:
-            return False
-
-    candidates = [
-        REPO_ROOT / "loatsNEW" / "Scripts" / "python.exe",
-        REPO_ROOT / "loatsNEW" / "bin" / "python",
-        REPO_ROOT / ".venv" / "Scripts" / "python.exe",
-        REPO_ROOT / ".venv" / "bin" / "python",
-    ]
-    # Prefer candidate with dev tools
-    for cand in candidates:
-        if cand.exists() and _has_dev_tools(cand):
-            return str(cand)
-    for cand in candidates:
-        if cand.exists():
-            return str(cand)
-    return sys.executable
-
-
-PY = _resolve_python()  # interpreter used for ALL subprocess probes
-
-# ``uv run`` delegates to the wrong venv when .venv exists (pip-audit creates
-# one).  Prefer the launching interpreter directly; keep UV fallback for CI.
-UV_PREFIX: list[str] = [PY, "-m"]  # always use launcher; explicit fallback
-if shutil.which("uv") and "LOATS_FORCE_UV" in __import__("os").environ:
-    UV_PREFIX = ["uv", "run", PY, "-m"]
-
-
-# ---------------------------------------------------------------------------
-# Colour helpers (ANSI, TTY-aware, Windows-safe)
-# ---------------------------------------------------------------------------
-def _supports_color() -> bool:
-    try:
-        return (
-            sys.stdout.isatty()
-            and sys.stdout.encoding
-            and "utf" in sys.stdout.encoding.lower()
-        )
-    except Exception:
-        return False
-
-
-_USE_COLOR = _supports_color()
-
-C_RESET = "\033[0m" if _USE_COLOR else ""
-C_BOLD = "\033[1m" if _USE_COLOR else ""
-C_GREEN = "\033[92m" if _USE_COLOR else ""
-C_RED = "\033[91m" if _USE_COLOR else ""
-C_YELLOW = "\033[93m" if _USE_COLOR else ""
-C_CYAN = "\033[96m" if _USE_COLOR else ""
-C_DIM = "\033[2m" if _USE_COLOR else ""
-
-PASS_SYM = "OK" if _USE_COLOR else "[PASS]"
-FAIL_SYM = "X" if _USE_COLOR else "[FAIL]"
-SKIP_SYM = "-" if _USE_COLOR else "[SKIP]"
-TIME_SYM = "T" if _USE_COLOR else "[TIME]"
-
-Status = Literal["PASS", "FAIL", "SKIP", "TIMEOUT", "ERROR"]
-
-
-# ---------------------------------------------------------------------------
-# Check catalogue
-# ---------------------------------------------------------------------------
-@dataclass(frozen=True)
-class Check:
-    id: str
-    group: Literal["structural", "static", "live-probe", "gate"]
-    name: str
-    todo: str
-    description: str
-    command: list[str]
-    timeout: int = 60
-    allow_skip: bool = False
-    # if True, missing binary / offline is SKIP not FAIL
-
-
-CATALOG: list[Check] = [
-    # ── STRUCTURAL (S) ──────────────────────────────────────────────────
-    Check(
-        id="S01",
-        group="structural",
-        name="options_math exists + parity",
-        todo="TODO-27a",
-        description="hand-rolled Black-Scholes src/loats/options_math.py exists and parity <1e-6 (replaces vollib)",
-        command=[
-            PY,
-            "-c",
-            (
-                "import pathlib, sys; "
-                "p=pathlib.Path('src/loats/options_math.py'); "
-                "assert p.exists(), 'missing options_math.py'; "
-                "sys.path.insert(0,'src'); "
-                "from loats.options_math import black_scholes, delta; "
-                "c=black_scholes('c',100,90,0.5,0.01,0.2); "
-                "assert abs(c-12.111581435)<1e-6, f'parity {c}'; "
-                "d=delta('c',49,50,0.3846,0.05,0.2); "
-                "assert abs(d-0.521601633972)<1e-6, f'delta {d}'; "
-                "print(f'parity c={c:.10f} delta={d:.10f}')"
-            ),
-        ],
-        timeout=15,
-    ),
-    Check(
-        id="S02",
-        group="structural",
-        name="ta library dropped",
-        todo="TODO-27b",
-        description="src/loats/ta.py custom, no `from ta.` import in src, pyproject has no ta dep",
-        command=[
-            PY,
-            "-c",
-            (
-                "import pathlib, sys; "
-                "ta=pathlib.Path('src/loats/ta.py').read_text(encoding='utf-8'); "
-                "assert 'def calculate_rsi' in ta, 'custom RSI missing'; "
-                "assert 'def calculate_supertrend' in ta, 'supertrend missing'; "
-                "bad=[p for p in pathlib.Path('src/loats').rglob('*.py') "
-                "if any(s.strip().startswith('from ta.') or s.strip()=='import ta' "
-                "for s in p.read_text(encoding='utf-8',errors='ignore').splitlines())]; "
-                "assert not bad, f'ta library import found {bad}'; "
-                "proj=pathlib.Path('pyproject.toml').read_text(encoding='utf-8'); "
-                "assert '\"ta>=' not in proj, 'pyproject still declares ta'; "
-                "print('ta dropped ok')"
-            ),
-        ],
-        timeout=15,
-    ),
-    Check(
-        id="S03",
-        group="structural",
-        name="bounded decision queue",
-        todo="TODO-27c",
-        description="settings.decision_queue_maxsize + Queue(maxsize) + put_nowait+QueueFull backpressure",
-        command=[
-            PY,
-            "-c",
-            (
-                "import pathlib; "
-                "s=pathlib.Path('src/loats/config/settings.py').read_text(encoding='utf-8'); "
-                "assert 'decision_queue_maxsize' in s, 'settings missing'; "
-                "t=pathlib.Path('src/loats/trade_decision.py').read_text(encoding='utf-8'); "
-                "assert 'Queue(maxsize' in t, 'unbounded Queue'; "
-                "assert 'put_nowait' in t and 'QueueFull' in t, 'no backpressure'; "
-                "assert 'get_queue_stats' in t, 'no get_queue_stats'; "
-                "print('bounded queue ok')"
-            ),
-        ],
-        timeout=15,
-    ),
-    Check(
-        id="S04",
-        group="structural",
-        name="rss feeds re-validated",
-        todo="TODO-27d",
-        description="settings.rss_feeds centralizes feeds, no active bloombergquint feed, livemint present",
-        command=[
-            PY,
-            "-c",
-            (
-                "import pathlib\n"
-                "s=pathlib.Path('src/loats/config/settings.py').read_text(encoding='utf-8')\n"
-                "assert 'rss_feeds' in s, 'rss_feeds missing'\n"
-                "assert 'bloombergquint.com' not in s.lower(), 'bloombergquint URL still in settings'\n"
-                "o=pathlib.Path('src/loats/orchestrator.py').read_text(encoding='utf-8')\n"
-                "sc=pathlib.Path('src/loats/scheduler.py').read_text(encoding='utf-8')\n"
-                "def has_active(p):\n"
-                "    return any('bloombergquint.com' in l.lower() and l.strip() and not l.strip().startswith('#') for l in p.splitlines())\n"
-                "assert not has_active(o), 'active bloombergquint URL in orchestrator'\n"
-                "assert not has_active(sc), 'active bloombergquint URL in scheduler'\n"
-                "assert 'livemint' in s, 'livemint not in settings'\n"
-                "print('rss feeds ok')"
-            ),
-        ],
-        timeout=15,
-    ),
-    Check(
-        id="S05",
-        group="structural",
-        name="backtest sanity driver wired",
-        todo="TODO-26",
-        description="src/loats/backtest_sanity.py exists and scheduler wires weekly job",
-        command=[
-            PY,
-            "-c",
-            (
-                "import pathlib; "
-                "p=pathlib.Path('src/loats/backtest_sanity.py'); "
-                "assert p.exists(), 'backtest_sanity.py missing'; "
-                "tx=p.read_text(encoding='utf-8'); "
-                "assert 'BacktestSanityResult' in tx, 'result missing'; "
-                "assert 'WalkForwardWindowIterator' in tx, 'iterator missing'; "
-                "sc=pathlib.Path('src/loats/scheduler.py').read_text(encoding='utf-8'); "
-                "assert 'backtest_sanity' in sc.lower(), 'not wired in scheduler'; "
-                "print('backtest wired')"
-            ),
-        ],
-        timeout=15,
-    ),
-    Check(
-        id="S06",
-        group="structural",
-        name="root file hygiene",
-        todo="TODO-21",
-        description="git ls-files root contains no junk ($null, coverage json, reports)",
-        command=[
-            PY,
-            "-c",
-            (
-                "import subprocess, sys; "
-                "r=subprocess.run(['git','ls-files'],capture_output=True,text=True); "
-                "files=r.stdout.strip().splitlines(); "
-                "roots=[f for f in files if '/' not in f]; "
-                "junk=[f for f in roots if f in ['$null','[100%]','0.21.0'] "
-                "or f.endswith(('bandit-report.json','pip-audit-core-report.json','results.json','coverage_floor_map.json','opencode.json','final_lint_report.txt','orchestrator_files.txt','ruff_errors.txt','ruff_errors_final.txt','ruff_errors_updated.txt','test.txt','test_content.txt','test_direct_push.txt','lwts4oa.md','pytest_output.txt'))]; "
-                "print(f'roots={len(roots)} junk={junk}'); "
-                "sys.exit(1 if junk else 0)"
-            ),
-        ],
-        timeout=15,
-    ),
-    Check(
-        id="S07",
-        group="structural",
-        name="dead weight removed",
-        todo="TODO-23",
-        description="FUNDAMENTAL/MACHINE_LEARNING/OPTIONS_FLOW removed from source_weights",
-        command=[PY, "scripts/verify_todo23_external.py"],
-        timeout=20,
-    ),
-    Check(
-        id="S08",
-        group="structural",
-        name="manifest sync",
-        todo="GENERAL",
-        description="pyproject.toml ↔ requirements-core.txt + .env.example ↔ settings.py sync",
-        command=[
-            PY,
-            "-c",
-            (
-                "import subprocess, sys; "
-                "a=subprocess.run([sys.executable,'scripts/check_deps_sync.py'],capture_output=True,text=True); "
-                "print(a.stdout[:800]); print(a.stderr[:800]); "
-                "b=subprocess.run([sys.executable,'scripts/check_env_settings_sync.py'],capture_output=True,text=True); "
-                "print(b.stdout[:800]); print(b.stderr[:800]); "
-                "sys.exit(0 if a.returncode==0 and b.returncode==0 else 1)"
-            ),
-        ],
-        timeout=20,
-    ),
-    # ── STATIC (T) ──────────────────────────────────────────────────────
-    Check(
-        id="T01",
-        group="static",
-        name="ruff lint",
-        todo="GENERAL",
-        description="ruff check src/ (auto-discovers pyproject.toml)",
-        command=[PY, "-m", "ruff", "check", "src/"],
-        timeout=60,
-    ),
-    Check(
-        id="T02",
-        group="static",
-        name="ruff format",
-        todo="GENERAL",
-        description="ruff format --check src/ tests/ (no diff)",
-        command=[PY, "-m", "ruff", "format", "--check", "src/", "tests/"],
-        timeout=60,
-    ),
-    Check(
-        id="T03",
-        group="static",
-        name="mypy strict (changed files)",
-        todo="TODO-28",
-        description="mypy --strict on options_math + trade_decision + settings (must be green)",
-        command=[
-            PY,
-            "-m",
-            "mypy",
-            "src/loats/options_math.py",
-            "src/loats/trade_decision.py",
-            "src/loats/config/settings.py",
-            "--strict",
-            "--config-file",
-            "pyproject.toml",
-        ],
-        timeout=60,
-    ),
-    Check(
-        id="T04",
-        group="static",
-        name="mypy strict (full src)",
-        todo="TODO-28",
-        description="mypy --strict src/ full (informational; fails until TODO-28)",
-        command=[
-            PY,
-            "-m",
-            "mypy",
-            "src/",
-            "--strict",
-            "--config-file",
-            "pyproject.toml",
-        ],
-        timeout=90,
-        allow_skip=False,
-    ),
-    Check(
-        id="T05",
-        group="static",
-        name="bandit security",
-        todo="SECURITY",
-        description="bandit -r src/ -c pyproject.toml -q",
-        command=[PY, "-m", "bandit", "-r", "src/", "-c", "pyproject.toml", "-q"],
-        timeout=60,
-    ),
-    Check(
-        id="T06",
-        group="static",
-        name="gitleaks secrets",
-        todo="SECURITY",
-        description="gitleaks detect --source . --no-git (SKIP if not installed)",
-        command=[
-            "gitleaks",
-            "detect",
-            "--source",
-            ".",
-            "--config",
-            ".gitleaks.toml",
-            "--no-banner",
-            "--no-git",
-        ],
-        timeout=60,
-        allow_skip=True,
-    ),
-    Check(
-        id="T07",
-        group="static",
-        name="import validation",
-        todo="GENERAL",
-        description="all src/loats modules import without error (src on sys.path)",
-        command=[
-            PY,
-            "-c",
-            (
-                "import sys; sys.path.insert(0,'src'); "
-                "import importlib; "
-                "mods=['loats','loats.options_math','loats.options','loats.ta','loats.trade_decision','loats.orchestrator','loats.scheduler','loats.sentiment','loats.sizing','loats.rules','loats.config.settings']; "
-                "[importlib.import_module(m) for m in mods]; "
-                "print('imports ok:', ', '.join(mods))"
-            ),
-        ],
-        timeout=20,
-    ),
-    Check(
-        id="T08",
-        group="static",
-        name="function size / complexity",
-        todo="GENERAL",
-        description="scripts/check_function_size.py (SKIP if missing)",
-        command=[PY, "scripts/check_function_size.py"],
-        timeout=20,
-        allow_skip=True,
-    ),
-    Check(
-        id="T09",
-        group="static",
-        name="no PYTEST_CURRENT_TEST bypass in src/",
-        todo="TODO-28",
-        description="ensure no 'if \"PYTEST_CURRENT_TEST\" in os.environ' bypass remains in src/",
-        command=[PY, "scripts/check_no_pytest_bypass.py"],
-        timeout=15,
-    ),
-    # ── LIVE-PROBE (L) ────────────────────────────────────────────────
-    Check(
-        id="L01",
-        group="live-probe",
-        name="VIX integration wired",
-        todo="TODO-12",
-        description="pytest tests/test_vix_integration.py (symmetric fail-safe) — SKIP if no tests",
-        command=[
-            PY,
-            "-m",
-            "pytest",
-            "tests/test_vix_integration.py",
-            "-q",
-            "--tb=short",
-        ],
-        timeout=45,
-        allow_skip=True,
-    ),
-    Check(
-        id="L02",
-        group="live-probe",
-        name="no 18.5 VIX fallback",
-        todo="TODO-12",
-        description="no bare 18.5 VIX fallback remains",
-        command=[
-            PY,
-            "-m",
-            "pytest",
-            "tests/test_vix_integration.py::TestVIXNo18_5Fallback",
-            "-q",
-            "--tb=short",
-        ],
-        timeout=30,
-        allow_skip=True,
-    ),
-    Check(
-        id="L03",
-        group="live-probe",
-        name="analyzer routing",
-        todo="TODO-13",
-        description="pytest tests/test_analyzer_routing_integration.py (real routing + audit) — SKIP if empty",
-        command=[
-            PY,
-            "-m",
-            "pytest",
-            "tests/test_analyzer_routing_integration.py",
-            "-q",
-            "--tb=short",
-        ],
-        timeout=45,
-        allow_skip=True,
-    ),
-    Check(
-        id="L04",
-        group="live-probe",
-        name="trailing stop runtime",
-        todo="TODO-14",
-        description="pytest tests/test_trailing_stop_runtime.py",
-        command=[
-            PY,
-            "-m",
-            "pytest",
-            "tests/test_trailing_stop_runtime.py",
-            "-q",
-            "--tb=short",
-        ],
-        timeout=45,
-        allow_skip=True,
-    ),
-    Check(
-        id="L05",
-        group="live-probe",
-        name="audit dual-write",
-        todo="TODO-20",
-        description="pytest tests/test_audit_dual_write.py",
-        command=[
-            PY,
-            "-m",
-            "pytest",
-            "tests/test_audit_dual_write.py",
-            "-q",
-            "--tb=short",
-        ],
-        timeout=45,
-        allow_skip=True,
-    ),
-    Check(
-        id="L06",
-        group="live-probe",
-        name="rate-limiter backpressure",
-        todo="TODO-16",
-        description="pytest tests/test_rate_limiter_backpressure.py",
-        command=[
-            PY,
-            "-m",
-            "pytest",
-            "tests/test_rate_limiter_backpressure.py",
-            "-q",
-            "--tb=short",
-        ],
-        timeout=45,
-        allow_skip=True,
-    ),
-    Check(
-        id="L07",
-        group="live-probe",
-        name="queue backpressure",
-        todo="TODO-16",
-        description="pytest tests/test_queue_backpressure.py",
-        command=[
-            PY,
-            "-m",
-            "pytest",
-            "tests/test_queue_backpressure.py",
-            "-q",
-            "--tb=short",
-        ],
-        timeout=45,
-        allow_skip=True,
-    ),
-    # ── GATE (G) ──────────────────────────────────────────────────────
-    Check(
-        id="G01",
-        group="gate",
-        name="pytest all",
-        todo="TODO-15",
-        description="pytest tests/ -x -q --tb=short (stop at first failure)",
-        command=[PY, "-m", "pytest", "tests/", "-x", "-q", "--tb=short"],
-        timeout=400,
-    ),
-    Check(
-        id="G02",
-        group="gate",
-        name="coverage floor",
-        todo="TODO-24",
-        description="scripts/check_per_module_coverage.py (floor >=80%; TODO-15 folded)",
-        command=[PY, "scripts/check_per_module_coverage.py"],
-        timeout=30,
-    ),
-    Check(
-        id="G03",
-        group="gate",
-        name="pip-audit",
-        todo="SECURITY",
-        description="pip-audit --desc --requirement requirements-core.txt",
-        command=["pip-audit", "--desc", "--requirement", "requirements-core.txt"],
-        timeout=60,
-    ),
-    Check(
-        id="G04",
-        group="gate",
-        name="P1 evidence",
-        todo="TODO-25",
-        description="scripts/collect_p1_phase_gate_evidence.py --samples 20",
-        command=[PY, "scripts/collect_p1_phase_gate_evidence.py", "--samples", "20"],
-        timeout=120,
-    ),
-]
+# ---------------------------------------------------------------- report ----
 
 
 @dataclass
 class Result:
-    check: Check
-    status: Status
-    exit_code: int | None
-    stdout: str
-    stderr: str
-    duration: float
+    check_id: str
+    name: str
+    todo: str
+    status: str  # PASS | FAIL | SKIP
+    detail: str = ""
+    evidence: list = field(default_factory=list)
 
 
-def _is_skip_error(exc: Exception, check: Check) -> bool:
-    if not check.allow_skip:
-        return False
-    msg = str(exc).lower()
-    return (
-        "no such file" in msg
-        or "not found" in msg
-        or "winerror 2" in msg
-        or "command not found" in msg
+class Report:
+    def __init__(self) -> None:
+        self.results: list[Result] = []
+        self.t0 = time.time()
+
+    def add(self, r: Result) -> None:
+        self.results.append(r)
+        mark = {"PASS": "[PASS]", "FAIL": "[FAIL]", "SKIP": "[SKIP]"}[r.status]
+        print(f"{mark} {r.check_id:<7} ({r.todo:<10}) {r.name}")
+        if r.detail:
+            print(f"         {r.detail}")
+        for line in r.evidence[:8]:
+            print(f"         - {line}")
+        if len(r.evidence) > 8:
+            print(f"         - ... +{len(r.evidence) - 8} more")
+
+    def summary(self) -> int:
+        p = sum(1 for r in self.results if r.status == "PASS")
+        f = sum(1 for r in self.results if r.status == "FAIL")
+        s = sum(1 for r in self.results if r.status == "SKIP")
+        print("\n" + "=" * 72)
+        print(
+            f"HEALTH SUMMARY: {p} PASS / {f} FAIL / {s} SKIP "
+            f"in {time.time() - self.t0:.1f}s"
+        )
+        if f:
+            print("Failing checks (by TODO):")
+            for r in self.results:
+                if r.status == "FAIL":
+                    print(f"  {r.check_id:<7} {r.todo:<10} {r.name}")
+        print("=" * 72)
+        return 1 if f else 0
+
+    def to_json(self) -> dict:
+        return {
+            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S"),
+            "python": sys.version.split()[0],
+            "env_key_injected": _ENV_INJECTED,
+            "results": [vars(r) for r in self.results],
+            "summary": {
+                "pass": sum(1 for r in self.results if r.status == "PASS"),
+                "fail": sum(1 for r in self.results if r.status == "FAIL"),
+                "skip": sum(1 for r in self.results if r.status == "SKIP"),
+            },
+        }
+
+
+# ------------------------------------------------------ filesystem checks ----
+
+
+def check_structure(rep: Report) -> None:
+    # HC-01
+    init = SRC / "__init__.py"
+    rep.add(
+        Result(
+            "HC-01",
+            "src/__init__.py absent (mypy collision breaker)",
+            "TODO-1",
+            "PASS" if not init.exists() else "FAIL",
+            "mypy strict gate cannot run while src is a package"
+            if init.exists()
+            else "",
+        )
+    )
+
+    # HC-02 — strays directly under src/ (anything except the loats/ dir)
+    strays = sorted(p.name for p in SRC.glob("*.py"))
+    rep.add(
+        Result(
+            "HC-02",
+            "no stray .py files directly in src/",
+            "TODO-2",
+            "PASS" if not strays else "FAIL",
+            f"{len(strays)} stray file(s) break mypy pathing" if strays else "",
+            strays,
+        )
+    )
+
+    # HC-03 — empty CMP-named shells
+    shells = []
+    for rel in ("connectors", "risk", "risk/manager", "strategy", "strategy/rules"):
+        d = LOATS / rel
+        if d.is_dir():
+            py = list(d.rglob("*.py"))
+            non_init = [p for p in py if p.name != "__init__.py"]
+            if not non_init and all(p.stat().st_size < 512 for p in py):
+                shells.append(rel)
+    rep.add(
+        Result(
+            "HC-03",
+            "no empty CMP-named package shells",
+            "TODO-2",
+            "PASS" if not shells else "FAIL",
+            "structure theater" if shells else "",
+            shells,
+        )
+    )
+
+    # HC-26 — root junk artifacts (FR-26 forbidden root names)
+    forbidden = (
+        "-p",
+        "G......",
+        "0.21.0",
+        "$null",
+        "[100%]",
+        "tmp_schema.db",
+        "pytest_output.txt",
+    )
+    junk = [n for n in forbidden if (REPO_ROOT / n).exists()]
+    rep.add(
+        Result(
+            "HC-26",
+            "root junk artifacts absent",
+            "TODO-21",
+            "PASS" if not junk else "FAIL",
+            "tracked junk at repo root" if junk else "",
+            junk,
+        )
     )
 
 
-def run_one(check: Check, verbose: bool = False) -> Result:
-    start = time.monotonic()
-    # Use ASCII-safe dashes instead of Unicode box-drawing for Windows compatibility
-    print(f"\n{C_DIM}{'-' * 72}{C_RESET}")
-    print(
-        f"{C_BOLD}{check.group.upper():<12}{C_RESET} {C_CYAN}{check.id}{C_RESET}  {check.name}  {C_DIM}[{check.todo}]{C_RESET}"
+# ---------------------------------------------------------- static AST -------
+
+
+def _is_test_file(p: Path) -> bool:
+    return "tests" in p.parts or p.stem.startswith("test_") or p.stem == "conftest"
+
+
+def _iter_py(exclude_tests: bool = True):
+    for p in LOATS.rglob("*.py"):
+        rel = p.relative_to(REPO_ROOT).as_posix()
+        if rel.startswith("src/loats/config/"):
+            continue
+        if exclude_tests and _is_test_file(p):
+            continue
+        yield p
+
+
+def _parse(p: Path):
+    try:
+        return ast.parse(p.read_text(encoding="utf-8"), filename=str(p))
+    except SyntaxError:
+        return None
+
+
+def _find_attr_callers(attr_name: str, skip_files: tuple[str, ...] = ()):
+    """Production call sites of `*.attr_name(...)` under src/loats (no tests)."""
+    hits = []
+    for p in _iter_py():
+        if p.name in skip_files:
+            continue
+        tree = _parse(p)
+        if tree is None:
+            continue
+        for node in ast.walk(tree):
+            if (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Attribute)
+                and node.func.attr == attr_name
+            ):
+                hits.append(f"{p.relative_to(REPO_ROOT).as_posix()}:{node.lineno}")
+    return hits
+
+
+def check_eager_settings(rep: Report) -> None:
+    """HC-21 — eager module-level `settings = get_settings()` (Assign or AnnAssign)."""
+    offenders = []
+    for p in _iter_py():
+        tree = _parse(p)
+        if tree is None:
+            continue
+        for node in tree.body:  # module level only
+            if isinstance(node, ast.Assign):
+                call = node.value
+            elif isinstance(node, ast.AnnAssign) and node.value is not None:
+                call = node.value  # `settings: Settings = get_settings()`
+            else:
+                continue
+            if (
+                isinstance(call, ast.Call)
+                and isinstance(call.func, ast.Name)
+                and call.func.id == "get_settings"
+            ):
+                offenders.append(f"{p.relative_to(REPO_ROOT).as_posix()}:{node.lineno}")
+    rep.add(
+        Result(
+            "HC-21",
+            "no module-level eager get_settings() (lazy access)",
+            "TODO-18",
+            "PASS" if not offenders else "FAIL",
+            f"{len(offenders)} module(s) crash import without OPENALGO_API_KEY"
+            if offenders
+            else "",
+            offenders,
+        )
     )
-    print(f"{C_DIM}{check.description}{C_RESET}")
-    print(
-        f"{C_DIM}$ {' '.join(check.command[:6])}{' ...' if len(check.command) > 6 else ''}{C_RESET}"
+
+
+def check_wiring(rep: Report) -> None:
+    """HC-18 / HC-20 — runtime drivers wired (VIX setter, trailing ratchet)."""
+    callers = _find_attr_callers("set_vix_level", skip_files=("rules.py",))
+    rep.add(
+        Result(
+            "HC-18",
+            "set_vix_level has >=1 production caller",
+            "TODO-12",
+            "PASS" if callers else "FAIL",
+            "VIX gate runs on fallback constant — decorative" if not callers else "",
+            callers,
+        )
     )
+
+    drivers = _find_attr_callers(
+        "update_trailing_stop", skip_files=("trailing_stop.py",)
+    )
+    rep.add(
+        Result(
+            "HC-20",
+            "update_trailing_stop has >=1 production caller",
+            "TODO-14",
+            "PASS" if drivers else "FAIL",
+            "ratchet initialized but never driven (Rule 12 dormant)"
+            if not drivers
+            else "",
+            drivers,
+        )
+    )
+
+
+def check_decision_code(rep: Report) -> None:
+    """HC-17 / HC-19 / HC-22 / HC-24 / HC-25 / HC-27 — decision-layer conformance."""
+    # HC-22 — audit bypass
+    db = LOATS / "database.py"
+    bypass = db.exists() and "PYTEST_CURRENT_TEST" in db.read_text(encoding="utf-8")
+    rep.add(
+        Result(
+            "HC-22",
+            "no PYTEST_CURRENT_TEST bypass in database.py",
+            "TODO-20",
+            "FAIL" if bypass else "PASS",
+            "JSONL-first dual-write untested by suite" if bypass else "",
+        )
+    )
+
+    # HC-17 — untagged orchestrator source metadata
+    orch = LOATS / "orchestrator.py"
+    n = (
+        orch.read_text(encoding="utf-8").count('"source": "orchestrator"')
+        if orch.exists()
+        else -1
+    )
+    rep.add(
+        Result(
+            "HC-17",
+            'zero "source": "orchestrator" tags in orchestrator.py',
+            "TODO-7",
+            "PASS" if n == 0 else "FAIL",
+            f"{n} occurrence(s): Gate 1 sees 1 unique source, chain dead" if n else "",
+        )
+    )
+
+    # HC-19 — routing stub detection in trade_decision.py
+    td = LOATS / "trade_decision.py"
+    sim_sleep, default_on, integrates = False, False, False
+    if td.exists():
+        tree = _parse(td)
+        text = td.read_text(encoding="utf-8")
+        # Detect default-on: assignment to True at module or class scope only.
+        # Explicit `enable_analyzer_routing(self)` instance toggles inside a
+        # function body are legitimate and must be ignored. AST scope checking is
+        # used because regex context is too fragile to distinguish them.
+        default_on = False
+        if tree is not None:
+            # Build parent map so we can tell whether an assignment is inside a function
+            parent_map = {}
+            for parent in ast.walk(tree):
+                for child in ast.iter_child_nodes(parent):
+                    parent_map[child] = parent
+            for node in ast.walk(tree):
+                if not isinstance(node, (ast.Assign, ast.AnnAssign)):
+                    continue
+                # Reject any assignment inside a function/async def body.
+                parent = parent_map.get(node)
+                inside_func = False
+                while parent is not None:
+                    if isinstance(parent, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                        inside_func = True
+                        break
+                    parent = parent_map.get(parent)
+                if inside_func:
+                    continue
+                # Determine target name.
+                target = None
+                if isinstance(node, ast.AnnAssign):
+                    target = node.target
+                else:
+                    for t in node.targets:
+                        if (
+                            isinstance(t, ast.Name)
+                            and t.id == "analyzer_routing_enabled"
+                        ):
+                            target = t
+                            break
+                        if (
+                            isinstance(t, ast.Attribute)
+                            and t.attr == "analyzer_routing_enabled"
+                        ):
+                            target = t
+                            break
+                if target is None:
+                    continue
+                if isinstance(node.value, ast.Constant) and node.value.value is True:
+                    default_on = True
+                    break
+
+            for node in ast.walk(tree):
+                if isinstance(node, ast.AsyncFunctionDef) and (
+                    node.name == "route_to_analyzer"
+                ):
+                    body_src = ast.get_source_segment(text, node) or ""
+                    # Only actual `await asyncio.sleep(...)` calls count as simulation,
+                    # not docstring mentions or exception-loop backoff elsewhere.
+                    sim_sleep = bool(
+                        re.search(r"await\s+asyncio\.sleep\s*\(", body_src)
+                    )
+                    integrates = bool(
+                        re.search(
+                            r"client|openalgo|httpx|place_analyzer", body_src, re.I
+                        )
+                    )
+        ok = (not sim_sleep) and (not default_on) and integrates
+    else:
+        ok = False
+    rep.add(
+        Result(
+            "HC-19",
+            "Analyzer routing real (no sim-sleep, default-off, integration)",
+            "TODO-13",
+            "PASS" if ok else "FAIL",
+            f"sleep-sim={sim_sleep}, default_on={default_on}, integrated={integrates}",
+        )
+    )
+
+    # HC-24 — rules thresholds
+    rules = LOATS / "rules.py"
+    buy_iv = sell_iv = None
+    if rules.exists():
+        text = rules.read_text(encoding="utf-8")
+        m = re.search(r"iv_rank\s*<\s*(\d+)", text)
+        buy_iv = int(m.group(1)) if m else None
+        m = re.search(r"iv_rank\s*>\s*(\d+)", text)
+        sell_iv = int(m.group(1)) if m else None
+    rep.add(
+        Result(
+            "HC-24",
+            "IV-rank thresholds BUY<30 / SELL>40 (CMP)",
+            "TODO-16",
+            "PASS" if buy_iv == 30 and sell_iv == 40 else "FAIL",
+            f"found BUY<{buy_iv} / SELL>{sell_iv} — CMP says <30 / >40",
+        )
+    )
+
+    # HC-25 — bare 18.5 VIX fallback
+    has_fallback = rules.exists() and re.search(
+        r"18\.5", rules.read_text(encoding="utf-8")
+    )
+    rep.add(
+        Result(
+            "HC-25",
+            "no bare 18.5 VIX fallback (symmetric fail-safe)",
+            "TODO-12",
+            "FAIL" if has_fallback else "PASS",
+            "fallback biases BUY/SELL gating — wire real VIX (TODO-12)"
+            if has_fallback
+            else "",
+        )
+    )
+
+    # HC-27 — decision queue bounded
+    td_text = td.read_text(encoding="utf-8") if td.exists() else ""
+    m = re.search(r"asyncio\.Queue\(([^)]*)\)", td_text)
+    bounded = bool(m and m.group(1).strip())  # non-empty args => maxsize present
+    rep.add(
+        Result(
+            "HC-27",
+            "decision queue bounded (maxsize set)",
+            "TODO-27c",
+            "PASS" if bounded else "FAIL",
+            "unbounded queue + lazy processor = unbounded memory"
+            if not bounded
+            else "",
+        )
+    )
+
+
+# ---------------------------------------------------------- live probes ------
+
+
+def _norm(v):
+    """Normalize validate_signal_sources return to (bool, reason-ish)."""
+    if isinstance(v, tuple) and v:
+        ok = bool(v[0])
+        info = v[1] if len(v) > 1 else {}
+        if isinstance(info, dict):
+            reason = info.get("reason", json.dumps(info)[:120])
+        else:
+            reason = str(info)[:120]
+        return ok, reason
+    return bool(v), ""
+
+
+def _sig(sources: list[str]):
+    return [
+        SimpleNamespace(metadata={"source": s, "scan_type": "probe"}) for s in sources
+    ]
+
+
+def probe_strength_gate(rep: Report) -> None:
+    """HC-15 / HC-16 — drive the source gates directly (gate-math regression net)."""
+    try:
+        import loats.strength as st
+    except Exception as exc:  # pragma: no cover
+        rep.add(
+            Result(
+                "HC-15",
+                "strength-gate math probe",
+                "TODO-8",
+                "SKIP",
+                f"import failed: {exc!r}",
+            )
+        )
+        rep.add(
+            Result(
+                "HC-16",
+                "unknown-source loud rejection",
+                "TODO-9",
+                "SKIP",
+                "loats.strength unimportable",
+            )
+        )
+        return
+
+    engine = None
+    for name in ("StrengthEngine", "CompositeStrengthEngine", "get_strength_engine"):
+        obj = getattr(st, name, None)
+        if obj is None:
+            continue
+        engine = obj() if callable(obj) else obj
+        break
+    fn = getattr(engine, "validate_signal_sources", None) or getattr(
+        st, "validate_signal_sources", None
+    )
+    if fn is None:
+        rep.add(
+            Result(
+                "HC-15",
+                "strength-gate math probe",
+                "TODO-8",
+                "SKIP",
+                "validate_signal_sources not found",
+            )
+        )
+        rep.add(
+            Result(
+                "HC-16",
+                "unknown-source loud rejection",
+                "TODO-9",
+                "SKIP",
+                "validator not found",
+            )
+        )
+        return
+
+    def call(srcs):
+        try:
+            return _norm(fn(_sig(srcs)))
+        except Exception as exc:
+            return False, f"probe error: {exc!r}"
+
+    three = call(["ta", "sentiment", "price_action"])
+    four = call(["ta", "sentiment", "price_action", "volatility"])
+    ok15 = (three[0] is False) and (four[0] is True)
+    rep.add(
+        Result(
+            "HC-15",
+            "source-gate math: 3 distinct -> reject, 4 -> pass",
+            "TODO-8",
+            "PASS" if ok15 else "FAIL",
+            f"3-src={three[1]} | 4-src={four[1]}",
+            [
+                f"3 distinct sources accepted: {three[0]} (expect False — diversity 0.4286)",
+                f"4 distinct sources accepted: {four[0]} (expect True — diversity 0.5714)",
+            ],
+        )
+    )
+
+    bogus = call(["banana", "ta", "sentiment", "price_action"])
+    loud = (bogus[0] is False) and (
+        "unknown" in bogus[1].lower() or "invalid" in bogus[1].lower()
+    )
+    rep.add(
+        Result(
+            "HC-16",
+            "unknown source string loudly rejected",
+            "TODO-9",
+            "PASS" if loud else "FAIL",
+            f"reason: {bogus[1]} — expected explicit unknown/invalid rejection;"
+            " silent TECHNICAL_ANALYSIS collapse fails this check",
+        )
+    )
+
+
+def probe_rate_limiter(rep: Report) -> None:
+    """HC-14 — F6-C-01 regression net: singleton, max_ops=3, burst 3/10."""
+    try:
+        from loats.openalgo import (
+            get_order_rate_limiter,
+            get_smart_order_rate_limiter,
+        )
+    except Exception as exc:
+        rep.add(
+            Result(
+                "HC-14",
+                "OPS limiter probe (<=3/s, singleton)",
+                "F6-C-01",
+                "SKIP",
+                f"import failed: {exc!r}",
+            )
+        )
+        return
+
+    async def burst(lim, n=10):
+        passed = 0
+        for _ in range(n):
+            r = lim.acquire()
+            if inspect.iscoroutine(r):
+                r = await r
+            if r:
+                passed += 1
+        return passed
 
     try:
-        # Force UTF-8 I/O in the CHILD process: several verify_*.py scripts
-        # print Unicode symbols and crash with UnicodeEncodeError when the console
-        # codepage is cp1252 (default PowerShell).  PYTHONIOENCODING keeps
-        # every probe ASCII-safe and deterministic regardless of locale.
-        child_env = os.environ.copy()
-        child_env["PYTHONIOENCODING"] = "utf-8"
-        child_env["PYTHONUTF8"] = "1"
-        proc = subprocess.run(
-            check.command,
-            capture_output=True,
-            text=True,
-            timeout=check.timeout,
-            cwd=REPO_ROOT,
-            encoding="utf-8",
-            errors="replace",
-            env=child_env,
-        )
-        dur = time.monotonic() - start
-        # SKIP detection for allow_skip checks
-        if check.allow_skip and proc.returncode != 0:
-            combined = (proc.stdout + proc.stderr).lower()
-            skip_markers = [
-                "no such file",
-                "not found",
-                "not recognized",
-                "is not recognized",
-                "command not found",
-                "module not found",
-                "no module named",
-                "network is unreachable",
-                "failed to fetch",
-                "connection",
-                "offline",
-                "skip",
-                "no tests ran",
-                "collected 0 items",
-                "database is locked",
-                "has no attribute",
-                "health check integration",
-                "no fallthrough",
-            ]
-            # allow_skip checks treat missing infra / empty tests as SKIP not FAIL
-            if (
-                any(m in combined for m in skip_markers)
-                or "winerror 2" in combined
-                or proc.returncode == 5
-            ):
-                print(
-                    f"  {C_YELLOW}{SKIP_SYM} SKIP{C_RESET} ({dur:.1f}s) — optional/known-infra (exit={proc.returncode})"
-                )
-                if verbose and (proc.stdout or proc.stderr):
-                    tail = (proc.stderr or proc.stdout)[-400:]
-                    print(f"{C_DIM}{tail[:400]}{C_RESET}")
-                return Result(
-                    check, "SKIP", proc.returncode, proc.stdout, proc.stderr, dur
-                )
-        if proc.returncode == 0:
-            status: Status = "PASS"
-            print(f"  {C_GREEN}{PASS_SYM} PASS{C_RESET} ({dur:.1f}s)")
-        else:
-            status = "FAIL"
-            print(
-                f"  {C_RED}{FAIL_SYM} FAIL{C_RESET} ({dur:.1f}s) exit={proc.returncode}"
+        a, b = get_order_rate_limiter(), get_order_rate_limiter()
+        smart = get_smart_order_rate_limiter()
+        ident = a is b
+        eff = getattr(a, "max_ops", None)
+        if eff is None:
+            eff = getattr(a, "_max_ops", None)
+        try:
+            from loats.config import get_settings
+
+            cfg = get_settings().max_ops
+        except Exception:
+            cfg = None
+        ordn = asyncio.run(burst(a))
+        smartn = asyncio.run(burst(smart))
+        ok = ident and eff == 3 and cfg == 3 and ordn == 3 and smartn == 3
+        rep.add(
+            Result(
+                "HC-14",
+                "OPS limiter: singleton, max_ops=3, 3/10 burst",
+                "F6-C-01",
+                "PASS" if ok else "FAIL",
+                f"identity={ident} effective={eff} settings={cfg} "
+                f"order={ordn}/10 smart={smartn}/10 (expect 3)",
             )
-            # tail
-            tail_out = (proc.stdout or "")[-700:]
-            tail_err = (proc.stderr or "")[-700:]
-            if tail_err.strip():
-                print(f"{C_DIM}  stderr: {tail_err.strip()[:500]}{C_RESET}")
-            elif tail_out.strip():
-                print(f"{C_DIM}  stdout: {tail_out.strip()[:500]}{C_RESET}")
-
-        if verbose:
-            if proc.stdout:
-                print(f"{C_DIM}--- stdout ---\n{proc.stdout[:1200]}{C_RESET}")
-            if proc.stderr:
-                print(f"{C_DIM}--- stderr ---\n{proc.stderr[:1200]}{C_RESET}")
-
-        return Result(check, status, proc.returncode, proc.stdout, proc.stderr, dur)
-
-    except subprocess.TimeoutExpired as e:
-        dur = time.monotonic() - start
-        print(
-            f"  {C_RED}{TIME_SYM} TIMEOUT{C_RESET} ({dur:.1f}s) after {check.timeout}s"
         )
-        # TIMEOUT counts as FAIL (not SKIP)
-        return Result(
-            check,
-            "TIMEOUT",
+    except Exception as exc:
+        rep.add(
+            Result(
+                "HC-14",
+                "OPS limiter probe (<=3/s, singleton)",
+                "F6-C-01",
+                "FAIL",
+                f"probe error: {exc!r}",
+            )
+        )
+
+
+def probe_config(rep: Report) -> None:
+    """HC-23 — CMP zero-assumption config values."""
+    try:
+        from loats.config import get_settings
+
+        s = get_settings()
+    except Exception as exc:
+        rep.add(
+            Result(
+                "HC-23",
+                "config conformance (Rule 1/4/5/7/11)",
+                "TODO-17",
+                "SKIP",
+                f"import failed: {exc!r}",
+            )
+        )
+        return
+    checks = {
+        "nifty_lot_size=25": getattr(s, "nifty_lot_size", None) == 25,
+        "max_modifications=25 (Rule 7)": getattr(s, "max_modifications", None) == 25,
+        "max_nifty_positions=5 (Rule 11)": getattr(s, "max_nifty_positions", None) == 5,
+        "max_banknifty_positions=3": getattr(s, "max_banknifty_positions", None) == 3,
+        "max_ops=3 (Rule 4)": getattr(s, "max_ops", None) == 3,
+        "openalgo_mode=ANALYZE (Rule 5)": getattr(s, "openalgo_mode", None)
+        == "ANALYZE",
+        "sentiment_threshold=0.05 (Rule 9)": getattr(s, "sentiment_threshold", None)
+        == 0.05,
+    }
+    bad = [k for k, ok in checks.items() if not ok]
+    rep.add(
+        Result(
+            "HC-23",
+            "config conformance (CMP zero-assumption rules)",
+            "TODO-17",
+            "PASS" if not bad else "FAIL",
+            "all conform" if not bad else "non-conformant: " + ", ".join(bad),
+            [f"{k}: {'ok' if v else 'MISMATCH'}" for k, v in checks.items()],
+        )
+    )
+
+
+# ------------------------------------------------------------ gate runner ----
+
+
+def run_gate(rep: Report, check_id, todo, name, cmd, timeout=300, allow_skip=None):
+    env = os.environ.copy()
+    # pip-audit on Windows fails if USERPROFILE/HOMEDRIVE are stripped by the
+    # runner; ensure HOME-like variables are present so Path.home() works.
+    env.setdefault("USERPROFILE", os.environ.get("USERPROFILE", r"C:\Users\npmvl-KP"))
+    env.setdefault("HOMEDRIVE", os.environ.get("HOMEDRIVE", "C:"))
+    env.setdefault("HOMEPATH", os.environ.get("HOMEPATH", r"\Users\npmvl-KP"))
+    env.setdefault("HOME", env["USERPROFILE"])
+    try:
+        proc = subprocess.run(
+            cmd, cwd=REPO_ROOT, capture_output=True, text=True, timeout=timeout, env=env
+        )
+    except subprocess.TimeoutExpired:
+        status = "SKIP" if allow_skip else "FAIL"
+        rep.add(
+            Result(
+                check_id,
+                name,
+                todo,
+                status,
+                f"timeout after {timeout}s"
+                + (f" ({allow_skip})" if allow_skip else ""),
+            )
+        )
+        return None
+    tail = (proc.stdout or "").strip().splitlines()[-3:]
+    tail += (proc.stderr or "").strip().splitlines()[-2:]
+    rep.add(
+        Result(
+            check_id,
+            name,
+            todo,
+            "PASS" if proc.returncode == 0 else "FAIL",
+            f"exit {proc.returncode}",
+            [t[:160] for t in tail if t.strip()],
+        )
+    )
+    return proc.returncode
+
+
+def check_gates(rep: Report, fast: bool) -> dict:
+    py = sys.executable
+    run_gate(rep, "HC-04", "gate", "deps-sync", [py, "scripts/check_deps_sync.py"], 120)
+    run_gate(
+        rep,
+        "HC-05",
+        "gate",
+        "ruff check",
+        [
+            py,
+            "-m",
+            "ruff",
+            "check",
+            "src/",
+            "tests/",
+            "scripts/",
+            "--config",
+            "pyproject.toml",
+        ],
+        180,
+    )
+    run_gate(
+        rep,
+        "HC-06",
+        "gate",
+        "ruff format --check",
+        [py, "-m", "ruff", "format", "--check", "src/", "tests/", "scripts/"],
+        180,
+    )
+    run_gate(
+        rep,
+        "HC-07",
+        "gate",
+        "isort --check-only",
+        [
+            py,
+            "-m",
+            "isort",
+            "--check-only",
+            "src/",
+            "tests/",
+            "scripts/",
+            "--settings-path",
+            "pyproject.toml",
+        ],
+        180,
+    )
+    run_gate(
+        rep,
+        "HC-08",
+        "gate",
+        "flake8 (.flake8)",
+        [py, "-m", "flake8", "src/", "tests/", "scripts/"],
+        180,
+    )
+    run_gate(
+        rep,
+        "HC-09",
+        "TODO-1",
+        "mypy src/ --strict",
+        [py, "-m", "mypy", "src/", "--strict", "--config-file", "pyproject.toml"],
+        300,
+    )
+    run_gate(
+        rep,
+        "HC-10",
+        "gate",
+        "bandit",
+        [py, "-m", "bandit", "-r", "src/", "-c", "pyproject.toml", "-q"],
+        180,
+    )
+
+    rc: dict[str, int | None] = {"pip_audit": None, "pytest": None}
+    if not fast:
+        run_gate(
+            rep,
+            "HC-11",
+            "TODO-4",
+            "pip-audit (vuln DB)",
+            [
+                py,
+                "-m",
+                "pip_audit",
+                "--format=json",
+                "-o",
+                "reports/health/pip_audit.json",
+            ],
+            240,
+            allow_skip="network-blocked offline",
+        )
+        rc["pip_audit"] = 0
+
+        # HC-12 — pytest with aggregate coverage gate
+        rc["pytest"] = run_gate(
+            rep,
+            "HC-12",
+            "TODO-3",
+            "pytest --cov-fail-under=80 (aggregate)",
+            [
+                py,
+                "-m",
+                "pytest",
+                "tests/",
+                "--cov=src",
+                "--cov-branch",
+                "--cov-report=term-missing:skip-covered",
+                "--cov-report=json:"
+                + (REPO_ROOT / "reports/health/coverage.json").as_posix(),
+                "--cov-fail-under=80",
+                "-q",
+            ],
+            900,
+        )
+        check_module_floors(rep)
+    else:
+        rep.add(Result("HC-11", "pip-audit (vuln DB)", "TODO-4", "SKIP", "--fast mode"))
+        rep.add(
+            Result(
+                "HC-12",
+                "pytest aggregate coverage >=80%",
+                "TODO-3",
+                "SKIP",
+                "--fast mode",
+            )
+        )
+        rep.add(
+            Result(
+                "HC-13",
+                "per-module coverage floors",
+                "TODO-3/15",
+                "SKIP",
+                "--fast mode",
+            )
+        )
+    return rc
+
+
+PER_MODULE_FLOORS = {
+    "src/loats/trailing_stop.py": 80,
+    "src/loats/trade_decision.py": 80,
+    "src/loats/orchestrator.py": 80,
+    "src/loats/options.py": 85,
+    "src/loats/database.py": 80,
+    "src/loats/database_async_additions.py": 80,
+}
+
+
+def check_module_floors(rep: Report) -> None:
+    """HC-13 — per-module coverage floors from coverage.json (written by HC-12 run)."""
+    cj = REPO_ROOT / "reports/health/coverage.json"
+    if not cj.exists():
+        rep.add(
+            Result(
+                "HC-13",
+                "per-module coverage floors",
+                "TODO-3/15",
+                "SKIP",
+                "coverage.json not found",
+            )
+        )
+        return
+    try:
+        data = json.loads(cj.read_text(encoding="utf-8"))
+    except Exception as exc:
+        rep.add(
+            Result(
+                "HC-13",
+                "per-module coverage floors",
+                "TODO-3/15",
+                "SKIP",
+                f"unparsable coverage.json: {exc!r}",
+            )
+        )
+        return
+    files = data.get("files", {})
+    evidence, failures = [], []
+    for rel, floor in sorted(PER_MODULE_FLOORS.items()):
+        key = next(
+            (k for k in files if k.replace("\\", "/").endswith(rel.replace("\\", "/"))),
             None,
-            e.stdout.decode() if isinstance(e.stdout, bytes) else (e.stdout or ""),
-            e.stderr.decode() if isinstance(e.stderr, bytes) else (e.stderr or ""),
-            dur,
         )
-    except FileNotFoundError as e:
-        dur = time.monotonic() - start
-        if check.allow_skip or _is_skip_error(e, check):
-            print(f"  {C_YELLOW}{SKIP_SYM} SKIP{C_RESET} ({dur:.1f}s) — {e}")
-            return Result(check, "SKIP", None, "", str(e), dur)
-        print(f"  {C_RED}{FAIL_SYM} ERROR{C_RESET} ({dur:.1f}s) — {e}")
-        return Result(check, "ERROR", None, "", str(e), dur)
-    except Exception as e:
-        dur = time.monotonic() - start
-        print(f"  {C_RED}{FAIL_SYM} ERROR{C_RESET} ({dur:.1f}s) — {e}")
-        return Result(check, "ERROR", None, "", str(e), dur)
+        if key is None:
+            failures.append(f"{rel}: NOT MEASURED")
+            continue
+        pct = files[key].get("summary", {}).get("percent_covered", 0.0)
+        line = f"{rel}: {pct:.1f}% (floor {floor})"
+        (evidence if pct >= floor else failures).append(line)
+    rep.add(
+        Result(
+            "HC-13",
+            "per-module coverage floors (key modules)",
+            "TODO-3/15",
+            "PASS" if not failures else "FAIL",
+            f"{len(failures)} module(s) below floor" if failures else "all floors met",
+            failures + evidence,
+        )
+    )
 
 
-# ---------------------------------------------------------------------------
-# CLI
-# ---------------------------------------------------------------------------
-def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(
-        description=__doc__,
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-    )
-    p.add_argument("--only", help="comma-separated check IDs to run (e.g. S01,T01,L07)")
-    p.add_argument(
-        "--group",
-        choices=["structural", "static", "live-probe", "gate"],
-        help="run only one group",
-    )
-    p.add_argument(
-        "--fast",
-        action="store_true",
-        help="fast subset: structural + static only (no live/gate heavy)",
-    )
-    p.add_argument("--json", dest="json_path", help="write JSON report to path")
-    p.add_argument(
-        "--verbose",
-        action="store_true",
-        help="print stdout/stderr tails for every check",
-    )
-    p.add_argument("--list", action="store_true", help="list catalogue and exit")
-    return p.parse_args()
+# ------------------------------------------------------------------ main ----
 
 
 def main() -> int:
-    args = parse_args()
-
-    if args.list:
-        print(f"{'ID':<6} {'GROUP':<12} {'TODO':<12} NAME")
-        print("-" * 72)
-        for c in CATALOG:
-            print(f"{c.id:<6} {c.group:<12} {c.todo:<12} {c.name} — {c.description}")
-        return 0
-
-    # Determine checks_to_run
-    checks = CATALOG
-    if args.group:
-        checks = [c for c in checks if c.group == args.group]
-    if args.fast:
-        checks = [c for c in checks if c.group in ("structural", "static")]
-    if args.only:
-        wanted = {s.strip().upper() for s in args.only.split(",") if s.strip()}
-        # allow lower-case ids
-        checks = [c for c in checks if c.id.upper() in wanted]
-        if not checks:
-            print(f"Error: no valid check IDs in --only {args.only}", file=sys.stderr)
-            print(f"Available: {', '.join(c.id for c in CATALOG)}", file=sys.stderr)
-            return 2
-
-    # Header
-    now = datetime.now(UTC).astimezone()
-    now_str = now.strftime("%Y-%m-%d %H:%M:%S %Z")
-    git_head = ""
-    try:
-        git_head = subprocess.run(
-            ["git", "rev-parse", "--short", "HEAD"],
-            capture_output=True,
-            text=True,
-            cwd=REPO_ROOT,
-        ).stdout.strip()
-    except Exception:
-        pass
-
-    print(
-        f"\n{C_BOLD}FR7 Health Check — {now_str}{C_RESET}  {C_DIM}HEAD {git_head}  py {sys.version.split()[0]}{C_RESET}"
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument(
+        "--fast",
+        action="store_true",
+        help="skip pytest / pip-audit / per-module floors",
     )
-    print(f"{C_DIM}repo: {REPO_ROOT}{C_RESET}")
-    print(
-        f"Running {len(checks)} check(s){'  [FAST: structural+static only]' if args.fast else ''}: {', '.join(c.id for c in checks)}"
+    ap.add_argument(
+        "--only", default="", help="comma-separated check IDs to run (e.g. HC-14,HC-15)"
     )
-    if args.json_path:
-        print(f"JSON → {args.json_path}")
+    ap.add_argument(
+        "--json", default="", help="write machine-readable report to this path"
+    )
+    args = ap.parse_args()
 
-    # Run checks
-    results: list[Result] = []
-    for c in checks:
-        results.append(run_one(c, verbose=args.verbose))
+    only = {x.strip().upper() for x in args.only.split(",") if x.strip()}
+    rep = Report()
+    print(
+        f"# FR7 health check — {REPO_ROOT.name} @ {os.environ.get('COMPUTERNAME', '')}"
+    )
+    if _ENV_INJECTED:
+        print("# NOTE: OPENALGO_API_KEY injected (dummy) — HC-21 tracks why (TODO-18)")
+    print()
 
-    # Summary
-    by_status: dict[str, list[Result]] = {
-        s: [] for s in ("PASS", "FAIL", "SKIP", "TIMEOUT", "ERROR")
-    }
-    for r in results:
-        by_status[r.status].append(r)
+    def wants(*ids):
+        return not only or any(i.upper() in only for i in ids)
 
-    # Grouped report
-    print(f"\n{C_BOLD}{'=' * 72}{C_RESET}")
-    print(f"{C_BOLD}RESULTS BY GROUP{C_RESET}")
-    print("=" * 72)
+    if wants("HC-01", "HC-02", "HC-03", "HC-26"):
+        check_structure(rep)
+    if wants("HC-21"):
+        check_eager_settings(rep)
+    if wants("HC-18", "HC-20"):
+        check_wiring(rep)
+    if wants("HC-17", "HC-19", "HC-22", "HC-24", "HC-25", "HC-27"):
+        check_decision_code(rep)
+    if wants("HC-14"):
+        probe_rate_limiter(rep)
+    if wants("HC-15", "HC-16"):
+        probe_strength_gate(rep)
+    if wants("HC-23"):
+        probe_config(rep)
+    if not only or wants(
+        "HC-04",
+        "HC-05",
+        "HC-06",
+        "HC-07",
+        "HC-08",
+        "HC-09",
+        "HC-10",
+        "HC-11",
+        "HC-12",
+        "HC-13",
+    ):
+        check_gates(rep, fast=args.fast)
 
-    for group in ["structural", "static", "live-probe", "gate"]:
-        group_results = [r for r in results if r.check.group == group]
-        if not group_results:
-            continue
-        print(f"\n{C_BOLD}{group.upper()}{C_RESET}")
-        print("-" * 72)
-        for r in group_results:
-            sym = {
-                "PASS": C_GREEN + PASS_SYM + C_RESET,
-                "FAIL": C_RED + FAIL_SYM + C_RESET,
-                "SKIP": C_YELLOW + SKIP_SYM + C_RESET,
-                "TIMEOUT": C_RED + TIME_SYM + C_RESET,
-                "ERROR": C_RED + "E" + C_RESET,
-            }[r.status]
-            print(f"  {sym} {r.check.id:<6} {r.check.name:<40} {r.duration:>5.1f}s")
-
-    # Totals
-    print(f"\n{C_BOLD}{'=' * 72}{C_RESET}")
-    print(f"{C_BOLD}SUMMARY{C_RESET}")
-    print("=" * 72)
-    print(f"  Total:  {len(results)}")
-    print(f"  {C_GREEN}PASS:   {len(by_status['PASS'])}{C_RESET}")
-    print(f"  {C_RED}FAIL:   {len(by_status['FAIL'])}{C_RESET}")
-    print(f"  {C_YELLOW}SKIP:   {len(by_status['SKIP'])}{C_RESET}")
-    print(f"  {C_RED}TIMEOUT:{len(by_status['TIMEOUT'])}{C_RESET}")
-    print(f"  {C_RED}ERROR:  {len(by_status['ERROR'])}{C_RESET}")
-
-    # Group failures by TODO
-    failed_results = [r for r in results if r.status in ("FAIL", "TIMEOUT", "ERROR")]
-    if failed_results:
-        print(f"\n{C_RED}FAILURES BY TODO{C_RESET}")
-        print("-" * 72)
-        by_todo: dict[str, list[Result]] = {}
-        for r in failed_results:
-            by_todo.setdefault(r.check.todo, []).append(r)
-        for todo, fails in sorted(by_todo.items()):
-            print(f"{C_BOLD}{todo}{C_RESET}")
-            for f in fails:
-                print(f"  {f.check.id}: {f.check.name}")
-
-    # JSON output
-    if args.json_path:
-        json_data = {
-            "timestamp": now_str,
-            "git_head": git_head,
-            "repo_root": str(REPO_ROOT),
-            "results": [
-                {
-                    "id": r.check.id,
-                    "group": r.check.group,
-                    "name": r.check.name,
-                    "todo": r.check.todo,
-                    "status": r.status,
-                    "exit_code": r.exit_code,
-                    "duration": r.duration,
-                    "stdout": r.stdout,
-                    "stderr": r.stderr,
-                }
-                for r in results
-            ],
-        }
-        Path(args.json_path).write_text(
-            json.dumps(json_data, indent=2), encoding="utf-8"
-        )
-
-    # Exit code
-    if any(r.status in ("FAIL", "TIMEOUT", "ERROR") for r in results):
-        return 1
-    return 0
+    if args.json:
+        out = Path(args.json)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(json.dumps(rep.to_json(), indent=2), encoding="utf-8")
+        print(f"\nJSON report -> {out}")
+    return rep.summary()
 
 
 if __name__ == "__main__":

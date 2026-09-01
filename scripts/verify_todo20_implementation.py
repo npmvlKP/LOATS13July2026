@@ -26,6 +26,7 @@ def run_command(cmd, cwd=None):
     )
     return result.stdout, result.stderr, result.returncode
 
+
 def check_git_grep_empty():
     """Verify git grep PYTEST_CURRENT_TEST -- src/ returns empty."""
     print("=" * 70)
@@ -43,6 +44,7 @@ def check_git_grep_empty():
         print("✗ FAIL: PYTEST_CURRENT_TEST still exists in src/:")
         print(stdout)
         return False
+
 
 def check_database_py_no_bypass():
     """Verify database.py has no PYTEST_CURRENT_TEST bypass."""
@@ -62,6 +64,7 @@ def check_database_py_no_bypass():
         print(stdout)
         return False
 
+
 def check_test_file_exists():
     """Verify test_audit_dual_write.py exists."""
     print("\n" + "=" * 70)
@@ -76,6 +79,7 @@ def check_test_file_exists():
     else:
         print(f"✗ FAIL: {test_file} does not exist")
         return False
+
 
 def check_test_content():
     """Verify test file contains required assertions."""
@@ -95,7 +99,10 @@ def check_test_content():
         ("SQLite row exists", "SQLite audit row must exist"),
         ("JSONL line exists", "JSONL audit file must exist"),
         ("SHA-256 digest match", "SHA-256 digest must match SQLite row digest"),
-        ("tmp_path fixture", "def test_audit_dual_write_with_injectable_path(tmp_path):"),
+        (
+            "tmp_path fixture",
+            "def test_audit_dual_write_with_injectable_path(tmp_path):",
+        ),
         ("canonical serialization", "canonical serialization"),
     ]
 
@@ -114,6 +121,7 @@ def check_test_content():
         print("✗ FAIL: Some assertions missing")
         return False
 
+
 def check_health_check_exists():
     """Verify HC-22 health check exists."""
     print("\n" + "=" * 70)
@@ -131,13 +139,14 @@ def check_health_check_exists():
         print("✓ PASS: HC-22 health check defined")
         # Extract HC-22 definition
         hc22_start = content.find('"HC-22"')
-        hc22_end = content.find('},', hc22_start) + 2
+        hc22_end = content.find("},", hc22_start) + 2
         hc22_def = content[hc22_start:hc22_end]
         print(f"  Definition:\n{hc22_def}")
         return True
     else:
         print("✗ FAIL: HC-22 health check not found")
         return False
+
 
 def run_hc22_health_check():
     """Run HC-22 health check."""
@@ -160,6 +169,7 @@ def run_hc22_health_check():
         print("✗ FAIL: HC-22 health check failed")
         return False
 
+
 def verify_pytest_can_run_test():
     """Verify pytest can run the dual-write test."""
     print("\n" + "=" * 70)
@@ -180,6 +190,7 @@ def verify_pytest_can_run_test():
         print(f"  STDERR:\n{stderr}")
         return False
 
+
 def main():
     """Run all verification checks."""
     print("\n")
@@ -191,7 +202,9 @@ def main():
     results = []
 
     # Run all checks
-    results.append(("git grep PYTEST_CURRENT_TEST -- src/ empty", check_git_grep_empty()))
+    results.append(
+        ("git grep PYTEST_CURRENT_TEST -- src/ empty", check_git_grep_empty())
+    )
     results.append(("database.py no bypass", check_database_py_no_bypass()))
     results.append(("test_audit_dual_write.py exists", check_test_file_exists()))
     results.append(("test dual-write assertions", check_test_content()))
@@ -223,6 +236,7 @@ def main():
         print("║" + " " * 16 + "SOME CHECKS FAILED - REVIEW REQUIRED" + " " * 19 + "║")
         print("╚" + "=" * 68 + "╝")
         return 1
+
 
 if __name__ == "__main__":
     sys.exit(main())

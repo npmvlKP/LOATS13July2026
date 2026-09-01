@@ -290,14 +290,15 @@ class StrengthEngine:
             source_enum = resolve_source(source)
             source_types.add(source_enum)
 
-        # Diversity score: unique sources relative to required minimum.
-        # Using min_sources (3) as denominator ensures that meeting the
-        # source-count requirement always yields diversity >= 1.0,
-        # while partial coverage scales linearly.
-        # Previous formula (len(source_types) / len(StrengthSource))
-        # made 3/7 = 0.429 which was always < 0.5 threshold, deadlocking
-        # the entire CMP chain in production.
-        diversity_score = min(len(source_types) / self.min_sources, 1.0)
+        # Diversity score: unique sources relative to the total canonical
+        # source space. 3 distinct sources out of 7 -> 3/7 = 0.429,
+        # 4 distinct sources -> 4/7 = 0.571. The gate threshold is 0.5,
+        # so exactly 3 distinct sources is rejected and 4+ passes.
+        # This is the intended CMP diversity gate (HC-15).
+        total_sources = len(StrengthSource)
+        if total_sources == 0:
+            return 0.0
+        diversity_score = min(len(source_types) / total_sources, 1.0)
         return float(diversity_score)
 
     def validate_signal_sources(

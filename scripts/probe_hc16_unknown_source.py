@@ -13,8 +13,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from loats.models import Signal, SignalType  # noqa: E402
-from loats.strength import strength_engine  # noqa: E402
+from loats.models import Signal, SignalType
+from loats.strength import strength_engine
 
 
 def main() -> int:
