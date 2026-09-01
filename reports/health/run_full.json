@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-09-01T10:41:39",
+  "timestamp": "2026-09-01T20:28:38",
   "python": "3.12.7",
   "env_key_injected": true,
   "results": [
@@ -181,7 +181,7 @@
       "status": "PASS",
       "detail": "exit 0",
       "evidence": [
-        "183 files already formatted"
+        "184 files already formatted"
       ]
     },
     {
@@ -239,24 +239,17 @@
       "detail": "exit 0",
       "evidence": [
         "Coverage JSON written to file G:/.OA/LOATS-13July2026/LOATS13July2026/reports/health/coverage.json",
-        "Required test coverage of 80% reached. Total coverage: 85.21%",
-        "================= 1170 passed, 1 warning in 171.83s (0:02:51) ================="
+        "Required test coverage of 80% reached. Total coverage: 85.19%",
+        "================= 1170 passed, 1 warning in 181.07s (0:03:01) ================="
       ]
     },
     {
       "check_id": "HC-13",
       "name": "per-module coverage floors (key modules)",
-      "todo": "TODO-3/15",
+      "todo": "TODO-15",
       "status": "PASS",
       "detail": "all floors met",
-      "evidence": [
-        "src/loats/database.py: 81.9% (floor 80)",
-        "src/loats/database_async_additions.py: 80.9% (floor 80)",
-        "src/loats/options.py: 95.2% (floor 85)",
-        "src/loats/orchestrator.py: 80.1% (floor 80)",
-        "src/loats/trade_decision.py: 84.6% (floor 80)",
-        "src/loats/trailing_stop.py: 93.2% (floor 80)"
-      ]
+      "evidence": []
     }
   ],
   "summary": {

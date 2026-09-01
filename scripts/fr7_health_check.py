@@ -860,55 +860,75 @@ PER_MODULE_FLOORS = {
 
 
 def check_module_floors(rep: Report) -> None:
-    """HC-13 — per-module coverage floors from coverage.json (written by HC-12 run)."""
-    cj = REPO_ROOT / "reports/health/coverage.json"
-    if not cj.exists():
+    """HC-13 — per-module coverage floors via scripts/check_per_module_coverage.py (TODO-15)."""
+    coverage_json = REPO_ROOT / "reports/health/coverage.json"
+    if not coverage_json.exists():
         rep.add(
             Result(
                 "HC-13",
                 "per-module coverage floors",
-                "TODO-3/15",
+                "TODO-15",
                 "SKIP",
                 "coverage.json not found",
             )
         )
         return
+
+    cmd = [
+        sys.executable,
+        str(REPO_ROOT / "scripts" / "check_per_module_coverage.py"),
+        str(coverage_json),
+    ]
     try:
-        data = json.loads(cj.read_text(encoding="utf-8"))
+        proc = subprocess.run(
+            cmd,
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
     except Exception as exc:
         rep.add(
             Result(
                 "HC-13",
                 "per-module coverage floors",
-                "TODO-3/15",
-                "SKIP",
-                f"unparsable coverage.json: {exc!r}",
+                "TODO-15",
+                "FAIL",
+                f"could not run check_per_module_coverage.py: {exc!r}",
             )
         )
         return
-    files = data.get("files", {})
-    evidence, failures = [], []
-    for rel, floor in sorted(PER_MODULE_FLOORS.items()):
-        key = next(
-            (k for k in files if k.replace("\\", "/").endswith(rel.replace("\\", "/"))),
-            None,
+
+    # Parse the script's JSON summary from the last line if present.
+    summary: dict[str, object] = {}
+    try:
+        last_line = proc.stdout.strip().splitlines()[-1]
+        summary = json.loads(last_line)
+    except Exception:
+        summary = {}
+
+    if proc.returncode == 0:
+        rep.add(
+            Result(
+                "HC-13",
+                "per-module coverage floors (key modules)",
+                "TODO-15",
+                "PASS",
+                summary.get("message", "all floors met"),
+                summary.get("details", []),
+            )
         )
-        if key is None:
-            failures.append(f"{rel}: NOT MEASURED")
-            continue
-        pct = files[key].get("summary", {}).get("percent_covered", 0.0)
-        line = f"{rel}: {pct:.1f}% (floor {floor})"
-        (evidence if pct >= floor else failures).append(line)
-    rep.add(
-        Result(
-            "HC-13",
-            "per-module coverage floors (key modules)",
-            "TODO-3/15",
-            "PASS" if not failures else "FAIL",
-            f"{len(failures)} module(s) below floor" if failures else "all floors met",
-            failures + evidence,
+    else:
+        rep.add(
+            Result(
+                "HC-13",
+                "per-module coverage floors (key modules)",
+                "TODO-15",
+                "FAIL",
+                summary.get("message", proc.stdout.strip() or proc.stderr.strip()),
+                summary.get("details", []),
+            )
         )
-    )
 
 
 # ------------------------------------------------------------------ main ----
