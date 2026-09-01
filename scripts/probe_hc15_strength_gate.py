@@ -1,9 +1,10 @@
 """HC-15 production probe: strength-gate math.
 
-After the legacy 3/7=0.4286 deadlock fix (see strength.py:294-296),
-the current diversity formula is `min(len(source_types)/min_sources, 1.0)`.
-3 unique valid sources yield diversity = 3/3 = 1.0 (>= 0.5 threshold -> pass).
-4 unique valid sources yield still 1.0 (clipped) -> pass.
+The strength gate is diversity against the full canonical source space (7
+members in ``StrengthSource``). 3 distinct sources gives 3/7 ≈ 0.429,
+which is below the 0.5 floor and is rejected. 4 distinct sources gives
+4/7 ≈ 0.571, which passes. This reflects the CMP requirement that a
+valid composite needs at least 4 independent producers.
 """
 
 from __future__ import annotations
@@ -52,10 +53,10 @@ def main() -> int:
     score_ok = (
         isinstance(div3, (int, float))
         and isinstance(div4, (int, float))
-        and div3 >= 0.5
+        and div3 < 0.5
         and div4 >= 0.5
     )
-    print(f"BOTH gate verdicts >=0.5: {score_ok}")
+    print(f"3-src rejected AND 4-src accepted: {score_ok}")
     sys.exit(0 if score_ok else 1)
 
 
