@@ -142,6 +142,12 @@ class Settings(BaseSettings):
     # Metrics Configuration
     metrics_port: int = Field(8001, description="Port for Prometheus metrics server")
 
+    # Dev-only warning suppression
+    loats_suppress_nltk_warning: bool = Field(
+        False,
+        description="Set True to suppress newspaper4k dev-only NLTK tokenizer warning",
+    )
+
     # VIX Configuration
     vix_symbol: str = Field("INDIAVIX", description="Symbol for India VIX index")
     vix_cache_ttl_seconds: int = Field(

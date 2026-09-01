@@ -82,11 +82,21 @@ All commits must pass the following quality gates:
 - ✅ MyPy (type checking)
 - ✅ Pytest (testing)
 - ✅ Bandit (security scanning)
-- ✅ Pre-commit hooks
+- ✅ Pre-commit hooks (client-side; must be verified locally)
+- ✅ GitHub branch protection rules (must be verified in repository settings by a maintainer; an agent cannot mechanically enforce them)
+
+### Manual GitHub Gates (TODO-5 / TODO-6)
+
+The following safeguards are **not** enforceable by this codebase or by an agent; they require a maintainer with repository admin access to verify in the GitHub web UI:
+
+1. **Branch protection for `main`**: Enable "Require a pull request before merging" with at least one reviewer approval.
+2. **Status checks**: Enable "Require status checks to pass before merging" and select the CI jobs that run Ruff, MyPy, Pytest, Bandit, and pip-audit.
+3. **Pre-commit hooks as client-side guards**: The `.pre-commit-config.yaml` hooks run locally; they are not a server-side substitute for branch protection. Verify each contributor has run `pre-commit install`.
+4. **Review dismissal / admin enforcement**: Optionally enable "Dismiss stale pull request approvals when new commits are pushed" and "Include administrators".
 
 ## Code Review
 
-All changes require review and approval before merging. The QA team will perform final validation and declare production readiness.
+All changes require review and approval before merging. The QA team will perform final validation and declare production readiness. Branch protection and pre-commit hook configuration are checked manually by maintainers (TODO-5 / TODO-6).
 
 ## Reporting Issues
 
@@ -95,3 +105,7 @@ Please report any issues or bugs through the project's issue tracker with detail
 ---
 
 **Note**: This policy is enforced by pre-commit hooks. Any commit message containing prohibited phrases will be automatically rejected.
+
+### pip-audit Time Sensitivity
+
+The `pip-audit` security gate reports **zero vulnerabilities against production dependencies as of today**. Because the vulnerability database is updated continuously, a clean audit today does not guarantee a clean audit tomorrow. Re-run `pip-audit -r requirements-core.txt` before every release and in CI at least daily. Any newly disclosed advisory must be triaged and either remediated or documented as an accepted risk.

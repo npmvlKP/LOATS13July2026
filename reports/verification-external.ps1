@@ -6,6 +6,8 @@ $ErrorActionPreference = 'Stop'
 $REPO = Resolve-Path (Join-Path $PSScriptRoot '..')
 $PY = Join-Path $REPO 'loatsNEW\Scripts\python.exe'
 
+New-Item -ItemType Directory -Force -Path (Join-Path $REPO 'reports\security') | Out-Null
+
 function Invoke-Step($Name, $Arguments) {
     Write-Host "=== $Name ===" -ForegroundColor Cyan
     & $PY @Arguments
@@ -18,7 +20,7 @@ Set-Location $REPO
 Invoke-Step 'HC-01..HC-13 structural/quality delegate (verify_hc_all.py)' @('scripts\verify_hc_all.py')
 Invoke-Step 'HC-01..HC-27 full registry (health-final-20260901.json)' @('scripts\verify_hc_registry.py', '--json', 'reports\health\health-final-20260901.json')
 Invoke-Step 'TODO-8 / HC-15 external 4th producer / ADR verification' @('scripts\verify_todo8_external.py')
-Invoke-Step 'Pytest full suite (1170 tests, coverage >=80%)' @('-m', 'pytest', 'tests\', '--cov=src', '--cov-fail-under=80', '--cov-report=json', '-q')
+Invoke-Step 'Pytest full suite (coverage >=80%)' @('-m', 'pytest', 'tests\', '--cov=src', '--cov-fail-under=80', '--cov-report=json', '-q')
 Invoke-Step 'Ruff lint' @('-m', 'ruff', 'check', 'src\', 'tests\', 'scripts\', '--config', 'pyproject.toml')
 Invoke-Step 'Ruff format check' @('-m', 'ruff', 'format', 'src\', 'tests\', 'scripts\', '--config', 'pyproject.toml', '--check')
 Invoke-Step 'mypy --strict' @('-m', 'mypy', 'src\', '--strict', '--config-file', 'pyproject.toml')

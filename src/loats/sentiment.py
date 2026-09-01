@@ -6,6 +6,8 @@ Implements RSS news sentiment analysis using Vader Sentiment.
 import asyncio
 import hashlib
 import json
+import os
+import warnings
 from datetime import UTC, datetime
 from typing import Any, cast
 from urllib.parse import urlparse
@@ -13,6 +15,14 @@ from urllib.parse import urlparse
 import feedparser
 from newspaper import Article
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
+
+# Suppress the dev-only newspaper4k/nltk "punkt" tokenizer warning if requested.
+# Users can either download the model once in development (nltk.download("punkt"))
+# or set LOATS_SUPPRESS_NLTK_WARNING=1 to silence the warning.
+# We check the env var before Settings() is loaded; Settings() also exposes the
+# same flag via settings.loats_suppress_nltk_warning for runtime consistency.
+if os.environ.get("LOATS_SUPPRESS_NLTK_WARNING") == "1":
+    warnings.filterwarnings("ignore", category=UserWarning)
 
 from .lazy_settings import LazySettings
 from .loats_logging import get_logger

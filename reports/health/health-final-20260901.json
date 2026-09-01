@@ -1,0 +1,191 @@
+[
+  {
+    "hcid": "HC-01",
+    "title": "src/__init__.py absent",
+    "todo": "TODO-23",
+    "verdict": "PASS",
+    "detail": "delegate: verify_hc_all.py rc=0"
+  },
+  {
+    "hcid": "HC-02",
+    "title": "no stray src/*.py",
+    "todo": "TODO-23",
+    "verdict": "PASS",
+    "detail": "delegate: verify_hc_all.py rc=0"
+  },
+  {
+    "hcid": "HC-03",
+    "title": "no empty package shells",
+    "todo": "TODO-23",
+    "verdict": "PASS",
+    "detail": "delegate: verify_hc_all.py rc=0"
+  },
+  {
+    "hcid": "HC-04",
+    "title": "deps-sync script exists",
+    "todo": "TODO-19",
+    "verdict": "PASS",
+    "detail": "delegate: verify_hc_all.py rc=0"
+  },
+  {
+    "hcid": "HC-05",
+    "title": "ruff lint clean",
+    "todo": "TODO-28",
+    "verdict": "PASS",
+    "detail": "delegate: verify_hc_all.py rc=0"
+  },
+  {
+    "hcid": "HC-06",
+    "title": "ruff format clean",
+    "todo": "TODO-22",
+    "verdict": "PASS",
+    "detail": "delegate: verify_hc_all.py rc=0"
+  },
+  {
+    "hcid": "HC-07",
+    "title": "isort clean",
+    "todo": "TODO-22",
+    "verdict": "PASS",
+    "detail": "delegate: verify_hc_all.py rc=0"
+  },
+  {
+    "hcid": "HC-08",
+    "title": "flake8 clean",
+    "todo": "TODO-22",
+    "verdict": "PASS",
+    "detail": "delegate: verify_hc_all.py rc=0"
+  },
+  {
+    "hcid": "HC-09",
+    "title": "mypy strict clean",
+    "todo": "TODO-28",
+    "verdict": "PASS",
+    "detail": "delegate: verify_hc_all.py rc=0"
+  },
+  {
+    "hcid": "HC-10",
+    "title": "bandit clean",
+    "todo": "TODO-28",
+    "verdict": "PASS",
+    "detail": "delegate: verify_hc_all.py rc=0"
+  },
+  {
+    "hcid": "HC-11",
+    "title": "openalgo live",
+    "todo": "GENERAL",
+    "verdict": "PASS",
+    "detail": "delegate: verify_hc_all.py rc=0"
+  },
+  {
+    "hcid": "HC-12",
+    "title": "coverage aggregate >=80%",
+    "todo": "TODO-24",
+    "verdict": "PASS",
+    "detail": "delegate: verify_hc_all.py rc=0"
+  },
+  {
+    "hcid": "HC-13",
+    "title": "coverage per-module floors",
+    "todo": "TODO-24",
+    "verdict": "PASS",
+    "detail": "delegate: verify_hc_all.py rc=0"
+  },
+  {
+    "hcid": "HC-14",
+    "title": "OPS limiter probe (max_ops=3)",
+    "todo": "F6-C-01",
+    "verdict": "PASS",
+    "detail": "3 of 10 acquires accepted (max_ops=3)"
+  },
+  {
+    "hcid": "HC-15",
+    "title": "strength-gate math probe",
+    "todo": "TODO-8",
+    "verdict": "PASS",
+    "detail": "3 sources reject / 4 sources pass"
+  },
+  {
+    "hcid": "HC-16",
+    "title": "unknown source loudly rejected",
+    "todo": "TODO-9",
+    "verdict": "PASS",
+    "detail": "unknown source string rejected loudly"
+  },
+  {
+    "hcid": "HC-17",
+    "title": "zero orchestrator source literals",
+    "todo": "TODO-7",
+    "verdict": "PASS",
+    "detail": "0 occurrences (expect 0)"
+  },
+  {
+    "hcid": "HC-18",
+    "title": "set_vix_level has >=1 caller",
+    "todo": "TODO-12",
+    "verdict": "PASS",
+    "detail": "callers=1 (src\\loats\\orchestrator.py:666...)"
+  },
+  {
+    "hcid": "HC-19",
+    "title": "routing real (no sleep-sim, no default-on, integration)",
+    "todo": "TODO-13",
+    "verdict": "PASS",
+    "detail": "real HTTP routing (place_analyzer_request), default-on=False, integration test populated"
+  },
+  {
+    "hcid": "HC-20",
+    "title": "update_trailing_stop has >=1 caller",
+    "todo": "TODO-14",
+    "verdict": "PASS",
+    "detail": "callers=2 (src\\loats\\orchestrator.py:832, src\\loats\\orchestrator.py:1187...)"
+  },
+  {
+    "hcid": "HC-21",
+    "title": "zero module-level eager get_settings()",
+    "todo": "TODO-18",
+    "verdict": "PASS",
+    "detail": "0 module-level eager get_settings() sites"
+  },
+  {
+    "hcid": "HC-22",
+    "title": "no PYTEST_CURRENT_TEST in src/",
+    "todo": "TODO-20",
+    "verdict": "PASS",
+    "detail": "0 references in src/"
+  },
+  {
+    "hcid": "HC-23",
+    "title": "config conformance mods/lot/positions/max_ops/mode",
+    "todo": "TODO-17",
+    "verdict": "PASS",
+    "detail": "all required fields match expected defaults"
+  },
+  {
+    "hcid": "HC-24",
+    "title": "rules BUY<30 / SELL>40",
+    "todo": "TODO-16",
+    "verdict": "PASS",
+    "detail": "BUY<30 / SELL>40 thresholds enforced"
+  },
+  {
+    "hcid": "HC-25",
+    "title": "no bare 18.5 VIX fallback",
+    "todo": "TODO-12",
+    "verdict": "PASS",
+    "detail": "no bare 18.5 VIX fallback in rules.py"
+  },
+  {
+    "hcid": "HC-26",
+    "title": "root junk files absent",
+    "todo": "TODO-21",
+    "verdict": "PASS",
+    "detail": "no root-level junk files"
+  },
+  {
+    "hcid": "HC-27",
+    "title": "decision queue bounded",
+    "todo": "TODO-27c",
+    "verdict": "PASS",
+    "detail": "bounded queue (maxsize) + put_nowait + QueueFull + get_queue_stats"
+  }
+]
