@@ -280,7 +280,11 @@ class CMPRulesEngine:
         # VIX available - apply directional gating. Early returns above
         # cover all vix-is-None branches per CMP fail-safe; mypy cannot
         # narrow through the literal-list compare so re-bind local.
-        assert vix is not None
+        # Use a narrow local variable to keep mypy happy without an assert
+        # that would be removed under optimised bytecode (bandit B101).
+        if vix is None:
+            logger.error("Unexpected vix=None after None branches; blocking")
+            return False
         if direction == "SELL":
             passes = vix > 15
             logger.debug(f"VIX gate SELL: VIX={vix:.2f}, passes={passes}")
