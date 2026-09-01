@@ -102,7 +102,7 @@ async def test_routing_enabled_makes_real_http_call() -> None:
 
     with (
         patch.object(engine, "analyzer_routing_enabled", True),
-        patch("loats.openalgo.AsyncOpenAlgoClient", FakeClient),
+        patch("loats.trade_decision.AsyncOpenAlgoClient", FakeClient),
         patch(
             "loats.database.db.async_create_trade_decision",
             AsyncMock(return_value=None),
@@ -145,7 +145,7 @@ async def test_routing_propagates_errors_no_fabrication() -> None:
 
     with (
         patch.object(engine, "analyzer_routing_enabled", True),
-        patch("loats.openalgo.AsyncOpenAlgoClient", FailingClient),
+        patch("loats.trade_decision.AsyncOpenAlgoClient", FailingClient),
         patch(
             "loats.database.db.async_create_trade_decision",
             AsyncMock(return_value=None),

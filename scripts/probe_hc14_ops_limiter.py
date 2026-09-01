@@ -16,7 +16,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from loats.utils.rate_limiter import get_order_rate_limiter  # noqa: E402
+from loats.utils.rate_limiter import get_order_rate_limiter
 
 ATTEMPTS = 10
 

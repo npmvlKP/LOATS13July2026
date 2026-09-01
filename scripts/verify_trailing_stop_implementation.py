@@ -13,23 +13,13 @@ import sys
 def run_command(cmd, capture_output=True):
     """Run a command and return the result."""
     print(f"Running: {' '.join(cmd)}")
-    result = subprocess.run(
-        cmd,
-        capture_output=capture_output,
-        text=True,
-        check=False
-    )
+    result = subprocess.run(cmd, capture_output=capture_output, text=True, check=False)
     return result
 
 
 def run_pytest_test(test_file, test_name=None):
     """Run a pytest test and return results."""
-    cmd = [
-        sys.executable,
-        "-m", "pytest",
-        test_file,
-        "-v"
-    ]
+    cmd = [sys.executable, "-m", "pytest", test_file, "-v"]
 
     if test_name:
         cmd.append(f"-k {test_name}")
@@ -49,11 +39,13 @@ def verify_trailing_stop_implementation():
     print("\n1. VERIFYING RUNTIME DRIVER IMPLEMENTATION")
 
     # Check if update_trailing_stops function exists
-    result = run_command([
-        sys.executable,
-        "-c",
-        "import loats.orchestrator; print('update_trailing_stops' in dir(loats.orchestrator))"
-    ])
+    result = run_command(
+        [
+            sys.executable,
+            "-c",
+            "import loats.orchestrator; print('update_trailing_stops' in dir(loats.orchestrator))",
+        ]
+    )
 
     if "True" in result.stdout:
         print("✅ update_trailing_stops function exists")
@@ -65,11 +57,13 @@ def verify_trailing_stop_implementation():
     print("\n2. VERIFYING ORCHESTRATOR INTEGRATION")
 
     # Check if the function is called in _execute_cmp_strategy
-    result = run_command([
-        sys.executable,
-        "-c",
-        "import re; import loats.orchestrator; code = open('src/loats/orchestrator.py').read(); print('update_trailing_stops' in code)"
-    ])
+    result = run_command(
+        [
+            sys.executable,
+            "-c",
+            "import re; import loats.orchestrator; code = open('src/loats/orchestrator.py').read(); print('update_trailing_stops' in code)",
+        ]
+    )
 
     if "True" in result.stdout:
         print("✅ update_trailing_stops is referenced in orchestrator.py")
@@ -81,11 +75,13 @@ def verify_trailing_stop_implementation():
     print("\n3. VERIFYING RULE 7 COMPLIANCE")
 
     # Check modification count validation
-    result = run_command([
-        sys.executable,
-        "-c",
-        "import re; import loats.orchestrator; code = open('src/loats/orchestrator.py').read(); print('modification_count < 25' in code)"
-    ])
+    result = run_command(
+        [
+            sys.executable,
+            "-c",
+            "import re; import loats.orchestrator; code = open('src/loats/orchestrator.py').read(); print('modification_count < 25' in code)",
+        ]
+    )
 
     if "True" in result.stdout:
         print("✅ Rule 7 modification limit (≤25) is enforced")
@@ -97,11 +93,13 @@ def verify_trailing_stop_implementation():
     print("\n4. VERIFYING HEALTH CHECK INTEGRATION")
 
     # Check if HC-20 is defined
-    result = run_command([
-        sys.executable,
-        "-c",
-        "import json; import loats.scripts.fr7_health_check; checks = loats.scripts.fr7_health_check.HEALTH_CHECKS; print('HC-20' in checks)"
-    ])
+    result = run_command(
+        [
+            sys.executable,
+            "-c",
+            "import json; import loats.scripts.fr7_health_check; checks = loats.scripts.fr7_health_check.HEALTH_CHECKS; print('HC-20' in checks)",
+        ]
+    )
 
     if "True" in result.stdout:
         print("✅ HC-20 health check is defined")
@@ -125,11 +123,13 @@ def verify_trailing_stop_implementation():
     print("\n6. VERIFYING MONOTONICITY PROPERTY")
 
     # Check for monotonicity tests
-    result = run_command([
-        sys.executable,
-        "-c",
-        "import re; import loats.trailing_stop; code = open('src/loats/trailing_stop.py').read(); print('monotonic' in code.lower())"
-    ])
+    result = run_command(
+        [
+            sys.executable,
+            "-c",
+            "import re; import loats.trailing_stop; code = open('src/loats/trailing_stop.py').read(); print('monotonic' in code.lower())",
+        ]
+    )
 
     if "True" in result.stdout:
         print("✅ Monotonicity property is implemented")
@@ -141,11 +141,13 @@ def verify_trailing_stop_implementation():
     print("\n7. VERIFYING RATCHET EVENT RECORDING")
 
     # Check if async_record_ratchet_event exists
-    result = run_command([
-        sys.executable,
-        "-c",
-        "import loats.database; print('async_record_ratchet_event' in dir(loats.database))"
-    ])
+    result = run_command(
+        [
+            sys.executable,
+            "-c",
+            "import loats.database; print('async_record_ratchet_event' in dir(loats.database))",
+        ]
+    )
 
     if "True" in result.stdout:
         print("✅ async_record_ratchet_event exists")
@@ -164,7 +166,7 @@ def verify_trailing_stop_implementation():
         "✅ Monotonic ratchet implementation",
         "✅ Persisted modification counters",
         "✅ Ratchet event recording",
-        "✅ Test coverage for runtime driver"
+        "✅ Test coverage for runtime driver",
     ]
 
     print("\nTODO-14 REQUIREMENTS VERIFICATION:")

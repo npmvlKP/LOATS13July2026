@@ -25,15 +25,10 @@ Exit Codes:
 Dependencies: None (uses only standard library + file operations)
 """
 
-import ast
-import json
-import os
 import re
-import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
 
 
 class Colors:
@@ -100,8 +95,8 @@ class VerificationResult:
 
     def __init__(self) -> None:
         """Initialize verification results."""
-        self.checks: List[Tuple[str, bool, str]] = []
-        self.warnings: List[str] = []
+        self.checks: list[tuple[str, bool, str]] = []
+        self.warnings: list[str] = []
 
     def add_check(self, name: str, passed: bool, details: str = "") -> None:
         """Add a verification check."""
@@ -147,7 +142,9 @@ class TODO26Verifier:
             return False
 
         size = module_path.stat().st_size
-        lines = len(module_path.read_text(encoding="utf-8", errors="ignore").splitlines())
+        lines = len(
+            module_path.read_text(encoding="utf-8", errors="ignore").splitlines()
+        )
 
         print_success(f"backtest_sanity.py found at {module_path}")
         print_info(f"Size: {size:,} bytes, {lines} lines")
@@ -250,8 +247,8 @@ class TODO26Verifier:
             ("Method definition", "async def run_backtest_sanity_check"),
             ("CronTrigger", "CronTrigger"),
             ("Sunday schedule", 'day_of_week="sun"'),
-            ("Hour 4 AM", 'hour=4'),
-            ("Minute 0", 'minute=0'),
+            ("Hour 4 AM", "hour=4"),
+            ("Minute 0", "minute=0"),
         ]
 
         all_passed = True
@@ -265,7 +262,10 @@ class TODO26Verifier:
                 all_passed = False
 
         # Check for CronTrigger configuration
-        cron_match = re.search(r'CronTrigger\([^)]*day_of_week="sun"[^)]*hour=4[^)]*minute=0[^)]*\)', scheduler_content)
+        cron_match = re.search(
+            r'CronTrigger\([^)]*day_of_week="sun"[^)]*hour=4[^)]*minute=0[^)]*\)',
+            scheduler_content,
+        )
         if cron_match:
             print_success("Weekly schedule: Sunday 4:00 AM IST (CronTrigger)")
             self.results.add_check("Weekly schedule", True, "Sunday 4:00 AM IST")
@@ -309,7 +309,9 @@ class TODO26Verifier:
             self.results.add_check("Method call", False)
             return False
 
-        print_info("Allows on-demand execution: scheduler.run_once('backtest_sanity_check')")
+        print_info(
+            "Allows on-demand execution: scheduler.run_once('backtest_sanity_check')"
+        )
         return True
 
     def verify_health_check_integration(self) -> bool:
@@ -319,10 +321,14 @@ class TODO26Verifier:
         health_check_path = self.paths.scripts / "fr7_health_check.py"
         if not health_check_path.exists():
             print_error("fr7_health_check.py NOT FOUND")
-            self.results.add_check("Health check file", False, "fr7_health_check.py not found")
+            self.results.add_check(
+                "Health check file", False, "fr7_health_check.py not found"
+            )
             return False
 
-        health_check_content = health_check_path.read_text(encoding="utf-8", errors="ignore")
+        health_check_content = health_check_path.read_text(
+            encoding="utf-8", errors="ignore"
+        )
 
         checks = [
             ("HC-30 entry", '"HC-30"'),
@@ -412,7 +418,9 @@ class TODO26Verifier:
                 print_success(f"Safety check: {name}")
                 self.results.add_check(f"Safety: {name}", True)
             else:
-                print_warning(f"Safety check: {name} (may be present with different wording)")
+                print_warning(
+                    f"Safety check: {name} (may be present with different wording)"
+                )
 
         return all_passed
 
@@ -453,7 +461,9 @@ class TODO26Verifier:
         size = test_path.stat().st_size
         lines = len(test_path.read_text(encoding="utf-8", errors="ignore").splitlines())
 
-        print_success(f"test_backtest_sanity_production.py: present ({size:,} bytes, {lines} lines)")
+        print_success(
+            f"test_backtest_sanity_production.py: present ({size:,} bytes, {lines} lines)"
+        )
         self.results.add_check("Test suite", True, f"{size:,} bytes, {lines} lines")
 
         # Count test functions
@@ -485,20 +495,30 @@ class TODO26Verifier:
         print_section("VERIFICATION SUMMARY")
 
         print(f"\n{Colors.BOLD}Total Checks:{Colors.ENDC} {self.results.total}")
-        print(f"{Colors.OKGREEN}{Colors.BOLD}Passed:{Colors.ENDC} {self.results.passed}")
+        print(
+            f"{Colors.OKGREEN}{Colors.BOLD}Passed:{Colors.ENDC} {self.results.passed}"
+        )
         print(f"{Colors.FAIL}{Colors.BOLD}Failed:{Colors.ENDC} {self.results.failed}")
 
         if self.results.warnings:
-            print(f"\n{Colors.WARNING}{Colors.BOLD}Warnings:{Colors.ENDC} {len(self.results.warnings)}")
+            print(
+                f"\n{Colors.WARNING}{Colors.BOLD}Warnings:{Colors.ENDC} {len(self.results.warnings)}"
+            )
             for warning in self.results.warnings:
                 print_warning(warning)
 
-        print(f"\n{Colors.BOLD}Pass Rate:{Colors.ENDC} {(self.results.passed / self.results.total * 100):.1f}%")
+        print(
+            f"\n{Colors.BOLD}Pass Rate:{Colors.ENDC} {(self.results.passed / self.results.total * 100):.1f}%"
+        )
 
         if self.results.failed == 0:
-            print(f"\n{Colors.OKGREEN}{Colors.BOLD}✓ ALL CHECKS PASSED - TODO-26 IMPLEMENTATION VERIFIED{Colors.ENDC}\n")
+            print(
+                f"\n{Colors.OKGREEN}{Colors.BOLD}✓ ALL CHECKS PASSED - TODO-26 IMPLEMENTATION VERIFIED{Colors.ENDC}\n"
+            )
         else:
-            print(f"\n{Colors.FAIL}{Colors.BOLD}✗ {self.results.failed} CHECK(S) FAILED - TODO-26 NEEDS ATTENTION{Colors.ENDC}\n")
+            print(
+                f"\n{Colors.FAIL}{Colors.BOLD}✗ {self.results.failed} CHECK(S) FAILED - TODO-26 NEEDS ATTENTION{Colors.ENDC}\n"
+            )
 
     def run_all_verifications(self) -> bool:
         """Run all verification checks."""

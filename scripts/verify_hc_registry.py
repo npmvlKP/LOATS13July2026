@@ -29,10 +29,10 @@ import json
 import os
 import subprocess
 import sys
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
-from typing import Any, Callable
 
 # ---------------------------------------------------------------------------
 # Windows UTF-8 stdout/stderr fix.
@@ -72,7 +72,7 @@ def _has_dev_tools(p: Path) -> bool:
         return (p.parent.parent / "Lib" / "site-packages" / "ruff").exists() or (
             p.parent.parent / "lib" / "python3.12" / "site-packages" / "ruff"
         ).exists()
-    except Exception:  # noqa: BLE001
+    except Exception:
         return False
 
 
@@ -143,9 +143,7 @@ class Row:
 # HC-01..HC-13: structural + quality gates (delegated to verify_hc_all.py)
 # ---------------------------------------------------------------------------
 def _delegate_verify_hc_all() -> tuple[Verdict, str]:
-    rc, _, err = run_cmd(
-        [PY, "scripts/verify_hc_all.py"], cwd=REPO_ROOT, timeout=600
-    )
+    rc, _, err = run_cmd([PY, "scripts/verify_hc_all.py"], cwd=REPO_ROOT, timeout=600)
     if rc == 0:
         return Verdict.PASS, "delegate: verify_hc_all.py rc=0"
     return Verdict.FAIL, f"delegate: verify_hc_all.py rc={rc} :: {err.strip()[:200]}"
@@ -177,7 +175,10 @@ def _check_hc16() -> tuple[Verdict, str]:
         rc, out, err = run_cmd([PY, str(probe)], timeout=15)
         if rc == 0:
             return Verdict.PASS, "unknown source string rejected loudly"
-        return Verdict.FAIL, f"probe rc={rc} :: {err.strip()[:200] or out.strip()[:200]}"
+        return (
+            Verdict.FAIL,
+            f"probe rc={rc} :: {err.strip()[:200] or out.strip()[:200]}",
+        )
     sr = (REPO_ROOT / "src" / "loats" / "strength.py").read_text(encoding="utf-8")
     has_phrase = "Reject unknown source strings loudly" in sr
     has_validate = "validate_signal_sources" in sr
@@ -223,7 +224,10 @@ def _check_hc19() -> tuple[Verdict, str]:
         encoding="utf-8"
     )
     if "AsyncOpenAlgoClient" not in src or "place_analyzer_request" not in src:
-        return Verdict.FAIL, "no AsyncOpenAlgoClient.place_analyzer_request in trade_decision.py"
+        return (
+            Verdict.FAIL,
+            "no AsyncOpenAlgoClient.place_analyzer_request in trade_decision.py",
+        )
     # Default analyzer_routing_enabled must be False (or `Field(False, ...)`)
     tree = ast.parse(settings_txt)
     found_disabled = False
@@ -239,8 +243,16 @@ def _check_hc19() -> tuple[Verdict, str]:
                 found_disabled = True
                 break
             # `Field(False, ...)`: the first positional arg of Field call
-            if isinstance(v, ast.Call) and isinstance(v.func, ast.Name) and v.func.id == "Field":
-                if v.args and isinstance(v.args[0], ast.Constant) and v.args[0].value is False:
+            if (
+                isinstance(v, ast.Call)
+                and isinstance(v.func, ast.Name)
+                and v.func.id == "Field"
+            ):
+                if (
+                    v.args
+                    and isinstance(v.args[0], ast.Constant)
+                    and v.args[0].value is False
+                ):
                     found_disabled = True
                     break
     if not found_disabled:
@@ -285,21 +297,17 @@ def _check_hc21() -> tuple[Verdict, str]:
             continue
         for node in tree.body:
             value: ast.AST | None = None
-            targets_node: ast.AST | None = None
             if isinstance(node, ast.Assign):
-                targets_node = node
                 value = node.value
             elif isinstance(node, ast.AnnAssign) and node.value is not None:
-                targets_node = node
                 value = node.value
             else:
                 continue
             if value is None or not isinstance(value, ast.Call):
                 continue
             f = value.func
-            is_get_settings = (
-                (isinstance(f, ast.Name) and f.id == "get_settings")
-                or (isinstance(f, ast.Attribute) and f.attr == "get_settings")
+            is_get_settings = (isinstance(f, ast.Name) and f.id == "get_settings") or (
+                isinstance(f, ast.Attribute) and f.attr == "get_settings"
             )
             if not is_get_settings:
                 continue
@@ -308,9 +316,7 @@ def _check_hc21() -> tuple[Verdict, str]:
                 for t in node.targets:
                     if isinstance(t, ast.Name):
                         names.append(t.id)
-            elif isinstance(node, ast.AnnAssign) and isinstance(
-                node.target, ast.Name
-            ):
+            elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
                 names.append(node.target.id)
             if any(n in ("__all__", "__version__") for n in names):
                 continue
@@ -360,10 +366,22 @@ def _check_hc23() -> tuple[Verdict, str]:
         if name not in fields:
             return False, f"missing '{name}'"
         v = fields[name]
-        if isinstance(v, ast.Constant) and isinstance(v.value, int) and v.value == expected:
+        if (
+            isinstance(v, ast.Constant)
+            and isinstance(v.value, int)
+            and v.value == expected
+        ):
             return True, f"{name}={expected}"
-        if isinstance(v, ast.Call) and isinstance(v.func, ast.Name) and v.func.id == "Field":
-            if v.args and isinstance(v.args[0], ast.Constant) and v.args[0].value == expected:
+        if (
+            isinstance(v, ast.Call)
+            and isinstance(v.func, ast.Name)
+            and v.func.id == "Field"
+        ):
+            if (
+                v.args
+                and isinstance(v.args[0], ast.Constant)
+                and v.args[0].value == expected
+            ):
                 return True, f"{name}=Field({expected})"
         return False, f"{name}={ast.unparse(v)!r} (expect {expected})"
 
@@ -371,10 +389,22 @@ def _check_hc23() -> tuple[Verdict, str]:
         if name not in fields:
             return False, f"missing '{name}'"
         v = fields[name]
-        if isinstance(v, ast.Constant) and isinstance(v.value, str) and v.value == expected:
+        if (
+            isinstance(v, ast.Constant)
+            and isinstance(v.value, str)
+            and v.value == expected
+        ):
             return True, f"{name}={expected!r}"
-        if isinstance(v, ast.Call) and isinstance(v.func, ast.Name) and v.func.id == "Field":
-            if v.args and isinstance(v.args[0], ast.Constant) and v.args[0].value == expected:
+        if (
+            isinstance(v, ast.Call)
+            and isinstance(v.func, ast.Name)
+            and v.func.id == "Field"
+        ):
+            if (
+                v.args
+                and isinstance(v.args[0], ast.Constant)
+                and v.args[0].value == expected
+            ):
                 return True, f"{name}=Field({expected!r})"
         return False, f"{name}={ast.unparse(v)!r} (expect {expected!r})"
 
@@ -382,13 +412,34 @@ def _check_hc23() -> tuple[Verdict, str]:
         if name not in fields:
             return False, f"missing '{name}'"
         v = fields[name]
-        if isinstance(v, ast.Call) and isinstance(v.func, ast.Name) and v.func.id == "Decimal":
-            if v.args and isinstance(v.args[0], ast.Constant) and v.args[0].value == expected_str:
+        if (
+            isinstance(v, ast.Call)
+            and isinstance(v.func, ast.Name)
+            and v.func.id == "Decimal"
+        ):
+            if (
+                v.args
+                and isinstance(v.args[0], ast.Constant)
+                and v.args[0].value == expected_str
+            ):
                 return True, f"{name}=Decimal({expected_str!r})"
-        if isinstance(v, ast.Call) and isinstance(v.func, ast.Name) and v.func.id == "Field":
-            if v.args and isinstance(v.args[0], ast.Call) and isinstance(v.args[0].func, ast.Name):
+        if (
+            isinstance(v, ast.Call)
+            and isinstance(v.func, ast.Name)
+            and v.func.id == "Field"
+        ):
+            if (
+                v.args
+                and isinstance(v.args[0], ast.Call)
+                and isinstance(v.args[0].func, ast.Name)
+            ):
                 inner = v.args[0]
-                if inner.func.id == "Decimal" and inner.args and isinstance(inner.args[0], ast.Constant) and inner.args[0].value == expected_str:
+                if (
+                    inner.func.id == "Decimal"
+                    and inner.args
+                    and isinstance(inner.args[0], ast.Constant)
+                    and inner.args[0].value == expected_str
+                ):
                     return True, f"{name}=Field(Decimal({expected_str!r}))"
         return False, f"{name}={ast.unparse(v)!r} (expect Decimal({expected_str!r}))"
 
@@ -439,7 +490,6 @@ def _check_hc24() -> tuple[Verdict, str]:
 
 def _check_hc25() -> tuple[Verdict, str]:
     rp = REPO_ROOT / "src" / "loats" / "rules.py"
-    text = rp.read_text(encoding="utf-8")
     rc, out, _ = run_cmd(
         ["rg", "-n", r"\b18\.5\b", str(rp)],
         cwd=REPO_ROOT,
@@ -485,7 +535,10 @@ def _check_hc27() -> tuple[Verdict, str]:
         return Verdict.FAIL, "QueueFull handler missing"
     if "get_queue_stats" not in tp:
         return Verdict.FAIL, "get_queue_stats missing"
-    return Verdict.PASS, "bounded queue (maxsize) + put_nowait + QueueFull + get_queue_stats"
+    return (
+        Verdict.PASS,
+        "bounded queue (maxsize) + put_nowait + QueueFull + get_queue_stats",
+    )
 
 
 HC_CATALOG: list[tuple[str, str, str, bool, Callable[[], tuple[Verdict, str]]]] = [
@@ -507,11 +560,23 @@ HC_CATALOG: list[tuple[str, str, str, bool, Callable[[], tuple[Verdict, str]]]] 
     ("HC-16", "unknown source loudly rejected", "TODO-9", False, _check_hc16),
     ("HC-17", "zero orchestrator source literals", "TODO-7", False, _check_hc17),
     ("HC-18", "set_vix_level has >=1 caller", "TODO-12", False, _check_hc18),
-    ("HC-19", "routing real (no sleep-sim, no default-on, integration)", "TODO-13", False, _check_hc19),
+    (
+        "HC-19",
+        "routing real (no sleep-sim, no default-on, integration)",
+        "TODO-13",
+        False,
+        _check_hc19,
+    ),
     ("HC-20", "update_trailing_stop has >=1 caller", "TODO-14", False, _check_hc20),
     ("HC-21", "zero module-level eager get_settings()", "TODO-18", False, _check_hc21),
     ("HC-22", "no PYTEST_CURRENT_TEST in src/", "TODO-20", False, _check_hc22),
-    ("HC-23", "config conformance mods/lot/positions/max_ops/mode", "TODO-17", False, _check_hc23),
+    (
+        "HC-23",
+        "config conformance mods/lot/positions/max_ops/mode",
+        "TODO-17",
+        False,
+        _check_hc23,
+    ),
     ("HC-24", "rules BUY<30 / SELL>40", "TODO-16", False, _check_hc24),
     ("HC-25", "no bare 18.5 VIX fallback", "TODO-12", False, _check_hc25),
     ("HC-26", "root junk files absent", "TODO-21", False, _check_hc26),
@@ -548,26 +613,49 @@ def run_catalog(
     rows: list[Row] = []
     if fast:
         fast_ids = {
-            "HC-01", "HC-02", "HC-03", "HC-04", "HC-05", "HC-06",
-            "HC-07", "HC-08", "HC-09", "HC-10", "HC-12", "HC-13",
-            "HC-21", "HC-22", "HC-26",
+            "HC-01",
+            "HC-02",
+            "HC-03",
+            "HC-04",
+            "HC-05",
+            "HC-06",
+            "HC-07",
+            "HC-08",
+            "HC-09",
+            "HC-10",
+            "HC-12",
+            "HC-13",
+            "HC-21",
+            "HC-22",
+            "HC-26",
         }
         order = [r for r in order if r[0] in fast_ids]
     for hcid, title, todo, skip_tolerated, check_fn in order:
         try:
             verdict, detail = check_fn()
             rows.append(Row(hcid, title, todo, skip_tolerated, verdict, detail))
-        except Exception as e:  # noqa: BLE001
-            rows.append(Row(hcid, title, todo, skip_tolerated, Verdict.FAIL,
-                            f"exception: {type(e).__name__}: {e}"))
+        except Exception as e:
+            rows.append(
+                Row(
+                    hcid,
+                    title,
+                    todo,
+                    skip_tolerated,
+                    Verdict.FAIL,
+                    f"exception: {type(e).__name__}: {e}",
+                )
+            )
     return rows
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="HC Registry Verifier (HC-01..HC-27)")
     parser.add_argument("--only", help="comma-separated subset of HC IDs")
-    parser.add_argument("--fast", action="store_true",
-                        help="structural + critical static only (skip probes)")
+    parser.add_argument(
+        "--fast",
+        action="store_true",
+        help="structural + critical static only (skip probes)",
+    )
     parser.add_argument("--json", help="write JSON report to PATH")
     args = parser.parse_args()
     only = [s.strip() for s in args.only.split(",")] if args.only else None
@@ -582,7 +670,9 @@ def main() -> int:
     passed = sum(1 for r in rows if r.verdict == Verdict.PASS)
     failed = sum(1 for r in rows if r.verdict == Verdict.FAIL)
     skipped = sum(1 for r in rows if r.verdict == Verdict.SKIP)
-    print(f"TOTAL: PASS={passed} FAIL={failed} SKIP={skipped} ({len(rows)} of {len(HC_CATALOG)})")
+    print(
+        f"TOTAL: PASS={passed} FAIL={failed} SKIP={skipped} ({len(rows)} of {len(HC_CATALOG)})"
+    )
     if args.json:
         out = [
             {
@@ -596,10 +686,7 @@ def main() -> int:
         ]
         Path(args.json).write_text(json.dumps(out, indent=2), encoding="utf-8")
         print(f"JSON report written to {args.json}")
-    yellow = sum(
-        1 for r in rows
-        if r.verdict == Verdict.SKIP and not r.skip_tolerated
-    )
+    yellow = sum(1 for r in rows if r.verdict == Verdict.SKIP and not r.skip_tolerated)
     if failed or yellow:
         print(f"REGISTRY UNHEALTHY: failures={failed} intolerant-skips={yellow}")
         return 1

@@ -37,12 +37,8 @@ async def main() -> None:
     r3 = await eng.enqueue_decision(_mk(3))
     assert r1["status"] == "queued", f"r1={r1}"
     assert r2["status"] == "queued", f"r2={r2}"
-    assert (
-        r3["status"] == "rejected" and "queue_full" in str(r3).lower()
-    ), f"r3={r3}"
-    print(
-        f"queue probe r1={r1['status']} r2={r2['status']} r3={r3['status']}"
-    )
+    assert r3["status"] == "rejected" and "queue_full" in str(r3).lower(), f"r3={r3}"
+    print(f"queue probe r1={r1['status']} r2={r2['status']} r3={r3['status']}")
 
 
 if __name__ == "__main__":

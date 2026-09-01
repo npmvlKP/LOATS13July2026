@@ -14,9 +14,11 @@ from enum import StrEnum
 from typing import Any
 
 from .config import get_settings
+from .database import db
 from .lazy_settings import LazySettings
 from .loats_logging import get_logger
 from .models import FundsData, Signal, SignalType, Trade, TradeDecision, TransactionType
+from .openalgo import AsyncOpenAlgoClient
 from .options import calculate_portfolio_var
 from .rules import rules_engine
 from .sizing import sizing_engine
@@ -271,14 +273,21 @@ class TradeDecisionEngine:
             - Routing failure propagates (no fabricated success)
             - Audit row exists per decision (dual-write: SQLite + JSONL)
         """
-        from .database import db
-        from .openalgo import AsyncOpenAlgoClient
-
         payload = trade_decision.to_analyzer_payload()
-        response: dict[str, Any] = {}
+        response = await self._do_route_or_disable(trade_decision, payload)
+        return await self._persist_routing_outcome(trade_decision, response)
 
+    async def _do_route_or_disable(
+        self, trade_decision: TradeDecision, payload: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Return disabled status or make real Analyzer HTTP call.
+
+        Analyzer routing is intentionally gated by the environment flag
+        (default OFF, enable explicitly). When disabled we still return a
+        deterministic response so the paper-trail is complete, but we do not
+        fabricate a successful Analyzer response.
+        """
         if not self.analyzer_routing_enabled:
-            # Routing disabled - return disabled status but still persist to audit
             response = {
                 "status": "disabled",
                 "reason": "analyzer_routing_disabled",
@@ -288,48 +297,51 @@ class TradeDecisionEngine:
             logger.info(
                 f"Analyzer routing disabled for decision {trade_decision.decision_id}"
             )
-        else:
-            # Routing enabled - make real HTTP call to Analyzer
-            try:
-                logger.info(
-                    f"Routing TradeDecision to Analyzer: {trade_decision.decision_id}"
-                )
-                logger.debug(f"Analyzer payload: {payload}")
+            return response
 
-                async with AsyncOpenAlgoClient() as client:
-                    analyzer_response = await client.place_analyzer_request(payload)
-                    response = {
-                        "status": "success",
-                        "decision_id": trade_decision.decision_id,
-                        "analyzer_response": analyzer_response,
-                        "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
-                    }
-                    logger.info(
-                        f"Successfully routed decision "
-                        f"{trade_decision.decision_id} to Analyzer"
-                    )
-
-            except Exception as e:
-                # Propagate errors, don't fabricate success
-                logger.error(f"Failed to route TradeDecision to Analyzer: {e}")
-                response = {
-                    "status": "error",
-                    "decision_id": trade_decision.decision_id,
-                    "error": str(e),
-                    "error_type": type(e).__name__,
-                    "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
-                }
-                # Re-raise to propagate failure (no fabrication)
-                raise
-
-        # Persist decision + routing outcome to audit trail (always, even when disabled)
+        # Routing enabled - make real HTTP call to Analyzer (no simulation).
+        logger.info(f"Routing TradeDecision to Analyzer: {trade_decision.decision_id}")
+        logger.debug(f"Analyzer payload: {payload}")
         try:
-            # Prefer async_record_trade_decision (decision+response) if available,
-            # else fallback to async_create_trade_decision (decision only).
-            # The DB extension registers _async_record_trade_decision; the
-            # public wrapper may be async_record_trade_decision or
-            # async_create_trade_decision depending on migration state.
-            record_fn = getattr(db, "async_record_trade_decision", None)
+            async with AsyncOpenAlgoClient() as client:
+                analyzer_response = await client.place_analyzer_request(payload)
+            logger.info(
+                f"Successfully routed decision {trade_decision.decision_id} to Analyzer"
+            )
+            return {
+                "status": "success",
+                "decision_id": trade_decision.decision_id,
+                "analyzer_response": analyzer_response,
+                "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
+            }
+        except Exception as e:
+            # Propagate errors, don't fabricate success.
+            logger.error(f"Failed to route TradeDecision to Analyzer: {e}")
+            response = {
+                "status": "error",
+                "decision_id": trade_decision.decision_id,
+                "error": str(e),
+                "error_type": type(e).__name__,
+                "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
+            }
+            await self._persist_routing_outcome(trade_decision, response)
+            raise
+
+    async def _persist_routing_outcome(
+        self, trade_decision: TradeDecision, response: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Persist decision + routing outcome to audit trail (SQLite + JSONL).
+
+        Best-effort: if the DB write fails the routing response is still
+        returned so callers can decide whether to fail the orchestrator cycle.
+        """
+        # Prefer async_record_trade_decision (decision+response) if available,
+        # else fallback to async_create_trade_decision (decision only).
+        # The DB extension registers _async_record_trade_decision; the
+        # public wrapper may be async_record_trade_decision or
+        # async_create_trade_decision depending on migration state.
+        record_fn = getattr(db, "async_record_trade_decision", None)
+        try:
             if record_fn is not None:
                 await record_fn(trade_decision, response)
             else:
@@ -368,8 +380,12 @@ class TradeDecisionEngine:
 
                 self.decision_queue.task_done()
 
+            except asyncio.CancelledError:
+                raise
             except Exception as e:
                 logger.error(f"Error processing decision queue: {e}")
+                # Backoff to avoid tight spin on persistent errors, but never
+                # exceed the decision timeout so the queue does not stall.
                 await asyncio.sleep(1.0)
 
     async def enqueue_decision(self, trade_decision: TradeDecision) -> dict[str, Any]:

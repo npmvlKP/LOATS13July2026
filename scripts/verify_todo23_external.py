@@ -53,7 +53,7 @@ def verify_dead_weights_removed() -> tuple[bool, str]:
     content = strength_file.read_text()
 
     # Extract the source_weights dictionary initialization
-    weights_pattern = r'source_weights\s*=\s*\{([^}]+)\}'
+    weights_pattern = r"source_weights\s*=\s*\{([^}]+)\}"
     match = re.search(weights_pattern, content, re.DOTALL)
 
     if not match:
@@ -63,9 +63,9 @@ def verify_dead_weights_removed() -> tuple[bool, str]:
 
     # Check that dead weight entries are NOT present
     dead_weights = [
-        'StrengthSource.FUNDAMENTAL',
-        'StrengthSource.MACHINE_LEARNING',
-        'StrengthSource.OPTIONS_FLOW',
+        "StrengthSource.FUNDAMENTAL",
+        "StrengthSource.MACHINE_LEARNING",
+        "StrengthSource.OPTIONS_FLOW",
     ]
 
     for dead_weight in dead_weights:

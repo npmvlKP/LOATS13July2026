@@ -15,16 +15,11 @@ Exit code 0 means all verification stages passed.
 
 from __future__ import annotations
 
-import asyncio
 import inspect
-import json
 import os
 import subprocess
 import sys
-import tempfile
 from pathlib import Path
-from typing import Any
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -172,7 +167,9 @@ def stage_4_async_db_helpers() -> bool:
     if missing:
         _safe_print(f"FAIL: missing public async methods {missing}", indent=1)
         return False
-    _safe_print(f"PASS: all {len(required_public)} public async methods registered", indent=1)
+    _safe_print(
+        f"PASS: all {len(required_public)} public async methods registered", indent=1
+    )
 
     # Validate signatures for a few critical helpers.
     sig = inspect.signature(Database.async_update_trade)
@@ -189,7 +186,16 @@ def stage_4_async_db_helpers() -> bool:
 
     sig = inspect.signature(Database.async_log_audit)
     params = list(sig.parameters)
-    expected = ["self", "action", "entity_type", "entity_id", "user", "metadata", "previous_state", "new_state"]
+    expected = [
+        "self",
+        "action",
+        "entity_type",
+        "entity_id",
+        "user",
+        "metadata",
+        "previous_state",
+        "new_state",
+    ]
     if params != expected:
         _safe_print(f"FAIL: async_log_audit signature {params}", indent=1)
         return False
@@ -217,9 +223,7 @@ def stage_5_audit_dual_write_runtime() -> bool:
     if not audit_script.exists():
         _safe_print("SKIP: test_audit_dual_write.py not found", indent=1)
         return True
-    code, out, err = _run(
-        [PY, "-m", "pytest", str(audit_script), "-q", "--tb=short"]
-    )
+    code, out, err = _run([PY, "-m", "pytest", str(audit_script), "-q", "--tb=short"])
     if code != 0:
         _safe_print("FAIL: audit dual-write tests", indent=1)
         _safe_print((out + err)[:800], indent=2)
@@ -235,9 +239,7 @@ def stage_6_database_async_additions_tests() -> bool:
     if not test_path.exists():
         _safe_print("SKIP: test_database_async_additions.py not found", indent=1)
         return True
-    code, out, err = _run(
-        [PY, "-m", "pytest", str(test_path), "-q", "--tb=short"]
-    )
+    code, out, err = _run([PY, "-m", "pytest", str(test_path), "-q", "--tb=short"])
     if code != 0:
         _safe_print("FAIL: database async additions tests", indent=1)
         _safe_print((out + err)[:800], indent=2)

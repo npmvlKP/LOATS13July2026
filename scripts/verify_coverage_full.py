@@ -17,8 +17,8 @@ PASS = FAIL = 0
 
 def gate(name, ok, detail=""):
     global PASS, FAIL
-    PASS += (1 if ok else 0)
-    FAIL += (0 if ok else 1)
+    PASS += 1 if ok else 0
+    FAIL += 0 if ok else 1
     tag = "PASS" if ok else "FAIL"
     msg = f"  [{tag}] {name}"
     if detail:
@@ -52,7 +52,9 @@ for tf in test_files:
             for nd in ast.walk(tree)
             if isinstance(nd, (ast.FunctionDef, ast.AsyncFunctionDef))
         )
-        gate(f"{tf}", True, f"{len(p.read_text('utf-8').splitlines())} lines, {n} funcs")
+        gate(
+            f"{tf}", True, f"{len(p.read_text('utf-8').splitlines())} lines, {n} funcs"
+        )
     except SyntaxError as e:
         gate(f"{tf}", False, str(e))
 
@@ -84,10 +86,10 @@ result = subprocess.run(cmd, capture_output=True, text=True, timeout=120, cwd=Pa
 
 # Parse test result
 lines = result.stdout.splitlines()
-test_ok = any("passed" in l for l in lines)
-for l in lines:
-    if "passed" in l:
-        print(f"  [INFO] {l.strip()}")
+test_ok = any("passed" in line for line in lines)
+for line in lines:
+    if "passed" in line:
+        print(f"  [INFO] {line.strip()}")
 if not test_ok:
     gate("All tests pass", False, result.stdout[-200:])
 else:
@@ -123,9 +125,7 @@ for fp, fd in data.get("files", {}).items():
         f"{miss} stmts missed",
     )
 
-agg = (
-    tot_covered / (tot_covered + tot_miss) * 100 if (tot_covered + tot_miss) else 0
-)
+agg = tot_covered / (tot_covered + tot_miss) * 100 if (tot_covered + tot_miss) else 0
 gate(f"Aggregate 4-module: {agg:.1f}% >= 80%", agg >= 80)
 
 # G5 informational
@@ -136,8 +136,6 @@ print("  [INFO] HC-12 / HC-13: pre-existing failures, not in scope")
 
 print("\n" + "=" * 60)
 print(f"RESULT:  {PASS} PASS  |  {FAIL} FAIL")
-print(
-    "STATUS: " + ("ALL GATES PASSED" if FAIL == 0 else f"{FAIL} GATE(S) FAILED")
-)
+print("STATUS: " + ("ALL GATES PASSED" if FAIL == 0 else f"{FAIL} GATE(S) FAILED"))
 print("=" * 60)
 sys.exit(1 if FAIL else 0)

@@ -23,10 +23,9 @@ import argparse
 import json
 import subprocess
 import sys
-from datetime import UTC, datetime
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Literal
 
 # Repository root
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -136,7 +135,7 @@ def print_result(result: VerificationResult, verbose: bool = False) -> None:
                 print(f"  │ {line}")
             if len(stdout_lines) > 10:
                 print(f"  │ ... ({len(stdout_lines) - 10} more lines)")
-            print(f"  └─")
+            print("  └─")
 
         if result.stderr.strip():
             print(f"\n  ┌─ stderr ({len(result.stderr)} chars):")
@@ -145,7 +144,7 @@ def print_result(result: VerificationResult, verbose: bool = False) -> None:
                 print(f"  │ {line}")
             if len(stderr_lines) > 10:
                 print(f"  │ ... ({len(stderr_lines) - 10} more lines)")
-            print(f"  └─")
+            print("  └─")
 
 
 def generate_report(
@@ -209,10 +208,12 @@ def generate_report(
         }
 
     # Final summary
-    print_header(f"FINAL SUMMARY — {passed}/{total} PASSED ({(passed/total*100):.1f}%)")
+    print_header(
+        f"FINAL SUMMARY — {passed}/{total} PASSED ({(passed / total * 100):.1f}%)"
+    )
 
     if failed == 0:
-        print(f"✓ ALL VERIFICATIONS PASSED — Production Ready")
+        print("✓ ALL VERIFICATIONS PASSED — Production Ready")
         print(f"  Total Duration: {total_duration:.1f}s")
     else:
         print(f"✗ {failed} VERIFICATION(S) FAILED — Review output above")
@@ -249,9 +250,7 @@ def main() -> int:
     parser.add_argument(
         "--verbose", action="store_true", help="Show detailed output for each check"
     )
-    parser.add_argument(
-        "--json", type=str, help="Write JSON report to specified path"
-    )
+    parser.add_argument("--json", type=str, help="Write JSON report to specified path")
     parser.add_argument(
         "--fast", action="store_true", help="Run only fast verifications"
     )
@@ -270,7 +269,11 @@ def main() -> int:
         (
             "S01: Options Math Parity",
             "structural",
-            [PY, "-c", "import pathlib, sys; p=pathlib.Path('src/loats/options_math.py'); assert p.exists(), 'missing options_math.py'; sys.path.insert(0,'src'); from loats.options_math import black_scholes, delta; c=black_scholes('c',100,90,0.5,0.01,0.2); assert abs(c-12.111581435)<1e-6, f'parity {c}'; d=delta('c',49,50,0.3846,0.05,0.2); assert abs(d-0.521601633972)<1e-6, f'delta {d}'; print(f'parity c={c:.10f} delta={d:.10f}')"],
+            [
+                PY,
+                "-c",
+                "import pathlib, sys; p=pathlib.Path('src/loats/options_math.py'); assert p.exists(), 'missing options_math.py'; sys.path.insert(0,'src'); from loats.options_math import black_scholes, delta; c=black_scholes('c',100,90,0.5,0.01,0.2); assert abs(c-12.111581435)<1e-6, f'parity {c}'; d=delta('c',49,50,0.3846,0.05,0.2); assert abs(d-0.521601633972)<1e-6, f'delta {d}'; print(f'parity c={c:.10f} delta={d:.10f}')",
+            ],
         ),
         (
             "S07: Dead Weight Removal",
@@ -291,7 +294,17 @@ def main() -> int:
         (
             "T03: Mypy Strict (Changed Files)",
             "static",
-            [PY, "-m", "mypy", "src/loats/options_math.py", "src/loats/trade_decision.py", "src/loats/config/settings.py", "--strict", "--config-file", "pyproject.toml"],
+            [
+                PY,
+                "-m",
+                "mypy",
+                "src/loats/options_math.py",
+                "src/loats/trade_decision.py",
+                "src/loats/config/settings.py",
+                "--strict",
+                "--config-file",
+                "pyproject.toml",
+            ],
         ),
         (
             "T08: Function Size/Complexity",
@@ -321,13 +334,25 @@ def main() -> int:
         (
             "G01: Pytest Sanity",
             "gate",
-            [PY, "-m", "pytest", "tests/test_trade_decision.py", "tests/test_options.py", "tests/test_ta.py", "-q"],
+            [
+                PY,
+                "-m",
+                "pytest",
+                "tests/test_trade_decision.py",
+                "tests/test_options.py",
+                "tests/test_ta.py",
+                "-q",
+            ],
         ),
     ]
 
     # Select verifications to run
     if args.category:
-        verifications = [v for v in all_verifications + comprehensive_verifications if v[1] == args.category]
+        verifications = [
+            v
+            for v in all_verifications + comprehensive_verifications
+            if v[1] == args.category
+        ]
     elif args.fast:
         verifications = all_verifications
     else:

@@ -37,18 +37,22 @@ if str(SRC) not in sys.path:
 # Live check implementations (after)
 # ---------------------------------------------------------------------------
 
+
 def live_v1() -> tuple[bool, str]:
     try:
         from loats.options_math import black_scholes
+
         c = black_scholes("c", 100, 90, 0.5, 0.01, 0.2)
         ok = abs(c - 12.111581435) < 1e-6
-        return ok, f"c={c:.10f} exp 12.111581435 diff={abs(c-12.111581435):.2e}"
+        return ok, f"c={c:.10f} exp 12.111581435 diff={abs(c - 12.111581435):.2e}"
     except Exception as e:
         return False, str(e)
 
+
 def live_v2() -> tuple[bool, str]:
     try:
-        from loats.options_math import delta, gamma, theta, vega, rho
+        from loats.options_math import delta, gamma, rho, theta, vega
+
         S, K, r, t, sigma = 49, 50, 0.05, 0.3846, 0.2
         d = delta("c", S, K, t, r, sigma)
         g = gamma("c", S, K, t, r, sigma)
@@ -66,16 +70,19 @@ def live_v2() -> tuple[bool, str]:
     except Exception as e:
         return False, str(e)
 
+
 def live_v3() -> tuple[bool, str]:
     try:
         from loats.options_math import black_scholes, implied_volatility
+
         S, K, t, r, sigma = 100, 100, 1, 0.05, 0.2
         price = black_scholes("c", S, K, t, r, sigma)
         iv = implied_volatility(price, S, K, t, r, "c")
         ok = abs(iv - 0.2) < 1e-4
-        return ok, f"price={price:.6f} iv={iv:.6f} diff={abs(iv-0.2):.2e}"
+        return ok, f"price={price:.6f} iv={iv:.6f} diff={abs(iv - 0.2):.2e}"
     except Exception as e:
         return False, str(e)
+
 
 def live_t1() -> tuple[bool, str]:
     try:
@@ -85,10 +92,13 @@ def live_t1() -> tuple[bool, str]:
     except Exception as e:
         return False, str(e)
 
+
 def live_t2() -> tuple[bool, str]:
     try:
         ta_text = (SRC / "loats" / "ta.py").read_text(encoding="utf-8")
-        has_lib = "from ta." in ta_text or "import ta" in ta_text and "technical_analysis" not in ta_text
+        has_lib = "from ta." in ta_text or (
+            "import ta" in ta_text and "technical_analysis" not in ta_text
+        )
         # More precise: no library import
         has_custom = "def calculate_rsi" in ta_text
         ok = not has_lib and has_custom
@@ -96,14 +106,17 @@ def live_t2() -> tuple[bool, str]:
     except Exception as e:
         return False, str(e)
 
+
 def live_q1() -> tuple[bool, str]:
     try:
         from loats.trade_decision import TradeDecisionEngine
+
         eng = TradeDecisionEngine()
         ok = eng.decision_queue.maxsize != 0 and eng.decision_queue.maxsize == 100
         return ok, f"maxsize={eng.decision_queue.maxsize}"
     except Exception as e:
         return False, str(e)
+
 
 def live_q2() -> tuple[bool, str]:
     try:
@@ -112,36 +125,60 @@ def live_q2() -> tuple[bool, str]:
 
         async def _test():
             eng = TradeDecisionEngine(maxsize=2)
+
             def _td():
                 return TradeDecision(
-                    symbol="NIFTY", decision_type=SignalType.BUY, composite_strength=0.8,
-                    timestamp=datetime.now(UTC), entry_price=24500, quantity=25,
-                    stop_loss=24255, take_profit=24990, risk_percentage=0.02, status="PENDING"
+                    symbol="NIFTY",
+                    decision_type=SignalType.BUY,
+                    composite_strength=0.8,
+                    timestamp=datetime.now(UTC),
+                    entry_price=24500,
+                    quantity=25,
+                    stop_loss=24255,
+                    take_profit=24990,
+                    risk_percentage=0.02,
+                    status="PENDING",
                 )
+
             r1 = await eng.enqueue_decision(_td())
             r2 = await eng.enqueue_decision(_td())
             r3 = await eng.enqueue_decision(_td())
             return r1, r2, r3
 
         r1, r2, r3 = asyncio.run(_test())
-        ok = r1["status"] == "queued" and r2["status"] == "queued" and r3["status"] == "rejected" and r3.get("reason") == "queue_full"
-        return ok, f"r1={r1['status']} r2={r2['status']} r3={r3['status']}/{r3.get('reason')}"
+        ok = (
+            r1["status"] == "queued"
+            and r2["status"] == "queued"
+            and r3["status"] == "rejected"
+            and r3.get("reason") == "queue_full"
+        )
+        return (
+            ok,
+            f"r1={r1['status']} r2={r2['status']} r3={r3['status']}/{r3.get('reason')}",
+        )
     except Exception as e:
         return False, str(e)
+
 
 def live_q3() -> tuple[bool, str]:
     try:
         from loats.trade_decision import TradeDecisionEngine
+
         eng = TradeDecisionEngine(maxsize=5)
         stats = eng.get_queue_stats()
-        ok = all(k in stats for k in ("queue_size", "queue_maxsize", "queue_full", "queue_empty"))
+        ok = all(
+            k in stats
+            for k in ("queue_size", "queue_maxsize", "queue_full", "queue_empty")
+        )
         return ok, str(stats)
     except Exception as e:
         return False, str(e)
 
+
 def live_f1() -> tuple[bool, str]:
     try:
         from loats.config import get_settings
+
         get_settings.cache_clear()  # type: ignore
         feeds = get_settings().rss_feeds
         ok = not any("bloombergquint" in f for f in feeds)
@@ -149,9 +186,11 @@ def live_f1() -> tuple[bool, str]:
     except Exception as e:
         return False, str(e)
 
+
 def live_f2() -> tuple[bool, str]:
     try:
         from loats.config import get_settings
+
         get_settings.cache_clear()  # type: ignore
         feeds = get_settings().rss_feeds
         ok = any("livemint" in f for f in feeds) and len(feeds) >= 2
@@ -159,8 +198,13 @@ def live_f2() -> tuple[bool, str]:
     except Exception as e:
         return False, str(e)
 
+
 CASES = [
-    ("V1 Black-Scholes price (Hull)", live_v1, False),  # before: vollib, but also deprecated
+    (
+        "V1 Black-Scholes price (Hull)",
+        live_v1,
+        False,
+    ),  # before: vollib, but also deprecated
     ("V2 Greeks parity (Hull)", live_v2, False),
     ("V3 IV round-trip", live_v3, False),
     ("T1 pyproject drops ta", live_t1, False),
@@ -179,7 +223,10 @@ CASES = [
 # Q1-3: before unbounded Queue() => all fail
 # F1-2: before had bloombergquint defunct => both fail
 BEFORE_RESULTS = {
-    "V1 Black-Scholes price (Hull)": (True, "vollib price ~12.11 but deprecated dep"),  # technically passed but with debt
+    "V1 Black-Scholes price (Hull)": (
+        True,
+        "vollib price ~12.11 but deprecated dep",
+    ),  # technically passed but with debt
     "V2 Greeks parity (Hull)": (True, "vollib greeks but deprecated"),
     "V3 IV round-trip": (True, "vollib IV but deprecated"),
     "T1 pyproject drops ta": (False, "ta>=0.11.0 declared but unused"),
@@ -190,6 +237,7 @@ BEFORE_RESULTS = {
     "F1 rss_feeds no bloombergquint": (False, "bloombergquint present"),
     "F2 rss_feeds has livemint": (False, "bloombergquint present, no livemint"),
 }
+
 
 def main() -> None:
     print("=" * 72)
@@ -212,11 +260,15 @@ def main() -> None:
         print(f"  {'[PASS]' if ok else '[FAIL]':6} {name:35} — {detail}")
 
     print("\n" + "=" * 72)
-    print(f"SCORE: BEFORE {before_pass}/10 -> AFTER {after_pass}/10  (delta +{after_pass - before_pass})")
+    print(
+        f"SCORE: BEFORE {before_pass}/10 -> AFTER {after_pass}/10  (delta +{after_pass - before_pass})"
+    )
     if after_pass == 10:
         print("All 10 cases PASSED after — TODO-27 fully addressed.")
     elif after_pass > before_pass:
-        print(f"Improvement: +{after_pass - before_pass} cases. Remaining: {10 - after_pass}")
+        print(
+            f"Improvement: +{after_pass - before_pass} cases. Remaining: {10 - after_pass}"
+        )
     else:
         print("No improvement — investigate.")
     print("=" * 72)
@@ -231,6 +283,7 @@ def main() -> None:
         ],
     }
     Path("reports/todo27_eval.json").write_text(str(out), encoding="utf-8")
+
 
 if __name__ == "__main__":
     main()

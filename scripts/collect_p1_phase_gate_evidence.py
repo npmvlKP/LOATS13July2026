@@ -32,7 +32,7 @@ import asyncio
 import json
 import statistics
 import sys
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -40,9 +40,8 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.loats.database import Database
-from src.loats.performance_analyzer import PerformanceAnalyzer
-from src.loats.ta import TechnicalAnalysis
 from src.loats.models import HistoricalData
+from src.loats.ta import TechnicalAnalysis
 
 
 class P1EvidenceCollector:
@@ -76,7 +75,9 @@ class P1EvidenceCollector:
         for i in range(num_samples):
             # Measure TA calculation
             ta_start = datetime.now(UTC)
-            indicators = await asyncio.to_thread(self.ta.calculate_indicators, test_data)
+            indicators = await asyncio.to_thread(
+                self.ta.calculate_indicators, test_data
+            )
             ta_duration_ms = (datetime.now(UTC) - ta_start).total_seconds() * 1000
 
             # Measure database operations
@@ -153,11 +154,20 @@ class P1EvidenceCollector:
             "gate_compliance": {
                 "ta_gate_pass_rate": round(ta_passes / len(self.measurements) * 100, 2),
                 "db_gate_pass_rate": round(db_passes / len(self.measurements) * 100, 2),
-                "round_trip_gate_pass_rate": round(rt_passes / len(self.measurements) * 100, 2),
+                "round_trip_gate_pass_rate": round(
+                    rt_passes / len(self.measurements) * 100, 2
+                ),
                 "all_gates_pass_rate": round(
-                    sum(1 for m in self.measurements
-                        if m["passes_ta_gate"] and m["passes_db_gate"] and m["passes_round_trip_gate"])
-                    / len(self.measurements) * 100, 2
+                    sum(
+                        1
+                        for m in self.measurements
+                        if m["passes_ta_gate"]
+                        and m["passes_db_gate"]
+                        and m["passes_round_trip_gate"]
+                    )
+                    / len(self.measurements)
+                    * 100,
+                    2,
                 ),
             },
             "measurements": self.measurements,
@@ -165,8 +175,9 @@ class P1EvidenceCollector:
 
     def _generate_test_data(self, size: int) -> list[HistoricalData]:
         """Generate test historical data."""
-        import numpy as np
         from datetime import timedelta
+
+        import numpy as np
 
         base_time = datetime.now(UTC)
         data = []
@@ -234,24 +245,32 @@ class P1EvidenceCollector:
 
         summary = stats["summary"]
         print(f"\nTotal samples: {summary['total_samples']}")
-        print(f"Performance gates:")
+        print("Performance gates:")
         print(f"  - TA calculation: {summary['ta_gate']}")
         print(f"  - Database ops:   {summary['db_gate']}")
         print(f"  - Round-trip:     {summary['round_trip_gate']}")
 
         rt_stats = stats["round_trip_statistics"]
-        print(f"\nRound-trip latency statistics:")
+        print("\nRound-trip latency statistics:")
         print(f"  - Mean:   {rt_stats['mean']} ms")
         print(f"  - Median: {rt_stats['median']} ms")
         print(f"  - P95:    {rt_stats['p95']} ms")
         print(f"  - P99:    {rt_stats['p99']} ms")
 
         gate_compliance = stats["gate_compliance"]
-        print(f"\nGate compliance:")
-        print(f"  - TA gate pass rate:         {gate_compliance['ta_gate_pass_rate']:.2f}%")
-        print(f"  - DB gate pass rate:         {gate_compliance['db_gate_pass_rate']:.2f}%")
-        print(f"  - Round-trip gate pass rate: {gate_compliance['round_trip_gate_pass_rate']:.2f}%")
-        print(f"  - All gates pass rate:       {gate_compliance['all_gates_pass_rate']:.2f}%")
+        print("\nGate compliance:")
+        print(
+            f"  - TA gate pass rate:         {gate_compliance['ta_gate_pass_rate']:.2f}%"
+        )
+        print(
+            f"  - DB gate pass rate:         {gate_compliance['db_gate_pass_rate']:.2f}%"
+        )
+        print(
+            f"  - Round-trip gate pass rate: {gate_compliance['round_trip_gate_pass_rate']:.2f}%"
+        )
+        print(
+            f"  - All gates pass rate:       {gate_compliance['all_gates_pass_rate']:.2f}%"
+        )
 
         print("\n" + "=" * 70)
 
@@ -261,12 +280,16 @@ class P1EvidenceCollector:
         P1_GATE_THRESHOLD = 80.0
         p1_pass = gate_compliance["round_trip_gate_pass_rate"] >= P1_GATE_THRESHOLD
         if p1_pass:
-            print(f"✅ P1 PHASE-GATE: PASSED")
-            pct = gate_compliance['round_trip_gate_pass_rate']
-            print(f'   Evidence: Round-trip latency meets <100ms gate ({pct:.2f}% ≥ {P1_GATE_THRESHOLD:.0f}%)')
+            print("✅ P1 PHASE-GATE: PASSED")
+            pct = gate_compliance["round_trip_gate_pass_rate"]
+            print(
+                f"   Evidence: Round-trip latency meets <100ms gate ({pct:.2f}% ≥ {P1_GATE_THRESHOLD:.0f}%)"
+            )
         else:
             print("❌ P1 PHASE-GATE: FAILED")
-            print(f"   Evidence: Round-trip latency below <100ms gate ({gate_compliance['round_trip_gate_pass_rate']:.2f}% pass rate)")
+            print(
+                f"   Evidence: Round-trip latency below <100ms gate ({gate_compliance['round_trip_gate_pass_rate']:.2f}% pass rate)"
+            )
 
         print("=" * 70)
 

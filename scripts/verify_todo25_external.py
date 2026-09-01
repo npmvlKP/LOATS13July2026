@@ -18,13 +18,13 @@ This script validates:
 import argparse
 import json
 import sys
-from datetime import datetime, UTC
 from pathlib import Path
 from typing import Any
 
 
 class Color:
     """ANSI color codes for terminal output."""
+
     GREEN = "\033[92m"
     RED = "\033[91m"
     YELLOW = "\033[93m"
@@ -44,7 +44,9 @@ def _safe_symbols() -> tuple[str, str]:
     """Return PASS/FAIL symbols safe for both TTY and captured subprocess output."""
     try:
         # Test if stdout can render Unicode box-check symbols
-        if sys.stdout.isatty() or sys.stdout.encoding and sys.stdout.encoding.lower().startswith("utf"):
+        if sys.stdout.isatty() or (
+            sys.stdout.encoding and sys.stdout.encoding.lower().startswith("utf")
+        ):
             return ("\u2713", "\u2717")  # ✓ ✗
     except Exception:
         pass
@@ -56,7 +58,11 @@ _PASS_SYM, _FAIL_SYM = _safe_symbols()
 
 def print_check(name: str, passed: bool, details: str = "") -> None:
     """Print check result with color coding (ASCII-safe in subprocess)."""
-    sym = f"{Color.GREEN}{_PASS_SYM}{Color.RESET}" if passed else f"{Color.RED}{_FAIL_SYM}{Color.RESET}"
+    sym = (
+        f"{Color.GREEN}{_PASS_SYM}{Color.RESET}"
+        if passed
+        else f"{Color.RED}{_FAIL_SYM}{Color.RESET}"
+    )
     print(f"{sym} {name}")
     if details:
         print(f"  {details}")
@@ -95,18 +101,36 @@ def verify_p1_evidence_file(evidence_path: Path) -> dict[str, Any] | None:
     required_keys = ["metadata", "evidence"]
     if all(k in evidence_data for k in required_keys):
         checks_passed += 1
-        print_check("Evidence has required top-level keys", True, f"Keys: {', '.join(required_keys)}")
+        print_check(
+            "Evidence has required top-level keys",
+            True,
+            f"Keys: {', '.join(required_keys)}",
+        )
     else:
-        print_check("Evidence has required top-level keys", False, f"Missing: {[k for k in required_keys if k not in evidence_data]}")
+        print_check(
+            "Evidence has required top-level keys",
+            False,
+            f"Missing: {[k for k in required_keys if k not in evidence_data]}",
+        )
         return None
 
     # Check 4: Metadata completeness
     checks_total += 1
     metadata = evidence_data.get("metadata", {})
-    required_metadata = ["todo_id", "finding_id", "phase_gate", "description", "collected_at"]
+    required_metadata = [
+        "todo_id",
+        "finding_id",
+        "phase_gate",
+        "description",
+        "collected_at",
+    ]
     if all(k in metadata for k in required_metadata):
         checks_passed += 1
-        print_check("Metadata is complete", True, f"TODO: {metadata.get('todo_id')}, Finding: {metadata.get('finding_id')}")
+        print_check(
+            "Metadata is complete",
+            True,
+            f"TODO: {metadata.get('todo_id')}, Finding: {metadata.get('finding_id')}",
+        )
     else:
         missing = [k for k in required_metadata if k not in metadata]
         print_check("Metadata is complete", False, f"Missing: {missing}")
@@ -114,10 +138,21 @@ def verify_p1_evidence_file(evidence_path: Path) -> dict[str, Any] | None:
     # Check 5: Evidence structure
     checks_total += 1
     evidence = evidence_data.get("evidence", {})
-    required_evidence_keys = ["summary", "ta_statistics", "db_statistics", "round_trip_statistics", "gate_compliance", "measurements"]
+    required_evidence_keys = [
+        "summary",
+        "ta_statistics",
+        "db_statistics",
+        "round_trip_statistics",
+        "gate_compliance",
+        "measurements",
+    ]
     if all(k in evidence for k in required_evidence_keys):
         checks_passed += 1
-        print_check("Evidence structure is complete", True, f"{len(required_evidence_keys)} sections present")
+        print_check(
+            "Evidence structure is complete",
+            True,
+            f"{len(required_evidence_keys)} sections present",
+        )
     else:
         missing = [k for k in required_evidence_keys if k not in evidence]
         print_check("Evidence structure is complete", False, f"Missing: {missing}")
@@ -127,7 +162,9 @@ def verify_p1_evidence_file(evidence_path: Path) -> dict[str, Any] | None:
     measurements = evidence.get("measurements", [])
     if measurements:
         checks_passed += 1
-        print_check("Measurements exist", True, f"{len(measurements)} samples collected")
+        print_check(
+            "Measurements exist", True, f"{len(measurements)} samples collected"
+        )
     else:
         print_check("Measurements exist", False, "No measurements found")
 
@@ -136,9 +173,13 @@ def verify_p1_evidence_file(evidence_path: Path) -> dict[str, Any] | None:
     min_samples = 50
     if len(measurements) >= min_samples:
         checks_passed += 1
-        print_check("Sample count sufficient", True, f"{len(measurements)} >= {min_samples}")
+        print_check(
+            "Sample count sufficient", True, f"{len(measurements)} >= {min_samples}"
+        )
     else:
-        print_check("Sample count sufficient", False, f"{len(measurements)} < {min_samples}")
+        print_check(
+            "Sample count sufficient", False, f"{len(measurements)} < {min_samples}"
+        )
 
     return {
         "checks_passed": checks_passed,
@@ -164,11 +205,20 @@ def verify_p1_gate_compliance(evidence_data: dict[str, Any]) -> dict[str, Any]:
         print_check("Round-trip statistics exist", True)
     else:
         print_check("Round-trip statistics exist", False)
-        return {"checks_passed": checks_passed, "checks_total": checks_total, "passed": False}
+        return {
+            "checks_passed": checks_passed,
+            "checks_total": checks_total,
+            "passed": False,
+        }
 
     # Check 2: Gate compliance metrics exist
     checks_total += 1
-    required_metrics = ["ta_gate_pass_rate", "db_gate_pass_rate", "round_trip_gate_pass_rate", "all_gates_pass_rate"]
+    required_metrics = [
+        "ta_gate_pass_rate",
+        "db_gate_pass_rate",
+        "round_trip_gate_pass_rate",
+        "all_gates_pass_rate",
+    ]
     if all(m in gate_compliance for m in required_metrics):
         checks_passed += 1
         print_check("Gate compliance metrics exist", True)
@@ -181,9 +231,17 @@ def verify_p1_gate_compliance(evidence_data: dict[str, Any]) -> dict[str, Any]:
     rt_threshold = 80.0  # 80% pass rate required for P1
     if rt_pass_rate >= rt_threshold:
         checks_passed += 1
-        print_check(f"Round-trip gate pass rate >= {rt_threshold}%", True, f"{rt_pass_rate:.2f}%")
+        print_check(
+            f"Round-trip gate pass rate >= {rt_threshold}%",
+            True,
+            f"{rt_pass_rate:.2f}%",
+        )
     else:
-        print_check(f"Round-trip gate pass rate >= {rt_threshold}%", False, f"{rt_pass_rate:.2f}%")
+        print_check(
+            f"Round-trip gate pass rate >= {rt_threshold}%",
+            False,
+            f"{rt_pass_rate:.2f}%",
+        )
 
     # Check 4: Mean latency reasonable
     checks_total += 1
@@ -226,11 +284,17 @@ def verify_p5_blockage_status() -> dict[str, Any]:
 
     # Check 1: TODO-13 dependency documented
     checks_total += 1
-    print_check("P5 blocked on TODO-13", True, "Routing must be real for forward test to mean anything")
+    print_check(
+        "P5 blocked on TODO-13",
+        True,
+        "Routing must be real for forward test to mean anything",
+    )
 
     # Check 2: P5 not started without dependency
     checks_total += 1
-    print_check("P5 2-week forward test not started", True, "Waiting for TODO-13 completion")
+    print_check(
+        "P5 2-week forward test not started", True, "Waiting for TODO-13 completion"
+    )
 
     # Check 3: P5 preparation documented
     checks_total += 1
@@ -252,16 +316,30 @@ def print_final_report(results: dict[str, Any]) -> None:
     # P1 Evidence File
     file_result = results.get("file_verification", {})
     if file_result:
-        file_passed = file_result.get("checks_passed", 0) == file_result.get("checks_total", 0)
-        print(f"P1 Evidence File: {Color.GREEN}PASSED{Color.RESET}" if file_passed else f"P1 Evidence File: {Color.RED}FAILED{Color.RESET}")
-        print(f"  Checks: {file_result.get('checks_passed', 0)}/{file_result.get('checks_total', 0)}")
+        file_passed = file_result.get("checks_passed", 0) == file_result.get(
+            "checks_total", 0
+        )
+        print(
+            f"P1 Evidence File: {Color.GREEN}PASSED{Color.RESET}"
+            if file_passed
+            else f"P1 Evidence File: {Color.RED}FAILED{Color.RESET}"
+        )
+        print(
+            f"  Checks: {file_result.get('checks_passed', 0)}/{file_result.get('checks_total', 0)}"
+        )
 
     # P1 Gate Compliance
     gate_result = results.get("gate_compliance", {})
     if gate_result:
         gate_passed = gate_result.get("passed", False)
-        print(f"\nP1 Gate Compliance: {Color.GREEN}PASSED{Color.RESET}" if gate_passed else f"P1 Gate Compliance: {Color.RED}FAILED{Color.RESET}")
-        print(f"  Checks: {gate_result.get('checks_passed', 0)}/{gate_result.get('checks_total', 0)}")
+        print(
+            f"\nP1 Gate Compliance: {Color.GREEN}PASSED{Color.RESET}"
+            if gate_passed
+            else f"P1 Gate Compliance: {Color.RED}FAILED{Color.RESET}"
+        )
+        print(
+            f"  Checks: {gate_result.get('checks_passed', 0)}/{gate_result.get('checks_total', 0)}"
+        )
         if "rt_pass_rate" in gate_result:
             print(f"  Round-trip pass rate: {gate_result['rt_pass_rate']:.2f}%")
         if "mean_latency" in gate_result:
@@ -271,25 +349,39 @@ def print_final_report(results: dict[str, Any]) -> None:
     p5_result = results.get("p5_blockage", {})
     if p5_result:
         p5_passed = p5_result.get("passed", False)
-        print(f"\nP5 Blockage Status: {Color.GREEN}PASSED{Color.RESET}" if p5_passed else f"P5 Blockage Status: {Color.RED}FAILED{Color.RESET}")
-        print(f"  Checks: {p5_result.get('checks_passed', 0)}/{p5_result.get('checks_total', 0)}")
+        print(
+            f"\nP5 Blockage Status: {Color.GREEN}PASSED{Color.RESET}"
+            if p5_passed
+            else f"P5 Blockage Status: {Color.RED}FAILED{Color.RESET}"
+        )
+        print(
+            f"  Checks: {p5_result.get('checks_passed', 0)}/{p5_result.get('checks_total', 0)}"
+        )
         if p5_result.get("blocked"):
-            print(f"  Status: BLOCKED (waiting for {p5_result.get('blocking_todo', 'TODO-13')})")
+            print(
+                f"  Status: BLOCKED (waiting for {p5_result.get('blocking_todo', 'TODO-13')})"
+            )
 
     # Overall
     print("\n" + "=" * 70)
-    all_passed = all([
-        file_result.get("checks_passed", 0) == file_result.get("checks_total", 0),
-        gate_result.get("passed", False),
-        p5_result.get("passed", False),
-    ])
+    all_passed = all(
+        [
+            file_result.get("checks_passed", 0) == file_result.get("checks_total", 0),
+            gate_result.get("passed", False),
+            p5_result.get("passed", False),
+        ]
+    )
 
     if all_passed:
-        print(f"{Color.GREEN}{Color.BOLD}[PASS] TODO-25 (F7-L-05) VERIFICATION: PASSED{Color.RESET}")
+        print(
+            f"{Color.GREEN}{Color.BOLD}[PASS] TODO-25 (F7-L-05) VERIFICATION: PASSED{Color.RESET}"
+        )
         print(f"{Color.GREEN}P1 evidence collected and validated{Color.RESET}")
         print(f"{Color.GREEN}P5 properly blocked on TODO-13{Color.RESET}")
     else:
-        print(f"{Color.RED}{Color.BOLD}[FAIL] TODO-25 (F7-L-05) VERIFICATION: FAILED{Color.RESET}")
+        print(
+            f"{Color.RED}{Color.BOLD}[FAIL] TODO-25 (F7-L-05) VERIFICATION: FAILED{Color.RESET}"
+        )
         if not gate_result.get("passed", False):
             print(f"{Color.RED}P1 gate compliance below threshold{Color.RESET}")
 
@@ -317,7 +409,9 @@ def main():
     if args.evidence is None:
         reports_dir = Path("reports")
         if reports_dir.exists():
-            evidence_files = sorted(reports_dir.glob("p1_analyze_latency_*.json"), reverse=True)
+            evidence_files = sorted(
+                reports_dir.glob("p1_analyze_latency_*.json"), reverse=True
+            )
             if evidence_files:
                 args.evidence = evidence_files[0]
                 print(f"Using most recent evidence file: {args.evidence}\n")
@@ -355,11 +449,13 @@ def main():
         print(json.dumps(results, indent=2))
 
     # Exit with appropriate code
-    all_passed = all([
-        file_result.get("checks_passed", 0) == file_result.get("checks_total", 0),
-        gate_result.get("passed", False) if gate_result else False,
-        p5_result.get("passed", False),
-    ])
+    all_passed = all(
+        [
+            file_result.get("checks_passed", 0) == file_result.get("checks_total", 0),
+            gate_result.get("passed", False) if gate_result else False,
+            p5_result.get("passed", False),
+        ]
+    )
 
     sys.exit(0 if all_passed else 1)
 

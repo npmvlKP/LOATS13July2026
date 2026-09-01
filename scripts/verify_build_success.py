@@ -66,7 +66,9 @@ def _run(cmd: list[str], timeout: int) -> tuple[int, str]:
 
 def _registry_passes() -> bool:
     print("\n[1/2] Running HC Registry verifier (HC-01..HC-27) ...")
-    rc, out = _run([PY, str(REPO_ROOT / "scripts" / "verify_hc_registry.py")], timeout=300)
+    rc, out = _run(
+        [PY, str(REPO_ROOT / "scripts" / "verify_hc_registry.py")], timeout=300
+    )
     tail = "\n".join(out.splitlines()[-5:])
     print(tail)
     return rc == 0 and "PASS=27 FAIL=0" in out
@@ -74,7 +76,9 @@ def _registry_passes() -> bool:
 
 def _health_check_passes() -> bool:
     print("\n[2/2] Running FR7 health-check master ...")
-    rc, out = _run([PY, str(REPO_ROOT / "scripts" / "fr7_health_check.py")], timeout=600)
+    rc, out = _run(
+        [PY, str(REPO_ROOT / "scripts" / "fr7_health_check.py")], timeout=600
+    )
     tail = "\n".join(out.splitlines()[-10:])
     print(tail)
     return rc == 0 and "FAIL:   0" in out

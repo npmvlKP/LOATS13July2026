@@ -34,6 +34,7 @@ from pathlib import Path
 @dataclass
 class CheckResult:
     """Result of a single verification check."""
+
     name: str
     description: str
     passed: bool
@@ -45,6 +46,7 @@ class CheckResult:
 @dataclass
 class VerificationReport:
     """Complete verification report."""
+
     verification_id: str
     timestamp: str
     todo_item: str
@@ -75,11 +77,7 @@ class ExternalValidator:
         """Run command and return exit code, stdout, stderr."""
         try:
             result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=30,
-                cwd=self.project_root
+                cmd, capture_output=True, text=True, timeout=30, cwd=self.project_root
             )
             return result.returncode, result.stdout.strip(), result.stderr.strip()
         except subprocess.TimeoutExpired:
@@ -89,51 +87,59 @@ class ExternalValidator:
 
     def get_git_info(self) -> dict:
         """Get repository Git information."""
-        exit_code, stdout, _ = self.run_command(['git', 'rev-parse', '--abbrev-ref', 'HEAD'])
-        branch = stdout if exit_code == 0 and stdout else 'unknown'
+        exit_code, stdout, _ = self.run_command(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"]
+        )
+        branch = stdout if exit_code == 0 and stdout else "unknown"
 
-        exit_code, stdout, _ = self.run_command(['git', 'rev-parse', 'HEAD'])
-        commit = stdout if exit_code == 0 and stdout else 'unknown'
+        exit_code, stdout, _ = self.run_command(["git", "rev-parse", "HEAD"])
+        commit = stdout if exit_code == 0 and stdout else "unknown"
 
-        exit_code, stdout, _ = self.run_command(['git', 'remote', 'get-url', 'origin'])
-        remote = stdout if exit_code == 0 and stdout else 'unknown'
+        exit_code, stdout, _ = self.run_command(["git", "remote", "get-url", "origin"])
+        remote = stdout if exit_code == 0 and stdout else "unknown"
 
         return {
-            'branch': branch,
-            'commit_short': commit[:7] if commit and len(commit) > 7 else commit,
-            'commit_full': commit,
-            'remote': remote,
-            'is_clean': self.is_git_clean()
+            "branch": branch,
+            "commit_short": commit[:7] if commit and len(commit) > 7 else commit,
+            "commit_full": commit,
+            "remote": remote,
+            "is_clean": self.is_git_clean(),
         }
 
     def is_git_clean(self) -> bool:
         """Check if working directory is clean (no unstaged changes)."""
-        _, stdout, _ = self.run_command(['git', 'status', '--porcelain'])
+        _, stdout, _ = self.run_command(["git", "status", "--porcelain"])
         return not stdout
 
     def check_no_root_junk(self) -> CheckResult:
         """Check 1: No junk files tracked in root directory."""
         start = datetime.now()
-        description = "Verify no junk files ($null, [100%], 0.21.0, etc.) tracked in root"
+        description = (
+            "Verify no junk files ($null, [100%], 0.21.0, etc.) tracked in root"
+        )
 
-        exit_code, stdout, _ = self.run_command(['git', 'ls-files'])
-        all_files = stdout.split('\n') if stdout else []
-        root_files = [f for f in all_files if '/' not in f and f]
+        exit_code, stdout, _ = self.run_command(["git", "ls-files"])
+        all_files = stdout.split("\n") if stdout else []
+        root_files = [f for f in all_files if "/" not in f and f]
 
         junk_patterns = {
-            'null_file': '$null',
-            'percent_file': '[100%]',
-            'version_file': '0.21.0',
-            'bandit_report': 'bandit-report.json',
-            'pip_audit': 'pip-audit-core-report.json',
-            'results_json': 'results.json',
-            'coverage_map': 'coverage_floor_map.json',
-            'opencode': 'opencode.json',
-            'lint_reports': ['final_lint_report.txt', 'orchestrator_files.txt',
-                           'ruff_errors.txt', 'ruff_errors_final.txt',
-                           'ruff_errors_updated.txt'],
-            'test_junk': ['test.txt', 'test_content.txt', 'test_direct_push.txt'],
-            'other': ['lwts4oa.md', 'pytest_output.txt']
+            "null_file": "$null",
+            "percent_file": "[100%]",
+            "version_file": "0.21.0",
+            "bandit_report": "bandit-report.json",
+            "pip_audit": "pip-audit-core-report.json",
+            "results_json": "results.json",
+            "coverage_map": "coverage_floor_map.json",
+            "opencode": "opencode.json",
+            "lint_reports": [
+                "final_lint_report.txt",
+                "orchestrator_files.txt",
+                "ruff_errors.txt",
+                "ruff_errors_final.txt",
+                "ruff_errors_updated.txt",
+            ],
+            "test_junk": ["test.txt", "test_content.txt", "test_direct_push.txt"],
+            "other": ["lwts4oa.md", "pytest_output.txt"],
         }
 
         found_junk = []
@@ -149,11 +155,11 @@ class ExternalValidator:
         passed = len(found_junk) == 0
 
         details = {
-            'total_root_files': len(root_files),
-            'junk_patterns_checked': len(junk_patterns),
-            'junk_files_found': len(found_junk),
-            'junk_files': found_junk,
-            'root_files': root_files
+            "total_root_files": len(root_files),
+            "junk_patterns_checked": len(junk_patterns),
+            "junk_files_found": len(found_junk),
+            "junk_files": found_junk,
+            "root_files": root_files,
         }
 
         duration = int((datetime.now() - start).total_seconds() * 1000)
@@ -164,7 +170,7 @@ class ExternalValidator:
             passed=passed,
             details=details,
             timestamp=datetime.now().isoformat(),
-            duration_ms=duration
+            duration_ms=duration,
         )
 
     def check_archived_scripts(self) -> CheckResult:
@@ -173,33 +179,33 @@ class ExternalValidator:
         description = "Verify stale audit scripts moved to reports/archived-audit/"
 
         scripts_to_archive = [
-            'docs/audit-history/debug_circuit_breaker.py',
-            'docs/audit-history/debug_order_status.py',
-            'docs/audit-history/debug_order_status_detailed.py',
-            'docs/audit-history/fix_test_imports.py',
-            'docs/audit-history/test_redis_cache.py'
+            "docs/audit-history/debug_circuit_breaker.py",
+            "docs/audit-history/debug_order_status.py",
+            "docs/audit-history/debug_order_status_detailed.py",
+            "docs/audit-history/fix_test_imports.py",
+            "docs/audit-history/test_redis_cache.py",
         ]
 
-        exit_code, stdout, _ = self.run_command(['git', 'ls-files'])
-        tracked_files = stdout.split('\n') if stdout else []
+        exit_code, stdout, _ = self.run_command(["git", "ls-files"])
+        tracked_files = stdout.split("\n") if stdout else []
 
         still_tracked = [s for s in scripts_to_archive if s in tracked_files]
 
-        archive_dir = self.project_root / 'reports' / 'archived-audit'
+        archive_dir = self.project_root / "reports" / "archived-audit"
         archive_exists = archive_dir.exists()
-        archived_files = list(archive_dir.glob('*.py')) if archive_exists else []
+        archived_files = list(archive_dir.glob("*.py")) if archive_exists else []
         archived_names = [f.name for f in archived_files]
 
         passed = len(still_tracked) == 0 and archive_exists
 
         details = {
-            'scripts_to_archive': len(scripts_to_archive),
-            'still_tracked': len(still_tracked),
-            'tracked_scripts': still_tracked,
-            'archive_dir_exists': archive_exists,
-            'archive_path': str(archive_dir),
-            'archived_count': len(archived_files),
-            'archived_files': archived_names
+            "scripts_to_archive": len(scripts_to_archive),
+            "still_tracked": len(still_tracked),
+            "tracked_scripts": still_tracked,
+            "archive_dir_exists": archive_exists,
+            "archive_path": str(archive_dir),
+            "archived_count": len(archived_files),
+            "archived_files": archived_names,
         }
 
         duration = int((datetime.now() - start).total_seconds() * 1000)
@@ -210,7 +216,7 @@ class ExternalValidator:
             passed=passed,
             details=details,
             timestamp=datetime.now().isoformat(),
-            duration_ms=duration
+            duration_ms=duration,
         )
 
     def check_gitignore_updates(self) -> CheckResult:
@@ -218,27 +224,27 @@ class ExternalValidator:
         start = datetime.now()
         description = "Verify .gitignore includes all junk file patterns"
 
-        gitignore_path = self.project_root / '.gitignore'
+        gitignore_path = self.project_root / ".gitignore"
 
         if not gitignore_path.exists():
             return CheckResult(
                 name=".gitignore Updates",
                 description=description,
                 passed=False,
-                details={'error': 'gitignore_not_found'},
+                details={"error": "gitignore_not_found"},
                 timestamp=datetime.now().isoformat(),
-                duration_ms=0
+                duration_ms=0,
             )
 
         gitignore_content = gitignore_path.read_text()
 
         required_patterns = [
-            'bandit-report.json',
-            'pip-audit-core-report.json',
-            'results.json',
-            'coverage_floor_map.json',
-            'opencode.json',
-            'reports/archived-audit/'
+            "bandit-report.json",
+            "pip-audit-core-report.json",
+            "results.json",
+            "coverage_floor_map.json",
+            "opencode.json",
+            "reports/archived-audit/",
         ]
 
         missing_patterns = [p for p in required_patterns if p not in gitignore_content]
@@ -246,12 +252,14 @@ class ExternalValidator:
         passed = len(missing_patterns) == 0
 
         details = {
-            'gitignore_exists': True,
-            'gitignore_size': len(gitignore_content),
-            'required_patterns': len(required_patterns),
-            'missing_patterns': len(missing_patterns),
-            'missing': missing_patterns,
-            'verified_patterns': [p for p in required_patterns if p in gitignore_content]
+            "gitignore_exists": True,
+            "gitignore_size": len(gitignore_content),
+            "required_patterns": len(required_patterns),
+            "missing_patterns": len(missing_patterns),
+            "missing": missing_patterns,
+            "verified_patterns": [
+                p for p in required_patterns if p in gitignore_content
+            ],
         }
 
         duration = int((datetime.now() - start).total_seconds() * 1000)
@@ -262,7 +270,7 @@ class ExternalValidator:
             passed=passed,
             details=details,
             timestamp=datetime.now().isoformat(),
-            duration_ms=duration
+            duration_ms=duration,
         )
 
     def check_tracking_reduction(self) -> CheckResult:
@@ -270,11 +278,13 @@ class ExternalValidator:
         start = datetime.now()
         description = "Verify total tracked files reduced from baseline"
 
-        exit_code, stdout, _ = self.run_command(['git', 'ls-files'])
-        current_count = len(stdout.split('\n')) if stdout else 0
+        exit_code, stdout, _ = self.run_command(["git", "ls-files"])
+        current_count = len(stdout.split("\n")) if stdout else 0
 
-        exit_code, deleted_files, _ = self.run_command(['git', 'diff', '--cached', '--name-only', '--diff-filter=D'])
-        staged_deletions = len(deleted_files.split('\n')) if deleted_files else 0
+        exit_code, deleted_files, _ = self.run_command(
+            ["git", "diff", "--cached", "--name-only", "--diff-filter=D"]
+        )
+        staged_deletions = len(deleted_files.split("\n")) if deleted_files else 0
 
         baseline_count = 343
         count_after_commit = current_count - staged_deletions
@@ -284,12 +294,12 @@ class ExternalValidator:
         passed = count_after_commit <= baseline_count
 
         details = {
-            'baseline_count': baseline_count,
-            'current_count': current_count,
-            'staged_deletions': staged_deletions,
-            'count_after_commit': count_after_commit,
-            'reduction': reduction,
-            'reduction_percentage': round(percentage, 2)
+            "baseline_count": baseline_count,
+            "current_count": current_count,
+            "staged_deletions": staged_deletions,
+            "count_after_commit": count_after_commit,
+            "reduction": reduction,
+            "reduction_percentage": round(percentage, 2),
         }
 
         duration = int((datetime.now() - start).total_seconds() * 1000)
@@ -300,15 +310,17 @@ class ExternalValidator:
             passed=passed,
             details=details,
             timestamp=datetime.now().isoformat(),
-            duration_ms=duration
+            duration_ms=duration,
         )
 
     def check_ai_reports_valid(self) -> CheckResult:
         """Check 5: AI-generated reports are valid JSON."""
         start = datetime.now()
-        description = "Verify AI-generated reports in reports/ai-generated/ are valid JSON"
+        description = (
+            "Verify AI-generated reports in reports/ai-generated/ are valid JSON"
+        )
 
-        reports_dir = self.project_root / 'reports' / 'ai-generated'
+        reports_dir = self.project_root / "reports" / "ai-generated"
 
         if not reports_dir.exists():
             return CheckResult(
@@ -316,20 +328,20 @@ class ExternalValidator:
                 description=description,
                 passed=True,  # Not critical
                 details={
-                    'directory_exists': False,
-                    'reason': 'reports/ai-generated/ directory not found'
+                    "directory_exists": False,
+                    "reason": "reports/ai-generated/ directory not found",
                 },
                 timestamp=datetime.now().isoformat(),
-                duration_ms=int((datetime.now() - start).total_seconds() * 1000)
+                duration_ms=int((datetime.now() - start).total_seconds() * 1000),
             )
 
-        json_files = list(reports_dir.glob('*.json'))
+        json_files = list(reports_dir.glob("*.json"))
         valid_files = []
         invalid_files = []
 
         for json_file in json_files:
             try:
-                with open(json_file, 'r', encoding='utf-8') as f:
+                with open(json_file, "r", encoding="utf-8") as f:
                     json.load(f)
                 valid_files.append(json_file.name)
             except json.JSONDecodeError as e:
@@ -338,12 +350,12 @@ class ExternalValidator:
         passed = len(invalid_files) == 0
 
         details = {
-            'directory_exists': True,
-            'total_json_files': len(json_files),
-            'valid_files': len(valid_files),
-            'invalid_files': len(invalid_files),
-            'invalid_details': invalid_files,
-            'valid_file_names': valid_files
+            "directory_exists": True,
+            "total_json_files": len(json_files),
+            "valid_files": len(valid_files),
+            "invalid_files": len(invalid_files),
+            "invalid_details": invalid_files,
+            "valid_file_names": valid_files,
         }
 
         duration = int((datetime.now() - start).total_seconds() * 1000)
@@ -354,7 +366,7 @@ class ExternalValidator:
             passed=passed,
             details=details,
             timestamp=datetime.now().isoformat(),
-            duration_ms=duration
+            duration_ms=duration,
         )
 
     def check_health_check_hc26(self) -> CheckResult:
@@ -362,30 +374,30 @@ class ExternalValidator:
         start = datetime.now()
         description = "Verify HC-26 (Root File Cleanup) health check exists and passes"
 
-        health_check_script = self.project_root / 'scripts' / 'fr7_health_check.py'
+        health_check_script = self.project_root / "scripts" / "fr7_health_check.py"
 
         if not health_check_script.exists():
             return CheckResult(
                 name="HC-26 Health Check",
                 description=description,
                 passed=False,
-                details={'error': 'health_check_script_not_found'},
+                details={"error": "health_check_script_not_found"},
                 timestamp=datetime.now().isoformat(),
-                duration_ms=0
+                duration_ms=0,
             )
 
         # Run HC-26 check
-        exit_code, stdout, stderr = self.run_command([
-            'python', str(health_check_script), '--only', 'HC-26'
-        ])
+        exit_code, stdout, stderr = self.run_command(
+            ["python", str(health_check_script), "--only", "HC-26"]
+        )
 
         passed = exit_code == 0
 
         details = {
-            'health_check_script_exists': True,
-            'exit_code': exit_code,
-            'stdout_sample': stdout[:200] if stdout else '',
-            'stderr_sample': stderr[:200] if stderr else ''
+            "health_check_script_exists": True,
+            "exit_code": exit_code,
+            "stdout_sample": stdout[:200] if stdout else "",
+            "stderr_sample": stderr[:200] if stderr else "",
         }
 
         duration = int((datetime.now() - start).total_seconds() * 1000)
@@ -396,7 +408,7 @@ class ExternalValidator:
             passed=passed,
             details=details,
             timestamp=datetime.now().isoformat(),
-            duration_ms=duration
+            duration_ms=duration,
         )
 
     def run_all_checks(self) -> list[CheckResult]:
@@ -407,7 +419,7 @@ class ExternalValidator:
             self.check_gitignore_updates(),
             self.check_tracking_reduction(),
             self.check_ai_reports_valid(),
-            self.check_health_check_hc26()
+            self.check_health_check_hc26(),
         ]
         return self.checks
 
@@ -426,27 +438,29 @@ class ExternalValidator:
             tracking_details = self.checks[3].details
 
         summary = {
-            'verification_duration_ms': int((datetime.now() - self.start_time).total_seconds() * 1000),
-            'baseline_files': 343,
-            'current_files': tracking_details.get('current_count', 0),
-            'files_removed': tracking_details.get('staged_deletions', 0),
-            'files_after_commit': tracking_details.get('count_after_commit', 0),
-            'reduction_percentage': tracking_details.get('reduction_percentage', 0)
+            "verification_duration_ms": int(
+                (datetime.now() - self.start_time).total_seconds() * 1000
+            ),
+            "baseline_files": 343,
+            "current_files": tracking_details.get("current_count", 0),
+            "files_removed": tracking_details.get("staged_deletions", 0),
+            "files_after_commit": tracking_details.get("count_after_commit", 0),
+            "reduction_percentage": tracking_details.get("reduction_percentage", 0),
         }
 
-        overall_status = 'PASS' if failed_checks == 0 else 'FAIL'
+        overall_status = "PASS" if failed_checks == 0 else "FAIL"
         if self.strict and failed_checks > 0:
-            overall_status = 'FAIL'
+            overall_status = "FAIL"
         elif not self.strict and failed_checks <= 1:
-            overall_status = 'PASS'
+            overall_status = "PASS"
 
         return VerificationReport(
             verification_id=self.verification_id,
             timestamp=datetime.now().isoformat(),
             todo_item="TODO-21 (F7-M-08)",
             project="LOATS13July2026",
-            git_branch=git_info['branch'],
-            git_commit=git_info['commit_full'],
+            git_branch=git_info["branch"],
+            git_commit=git_info["commit_full"],
             total_checks=total_checks,
             passed_checks=passed_checks,
             failed_checks=failed_checks,
@@ -455,26 +469,26 @@ class ExternalValidator:
             checks=[asdict(c) for c in self.checks],
             summary=summary,
             metadata={
-                'strict_mode': self.strict,
-                'project_root': str(self.project_root),
-                'git_remote': git_info['remote'],
-                'working_directory_clean': git_info['is_clean']
-            }
+                "strict_mode": self.strict,
+                "project_root": str(self.project_root),
+                "git_remote": git_info["remote"],
+                "working_directory_clean": git_info["is_clean"],
+            },
         )
 
     def print_summary(self, report: VerificationReport):
         """Print verification summary to console."""
-        print("\n" + "="*70)
+        print("\n" + "=" * 70)
         print("TODO-21 EXTERNAL VERIFICATION REPORT")
-        print("="*70)
+        print("=" * 70)
         print(f"Verification ID: {report.verification_id}")
         print(f"Timestamp: {report.timestamp}")
         print(f"Project: {report.project}")
         print(f"Git Branch: {report.git_branch}")
         print(f"Git Commit: {report.git_commit[:7]}")
-        print("="*70)
+        print("=" * 70)
         print("\nSUMMARY")
-        print("-"*70)
+        print("-" * 70)
         print(f"Total Checks: {report.total_checks}")
         print(f"Passed: {report.passed_checks}")
         print(f"Failed: {report.failed_checks}")
@@ -482,7 +496,7 @@ class ExternalValidator:
         print(f"Overall Status: {report.overall_status}")
 
         print("\nFILE STATISTICS")
-        print("-"*70)
+        print("-" * 70)
         print(f"Baseline: {report.summary['baseline_files']} files")
         print(f"Current: {report.summary['current_files']} files")
         print(f"Staged for deletion: {report.summary['files_removed']} files")
@@ -490,31 +504,37 @@ class ExternalValidator:
         print(f"Reduction: {report.summary['reduction_percentage']}%")
 
         print("\nDETAILED RESULTS")
-        print("-"*70)
+        print("-" * 70)
         for check in report.checks:
-            status = "✅ PASS" if check['passed'] else "❌ FAIL"
+            status = "✅ PASS" if check["passed"] else "❌ FAIL"
             print(f"{status} | {check['name']}")
             print(f"       {check['description']}")
             print(f"       Duration: {check['duration_ms']}ms")
 
-        print("\n" + "="*70)
+        print("\n" + "=" * 70)
         print(f"FINAL STATUS: {report.overall_status}")
-        print("="*70 + "\n")
+        print("=" * 70 + "\n")
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description=__doc__,
-        formatter_class=argparse.RawDescriptionHelpFormatter
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    parser.add_argument('--report-file', '-o',
-                        help='Save JSON report to file')
-    parser.add_argument('--project-root', '-p',
-                        help='Project root directory (default: current directory)')
-    parser.add_argument('--strict', '-s', action='store_true',
-                        help='Strict mode: any failure causes overall FAIL')
-    parser.add_argument('--quiet', '-q', action='store_true',
-                        help='Quiet mode: only print summary')
+    parser.add_argument("--report-file", "-o", help="Save JSON report to file")
+    parser.add_argument(
+        "--project-root",
+        "-p",
+        help="Project root directory (default: current directory)",
+    )
+    parser.add_argument(
+        "--strict",
+        "-s",
+        action="store_true",
+        help="Strict mode: any failure causes overall FAIL",
+    )
+    parser.add_argument(
+        "--quiet", "-q", action="store_true", help="Quiet mode: only print summary"
+    )
 
     args = parser.parse_args()
 
@@ -552,8 +572,8 @@ def main():
         print(f"📄 Report saved to: {report_path}")
 
     # Exit with appropriate code
-    return 0 if report.overall_status == 'PASS' else 1
+    return 0 if report.overall_status == "PASS" else 1
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())

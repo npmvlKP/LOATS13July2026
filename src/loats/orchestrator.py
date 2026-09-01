@@ -1143,8 +1143,9 @@ async def update_trailing_stops() -> None:
         if not positions_data:
             return
 
-        # Enforce Rule-7: ≤25 modifications per cycle
-        max_modifications = 25
+        # Enforce Rule-7: ≤25 modifications per cycle (pulled from settings).
+        cfg = get_settings()
+        max_modifications = cfg.max_modifications
         modifications_this_cycle = 0
 
         # Process each position with trailing stop configuration

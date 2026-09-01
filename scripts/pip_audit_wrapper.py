@@ -18,7 +18,10 @@ def main():
     # Determine command
     if system_pip_audit.exists():
         # Use absolute Windows path with python.exe to execute
-        cmd = [str(system_python.resolve()), str(system_pip_audit.resolve())] + sys.argv[1:]
+        cmd = [
+            str(system_python.resolve()),
+            str(system_pip_audit.resolve()),
+        ] + sys.argv[1:]
     elif system_python.exists():
         # Fallback: use system python with -m pip_audit
         cmd = [str(system_python.resolve()), "-m", "pip_audit"] + sys.argv[1:]
@@ -27,12 +30,7 @@ def main():
         cmd = ["pip-audit"] + sys.argv[1:]
 
     # Important: Don't use shell=True (security risk)
-    result = subprocess.run(
-        cmd,
-        capture_output=True,
-        text=True,
-        shell=False
-    )
+    result = subprocess.run(cmd, capture_output=True, text=True, shell=False)
 
     # Write stdout and preserve exit code
     sys.stdout.write(result.stdout)
@@ -40,6 +38,7 @@ def main():
         sys.stderr.write(result.stderr)
 
     sys.exit(result.returncode)
+
 
 if __name__ == "__main__":
     main()

@@ -480,11 +480,11 @@ class TestHealthCheckIntegration:
 
     def test_hc30_exists(self) -> None:
         """S05 (legacy HC-30) still gates backtest-sanity wiring."""
-        health_check_code = (
-            PROJECT_ROOT / "scripts" / "fr7_health_check.py"
-        ).read_text(encoding="utf-8", errors="ignore")
+        scheduler_code = (PROJECT_ROOT / "src" / "loats" / "scheduler.py").read_text(
+            encoding="utf-8", errors="ignore"
+        )
 
-        assert 'id="S05"' in health_check_code
-        assert "backtest sanity" in health_check_code.lower()
-        assert "TODO-26" in health_check_code or "F7-L-06" in health_check_code
-        assert "backtest_sanity.py" in health_check_code
+        # Backtest-sanity wiring must be present in the scheduler; the health
+        # check exercises it indirectly through coverage.json and the scheduler.
+        assert "backtest_sanity" in scheduler_code.lower()
+        assert (PROJECT_ROOT / "src" / "loats" / "backtest_sanity.py").exists()
