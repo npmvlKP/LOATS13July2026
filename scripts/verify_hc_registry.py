@@ -357,10 +357,12 @@ def _check_hc23() -> tuple[Verdict, str]:
             break
     if settings_cls is None:
         return Verdict.FAIL, "Settings class not found"
-    fields: dict[str, ast.AST] = {}
+    fields: dict[str, ast.AST | None] = {}
     for node in settings_cls.body:
         if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
             fields[node.target.id] = node.value
+    if not fields:
+        return Verdict.FAIL, "no annotated fields found in Settings class"
 
     def _int(name: str, expected: int) -> tuple[bool, str]:
         if name not in fields:
@@ -383,7 +385,12 @@ def _check_hc23() -> tuple[Verdict, str]:
                 and v.args[0].value == expected
             ):
                 return True, f"{name}=Field({expected})"
-        return False, f"{name}={ast.unparse(v)!r} (expect {expected})"
+        return (
+            False,
+            f"{name}={ast.unparse(v)!r} (expect {expected})"
+            if v is not None
+            else f"{name}=None (expect {expected})",
+        )
 
     def _str(name: str, expected: str) -> tuple[bool, str]:
         if name not in fields:
@@ -406,7 +413,12 @@ def _check_hc23() -> tuple[Verdict, str]:
                 and v.args[0].value == expected
             ):
                 return True, f"{name}=Field({expected!r})"
-        return False, f"{name}={ast.unparse(v)!r} (expect {expected!r})"
+        return (
+            False,
+            f"{name}={ast.unparse(v)!r} (expect {expected!r})"
+            if v is not None
+            else f"{name}=None (expect {expected!r})",
+        )
 
     def _decimal(name: str, expected_str: str) -> tuple[bool, str]:
         if name not in fields:
@@ -435,13 +447,19 @@ def _check_hc23() -> tuple[Verdict, str]:
             ):
                 inner = v.args[0]
                 if (
-                    inner.func.id == "Decimal"
+                    isinstance(inner.func, ast.Name)
+                    and inner.func.id == "Decimal"
                     and inner.args
                     and isinstance(inner.args[0], ast.Constant)
                     and inner.args[0].value == expected_str
                 ):
                     return True, f"{name}=Field(Decimal({expected_str!r}))"
-        return False, f"{name}={ast.unparse(v)!r} (expect Decimal({expected_str!r}))"
+        return (
+            False,
+            f"{name}={ast.unparse(v)!r} (expect Decimal({expected_str!r}))"
+            if v is not None
+            else f"{name}=None (expect Decimal({expected_str!r}))",
+        )
 
     failures: list[str] = []
     for name, expected in (
@@ -584,6 +602,12 @@ HC_CATALOG: list[tuple[str, str, str, bool, Callable[[], tuple[Verdict, str]]]] 
 ]
 
 
+def _colour(text: str, color_code: str) -> str:
+    if not sys.stdout.isatty():
+        return text
+    return f"\033[{color_code}m{text}\033[0m"
+
+
 def _print_row(row: Row) -> None:
     sym = (
         _colour(PASS_SYM, "92")
@@ -593,12 +617,6 @@ def _print_row(row: Row) -> None:
         else _colour(FAIL_SYM, "91")
     )
     print(f"{sym} {row.hcid:<7} {row.todo:<10} {row.title:<55} {row.detail}")
-
-
-def _colour(text: str, color_code: str) -> str:
-    if not sys.stdout.isatty():
-        return text
-    return f"\033[{color_code}m{text}\033[0m"
 
 
 def run_catalog(
