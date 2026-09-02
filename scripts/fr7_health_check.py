@@ -726,14 +726,87 @@ def probe_config(rep: Report) -> None:
         == 0.05,
     }
     bad = [k for k, ok in checks.items() if not ok]
+
+    # F8-H-02: Rule 7 must be per-order, persisted, and enforced at the
+    # modify_order boundary — verifying only the settings number let the
+    # original TODO-17 regression through (in-memory global counter).
+    details = [f"{k}: {'ok' if v else 'MISMATCH'}" for k, v in checks.items()]
+    try:
+        import sqlite3
+        import tempfile
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as td:
+            probe = Path(td) / "hc23_rule7.db"
+            conn = sqlite3.connect(probe)
+            try:
+                from loats.database import Database
+
+                db = Database(db_path=probe, audit_log_path=Path(td) / "audit.jsonl")
+                try:
+                    tables = {
+                        r[0]
+                        for r in conn.execute(
+                            "SELECT name FROM sqlite_master WHERE type='table'"
+                        )
+                    }
+                    checks_r7 = {
+                        "modification_counts table exists": (
+                            "modification_counts" in tables
+                        ),
+                        "per-order counter increments": (
+                            db.increment_modification_count("HC23") == 1
+                        ),
+                        "per-order counter isolated": (
+                            db.get_modification_count("HC23-OTHER") == 0
+                        ),
+                    }
+                finally:
+                    db.close()
+            finally:
+                conn.close()
+        bad_r7 = [k for k, ok in checks_r7.items() if not ok]
+        details.extend(
+            f"Rule7 {k}: {'ok' if v else 'MISMATCH'}" for k, v in checks_r7.items()
+        )
+    except Exception as exc:  # pragma: no cover - defensive
+        bad_r7 = [f"rule7 persistence probe failed: {exc!r}"]
+        details.append(bad_r7[0])
+
+    # Source-level gate wiring (no live broker needed): the reserve call
+    # must exist inside both modify_order implementations.
+    try:
+        import inspect
+
+        from loats import openalgo as _oa
+        from loats import rules as _rules
+
+        sync_src = inspect.getsource(_oa.OpenAlgoClient.modify_order)
+        async_src = inspect.getsource(_oa.AsyncOpenAlgoClient.modify_order)
+        wiring = {
+            "sync modify_order gates Rule-7": ("reserve_modification" in sync_src),
+            "async modify_order gates Rule-7": ("reserve_modification" in async_src),
+            "rules engine exposes reserve/release": all(
+                hasattr(_rules.rules_engine, m)
+                for m in ("reserve_modification", "release_modification")
+            ),
+        }
+        bad_wire = [k for k, ok in wiring.items() if not ok]
+        details.extend(f"{k}: {'ok' if v else 'MISMATCH'}" for k, v in wiring.items())
+    except Exception as exc:  # pragma: no cover - defensive
+        bad_wire = [f"rule7 wiring probe failed: {exc!r}"]
+        details.append(bad_wire[0])
+
     rep.add(
         Result(
             "HC-23",
-            "config conformance (CMP zero-assumption rules)",
-            "TODO-17",
-            "PASS" if not bad else "FAIL",
-            "all conform" if not bad else "non-conformant: " + ", ".join(bad),
-            [f"{k}: {'ok' if v else 'MISMATCH'}" for k, v in checks.items()],
+            "config conformance (CMP zero-assumption rules + Rule-7 wiring)",
+            "TODO-17/F8-H-02",
+            "PASS" if not (bad or bad_r7 or bad_wire) else "FAIL",
+            "all conform"
+            if not (bad or bad_r7 or bad_wire)
+            else "non-conformant: " + ", ".join(bad + bad_r7 + bad_wire),
+            details,
         )
     )
 

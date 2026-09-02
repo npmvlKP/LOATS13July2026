@@ -350,11 +350,20 @@ class TestTradingCycleException:
                         with patch.object(
                             o, "_execute_volatility_analysis", new_callable=AsyncMock
                         ):
-                            with patch("loats.rules.rules_engine") as mre:
-                                mre.is_trading_allowed.return_value = True
-                                with patch("loats.orchestrator.record_cycle_time"):
-                                    with pytest.raises(RuntimeError, match="boom"):
-                                        await o._execute_trading_cycle()
+                            # F8-C-01 added this 5th producer to the gather;
+                            # left unmocked it performs real DB I/O, blows the
+                            # 80ms wait_for budget, and the timeout branch
+                            # cancels market_data_task before "boom" surfaces.
+                            with patch.object(
+                                o,
+                                "_execute_price_action_analysis",
+                                new_callable=AsyncMock,
+                            ):
+                                with patch("loats.rules.rules_engine") as mre:
+                                    mre.is_trading_allowed.return_value = True
+                                    with patch("loats.orchestrator.record_cycle_time"):
+                                        with pytest.raises(RuntimeError, match="boom"):
+                                            await o._execute_trading_cycle()
 
     @pytest.mark.asyncio
     async def test_trading_not_allowed(self):
@@ -371,13 +380,22 @@ class TestTradingCycleException:
                             o, "_execute_volatility_analysis", new_callable=AsyncMock
                         ):
                             with patch.object(
-                                o, "_execute_risk_management", new_callable=AsyncMock
+                                o,
+                                "_execute_price_action_analysis",
+                                new_callable=AsyncMock,
                             ):
-                                with patch("loats.rules.rules_engine") as mre:
-                                    mre.is_trading_allowed.return_value = False
-                                    mre.session_state.value = "CLOSING"
-                                    with patch("loats.orchestrator.record_cycle_time"):
-                                        await o._execute_trading_cycle()
+                                with patch.object(
+                                    o,
+                                    "_execute_risk_management",
+                                    new_callable=AsyncMock,
+                                ):
+                                    with patch("loats.rules.rules_engine") as mre:
+                                        mre.is_trading_allowed.return_value = False
+                                        mre.session_state.value = "CLOSING"
+                                        with patch(
+                                            "loats.orchestrator.record_cycle_time"
+                                        ):
+                                            await o._execute_trading_cycle()
 
 
 class TestExecuteStrikeSelection:

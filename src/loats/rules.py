@@ -26,6 +26,15 @@ logger = get_logger(__name__)
 settings: Any = LazySettings()  # LazySettings.__getattr__ proxies to Settings()
 
 
+class Rule7ModificationLimitError(RuntimeError):
+    """
+    CMP Rule 7 per-order modification ceiling exceeded (F8-H-02).
+
+    Raised at the ``modify_order`` boundary when ``order_id`` has already
+    consumed its ``max_modifications`` budget (persisted in SQLite).
+    """
+
+
 class RuleType(StrEnum):
     """Rule type enumeration."""
 
@@ -470,20 +479,97 @@ class CMPRulesEngine:
         return True, {"reason": "circuit_breakers_ok"}
 
     def increment_modification_counter(self) -> int:
-        """Increment rule 7 modification counter."""
+        """
+        Increment the legacy process-global Rule-7 counter.
+
+        .. deprecated:: F8-H-02
+            Retained solely for backward compatibility with external
+            callers/tests. CMP Rule 7 is enforced per-order with a
+            persisted SQLite counter at the ``modify_order`` boundary —
+            see :meth:`check_modification_limit` /
+            :meth:`record_modification_result`. This global int has no
+            enforcement role.
+        """
         self.modification_counter += 1
         return self.modification_counter
 
     def reset_modification_counter(self) -> None:
-        """Reset rule 7 modification counter."""
+        """Reset the legacy process-global Rule-7 counter (see F8-H-02 note)."""
         self.modification_counter = 0
 
-    def get_modification_count(self) -> int:
-        """Get current modification counter value."""
-        return self.modification_counter
+    def get_modification_count(self, order_id: str | None = None) -> int:
+        """
+        Get the current Rule-7 modification count.
+
+        F8-H-02: with ``order_id``, reads the persisted per-order counter
+        from SQLite (survives restarts, keyed by order). Without one,
+        returns the legacy process-global counter (no enforcement role).
+        """
+        if order_id is None:
+            return self.modification_counter
+        from .database import db
+
+        return db.get_modification_count(order_id)
+
+    def check_modification_limit(self, order_id: str, limit: int | None = None) -> bool:
+        """
+        Check whether ``order_id`` still has Rule-7 modification budget.
+
+        Reads the persisted per-order counter. Raises Rule7StateError when
+        the counter state cannot be read (DB failure) — callers must treat
+        that as "refuse the modification" (fail-closed).
+        """
+        if limit is None:
+            limit = int(settings.max_modifications)
+        current = self.get_modification_count(order_id)
+        return current < limit
+
+    def reserve_modification(self, order_id: str, limit: int | None = None) -> int:
+        """
+        Atomically reserve one Rule-7 modification slot for ``order_id``.
+
+        F8-H-02 reserve/release protocol (race-safe AND failure-safe):
+        the persisted counter is incremented BEFORE the broker call inside
+        a BEGIN IMMEDIATE transaction, so two concurrent modify attempts
+        can never both claim the same slot. If the increment exceeds
+        ``limit`` the reservation is rolled back and
+        Rule7ModificationLimitError is raised — the caller must refuse the
+        modification. Rule7StateError is raised when the counter state
+        cannot be read/written (fail-closed).
+        """
+        from .database import db
+
+        if limit is None:
+            limit = int(settings.max_modifications)
+        new_count = db.increment_modification_count(order_id)
+        if new_count > limit:
+            db.decrement_modification_count(order_id)
+            raise Rule7ModificationLimitError(
+                f"CMP Rule 7: modification limit ({limit}) exceeded for "
+                f"order {order_id} (count would be {new_count})"
+            )
+        return new_count
+
+    def release_modification(self, order_id: str) -> None:
+        """
+        Release a reserved Rule-7 slot for ``order_id`` (best-effort).
+
+        Called when a modification was reserved but the broker request
+        subsequently failed, so failed attempts never consume budget.
+        Never raises: the original broker error is the actionable one.
+        """
+        from .database import db
+
+        db.decrement_modification_count(order_id)
 
 
 # Module-level singleton instance
 rules_engine = CMPRulesEngine()
 
-__all__ = ["CMPRulesEngine", "RuleType", "TradingSession", "rules_engine"]
+__all__ = [
+    "CMPRulesEngine",
+    "Rule7ModificationLimitError",
+    "RuleType",
+    "TradingSession",
+    "rules_engine",
+]
