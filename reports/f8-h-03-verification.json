@@ -1,0 +1,30 @@
+{
+  "git_status": " M src/loats/scheduler.py\n M tests/test_scheduler_coverage.py\n?? docs/adr/0005-scheduler-signal-engine-retirement.md\n?? tests/test_signal_source_invariant.py\n?? tests/test_single_engine_consolidation.py\n",
+  "git_diff_stat": " src/loats/scheduler.py           | 307 ++++++---------------------------------\n tests/test_scheduler_coverage.py | 197 ++++++++-----------------\n 2 files changed, 103 insertions(+), 401 deletions(-)\n",
+  "results": [
+    {
+      "cmd": "G:\\.OA\\LOATS-13July2026\\LOATS13July2026\\loatsNEW\\Scripts\\python.exe -m pytest tests/test_signal_source_invariant.py tests/test_single_engine_consolidation.py tests/test_scheduler.py tests/test_scheduler_coverage.py -v",
+      "rc": 0,
+      "out": "_adds_only_support_jobs\n  G:\\.OA\\LOATS-13July2026\\LOATS13July2026\\src\\loats\\scheduler.py:188: RuntimeWarning: coroutine 'AsyncMockMixin._execute_mock_call' was never awaited\n    self.scheduler.add_job(\n  Enable tracemalloc to get traceback where the object was allocated.\n  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.\n\ntests/test_single_engine_consolidation.py::TestSchedulerDoesNotEmitSignals::test_scheduler_start_does_not_run_signal_scans\n  G:\\.OA\\LOATS-13July2026\\LOATS13July2026\\src\\loats\\scheduler.py:204: RuntimeWarning: coroutine 'AsyncMockMixin._execute_mock_call' was never awaited\n    self.scheduler.start()\n  Enable tracemalloc to get traceback where the object was allocated.\n  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n======================= 38 passed, 5 warnings in 3.39s ========================\n",
+      "err": ""
+    },
+    {
+      "cmd": "G:\\.OA\\LOATS-13July2026\\LOATS13July2026\\loatsNEW\\Scripts\\python.exe -m ruff check src/loats/scheduler.py tests/test_signal_source_invariant.py tests/test_single_engine_consolidation.py tests/test_scheduler_coverage.py",
+      "rc": 0,
+      "out": "All checks passed!\n",
+      "err": ""
+    },
+    {
+      "cmd": "G:\\.OA\\LOATS-13July2026\\LOATS13July2026\\loatsNEW\\Scripts\\python.exe -m ruff format --check src/loats/scheduler.py tests/test_signal_source_invariant.py tests/test_single_engine_consolidation.py tests/test_scheduler_coverage.py",
+      "rc": 0,
+      "out": "4 files already formatted\n",
+      "err": ""
+    },
+    {
+      "cmd": "G:\\.OA\\LOATS-13July2026\\LOATS13July2026\\loatsNEW\\Scripts\\python.exe -m mypy src/loats/scheduler.py --ignore-missing-imports",
+      "rc": 0,
+      "out": "pyproject.toml: note: unused section(s): module = ['feedparser.*', 'newspaper.*', 'numba.*', 'vaderSentiment.*']\nSuccess: no issues found in 1 source file\n",
+      "err": ""
+    }
+  ]
+}
