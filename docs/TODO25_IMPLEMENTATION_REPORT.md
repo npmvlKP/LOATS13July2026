@@ -6,6 +6,17 @@
 **Branch:** fix/fr7-wave
 **Git Commit:** 5fdd480 (parent)
 
+> **STATUS UPDATE 2026-09-02 (post F8-H-01 / ADR-006):** The "P5 blocked on
+> TODO-13 (routing)" narrative below is **superseded**. Routing is implemented
+> and audited (commit f5c79b2): every analyzer-routing outcome writes a
+> SHA-256-chained ROUTE audit row. The P5 closing step now exists —
+> `scripts/run_p5_forward_test.py` (supervised 2-week run, `--ack-live-endpoint`
+> gate) and `scripts/verify_p5_forward_test.py` (grades run logs: ≥14d span,
+> zero unhandled exceptions, routing enabled). P5 is no longer blocked on any
+> code dependency; it is pending only the operator's live 14-day run (validator
+> correctly reports NOT-YET-PASSING until then). Sections below retain their
+> original 2026-08-28 content as the historical record.
+
 ---
 
 ## Executive Summary

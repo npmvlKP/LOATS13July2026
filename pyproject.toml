@@ -125,6 +125,10 @@ ignore = [
 "scripts/user_verify_deployment.py" = ["E741"]
 "scripts/verify_hc_registry.py" = ["C901", "F841"]
 "scripts/verify_coverage_full.py" = ["F841"]
+# Historical frozen audit evidence — superseded verification scripts preserved verbatim.
+# Line-length violations in them are not production debt and must not be mutated.
+"docs/audit-history/*" = ["E501"]
+"reports/ai-generated/*" = ["E501"]
 
 [tool.mypy]
 python_version = "3.12"
