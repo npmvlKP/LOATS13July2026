@@ -9,7 +9,12 @@ import pytest
 
 from loats.database import Database
 from loats.models import FundsData, HistoricalData, Signal, SignalType, TradeDecision
-from loats.strength import StrengthEngine, StrengthSource, resolve_source
+from loats.strength import (
+    StrengthEngine,
+    StrengthSource,
+    exclude_unknown_source_signals,
+    resolve_source,
+)
 from loats.trade_decision import DecisionStatus, TradeDecisionEngine
 
 
@@ -138,9 +143,128 @@ class TestStrength:
         assert ok is False
         assert d["reason"] == "insufficient_unique_sources"
 
-    def test_unknown_source(self):
+    def test_unknown_source_excluded_per_signal(self):
+        """F8-M-01: unknown sources are excluded individually, not batch-fatal.
+
+        A batch with 2 valid + 1 unknown passes validation on the strength
+        of the known-source signals; the offender is reported in
+        ``excluded_unknown_sources`` and stays loudly visible.
+        """
         now = datetime.now(UTC)
         sigs = _sigs(2) + [
+            Signal(
+                symbol="NIFTY",
+                signal_type=SignalType.BUY,
+                strength=0.68,
+                timestamp=now - timedelta(seconds=60),
+                indicators={},
+                confidence=0.72,
+                metadata={"source": "bad"},
+            )
+        ]
+        ok, d = StrengthEngine().validate_signal_sources(sigs)
+        assert ok is False
+        # 2 valid < min_sources(3): fails on the count gate, NOT unknown_source
+        assert d["reason"] == "insufficient_unique_sources"
+        assert d["excluded_unknown_sources"] == ["bad"]
+
+    def test_unknown_source_excluded_with_enough_valid(self):
+        """F8-M-01 case 1: 4 valid + 1 unknown -> validation passes.
+
+        The stray signal is excluded and audited; the known-source
+        remainder is validated normally.
+        """
+        now = datetime.now(UTC)
+        sigs = _sigs(4) + [
+            Signal(
+                symbol="NIFTY",
+                signal_type=SignalType.BUY,
+                strength=0.68,
+                timestamp=now - timedelta(seconds=60),
+                indicators={},
+                confidence=0.72,
+                metadata={"source": "stray_producer"},
+            )
+        ]
+        ok, d = StrengthEngine().validate_signal_sources(sigs)
+        assert ok is True
+        assert d["reason"] == "source_validation_passed"
+        assert d["excluded_unknown_sources"] == ["stray_producer"]
+        assert "stray_producer" not in d["sources"]
+
+    def test_unknown_source_excluded_leads_to_gate_failure(self):
+        """F8-M-01 case 2: 3 valid + 1 unknown -> rejected with exclusion.
+
+        The exclusion is recorded while the remainder fails a CMP gate
+        (3 distinct sources = diversity 3/7 < 0.5, the HC-15 gate).
+        """
+        now = datetime.now(UTC)
+        sigs = _sigs(3) + [
+            Signal(
+                symbol="NIFTY",
+                signal_type=SignalType.BUY,
+                strength=0.68,
+                timestamp=now - timedelta(seconds=60),
+                indicators={},
+                confidence=0.72,
+                metadata={"source": "stray_producer"},
+            )
+        ]
+        ok, d = StrengthEngine().validate_signal_sources(sigs)
+        assert ok is False
+        assert d["reason"] == "insufficient_source_diversity"
+        assert d["excluded_unknown_sources"] == ["stray_producer"]
+
+    def test_all_unknown_source_rejected_loudly(self):
+        """F8-M-01 case 3: all-unknown batch -> unknown_source, full list."""
+        now = datetime.now(UTC)
+        sigs = [
+            Signal(
+                symbol="NIFTY",
+                signal_type=SignalType.BUY,
+                strength=0.7,
+                timestamp=now - timedelta(seconds=i * 30),
+                indicators={},
+                confidence=0.7,
+                metadata={"source": f"ghost_{i}"},
+            )
+            for i in range(4)
+        ]
+        ok, d = StrengthEngine().validate_signal_sources(sigs)
+        assert ok is False
+        assert d["reason"] == "unknown_source"
+        assert d["offenders"] == ["ghost_0", "ghost_1", "ghost_2", "ghost_3"]
+
+    def test_empty_batch_fails_min_sources(self):
+        """Empty input is a count failure, not an unknown-source one."""
+        ok, d = StrengthEngine().validate_signal_sources([])
+        assert ok is False
+        assert d["reason"] == "insufficient_unique_sources"
+
+    def test_exclude_unknown_source_signals_splits_batch(self):
+        """The shared exclusion primitive partitions known/unknown correctly."""
+        now = datetime.now(UTC)
+
+        def sig(src):
+            return Signal(
+                symbol="NIFTY",
+                signal_type=SignalType.BUY,
+                strength=0.7,
+                timestamp=now,
+                indicators={},
+                confidence=0.7,
+                metadata={"source": src},
+            )
+
+        known, unknown = exclude_unknown_source_signals(
+            [sig("ta"), sig("not_a_source"), sig("volatility"), sig("also_bad")]
+        )
+        assert [s.metadata["source"] for s in known] == ["ta", "volatility"]
+        assert unknown == ["not_a_source", "also_bad"]
+
+    def test_unknown_source_no_signal(self):
+        now = datetime.now(UTC)
+        sigs = [
             Signal(
                 symbol="NIFTY",
                 signal_type=SignalType.BUY,
