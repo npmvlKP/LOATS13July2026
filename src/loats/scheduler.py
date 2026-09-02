@@ -205,10 +205,17 @@ class TradingScheduler:
                 self.running = True
                 logger.info("Trading scheduler started")
                 # Run initial market-status check so open/close logic is current
-                await self.check_market_status()
+                await self._start_market_status_check()
             except Exception:
                 logger.exception("Failed start scheduler")
                 raise
+
+    async def _start_market_status_check(self) -> None:
+        """Standalone helper for the initial market-status check at startup."""
+        try:
+            await self.check_market_status()
+        except Exception:
+            logger.exception("Initial market-status check failed; continuing startup")
 
     async def shutdown(self) -> None:
         """Shutdown scheduler."""
@@ -342,6 +349,7 @@ class TradingScheduler:
             await self.db.async_vacuum()
         except Exception:
             logger.exception("Data cleanup failed")
+            raise
         finally:
             duration = (
                 datetime.datetime.now(datetime.UTC) - start_time
@@ -362,27 +370,30 @@ class TradingScheduler:
         finally:
             self.scan_tasks.pop(task_id, None)
 
-    async def _backtest_sanity_task(self) -> None:
-        """Backtest sanity check task."""
+    async def _backtest_sanity_task(self, symbol: str | None = None) -> None:
+        """Backtest sanity check task.
+
+        Args:
+            symbol: Optional symbol override. Defaults to settings.default_symbol.
+        """
         start_time = datetime.datetime.now(datetime.UTC)
         logger.info("Starting backtest sanity check")
         try:
-            # Import here to avoid circular dependencies
-            from .backtest_sanity import (
-                backtest_sanity_pass_gate,
-            )
-            from .backtest_sanity import run_backtest_sanity_check as run_sanity
+            # Import here to avoid circular dependencies; bind to module
+            # attributes so tests can patch them reliably without relying on
+            # import-time re-exports.
+            import loats.backtest_sanity as _backtest_sanity
 
             # Run sanity check on default symbol for 30 days
-            result = await run_sanity(
-                symbol=settings.default_symbol,
+            result = await _backtest_sanity.run_backtest_sanity_check(
+                symbol=symbol or settings.default_symbol,
                 days_back=30,
                 window_size=20,
                 step_size=10,
             )
 
             # Check if gate passes (80% pass rate)
-            passes = backtest_sanity_pass_gate(result)
+            passes = _backtest_sanity.backtest_sanity_pass_gate(result)
 
             logger.info(
                 "Backtest sanity check completed: %s",

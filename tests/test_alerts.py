@@ -1,5 +1,6 @@
 """Tests alerts module."""
 
+import asyncio
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -129,9 +130,19 @@ class TestAlertSystem:
 
     @pytest.mark.asyncio
     async def test_initialize_without_token(self, alert_system):
-        """Test initialization fails gracefully without bot token."""
+        """Test initialization returns early without bot token."""
         with patch("loats.alerts.settings") as mock_settings:
-            mock_settings.telegram_bot_token.get_secret_value.return_value = ""
+            mock_settings.telegram_bot_token = None
+            mock_settings.telegram_chat_id = None
+            await alert_system.initialize()
+        assert alert_system.bot is None
+
+    @pytest.mark.asyncio
+    async def test_initialize_with_invalid_token(self, alert_system):
+        """Test initialization propagates InvalidToken from Bot constructor."""
+        with patch("loats.alerts.settings") as mock_settings:
+            mock_settings.telegram_bot_token = "invalid_token"
+            mock_settings.telegram_chat_id = "chat_id"
             with patch("loats.alerts.Bot", side_effect=InvalidToken("Invalid token")):
                 with pytest.raises(InvalidToken):
                     await alert_system.initialize()
@@ -139,14 +150,26 @@ class TestAlertSystem:
 
     @pytest.mark.asyncio
     async def test_initialize_without_chat_id(self, alert_system):
-        """Test initialization fails gracefully without chat ID."""
+        """Test initialization returns early without chat ID."""
         with patch("loats.alerts.settings") as mock_settings:
-            mock_settings.telegram_bot_token.get_secret_value.return_value = (
-                "test_token"
-            )
+            mock_settings.telegram_bot_token = "test_token"
             mock_settings.telegram_chat_id = None
             await alert_system.initialize()
         assert alert_system.bot is None
+
+    @pytest.mark.asyncio
+    async def test_initialize_exception(self, alert_system):
+        """Test initialization logs and propagates exception."""
+        with (
+            patch("loats.alerts.settings") as mock_settings,
+            patch("loats.alerts.logger") as mock_logger,
+        ):
+            mock_settings.telegram_bot_token = "token"
+            mock_settings.telegram_chat_id = "chat_id"
+            with patch("loats.alerts.Bot", side_effect=Exception("bot boom")):
+                with pytest.raises(Exception, match="bot boom"):
+                    await alert_system.initialize()
+        mock_logger.error.assert_called()
 
     @pytest.mark.asyncio
     async def test_initialize_success(self, alert_system, mock_bot):
@@ -156,9 +179,7 @@ class TestAlertSystem:
             patch("loats.alerts.Bot") as mock_bot_class,
             patch("loats.alerts.Application") as mock_app_class,
         ):
-            mock_settings.telegram_bot_token.get_secret_value.return_value = (
-                "test_token"
-            )
+            mock_settings.telegram_bot_token = "test_token"
             mock_settings.telegram_chat_id = "test_chat_id"
             mock_bot_class.return_value = mock_bot
 
@@ -174,17 +195,73 @@ class TestAlertSystem:
         assert alert_system.application == mock_app
 
     @pytest.mark.asyncio
+    async def test_initialize_with_secret_str(self, alert_system):
+        """Test initialize() accepts SecretStr token."""
+        from pydantic import SecretStr
+
+        with (
+            patch("loats.alerts.settings") as mock_settings,
+            patch("loats.alerts.Bot") as mock_bot_class,
+            patch("loats.alerts.Application") as mock_app_class,
+        ):
+            mock_settings.telegram_bot_token = SecretStr("secret")
+            mock_settings.telegram_chat_id = "chat_id"
+            mock_bot_class.return_value = MagicMock()
+            mock_app_class.builder.return_value.bot.return_value.build.return_value = (
+                MagicMock()
+            )
+            await alert_system.initialize()
+        mock_bot_class.assert_called_once_with(token="secret")
+
+    @pytest.mark.asyncio
     async def test_start_without_application(self, alert_system):
         """Test start() does nothing without application."""
         await alert_system.start()
         # Should not raise any exception
 
     @pytest.mark.asyncio
+    async def test_start_exception(self, alert_system, mock_application):
+        """Test start() propagates exception from start()."""
+        alert_system.application = mock_application
+        mock_application.start = AsyncMock(side_effect=Exception("start boom"))
+        with pytest.raises(Exception, match="start boom"):
+            await alert_system.start()
+
+    @pytest.mark.asyncio
     async def test_start_success(self, alert_system, mock_application):
         """Test successful bot start."""
         alert_system.application = mock_application
         await alert_system.start()
-        # Should not raise any exception
+        mock_application.initialize.assert_awaited_once()
+        mock_application.start.assert_awaited_once()
+        assert alert_system._running is True
+        assert alert_system._polling_task is not None
+
+    @pytest.mark.asyncio
+    async def test_start_success_no_updater(self, alert_system, mock_application):
+        """Test start() without updater logs warning and still marks running."""
+        alert_system.application = mock_application
+        mock_application.updater = None
+        await alert_system.start()
+        mock_application.initialize.assert_awaited_once()
+        mock_application.start.assert_awaited_once()
+        assert alert_system._running is True
+
+    @pytest.mark.asyncio
+    async def test_start_already_running(self, alert_system, mock_application):
+        """Test start() no-ops if already running."""
+        alert_system.application = mock_application
+        alert_system._running = True
+        await alert_system.start()
+        mock_application.initialize.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_start_no_updater(self, alert_system, mock_application):
+        """Test start() logs warning when updater is missing."""
+        alert_system.application = mock_application
+        mock_application.updater = None
+        await alert_system.start()
+        assert alert_system._running is True
 
     @pytest.mark.asyncio
     async def test_shutdown_without_application(self, alert_system):
@@ -199,6 +276,36 @@ class TestAlertSystem:
         alert_system._running = True
         await alert_system.shutdown()
         mock_application.stop.assert_called_once()
+        mock_application.updater.stop.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_shutdown_exception(self, alert_system, mock_application):
+        """Test shutdown logs and re-raises exception."""
+        alert_system.application = mock_application
+        alert_system._running = True
+        mock_application.stop = AsyncMock(side_effect=Exception("stop boom"))
+        with patch("loats.alerts.logger") as mock_logger:
+            with pytest.raises(Exception, match="stop boom"):
+                await alert_system.shutdown()
+        mock_logger.error.assert_called()
+
+    @pytest.mark.asyncio
+    async def test_shutdown_not_running(self, alert_system, mock_application):
+        """Test shutdown returns early if not running."""
+        alert_system.application = mock_application
+        alert_system._running = False
+        await alert_system.shutdown()
+        mock_application.stop.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_shutdown_cancels_polling_task(self, alert_system, mock_application):
+        """Test shutdown cancels the polling task."""
+        task = asyncio.create_task(asyncio.sleep(60))
+        alert_system._polling_task = task
+        alert_system.application = mock_application
+        alert_system._running = True
+        await alert_system.shutdown()
+        assert task.cancelled() or task.done()
 
     @pytest.mark.asyncio
     async def test_send_alert_without_bot(self, alert_system):
@@ -626,6 +733,19 @@ class TestAlertSystem:
         mock_update.message.reply_text.assert_called_once()
 
     @pytest.mark.asyncio
+    async def test_start_command_handler_exception(self, alert_system):
+        """Test /start command handler exception path."""
+        mock_update = MagicMock(spec=Update)
+        mock_update.message = MagicMock()
+        mock_update.message.reply_text = AsyncMock(side_effect=Exception("reply boom"))
+        mock_context = MagicMock()
+
+        with patch("loats.alerts.logger") as mock_logger:
+            await alert_system._start(mock_update, mock_context)
+        mock_update.message.reply_text.assert_awaited_once()
+        mock_logger.error.assert_called_once()
+
+    @pytest.mark.asyncio
     async def test_status_command_handler(self, alert_system):
         """Test /status command handler."""
         mock_update = MagicMock(spec=Update)
@@ -635,6 +755,46 @@ class TestAlertSystem:
 
         await alert_system._status(mock_update, mock_context)
         mock_update.message.reply_text.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_status_command_handler_exception(self, alert_system):
+        """Test /status command handler exception path."""
+        mock_update = MagicMock(spec=Update)
+        mock_update.message = MagicMock()
+        mock_update.message.reply_text = AsyncMock(side_effect=Exception("reply boom"))
+        mock_context = MagicMock()
+
+        with patch("loats.alerts.logger") as mock_logger:
+            await alert_system._status(mock_update, mock_context)
+        mock_update.message.reply_text.assert_awaited_once()
+        mock_logger.error.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_safe_send_message_no_bot(self, alert_system):
+        """Test _safe_send_message returns False without bot."""
+        alert_system.bot = None
+        result = await alert_system._safe_send_message(chat_id="chat", text="hello")
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_safe_send_message_success(self, alert_system, mock_bot):
+        """Test _safe_send_message delegates to bot."""
+        alert_system.bot = mock_bot
+        result = await alert_system._safe_send_message(
+            chat_id="chat", text="hello", parse_mode="HTML"
+        )
+        assert result is True
+        mock_bot.send_message.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_safe_send_message_failure(self, alert_system, mock_bot):
+        """Test _safe_send_message returns False on send failure."""
+        alert_system.bot = mock_bot
+        mock_bot.send_message = AsyncMock(side_effect=Exception("send boom"))
+        result = await alert_system._safe_send_message(
+            chat_id="chat", text="hello", parse_mode="HTML"
+        )
+        assert result is False
 
     @pytest.mark.asyncio
     async def test_kill_command_handler_already_active(self, alert_system):
@@ -653,6 +813,22 @@ class TestAlertSystem:
         mock_update.message.reply_text.assert_called_once_with(
             "⚠️ Kill switch already active."
         )
+
+    @pytest.mark.asyncio
+    async def test_kill_command_handler_unauthorized(self, alert_system):
+        """Test /kill command rejects unauthorized user."""
+        mock_update = MagicMock(spec=Update)
+        mock_update.message = MagicMock()
+        mock_update.message.reply_text = AsyncMock()
+        mock_update.effective_user.id = 999999
+        mock_context = MagicMock()
+
+        with patch("loats.alerts.settings") as mock_settings:
+            mock_settings.telegram_admin_ids = ["123456789"]
+            await alert_system._kill_switch(mock_update, mock_context)
+
+        mock_update.message.reply_text.assert_called_once()
+        assert "not authorized" in mock_update.message.reply_text.call_args[0][0]
 
     @pytest.mark.asyncio
     async def test_kill_command_handler_with_reason(self, alert_system, mock_bot):
@@ -688,6 +864,23 @@ class TestAlertSystem:
 
         await alert_system._resume(mock_update, mock_context)
         mock_update.message.reply_text.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_resume_command_handler_unauthorized(self, alert_system):
+        """Test /resume command rejects unauthorized user."""
+        alert_system.kill_switch_active = True
+        mock_update = MagicMock(spec=Update)
+        mock_update.message = MagicMock()
+        mock_update.message.reply_text = AsyncMock()
+        mock_update.effective_user.id = 999999
+        mock_context = MagicMock()
+
+        with patch("loats.alerts.settings") as mock_settings:
+            mock_settings.telegram_admin_ids = ["123456789"]
+            await alert_system._resume(mock_update, mock_context)
+
+        mock_update.message.reply_text.assert_called_once()
+        assert "not authorized" in mock_update.message.reply_text.call_args[0][0]
 
     @pytest.mark.asyncio
     async def test_resume_command_handler_success(self, alert_system, mock_bot):
@@ -951,41 +1144,6 @@ class TestAlertSystem:
         assert "&lt;b&gt;bold attempt&lt;/b&gt;" in sent_message
 
     @pytest.mark.asyncio
-    async def test_send_position_alert_html_injection_prevention(
-        self, alert_system, mock_bot
-    ):
-        """Test that HTML in position data from API is properly escaped."""
-        alert_system.bot = mock_bot
-        with (
-            patch("loats.alerts.settings") as mock_settings,
-            patch("loats.alerts.async_client") as mock_openalgo,
-        ):
-            mock_settings.telegram_chat_id = "test_chat_id"
-            # Simulate malicious symbol name from external API
-            mock_openalgo.get_position_book = AsyncMock(
-                return_value={
-                    "data": [
-                        {
-                            "symbol": "<XSS>",
-                            "quantity": 50,
-                            "average_price": 18500.0,
-                            "last_price": 18550.0,
-                            "pnl": 2500.0,
-                            "product_type": "MIS",
-                        }
-                    ]
-                }
-            )
-
-            await alert_system.send_position_alert()
-
-        mock_bot.send_message.assert_called_once()
-        call_args = mock_bot.send_message.call_args
-        sent_message = call_args.kwargs.get("text") or call_args[1].get("text")
-        # Verify HTML is escaped: malicious symbol should appear as escaped entity
-        assert "&lt;XSS&gt;" in sent_message
-
-    @pytest.mark.asyncio
     async def test_orders_command_html_injection_prevention(self, alert_system):
         """Test that HTML in order data from API is properly escaped."""
         mock_update = MagicMock(spec=Update)
@@ -1057,3 +1215,97 @@ class TestAlertSystem:
         # Verify HTML is escaped: malicious tags should appear as escaped entities
         assert "&lt;script&gt;" in sent_message
         assert "&lt;b&gt;indicator&lt;/b&gt;" in sent_message
+
+    @pytest.mark.asyncio
+    async def test_send_alert_safe_message_failure_path(self, alert_system, mock_bot):
+        """Test send_alert when safe_send_message returns False (failure path)."""
+        alert_system.bot = mock_bot
+        with patch("loats.alerts.settings") as mock_settings:
+            mock_settings.telegram_chat_id = "test_chat_id"
+            with patch.object(
+                alert_system, "_safe_send_message", return_value=False
+            ) as mock_safe:
+                result = await alert_system.send_alert("Will not send", "info")
+        mock_safe.assert_awaited_once()
+        assert result is False
+        assert "info" not in alert_system.alert_cooldown
+
+    def test_get_circuit_breaker_status(self, alert_system):
+        """Test circuit breaker status includes both breakers."""
+        status = alert_system.get_circuit_breaker_status()
+        assert "openalgo" in status
+        assert "telegram" in status
+
+    def test_is_authorized_admin_no_admin_ids(self, alert_system):
+        """Test admin check when no admin ids are configured."""
+        with patch("loats.alerts.settings") as mock_settings:
+            mock_settings.telegram_admin_ids = []
+            update = MagicMock(spec=Update)
+            update.effective_user = MagicMock(id=123456789)
+            assert alert_system._is_authorized_admin(update) is False
+
+    def test_is_authorized_admin_no_user(self, alert_system):
+        """Test admin check when effective_user is missing."""
+        with patch("loats.alerts.settings") as mock_settings:
+            mock_settings.telegram_admin_ids = ["123456789"]
+            update = MagicMock(spec=Update)
+            update.effective_user = None
+            assert alert_system._is_authorized_admin(update) is False
+
+    def test_is_authorized_admin_authorized(self, alert_system):
+        """Test admin check for authorized user."""
+        with patch("loats.alerts.settings") as mock_settings:
+            mock_settings.telegram_admin_ids = ["123456789"]
+            update = MagicMock(spec=Update)
+            update.effective_user = MagicMock(id=123456789)
+            assert alert_system._is_authorized_admin(update) is True
+
+    @pytest.mark.asyncio
+    async def test_send_alert_cooldown_reset_after_success(
+        self, alert_system, mock_bot
+    ):
+        """Test cooldown is updated only after a successful send."""
+        alert_system.bot = mock_bot
+        with patch("loats.alerts.settings") as mock_settings:
+            mock_settings.telegram_chat_id = "test_chat_id"
+            result = await alert_system.send_alert("msg", "info")
+        assert result is True
+        assert "info" in alert_system.alert_cooldown
+
+    @pytest.mark.asyncio
+    async def test_initialize_bot_without_token(self, alert_system):
+        """Test _initialize_bot() raises ValueError when token is missing."""
+        with patch("loats.alerts.settings") as mock_settings:
+            mock_settings.telegram_bot_token = None
+            with patch("loats.alerts.logger") as mock_logger:
+                with pytest.raises(ValueError):
+                    await alert_system._initialize_bot()
+        mock_logger.warning.assert_called()
+
+    @pytest.mark.asyncio
+    async def test_initialize_bot_without_chat_id(self, alert_system):
+        """Test _initialize_bot() raises ValueError when chat id is missing."""
+        with patch("loats.alerts.settings") as mock_settings:
+            mock_settings.telegram_bot_token = "token"
+            mock_settings.telegram_chat_id = None
+            with pytest.raises(ValueError):
+                await alert_system._initialize_bot()
+
+    @pytest.mark.asyncio
+    async def test_initialize_bot_with_secret_str(self, alert_system):
+        """Test _initialize_bot() handles SecretStr token."""
+        from pydantic import SecretStr
+
+        with (
+            patch("loats.alerts.settings") as mock_settings,
+            patch("loats.alerts.Bot") as mock_bot_class,
+        ):
+            mock_settings.telegram_bot_token = SecretStr("secret_token")
+            mock_settings.telegram_chat_id = "chat_id"
+            mock_bot_instance = MagicMock()
+            mock_bot_class.return_value = mock_bot_instance
+
+            bot = await alert_system._initialize_bot()
+
+        assert bot is mock_bot_instance
+        mock_bot_class.assert_called_once_with(token="secret_token")

@@ -1,19 +1,44 @@
 #!/usr/bin/env python3
 """
 Script to check per-module coverage against a floor map.
-Enforces ≥80% coverage threshold for floor-mapped modules; others are informational.
-This script reads coverage.json and coverage_floor_map.json.
+
+F8-H-04: enforces the FR-specified per-module floor map
+(coverage_floor_map.json) against coverage.json. The fallback floor map is
+intentionally identical to the tracked map so that the script never silently
+accepts a narrowed gate.
 """
 
 import json
 import sys
 from pathlib import Path
 
+# F8-H-04 canonical FR-specified floor map. Kept in one place so the fallback
+# and the tracked json file cannot drift apart.
+FR_FLOOR_MAP: dict[str, float] = {
+    "orchestrator.py": 80.0,
+    "trailing_stop.py": 80.0,
+    "trade_decision.py": 80.0,
+    "options.py": 85.0,
+    "database.py": 80.0,
+    "database_async_additions.py": 80.0,
+    "alerts.py": 80.0,
+    "scheduler.py": 80.0,
+    "backtest_sanity.py": 80.0,
+    "strike_selection.py": 75.0,
+}
+
+EXCLUDED_MODULES: list[str] = [
+    "database_async_additions.py",
+    "database_async_additions_clean.py",
+    "database_async_additions_temp.py",
+    "__init__.py",
+]
+
 
 def load_coverage_data(coverage_file: Path) -> dict:
     """Load coverage data from coverage.json file."""
     try:
-        with open(coverage_file, "r") as f:
+        with open(coverage_file, "r", encoding="utf-8") as f:
             return json.load(f)
     except (FileNotFoundError, json.JSONDecodeError) as e:
         print(f"Error loading coverage data: {e}")
@@ -21,29 +46,18 @@ def load_coverage_data(coverage_file: Path) -> dict:
 
 
 def load_floor_map(floor_map_file: Path) -> dict:
-    """Load coverage floor map from JSON file."""
+    """Load coverage floor map from JSON file.
+
+    F8-H-04: fallback is the canonical FR floor map, not a narrowed gate.
+    """
     try:
-        with open(floor_map_file, "r") as f:
+        with open(floor_map_file, "r", encoding="utf-8") as f:
             return json.load(f)
     except (FileNotFoundError, json.JSONDecodeError) as e:
-        print(f"Error loading floor map: {e}")
-        print(
-            "Floor map is required. Using default fallback (orchestrator, trailing_stop, trade_decision, options >=80%)."
-        )
-        # Fallback floor map for backward compatibility
+        print(f"Warning: could not load floor map ({e}); using FR fallback.")
         return {
-            "floor_mapped_modules": {
-                "orchestrator.py": 80.0,
-                "trailing_stop.py": 80.0,
-                "trade_decision.py": 80.0,
-                "options.py": 80.0,
-            },
-            "excluded_modules": [
-                "database_async_additions.py",
-                "database_async_additions_clean.py",
-                "database_async_additions_temp.py",
-                "__init__.py",
-            ],
+            "floor_mapped_modules": FR_FLOOR_MAP,
+            "excluded_modules": EXCLUDED_MODULES,
         }
 
 
@@ -101,7 +115,7 @@ def check_floor_map_thresholds(
     return len(failures) == 0, failures, warnings
 
 
-def main():
+def main() -> None:
     """Main function to check per-module coverage against floor map."""
     coverage_file = Path("coverage.json")
     floor_map_file = Path("coverage_floor_map.json")
@@ -116,6 +130,30 @@ def main():
 
     # Load floor map
     floor_map = load_floor_map(floor_map_file)
+
+    # Safety check: if the tracked floor map is missing modules or has lowered
+    # floors, this script fails-closed (F8-H-04 regression guard).
+    tracked = floor_map.get("floor_mapped_modules", {})
+    if set(tracked.keys()) != set(FR_FLOOR_MAP.keys()):
+        print(
+            "CRITICAL: coverage_floor_map.json module set does not match the "
+            "FR-specified set. This is the F8-H-04 gate-weakening pathology."
+        )
+        print(f"Expected: {sorted(FR_FLOOR_MAP.keys())}")
+        print(f"Got: {sorted(tracked.keys())}")
+        sys.exit(1)
+
+    lowered = [
+        module
+        for module in FR_FLOOR_MAP
+        if tracked.get(module, 0.0) < FR_FLOOR_MAP[module]
+    ]
+    if lowered:
+        print(
+            "CRITICAL: coverage_floor_map.json has lowered floors for "
+            f"{', '.join(lowered)}. Floors must not be weakened."
+        )
+        sys.exit(1)
 
     # Extract module coverage
     module_coverage = extract_module_coverage(coverage_data)

@@ -77,21 +77,29 @@ async def test_trading_system_start_shutdown(trading_system):
 
 @pytest.mark.asyncio
 async def test_trading_system_run_once(trading_system):
-    """Test run_once executes scheduler scans (TA and sentiment).
+    """Test run_once executes scheduler support jobs.
 
-    Note: Signal generation is handled by the orchestrator cycle loop,
-    not by scheduler. The orchestrator runs signal generation in
-    _execute_trading_cycle() when started via start_orchestrator().
+    F8-H-03: TA and sentiment signal scans have been retired from the
+    scheduler; the orchestrator is the sole signal engine. run_once now only
+    exercises support jobs (market status, data cleanup, backtest sanity check).
     """
-    with (
-        patch("loats.main.scheduler.run_ta_scan", new_callable=AsyncMock) as mock_ta,
-        patch(
-            "loats.main.scheduler.run_sentiment_scan", new_callable=AsyncMock
-        ) as mock_sentiment,
-    ):
+    with patch.object(
+        trading_system, "_run_scheduler_support_jobs", new_callable=AsyncMock
+    ) as mock_support:
         await trading_system.run_once()
-        mock_ta.assert_called_once()
-        mock_sentiment.assert_called_once()
+        mock_support.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_run_once_exception(trading_system):
+    """Test run_once exception handling when a support job fails."""
+    with patch.object(
+        trading_system,
+        "_run_scheduler_support_jobs",
+        side_effect=Exception("Support job error"),
+    ):
+        with pytest.raises(Exception, match="Support job error"):
+            await trading_system.run_once()
 
 
 @pytest.mark.asyncio

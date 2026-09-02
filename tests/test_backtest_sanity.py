@@ -1,6 +1,9 @@
 """Tests for walk-forward window slicing and no look-ahead."""
 
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
+
+import pytest
 
 from loats.models import HistoricalData
 
@@ -81,3 +84,163 @@ class TestNoLookAhead:
         d = make_ohlc("NIFTY", 100, 50)
         for w in walk_forward(d, 20, 10):
             assert all(c > 0 for c in [h.close for h in w])
+
+
+class TestBacktestSanityFunctions:
+    """F8-H-04: direct coverage of the production backtest_sanity module."""
+
+    def test_walk_forward_iterator_validation(self):
+        """WalkForwardWindowIterator validates empty data and window size."""
+        from loats.backtest_sanity import WalkForwardWindowIterator
+
+        with pytest.raises(ValueError):
+            WalkForwardWindowIterator([], 20, 10)
+
+        data = make_ohlc("NIFTY", 100, 10)
+        with pytest.raises(ValueError):
+            WalkForwardWindowIterator(data, 20, 10)
+
+    def test_walk_forward_iterator_unsorted_data(self):
+        """WalkForwardWindowIterator rejects unsorted data."""
+        from loats.backtest_sanity import WalkForwardWindowIterator
+
+        data = make_ohlc("NIFTY", 100, 50)
+        data[5].timestamp = data[40].timestamp
+        with pytest.raises(ValueError):
+            WalkForwardWindowIterator(data, 20, 10)
+
+    def test_walk_forward_iterator_length(self):
+        """WalkForwardWindowIterator __len__ matches generated windows."""
+        from loats.backtest_sanity import WalkForwardWindowIterator
+
+        data = make_ohlc("NIFTY", 100, 50)
+        it = WalkForwardWindowIterator(data, 20, 10)
+        assert len(it) == 4
+        windows = list(it)
+        assert len(windows) == 4
+        assert all(len(w) == 20 for _, w in windows)
+
+    def test_calculate_simple_pnl(self):
+        """calculate_simple_pnl returns expected Decimal percentage."""
+        from decimal import Decimal
+
+        from loats.backtest_sanity import calculate_simple_pnl
+
+        data = make_ohlc("NIFTY", 100, 50)
+        pnl = calculate_simple_pnl(data[0:2])
+        assert isinstance(pnl, Decimal)
+        assert pnl == Decimal(str(data[1].close - data[0].open)) / Decimal(
+            str(data[0].open)
+        ) * Decimal("100")
+
+        assert calculate_simple_pnl([data[0]]) == Decimal("0")
+
+    def test_validate_no_lookahead(self):
+        """validate_no_lookahead accepts sorted and rejects unsorted."""
+        from loats.backtest_sanity import validate_no_lookahead
+
+        sorted_data = make_ohlc("NIFTY", 100, 50)
+        assert validate_no_lookahead(sorted_data) is True
+
+        unsorted = sorted_data[:]
+        unsorted[10], unsorted[20] = unsorted[20], unsorted[10]
+        assert validate_no_lookahead(unsorted) is False
+
+    @pytest.mark.asyncio
+    async def test_backtest_sanity_pass_gate(self):
+        """backtest_sanity_pass_gate enforces min pass rate."""
+        from datetime import UTC
+        from decimal import Decimal
+
+        from loats.backtest_sanity import (
+            BacktestSanityResult,
+            backtest_sanity_pass_gate,
+        )
+
+        result = BacktestSanityResult(
+            symbol="NIFTY",
+            timestamp=datetime.now(UTC),
+            total_windows=10,
+            total_bars=200,
+            total_pnl=Decimal("0"),
+            avg_pnl_per_window=Decimal("0"),
+            windows_passed=8,
+            windows_failed=2,
+            pass_rate=Decimal("80"),
+            details=[],
+        )
+        assert backtest_sanity_pass_gate(result) is True
+        result.pass_rate = Decimal("79.9")
+        assert backtest_sanity_pass_gate(result) is False
+
+
+class TestBacktestSanityCheckRun:
+    """F8-H-04: integration tests for run_backtest_sanity_check."""
+
+    @pytest.mark.asyncio
+    async def test_run_backtest_sanity_check_success(self):
+        """run_backtest_sanity_check completes with passing gate."""
+        from unittest.mock import MagicMock, patch
+
+        from loats.backtest_sanity import (
+            BacktestSanityResult,
+            run_backtest_sanity_check,
+        )
+
+        fake_data = make_ohlc("NIFTY", 100, 50)
+        mock_db = MagicMock()
+        mock_db.get_historical_data.return_value = fake_data
+
+        with (
+            patch("loats.backtest_sanity.db", mock_db),
+            patch("loats.backtest_sanity.settings.default_symbol", "NIFTY"),
+        ):
+            result = await run_backtest_sanity_check(
+                symbol="NIFTY", days_back=1, window_size=20, step_size=10
+            )
+
+        assert isinstance(result, BacktestSanityResult)
+        assert result.symbol == "NIFTY"
+        assert result.total_windows > 0
+        assert result.pass_rate >= Decimal("80")
+
+    @pytest.mark.asyncio
+    async def test_run_backtest_sanity_check_no_data(self):
+        """run_backtest_sanity_check raises when no data."""
+        from unittest.mock import MagicMock, patch
+
+        from loats.backtest_sanity import run_backtest_sanity_check
+
+        mock_db = MagicMock()
+        mock_db.get_historical_data.return_value = []
+
+        with (
+            patch("loats.backtest_sanity.db", mock_db),
+            patch("loats.backtest_sanity.settings.default_symbol", "NIFTY"),
+        ):
+            with pytest.raises(ValueError, match="No historical data"):
+                await run_backtest_sanity_check(
+                    symbol="NIFTY", days_back=1, window_size=20, step_size=10
+                )
+
+    @pytest.mark.asyncio
+    async def test_run_backtest_sanity_check_lookahead_failure(self):
+        """run_backtest_sanity_check raises on look-ahead contamination."""
+        from unittest.mock import MagicMock, patch
+
+        from loats.backtest_sanity import run_backtest_sanity_check
+
+        fake_data = make_ohlc("NIFTY", 100, 50)
+        fake_data[25].timestamp = fake_data[0].timestamp
+
+        mock_db = MagicMock()
+        mock_db.get_historical_data.return_value = fake_data
+
+        with (
+            patch("loats.backtest_sanity.db", mock_db),
+            patch("loats.backtest_sanity.settings.default_symbol", "NIFTY"),
+        ):
+            with pytest.raises(ValueError, match="no-lookahead"):
+                await run_backtest_sanity_check(
+                    symbol="NIFTY", days_back=1, window_size=20, step_size=10
+                )

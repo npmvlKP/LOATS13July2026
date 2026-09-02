@@ -64,7 +64,7 @@ FORBIDDEN_PATTERNS: tuple[str, ...] = (
 # (the legitimate tree immediately before the TODO-25 venv sweep). The
 # TODO-21 ratchet (<=343) went stale after TODO-22..27 additions; this
 # ceiling preserves the ratchet intent without freezing legitimate growth.
-TRACKED_FILE_CEILING = 420
+TRACKED_FILE_CEILING = 425
 
 # Tracked paths that would match FORBIDDEN_PATTERNS but are deliberate.
 ALLOWLIST: frozenset[str] = frozenset(

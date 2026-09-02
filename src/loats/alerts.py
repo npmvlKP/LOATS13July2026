@@ -97,7 +97,12 @@ class AlertSystem:
             logger.warning("Telegram chat ID not configured.")
             raise ValueError("Telegram chat ID not configured")
 
-        self.bot = Bot(token=settings.telegram_bot_token.get_secret_value())
+        token = settings.telegram_bot_token
+        # SecretStr and plain string both expose a token value for the Bot.
+        token_value = (
+            token.get_secret_value() if hasattr(token, "get_secret_value") else token
+        )
+        self.bot = Bot(token=token_value)
         return self.bot
 
     async def initialize(self) -> None:
@@ -110,7 +115,14 @@ class AlertSystem:
                 logger.warning("Telegram chat not configured. Alerts not sent.")
                 return
 
-            self.bot = Bot(token=settings.telegram_bot_token.get_secret_value())
+            token = settings.telegram_bot_token
+            # SecretStr and plain string both expose a token value for the Bot.
+            token_value = (
+                token.get_secret_value()
+                if hasattr(token, "get_secret_value")
+                else token
+            )
+            self.bot = Bot(token=token_value)
             self.application = Application.builder().bot(self.bot).build()
 
             self.application.add_handler(CommandHandler("start", self._start))
@@ -164,6 +176,7 @@ class AlertSystem:
             logger.info("Telegram bot started")
         except Exception as e:
             logger.error(f"Failed start Telegram bot: {e}")
+            self._running = False
             raise
 
     async def shutdown(self) -> None:

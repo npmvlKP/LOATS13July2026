@@ -730,6 +730,87 @@ class TestStrikeSelectionEngine(unittest.IsolatedAsyncioTestCase):
         # Should select strikes closest to ATM
         assert 100.0 in selected
 
+    async def test_optimal_strike_spacing(self):
+        """Test optimal strike spacing calculation."""
+        spacing = await self.engine.calculate_optimal_strike_spacing(100.0, 0.25, 30)
+        assert spacing > 0.0
+
+        # Zero days to expiry returns 0.0
+        spacing_zero = await self.engine.calculate_optimal_strike_spacing(
+            100.0, 0.25, 0
+        )
+        assert spacing_zero == 0.0
+
+    async def test_analyze_strike_efficiency(self):
+        """Test strike efficiency analysis."""
+        now = datetime.now(UTC)
+        option_chain = [
+            OptionContract(
+                symbol="TEST24JUL100CE",
+                strike_price=100.0,
+                expiry=now,
+                option_type=OptionType.CALL,
+                last_price=5.0,
+                open_interest=1000,
+                volume=500,
+                implied_volatility=0.25,
+                delta=0.5,
+                gamma=0.01,
+                theta=-0.05,
+                vega=0.1,
+                rho=0.05,
+                quantity=1,
+            ),
+            OptionContract(
+                symbol="TEST24JUL105CE",
+                strike_price=105.0,
+                expiry=now,
+                option_type=OptionType.CALL,
+                last_price=3.0,
+                open_interest=800,
+                volume=400,
+                implied_volatility=0.23,
+                delta=0.4,
+                gamma=0.008,
+                theta=-0.04,
+                vega=0.08,
+                rho=0.04,
+                quantity=1,
+            ),
+        ]
+        selected = [100.0]
+        metrics = await self.engine.analyze_strike_efficiency(
+            selected, option_chain, 100.0
+        )
+        assert "coverage_score" in metrics
+        assert metrics["coverage_score"] == 1.0
+
+    async def test_analyze_strike_efficiency_empty(self):
+        """Test efficiency analysis with empty inputs."""
+        metrics = await self.engine.analyze_strike_efficiency([], [], 100.0)
+        assert metrics["coverage_score"] == 0.0
+        assert metrics["liquidity_score"] == 0.0
+
+    def test_clear_cache(self):
+        """Test cache clearing."""
+        self.engine._cache["key"] = [100.0]
+        self.engine.clear_cache()
+        assert len(self.engine._cache) == 0
+
+    def test_get_cache_stats(self):
+        """Test cache statistics."""
+        stats = self.engine.get_cache_stats()
+        assert "hits" in stats
+        assert "misses" in stats
+        assert 0 <= stats["hit_rate"] <= 1
+
+    def test_cleanup(self):
+        """Test resource cleanup."""
+        self.engine._cache["key"] = [100.0]
+        self.engine.cleanup()
+        assert len(self.engine._cache) == 0
+        assert self.engine._initialized is False
+
 
 if __name__ == "__main__":
     # Run the tests

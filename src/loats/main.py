@@ -149,6 +149,17 @@ class TradingSystem:
             logger.error(f"Error during shutdown: {e}")
             raise
 
+    async def _run_scheduler_support_jobs(self) -> None:
+        """Run scheduler support jobs (no signal production).
+
+        F8-H-03: TA and sentiment signal scans have been retired from the
+        scheduler.  Signal generation is the sole responsibility of the
+        orchestrator's 100 ms trading cycle.
+        """
+        await scheduler.run_once("market_status_check")
+        await scheduler.run_once("data_cleanup")
+        await scheduler.run_once("backtest_sanity_check")
+
     async def run_once(self) -> None:
         """Run all non-signal scheduler jobs once for testing.
 
@@ -160,9 +171,7 @@ class TradingSystem:
         """
         try:
             logger.info("Running scheduler support jobs once")
-            await scheduler.run_once("market_status_check")
-            await scheduler.run_once("data_cleanup")
-            await scheduler.run_once("backtest_sanity_check")
+            await self._run_scheduler_support_jobs()
             logger.info(
                 "All support jobs completed; orchestrator owns signal generation"
             )

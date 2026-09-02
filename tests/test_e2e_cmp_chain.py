@@ -601,62 +601,16 @@ class TestRealProducersE2E:
 
 
 class TestSchedulerSignalTagging:
-    """Scheduler-emitted signals must carry enum-valid sources."""
+    """F8-H-03: scheduler no longer emits signals; signal source tagging is orchestrator-only."""
 
-    @pytest.mark.asyncio
-    async def test_scheduler_ta_signal_has_enum_source(self, temp_db):
-        sched = TradingScheduler()
-        sched.db = temp_db
-
-        rows = make_history_rows(60)
-        payload = rows_to_payload(rows)
-        quote_payload = make_quote_payload(rows[-1].close)
-
-        with (
-            patch.object(
-                sched, "_safe_get_history", new_callable=AsyncMock
-            ) as mock_history,
-            patch.object(
-                sched, "_safe_get_quotes", new_callable=AsyncMock
-            ) as mock_quotes,
-        ):
-            mock_history.return_value = payload
-            mock_quotes.return_value = quote_payload
-            await sched._ta_scan_task()
-
-        stored = await temp_db.async_get_latest_signals("NIFTY", limit=5)
-        assert len(stored) >= 1, "Scheduler TA scan must persist a signal"
-        valid_sources = {src.value for src in StrengthSource}
-        for s in stored:
-            assert s.metadata.get("source") in valid_sources, (
-                f"Scheduler signal missing enum source: {s.metadata}"
-            )
-
-    @pytest.mark.asyncio
-    async def test_scheduler_sentiment_signal_has_enum_source(self, temp_db):
-        sched = TradingScheduler()
-        sched.db = temp_db
-
-        with (
-            patch(
-                "loats.orchestrator.validate_rss_feed", new_callable=AsyncMock
-            ) as mock_rss,
-            patch(
-                "loats.scheduler.sentiment.analyze_symbol_sentiment",
-                new_callable=AsyncMock,
-            ) as mock_sentiment,
-        ):
-            mock_rss.return_value = True
-            mock_sentiment.return_value = make_sentiment_result(0.6)
-            await sched._sentiment_scan_task()
-
-        stored = await temp_db.async_get_latest_signals("NIFTY", limit=5)
-        assert len(stored) >= 1, "Scheduler sentiment scan must persist a signal"
-        valid_sources = {src.value for src in StrengthSource}
-        for s in stored:
-            assert s.metadata.get("source") in valid_sources, (
-                f"Scheduler sentiment signal missing enum source: {s.metadata}"
-            )
+    def test_scheduler_no_signal_producer_methods(self):
+        """Scheduler must not have _ta_scan_task or _sentiment_scan_task after F8-H-03."""
+        assert not hasattr(TradingScheduler, "_ta_scan_task"), (
+            "F8-H-03: _ta_scan_task must be retired"
+        )
+        assert not hasattr(TradingScheduler, "_sentiment_scan_task"), (
+            "F8-H-03: _sentiment_scan_task must be retired"
+        )
 
 
 # --------------------------------------------------------------------------
@@ -748,22 +702,18 @@ class TestMutationSafety:
             f"Orchestrator must emit >=4 distinct StrengthSource tags, got {sites}"
         )
 
-    def test_scheduler_signal_sites_carry_enum_source(self):
-        """Static check: scheduler Signal(...) metadata blocks include source."""
+    def test_scheduler_no_signal_source_blocks(self):
+        """F8-H-03: scheduler source must not contain any signal metadata blocks."""
         import inspect
 
         source = inspect.getsource(TradingScheduler)
-        # Every 'scan_type': 'X' metadata block must be followed by a source
-        # tag before the block closes.
         scan_blocks = re.findall(
             r'metadata\s*=\s*\{[^}]*"scan_type"\s*:\s*"[^"]+"[^}]*\}',
             source,
         )
-        assert scan_blocks, "Scheduler should still emit scan metadata blocks"
-        for block in scan_blocks:
-            assert '"source"' in block, (
-                f"Scheduler metadata block missing source tag: {block[:120]}"
-            )
+        assert scan_blocks == [], (
+            f"F8-H-03: scheduler must not emit scan metadata blocks, got {scan_blocks}"
+        )
 
 
 if __name__ == "__main__":
