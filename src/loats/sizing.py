@@ -16,6 +16,7 @@ import numpy as np
 from .lazy_settings import LazySettings
 from .loats_logging import get_logger
 from .models import FundsData, Trade
+from .utils.lazy_singleton import lazy_singleton
 
 # Lazy proxy module-level binding (TODO-18 / HC-21).
 # AST scanner for HC-21 sees a Call to LazySettings(),
@@ -421,6 +422,9 @@ class SizingEngine:
 
 
 # Module-level singleton instance
-sizing_engine = SizingEngine()
+# F8-C-03 (2026-09-02): __init__ reads Settings() (max_position_size,
+# nifty_lot_size, max_order_value); defer construction so imports
+# stay credential-free. Test patches keep working via proxy __dict__.
+sizing_engine: SizingEngine = lazy_singleton(SizingEngine)
 
 __all__ = ["SizingEngine", "SizingMethod", "sizing_engine"]

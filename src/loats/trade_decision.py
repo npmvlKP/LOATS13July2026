@@ -24,6 +24,7 @@ from .rules import rules_engine
 from .sizing import sizing_engine
 from .strength import strength_engine
 from .trailing_stop import TrailingStopType, trailing_stop_engine
+from .utils.lazy_singleton import lazy_singleton
 
 # Lazy proxy module-level binding (TODO-18 / HC-21).
 # AST scanner for HC-21 sees a Call to LazySettings(),
@@ -533,6 +534,9 @@ class TradeDecisionEngine:
 
 
 # Module-level singleton instance
-trade_decision_engine = TradeDecisionEngine()
+# F8-C-03 (2026-09-02): __init__ reads Settings() (decision_queue_maxsize,
+# analyzer_routing_enabled); defer construction so imports stay
+# credential-free. Test patches keep working via proxy __dict__.
+trade_decision_engine: TradeDecisionEngine = lazy_singleton(TradeDecisionEngine)
 
 __all__ = ["TradeDecisionEngine", "DecisionStatus", "trade_decision_engine"]
