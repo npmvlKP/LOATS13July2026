@@ -129,6 +129,10 @@ reports/health/pip_audit.json
 reports/health/run*.json
 reports/health/only-probes.json
 
+# F8-H-03 runtime verification report (generated artifact, external verifier emits
+# reports/f8-h-03-verification.json; keep it out of the index)
+reports/*.json
+
 # Junk files
 $null
 [100%]
