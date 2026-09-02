@@ -560,6 +560,48 @@ def probe_strength_gate(rep: Report) -> None:
         )
     )
 
+    # F8-C-01 hardening: production-side emission check. Gate math alone
+    # cannot detect a production side that emits fewer sources than the
+    # gate requires (the exact blind spot of the F7 wave).
+    import re as _re
+
+    orch_path = (
+        Path(__file__).resolve().parents[1] / "src" / "loats" / "orchestrator.py"
+    )
+    emitted: set[str] = set()
+    try:
+        emitted = set(
+            _re.findall(
+                r"StrengthSource\.([A-Z_]+)\.value",
+                orch_path.read_text(encoding="utf-8"),
+            )
+        )
+        required = {
+            "TECHNICAL_ANALYSIS",
+            "SENTIMENT",
+            "VOLATILITY",
+            "PRICE_ACTION",
+        }
+        missing = required - emitted
+        prod_ok = not missing
+        detail = (
+            f"orchestrator emits {sorted(emitted)}"
+            if prod_ok
+            else f"missing producers: {sorted(missing)}"
+        )
+    except OSError as exc:
+        prod_ok = False
+        detail = f"cannot read orchestrator.py: {exc}"
+    rep.add(
+        Result(
+            "HC-15",
+            "production emission set: >=4 enum-tagged producers in orchestrator",
+            "F8-C-01",
+            "PASS" if prod_ok else "FAIL",
+            detail + " — a live cycle must be able to satisfy the 4/7 diversity gate",
+        )
+    )
+
 
 def probe_rate_limiter(rep: Report) -> None:
     """HC-14 — F6-C-01 regression net: singleton, max_ops=3, burst 3/10."""
