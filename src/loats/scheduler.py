@@ -25,6 +25,7 @@ from .models import (
 )
 from .openalgo import KillSwitchError, async_client
 from .sentiment import sentiment
+from .strength import StrengthSource
 from .ta import technical_analysis
 from .utils.circuit_breaker import (
     OPENALGO_CIRCUIT_BREAKER,
@@ -365,6 +366,7 @@ class TradingScheduler:
                         "scan_type": "ta",
                         "timeframe": timeframe,
                         "indicators_count": len(indicators),
+                        "source": StrengthSource.TECHNICAL_ANALYSIS.value,
                     },
                 )
                 await self.db.async_create_signal(signal)
@@ -443,6 +445,7 @@ class TradingScheduler:
                 "negative_count": result.negative_count,
                 "neutral_count": result.neutral_count,
                 "top_sources": [news.source for news in result.top_news],
+                "source": StrengthSource.SENTIMENT.value,
             }
             if result.sentiment_score > 0:
                 signal_type = SignalType.BUY

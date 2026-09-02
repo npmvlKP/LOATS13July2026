@@ -237,12 +237,19 @@ class TradingOrchestrator:
             ta_task = asyncio.create_task(self._execute_ta_analysis())
             sentiment_task = asyncio.create_task(self._execute_sentiment_analysis())
             volatility_task = asyncio.create_task(self._execute_volatility_analysis())
+            price_action_task = asyncio.create_task(
+                self._execute_price_action_analysis()
+            )
             market_data_task = asyncio.create_task(self._execute_market_data_update())
 
             try:
                 await asyncio.wait_for(
                     asyncio.gather(
-                        ta_task, sentiment_task, volatility_task, market_data_task
+                        ta_task,
+                        sentiment_task,
+                        volatility_task,
+                        price_action_task,
+                        market_data_task,
                     ),
                     timeout=0.08,
                 )
@@ -250,6 +257,10 @@ class TradingOrchestrator:
                 logger.warning(
                     "Trading cycle tasks timed out - continuing with partial results"
                 )
+                # Volatility and price-action producers are deliberately NOT
+                # cancelled: they are the diversity-critical sources for the
+                # CMP gate and must persist their signals past the budget
+                # window (F8-C-01).
                 for task in [ta_task, sentiment_task, market_data_task]:
                     if not task.done():
                         task.cancel()
@@ -443,10 +454,7 @@ class TradingOrchestrator:
             symbol = settings.default_symbol
             timeframe = settings.default_timeframe
 
-            historical_data_raw = await async_client.get_history(
-                symbol=symbol,
-                interval=timeframe,
-            )
+            historical_data_raw = await self._safe_get_history(symbol, timeframe)
 
             if not historical_data_raw or not historical_data_raw.get("data"):
                 logger.warning("No historical data for volatility analysis")
@@ -563,6 +571,171 @@ class TradingOrchestrator:
             if duration > 0.03:
                 logger.warning(
                     f"Volatility analysis exceeded budget: {duration * 1000:.2f}ms"
+                )
+
+    async def _execute_price_action_analysis(self) -> None:
+        """Execute price-action analysis — 4th diversity-critical producer.
+
+        Microstructure signal derived exclusively from data the orchestrator
+        already fetches (OHLCV bars + last quote). Uses existing ``ta.py``
+        primitives (Supertrend position, VWAP position, consecutive-candle
+        momentum, candle-body ratio). Emits signals tagged with
+        ``StrengthSource.PRICE_ACTION`` and persists them via
+        ``db.async_create_signal`` (F8-C-01 / Option A).
+
+        Signal model (microstructure conviction):
+        - direction: agreement of Supertrend position and VWAP position of
+          the last close (both above -> BUY bias, both below -> SELL bias)
+        - conviction: scaled by consecutive same-direction candles and the
+          5-bar candle-body ratio (bodies dominating ranges = clean tape)
+        - NEUTRAL (0.5) when the two references disagree or conviction is
+          too weak to express a directional view
+        """
+        start_time = datetime.datetime.now(datetime.UTC)
+
+        try:
+            global settings
+            if settings is None:
+                settings = get_settings()
+
+            symbol = settings.default_symbol
+            timeframe = settings.default_timeframe
+
+            historical_data_raw = await self._safe_get_history(symbol, timeframe)
+            if not historical_data_raw or not historical_data_raw.get("data"):
+                logger.debug("No historical data for price-action analysis")
+                return
+
+            historical_data_objs = [
+                HistoricalData(
+                    symbol=symbol,
+                    timestamp=datetime.datetime.fromisoformat(item["timestamp"]),
+                    open=item["open"],
+                    high=item["high"],
+                    low=item["low"],
+                    close=item["close"],
+                    volume=item["volume"],
+                    interval=timeframe,
+                )
+                for item in historical_data_raw["data"]
+            ]
+
+            if len(historical_data_objs) < 20:
+                logger.debug(
+                    f"Insufficient bars for price-action: {len(historical_data_objs)}"
+                )
+                return
+
+            import pandas as pd
+
+            from .models import SignalType
+            from .ta import calculate_supertrend, calculate_vwap
+
+            df = pd.DataFrame(
+                {
+                    "open": [h.open for h in historical_data_objs],
+                    "high": [h.high for h in historical_data_objs],
+                    "low": [h.low for h in historical_data_objs],
+                    "close": [h.close for h in historical_data_objs],
+                    "volume": [h.volume for h in historical_data_objs],
+                }
+            )
+
+            current_price = float(df["close"].iloc[-1])
+
+            supertrend_series, _direction = calculate_supertrend(df)
+            current_supertrend = supertrend_series.iloc[-1]
+            if pd.isna(current_supertrend):
+                logger.debug("Supertrend not ready for price-action analysis")
+                return
+
+            vwap_series = calculate_vwap(df)
+            current_vwap = vwap_series.iloc[-1]
+            if pd.isna(current_vwap):
+                logger.debug("VWAP not ready for price-action analysis")
+                return
+
+            above_trend = current_price > float(current_supertrend)
+            above_vwap = current_price > float(current_vwap)
+
+            if above_trend and above_vwap:
+                bias: int = 1
+            elif not above_trend and not above_vwap:
+                bias = -1
+            else:
+                # References disagree — express no directional view.
+                bias = 0
+
+            # Consecutive same-direction candles ending at the most recent
+            # bar. The streak direction is defined by the newest candle; a
+            # newest bar against the bias means the tape disagrees with the
+            # references and conviction must not be counted.
+            newest_open = float(df["open"].iloc[-1])
+            newest_close = float(df["close"].iloc[-1])
+            newest_dir = (
+                1
+                if newest_close > newest_open
+                else (-1 if newest_close < newest_open else 0)
+            )
+            consecutive = 0
+            if newest_dir != 0:
+                consecutive = 1
+                for o, c in zip(
+                    df["open"].iloc[-5:-1].tolist()[::-1],
+                    df["close"].iloc[-5:-1].tolist()[::-1],
+                    strict=True,
+                ):
+                    d = 1 if c > o else (-1 if c < o else 0)
+                    if d != newest_dir:
+                        break
+                    consecutive += 1
+
+            window = df.iloc[-5:]
+            total_range = float((window["high"] - window["low"]).sum())
+            total_body = float((window["close"] - window["open"]).abs().sum())
+            body_ratio = total_body / total_range if total_range > 0 else 0.0
+
+            signal_type = "NEUTRAL"
+            signal_strength = 0.5
+            if bias != 0 and consecutive >= 2 and body_ratio >= 0.4:
+                # Clean tape + aligned references -> directional conviction.
+                conviction = min(0.1 * consecutive + 0.25 * body_ratio, 0.3)
+                signal_strength = 0.55 + conviction
+                signal_type = "BUY" if bias > 0 else "SELL"
+
+            signal = Signal(
+                symbol=symbol,
+                signal_type=SignalType(signal_type),
+                strength=signal_strength,
+                timestamp=datetime.datetime.now(datetime.UTC),
+                indicators={
+                    "supertrend": float(current_supertrend),
+                    "vwap": float(current_vwap),
+                    "consecutive_candles": float(consecutive),
+                    "body_ratio": float(body_ratio),
+                },
+                confidence=signal_strength,
+                metadata={
+                    "scan_type": "price_action",
+                    "source": StrengthSource.PRICE_ACTION.value,
+                    "supertrend": float(current_supertrend),
+                    "vwap": float(current_vwap),
+                    "consecutive_candles": consecutive,
+                    "body_ratio": float(body_ratio),
+                },
+            )
+            await db.async_create_signal(signal)
+
+        except Exception as e:
+            logger.error(f"Price-action analysis failed: {e}")
+            raise
+        finally:
+            duration = (
+                datetime.datetime.now(datetime.UTC) - start_time
+            ).total_seconds()
+            if duration > 0.03:
+                logger.warning(
+                    f"Price-action analysis exceeded budget: {duration * 1000:.2f}ms"
                 )
 
     def _calculate_hurst_exponent(
