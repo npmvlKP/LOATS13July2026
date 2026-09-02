@@ -216,8 +216,12 @@ def check_tracking_count_reduction(verbose: bool = False) -> dict:
     )
     staged_deletions = len(deleted_files.split("\n")) if deleted_files else 0
 
-    # Baseline from TODO-21 description: 343 tracked files
-    baseline_count = 343
+    # F8-C-02 (2026-09-02): baseline re-set from 343 to 369, the measured
+    # tracked-file count at commit 7a2ea233^ (immediately before the venv
+    # sweep). TODO-22..27 legitimately added ~26 tracked files after
+    # TODO-21's cleanup; the ratchet intent is preserved (see
+    # scripts/check_repo_hygiene.py, which now enforces a hard ceiling).
+    baseline_count = 369
     removed_count = 21  # Files we removed
 
     expected_count = baseline_count - removed_count

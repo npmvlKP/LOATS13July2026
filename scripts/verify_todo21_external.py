@@ -286,7 +286,13 @@ class ExternalValidator:
         )
         staged_deletions = len(deleted_files.split("\n")) if deleted_files else 0
 
-        baseline_count = 343
+        # F8-C-02 (2026-09-02): baseline re-set from 343 to 369, the measured
+        # tracked-file count at commit 7a2ea233^ (immediately before the venv
+        # sweep). The TODO-22..27 waves legitimately added ~26 tracked files
+        # after TODO-21's 343, so 343 had gone stale; the ratchet intent --
+        # "no venv-class blowups" -- is preserved (10,414 tracked at the F8-C-02
+        # finding; 394 after remediation).
+        baseline_count = 369
         count_after_commit = current_count - staged_deletions
         reduction = baseline_count - count_after_commit
         percentage = (reduction / baseline_count * 100) if baseline_count > 0 else 0
