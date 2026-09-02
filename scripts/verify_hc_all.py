@@ -140,8 +140,13 @@ def check_hc03() -> bool:
     empty_shells: list[Path] = []
     loats_dir = REPO_ROOT / "src" / "loats"
     if loats_dir.is_dir():
+        # Tooling exhaust (mypy/pylint caches) is not package structure; skip
+        # any directory git already ignores (dot-prefixed caches at minimum).
+        skip_names = {"__pycache__"}
         for subdir in loats_dir.iterdir():
-            if subdir.is_dir() and subdir.name != "__pycache__":
+            if subdir.is_dir() and subdir.name not in skip_names:
+                if subdir.name.startswith("."):
+                    continue  # dot-prefixed tool caches (.mypy_cache, .ruff_cache)
                 py_files = list(subdir.rglob("*.py")) + list(subdir.rglob("*.pyi"))
                 if not py_files:
                     empty_shells.append(subdir)
