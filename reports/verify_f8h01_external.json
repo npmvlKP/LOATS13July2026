@@ -1,0 +1,93 @@
+{
+  "finding": "F8-H-01",
+  "passed": 17,
+  "total": 17,
+  "checks": [
+    {
+      "name": "A1 settings default OFF (AST)",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "name": "A2 .env.example documents flag",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "name": "B1 no dead async_record_trade_decision probe",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "name": "C1 ROUTE audit row wired in _persist_routing_outcome",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "name": "D1 get_decision_status reads DB (NOT_FOUND path)",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "name": "D2 no fabricated status strings",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "name": "E1 runner exists",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "name": "E2 validator exists",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "name": "E3 runner --dry-run exit 0",
+      "pass": true,
+      "note": "2026-09-02T06:07:14.874896Z [info     ] 2026-09-02T06:07:14.874896Z [info     ] "
+    },
+    {
+      "name": "E4 validator grades fixtures correctly",
+      "pass": true,
+      "note": "PASS/INCOMPLETE/FAIL/FAIL"
+    },
+    {
+      "name": "F1 enabled: HTTP fires + decision persisted",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "name": "F2 enabled: ROUTE audit row w/ outcome",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "name": "F3 disabled: audited disabled outcome",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "name": "F4 error: propagates + audited",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "name": "F5 status: real row surfaced",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "name": "G1 ADR-006 records F8-H-01",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "name": "G2 README records deviation",
+      "pass": true,
+      "note": ""
+    }
+  ],
+  "generated_at": "2026-09-02T06:07:17.437240+00:00"
+}

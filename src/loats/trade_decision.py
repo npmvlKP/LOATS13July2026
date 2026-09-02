@@ -333,24 +333,29 @@ class TradeDecisionEngine:
     ) -> dict[str, Any]:
         """Persist decision + routing outcome to audit trail (SQLite + JSONL).
 
+        F8-H-01: every routed decision must leave (a) a ``trade_decisions``
+        row and (b) a ROUTE audit row whose metadata carries the routing
+        outcome (success / disabled / error). The previous implementation
+        probed for a nonexistent ``db.async_record_trade_decision`` attribute
+        (the registered extension is the private one-arg
+        ``_async_record_trade_decision``), so the preferred branch was dead
+        code and the routing outcome was never audited.
+
+        Idempotent: the orchestrator pre-persists the decision before
+        routing (orchestrator.py ``_execute_cmp_strategy``), so the row is
+        only created when missing.
+
         Best-effort: if the DB write fails the routing response is still
-        returned so callers can decide whether to fail the orchestrator cycle.
+        returned so callers can decide whether to fail the orchestrator
+        cycle. Failures are logged loudly for monitoring.
         """
-        # Prefer async_record_trade_decision (decision+response) if available,
-        # else fallback to async_create_trade_decision (decision only).
-        # The DB extension registers _async_record_trade_decision; the
-        # public wrapper may be async_record_trade_decision or
-        # async_create_trade_decision depending on migration state.
-        record_fn = getattr(db, "async_record_trade_decision", None)
         try:
-            if record_fn is not None:
-                await record_fn(trade_decision, response)
-            else:
+            existing = await db.async_get_trade_decision(trade_decision.decision_id)
+            if existing is None:
                 await db.async_create_trade_decision(trade_decision)
-            logger.debug(
-                f"Persisted decision {trade_decision.decision_id} "
-                f"routing outcome to audit trail"
-            )
+                logger.debug(
+                    f"Persisted decision {trade_decision.decision_id} to audit trail"
+                )
         except Exception as e:
             logger.error(
                 f"Failed to persist decision {trade_decision.decision_id} "
@@ -358,6 +363,28 @@ class TradeDecisionEngine:
             )
             # Don't fail the routing if audit persistence fails
             # but log the error for monitoring
+
+        # ROUTE audit row: one per routed decision, carrying the outcome.
+        # async_log_audit is the canonical dual-write (SQLite + JSONL) with
+        # SHA-256 chaining; a failure here is logged but non-fatal so a
+        # transient audit-store error does not cascade into the cycle.
+        try:
+            await db.async_log_audit(
+                action="ROUTE",
+                entity_type="trade_decision",
+                entity_id=trade_decision.decision_id,
+                user="trade_decision_engine",
+                metadata={
+                    "symbol": trade_decision.symbol,
+                    "routing_enabled": self.analyzer_routing_enabled,
+                    "routing_outcome": dict(response),
+                },
+            )
+        except Exception as e:
+            logger.error(
+                f"Failed to write ROUTE audit row for decision "
+                f"{trade_decision.decision_id}: {e}"
+            )
 
         return response
 
@@ -508,16 +535,31 @@ class TradeDecisionEngine:
         }
 
     async def get_decision_status(self, decision_id: str) -> dict[str, Any]:
-        """Get status of a TradeDecision."""
-        # In production, this would query the Analyzer or database
-        # For simulation, we return a mock status
+        """Get status of a TradeDecision from the persisted audit trail.
 
+        F8-H-01: reads the real ``trade_decisions`` row instead of returning
+        a fabricated "PROCESSED/ANALYZED" mock (the F7-H-01 fabrication
+        class). Unknown ids return ``NOT_FOUND`` — deterministic, auditable,
+        no invented state.
+        """
+        decision = await db.async_get_trade_decision(decision_id)
+        if decision is None:
+            return {
+                "decision_id": decision_id,
+                "status": "NOT_FOUND",
+                "source": "database",
+                "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
+            }
         return {
-            "decision_id": decision_id,
-            "status": "PROCESSED",
-            "analyzer_status": "ANALYZED",
+            "decision_id": decision.decision_id,
+            "status": decision.status,
+            "symbol": decision.symbol,
+            "decision_type": str(decision.decision_type),
+            "entry_price": decision.entry_price,
+            "quantity": decision.quantity,
+            "composite_strength": decision.composite_strength,
+            "source": "database",
             "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
-            "notes": ("Simulated response - production would query actual Analyzer"),
         }
 
     def increment_modification_counter(self) -> int:

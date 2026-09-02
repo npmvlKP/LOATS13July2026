@@ -155,6 +155,21 @@ pytest tests/ --cov=src --cov-branch --cov-fail-under=80
 - **ISO 27001:2022**: Information security management.
 - **Audit Trail**: 7-year retention, append-only, SHA-256 chained.
 
+## Known Deviations (CMP Phase Gates)
+
+- **F8-H-01 / CMP P5 — Analyzer routing default OFF.** CMP P5 requires
+  routing ALL TradeDecisions to Analyzer Mode; production ships
+  `analyzer_routing_enabled=false` (the runtime kill path and the guard
+  against the F7-H-01 default-on fabrication; enforced by HC-19 and the
+  HC registry AST check). The deviation is recorded in
+  [ADR-006](docs/ADR-006-analyzer-routing-p5.md). The closing step is
+  runnable: `scripts/run_p5_forward_test.py --ack-live-endpoint` enables
+  routing only for the supervised 2-week run (log to
+  `reports/p5_forward_test_*.json`); `scripts/verify_p5_forward_test.py`
+  grades it (≥14-day span, zero unhandled exceptions, routing enabled).
+  Every routed decision leaves a SHA-256-chained `ROUTE` audit row
+  carrying the routing outcome (success / disabled / error).
+
 ## License
 
 MIT License

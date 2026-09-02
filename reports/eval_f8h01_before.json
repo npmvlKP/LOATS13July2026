@@ -1,0 +1,58 @@
+{
+  "phase": "before",
+  "passed": 4,
+  "total": 10,
+  "cases": [
+    {
+      "name": "1 default OFF in settings",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "name": "2 disabled: deterministic response, no HTTP",
+      "pass": true,
+      "note": "disabled"
+    },
+    {
+      "name": "3 disabled: decision persisted",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "name": "4 disabled: ROUTE audit row w/ outcome",
+      "pass": false,
+      "note": "audit calls=0"
+    },
+    {
+      "name": "5 enabled: real HTTP + persisted",
+      "pass": true,
+      "note": "http_calls=1"
+    },
+    {
+      "name": "6 enabled: ROUTE audit row w/ outcome",
+      "pass": false,
+      "note": "audit calls=0"
+    },
+    {
+      "name": "7 error: propagates + audited outcome",
+      "pass": false,
+      "note": "raised=True audit=0"
+    },
+    {
+      "name": "8 status: NOT_FOUND (no fabrication)",
+      "pass": false,
+      "note": "status=PROCESSED"
+    },
+    {
+      "name": "9 P5 run-log validator",
+      "pass": false,
+      "note": "script missing"
+    },
+    {
+      "name": "10 deviation recorded (ADR-006 + README)",
+      "pass": false,
+      "note": ""
+    }
+  ],
+  "generated_at": "2026-09-02T05:11:54.303624+00:00"
+}
