@@ -114,6 +114,9 @@ task_progress.md
 reports/p1_analyze_latency_*.json
 !reports/p1_analyze_latency_20260828_084822.json
 
+# P5 forward-test run logs (runtime evidence, graded by verify_p5_forward_test)
+reports/p5_forward_test_*.json
+
 # Health check intermediate run artifacts (keep health-final-*.json only)
 reports/health/health-fast-*.json
 reports/health/health-full-*.json
