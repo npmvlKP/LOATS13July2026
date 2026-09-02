@@ -262,6 +262,15 @@ async def run_backtest_sanity_check(
     if not validate_no_lookahead(history_data):
         raise ValueError("Historical data fails no-lookahead validation")
 
+    # Validate walk-forward parameters (F8-H-04: fail-fast for too-large windows)
+    if window_size > len(history_data):
+        raise ValueError(
+            f"Window size ({window_size}) cannot exceed data length "
+            f"({len(history_data)})"
+        )
+    if window_size <= 0 or step_size <= 0:
+        raise ValueError("Window size and step size must be positive")
+
     # Perform walk-forward analysis
     iterator = WalkForwardWindowIterator(history_data, window_size, step_size)
     total_windows = len(iterator)

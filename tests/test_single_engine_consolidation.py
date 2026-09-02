@@ -9,7 +9,7 @@ import inspect
 import tempfile
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -183,8 +183,8 @@ class TestSchedulerDoesNotEmitSignals:
     @pytest.mark.asyncio
     async def test_scheduler_start_does_not_run_signal_scans(self):
         sched = TradingScheduler()
-        sched.scheduler.start = AsyncMock()
-        sched.check_market_status = AsyncMock()
+        sched.scheduler.start = MagicMock()
+        sched._start_market_status_check = AsyncMock()
 
         # Verify by source inspection that start() does not reference the
         # retired signal scans.  The methods no longer exist on the class.

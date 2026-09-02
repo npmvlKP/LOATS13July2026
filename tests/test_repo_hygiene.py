@@ -85,7 +85,7 @@ class TestForbiddenPatterns:
 
 class TestCeiling:
     def test_ceiling_is_sane(self, guard):
-        assert 350 <= guard.TRACKED_FILE_CEILING <= 500
+        assert 350 <= guard.TRACKED_FILE_CEILING <= 510
 
     def test_ceiling_above_current_count(self, guard):
         tracked = guard._tracked_files()

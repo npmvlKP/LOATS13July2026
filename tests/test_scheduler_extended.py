@@ -55,17 +55,18 @@ async def test_is_market_open_before_hours(scheduler):
 
 @pytest.mark.asyncio
 async def test_run_once_all_jobs(scheduler):
-    scheduler.run_ta_scan = AsyncMock()
-    scheduler.run_sentiment_scan = AsyncMock()
+    """F8-H-03: run_once should warn and no-op for retired signal jobs, and dispatch support jobs."""
     scheduler.check_market_status = AsyncMock()
     scheduler.run_data_cleanup = AsyncMock()
     scheduler.run_backtest_sanity_check = AsyncMock()
 
-    await scheduler.run_once("ta_scan")
-    scheduler.run_ta_scan.assert_awaited_once()
+    with patch("loats.scheduler.logger") as mock_logger:
+        await scheduler.run_once("ta_scan")
+        await scheduler.run_once("sentiment_scan")
 
-    await scheduler.run_once("sentiment_scan")
-    scheduler.run_sentiment_scan.assert_awaited_once()
+    assert any(
+        "retired" in str(call.args[0]) for call in mock_logger.warning.call_args_list
+    )
 
     await scheduler.run_once("market_status_check")
     scheduler.check_market_status.assert_awaited_once()

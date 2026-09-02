@@ -34,8 +34,12 @@ async def test_trading_system_shutdown_not_running(trading_system):
 
 @pytest.mark.asyncio
 async def test_trading_system_run_once_failure(trading_system):
-    with patch("loats.main.scheduler.run_ta_scan", side_effect=Exception("Scan error")):
-        with pytest.raises(Exception, match="Scan error"):
+    with patch.object(
+        trading_system,
+        "_run_scheduler_support_jobs",
+        side_effect=Exception("Support job error"),
+    ):
+        with pytest.raises(Exception, match="Support job error"):
             await trading_system.run_once()
 
 

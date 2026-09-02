@@ -22,20 +22,28 @@ async def test_initialization(scheduler):
 
 @pytest.mark.asyncio
 async def test_start_shutdown(scheduler):
-    # Mock scan methods to avoid real async calls during start
-    scheduler.run_ta_scan = AsyncMock()
-    scheduler.run_sentiment_scan = AsyncMock()
-
     # Mock scheduler methods
     scheduler.scheduler.start = MagicMock()
     scheduler.scheduler.shutdown = MagicMock()
 
+    # F8-H-03: _start_market_status_check no longer triggers signal jobs
+    scheduler._start_market_status_check = AsyncMock()
+
     await scheduler.start()
     assert scheduler.running is True
+    scheduler._start_market_status_check.assert_awaited_once()
 
     await scheduler.shutdown()
     assert scheduler.running is False
     scheduler.scheduler.shutdown.assert_called_once()
+
+
+async def test_start_market_status_check_failure(scheduler):
+    """_start_market_status_check logs and swallows exception so startup continues."""
+    scheduler.check_market_status = AsyncMock(side_effect=Exception("market boom"))
+    with patch("loats.scheduler.logger") as mock_logger:
+        await scheduler._start_market_status_check()
+    mock_logger.exception.assert_called_once()
 
 
 def test_is_market_open_weekend():
@@ -114,3 +122,45 @@ async def test_ta_scan_task_tracks_metrics(scheduler):
     assert manager.job_execution_stats["total"] == 1
     assert manager.job_execution_stats["success"] == 1
     assert manager.job_latency_stats["count"] == 1
+
+
+@pytest.mark.asyncio
+async def test_run_once_support_jobs(scheduler):
+    """F8-H-03: run_once should dispatch only supported support jobs."""
+    scheduler.check_market_status = AsyncMock()
+    scheduler.run_data_cleanup = AsyncMock()
+    scheduler.run_backtest_sanity_check = AsyncMock()
+
+    await scheduler.run_once("market_status_check")
+    scheduler.check_market_status.assert_awaited_once()
+
+    await scheduler.run_once("data_cleanup")
+    scheduler.run_data_cleanup.assert_awaited_once()
+
+    await scheduler.run_once("backtest_sanity_check")
+    scheduler.run_backtest_sanity_check.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_run_once_retired_signal_jobs_warn(scheduler):
+    """F8-H-03: retired ta/sentiment scan jobs should warn and return."""
+    with patch("loats.scheduler.logger") as mock_logger:
+        await scheduler.run_once("ta_scan")
+        await scheduler.run_once("sentiment_scan")
+    assert mock_logger.warning.call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_run_once_unknown_job_warns(scheduler):
+    """run_once should warn on unknown job id."""
+    with patch("loats.scheduler.logger") as mock_logger:
+        await scheduler.run_once("no_such_job")
+    mock_logger.warning.assert_called_once()
+
+
+async def test_run_once_support_job_failure_logs(scheduler):
+    """run_once logs exception from support job but does not raise."""
+    scheduler.check_market_status = AsyncMock(side_effect=Exception("market boom"))
+    with patch("loats.scheduler.logger") as mock_logger:
+        await scheduler.run_once("market_status_check")
+    mock_logger.exception.assert_called_once()

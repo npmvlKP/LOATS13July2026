@@ -158,25 +158,23 @@ async def test_trading_system_shutdown_exception(trading_system):
 
 @pytest.mark.asyncio
 async def test_trading_system_run_once_success(trading_system):
-    """Test run_once successful execution (lines 132-142)."""
-    with (
-        patch("loats.main.scheduler.run_ta_scan", new_callable=AsyncMock) as mock_ta,
-        patch(
-            "loats.main.scheduler.run_sentiment_scan", new_callable=AsyncMock
-        ) as mock_sentiment,
-    ):
+    """Test run_once successful execution (F8-H-03 support jobs only)."""
+    with patch.object(
+        trading_system, "_run_scheduler_support_jobs", new_callable=AsyncMock
+    ) as mock_support:
         await trading_system.run_once()
-        mock_ta.assert_called_once()
-        mock_sentiment.assert_called_once()
+        mock_support.assert_called_once()
 
 
 @pytest.mark.asyncio
 async def test_trading_system_run_once_exception(trading_system):
-    """Test run_once exception handling (lines 140-142)."""
-    with (
-        patch("loats.main.scheduler.run_ta_scan", side_effect=Exception("Scan error")),
+    """Test run_once exception handling (F8-H-03 support jobs only)."""
+    with patch.object(
+        trading_system,
+        "_run_scheduler_support_jobs",
+        side_effect=Exception("Support job error"),
     ):
-        with pytest.raises(Exception, match="Scan error"):
+        with pytest.raises(Exception, match="Support job error"):
             await trading_system.run_once()
 
 

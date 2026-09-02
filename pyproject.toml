@@ -198,6 +198,13 @@ omit = ["tests/*", "*/__init__.py"]
 fail_under = 80
 show_missing = true
 
+# F8-H-04: per-module floors are enforced by scripts/check_per_module_coverage.py
+# reading coverage_floor_map.json. The aggregate 80% floor is retained as a
+# coarse guard; the authoritative module-level gates are:
+#   orchestrator/trailing_stop/trade_decision/database/alerts/scheduler/
+#   backtest_sanity/database_async_additions >= 80%; options >= 85%;
+#   strike_selection >= 75%.
+
 [tool.bandit]
 skips = ["B101"]
 
