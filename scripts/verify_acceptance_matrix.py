@@ -334,18 +334,42 @@ def main() -> int:
     safe_print("TODO -> CHECK -> DONE-WHEN MAPPING")
     safe_print("=" * 70)
     mapping = [
-        ("TODO-14 trailing driver", "HC-20", "ratchet driven per position; Rule-7-gated; audited"),
+        (
+            "TODO-14 trailing driver",
+            "HC-20",
+            "ratchet driven per position; Rule-7-gated; audited",
+        ),
         ("TODO-15 per-module blocking", "HC-13", "floors enforced in CI"),
         ("TODO-16 BUY IV<30", "HC-24", "literal 30; tests pin"),
-        ("TODO-17 mods=25 wired/persisted/fail-closed", "HC-23", "settings=gate=25; counter survives restart"),
+        (
+            "TODO-17 mods=25 wired/persisted/fail-closed",
+            "HC-23",
+            "settings=gate=25; counter survives restart",
+        ),
         ("TODO-18 lazy settings x11", "HC-21", "AST scan zero; bare-env import works"),
-        ("TODO-19 single signal engine", "HC-17 + review", "one producer path, one threshold"),
-        ("TODO-20 kill audit bypass", "HC-22", "no PYTEST_CURRENT_TEST; dual-write tested"),
+        (
+            "TODO-19 single signal engine",
+            "HC-17 + review",
+            "one producer path, one threshold",
+        ),
+        (
+            "TODO-20 kill audit bypass",
+            "HC-22",
+            "no PYTEST_CURRENT_TEST; dual-write tested",
+        ),
         ("TODO-21 untrack junk", "HC-26", "root clean; tracked count down"),
-        ("TODO-22 ruff ignore shrink", "HC-05/06/07/08", "F401/I001/E402/PGH003 gone from ignore"),
+        (
+            "TODO-22 ruff ignore shrink",
+            "HC-05/06/07/08",
+            "F401/I001/E402/PGH003 gone from ignore",
+        ),
         ("TODO-23 dead weights", "review", "removed or annotated-pending"),
         ("TODO-24 cov-script exits", "review", "exit-code unit test green"),
-        ("TODO-25 P1/P5 evidence", "review", "latency logs + forward test begun (post-13)"),
+        (
+            "TODO-25 P1/P5 evidence",
+            "review",
+            "latency logs + forward test begun (post-13)",
+        ),
         ("TODO-26 backtest driver", "review", "invoked by scheduler/job"),
         ("TODO-27 carried set", "HC-27 (c)", "queue bounded; rest per plan docs"),
     ]
