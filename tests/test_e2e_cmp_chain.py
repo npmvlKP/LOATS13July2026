@@ -504,11 +504,16 @@ class TestRealProducersE2E:
         )
 
     @pytest.mark.asyncio
-    async def test_real_producers_unknown_source_rejected(self, temp_db, orchestrator):
-        """A stored signal with an invalid source string must block decisions.
+    async def test_real_producers_unknown_source_excluded_not_batch_fatal(
+        self, temp_db, orchestrator
+    ):
+        """A stored signal with an invalid source string is excluded, not veto.
 
-        F8-M-01 guard: any 'unknown' source resolution must loudly reject
-        the batch, even when 4 valid sources are otherwise present.
+        F8-M-01: mixed-provenance windows are normal on a shared signal
+        table; one stray emission must not veto the whole cycle. The
+        unknown-source signal is excluded individually, the 4 valid
+        producer signals still create a TradeDecision, and the offender
+        is recorded in the decision metadata.
         """
         rows = make_directional_history(60)
         payload = rows_to_payload(rows)
@@ -587,11 +592,121 @@ class TestRealProducersE2E:
             await orchestrator._execute_cmp_strategy()
             await orchestrator.shutdown()
 
+        # F8-M-01: the stray signal must NOT block the chain — the 4 valid
+        # sources still yield a TradeDecision.
+        decisions = await asyncio.to_thread(
+            temp_db.get_trade_decisions, symbol="NIFTY", limit=1
+        )
+        assert len(decisions) == 1, (
+            "F8-M-01: unknown-source signal must be excluded individually; "
+            "the 4 valid sources must still create a TradeDecision"
+        )
+        decision = decisions[0]
+        excluded = decision.metadata.get("excluded_unknown_sources", [])
+        assert excluded == ["not_a_source"], (
+            f"Offender must be recorded in decision metadata, got {excluded}"
+        )
+        # The offender contributed no source to the validation.
+        validation = decision.metadata.get("validation_result", {})
+        assert "not_a_source" not in validation.get("sources", [])
+        assert validation.get("excluded_unknown_sources") == ["not_a_source"]
+
+    @pytest.mark.asyncio
+    async def test_real_producers_all_unknown_source_rejected(
+        self, temp_db, orchestrator
+    ):
+        """An all-unknown batch is still rejected loudly (F8-M-01 case 3).
+
+        The chain must not trade on signals with no known provenance:
+        when every source string is unknown, the decision path rejects
+        with ``unknown_source`` naming the offenders.
+        """
+        rows = make_directional_history(60)
+        payload = rows_to_payload(rows)
+        quote_payload = make_quote_payload(rows[-1].close)
+
+        with (
+            patch("loats.orchestrator.db", temp_db),
+            patch.object(
+                orchestrator, "_safe_get_history", new_callable=AsyncMock
+            ) as mock_history,
+            patch.object(
+                orchestrator, "_safe_get_quotes", new_callable=AsyncMock
+            ) as mock_quotes,
+            patch(
+                "loats.orchestrator.validate_rss_feed",
+                new_callable=AsyncMock,
+            ) as mock_rss,
+            patch(
+                "loats.orchestrator.sentiment.analyze_symbol_sentiment",
+                new_callable=AsyncMock,
+            ) as mock_sentiment,
+        ):
+            mock_history.return_value = payload
+            mock_quotes.return_value = quote_payload
+            mock_rss.return_value = True
+            mock_sentiment.return_value = make_sentiment_result(0.6)
+
+            await orchestrator._execute_ta_analysis()
+            await orchestrator._execute_sentiment_analysis()
+            await orchestrator._execute_volatility_analysis()
+            await orchestrator._execute_price_action_analysis()
+
+        # Inject a batch of all-unknown-source signals newer than the
+        # producer signals so the decision window (newest 10) contains
+        # only unknown provenance (no update API exists; newest-first
+        # windowing does the selection).
+        ts_base = datetime.now(UTC)
+        for i in range(10):
+            ghost = Signal(
+                symbol="NIFTY",
+                signal_type=SignalType.BUY,
+                strength=0.7,
+                timestamp=ts_base + timedelta(seconds=i + 1),
+                indicators={},
+                confidence=0.7,
+                metadata={"scan_type": "corruption_probe", "source": "ghost_source"},
+            )
+            await temp_db.async_create_signal(ghost)
+
+        with (
+            patch("loats.trade_decision.rules_engine") as mock_rules,
+            patch("loats.orchestrator.db", temp_db),
+            patch.object(
+                orchestrator, "_safe_get_history", new_callable=AsyncMock
+            ) as mock_history,
+            patch.object(
+                orchestrator, "_safe_get_quotes", new_callable=AsyncMock
+            ) as mock_quotes,
+            patch.object(
+                orchestrator, "_safe_get_funds", new_callable=AsyncMock
+            ) as mock_funds,
+            patch.object(
+                orchestrator, "_safe_get_position_book", new_callable=AsyncMock
+            ) as mock_positions,
+        ):
+            mock_rules.apply_gating_rules.return_value = (
+                True,
+                {"reason": "gating_passed"},
+            )
+            mock_rules.check_position_limits.return_value = (
+                True,
+                {"reason": "within_limits"},
+            )
+            mock_rules.session_state = "REGULAR"
+            mock_history.return_value = payload
+            mock_quotes.return_value = quote_payload
+            mock_funds.return_value = make_funds_payload()
+            mock_positions.return_value = {"data": []}
+            await orchestrator.initialize()
+            await orchestrator._execute_cmp_strategy()
+            await orchestrator.shutdown()
+
         decisions = await asyncio.to_thread(
             temp_db.get_trade_decisions, symbol="NIFTY", limit=1
         )
         assert len(decisions) == 0, (
-            "Unknown source in batch must block TradeDecision creation"
+            "All-unknown batch must block TradeDecision creation (loud rejection)"
         )
 
 

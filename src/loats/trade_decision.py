@@ -22,7 +22,7 @@ from .openalgo import AsyncOpenAlgoClient
 from .options import calculate_portfolio_var
 from .rules import rules_engine
 from .sizing import sizing_engine
-from .strength import strength_engine
+from .strength import exclude_unknown_source_signals, strength_engine
 from .trailing_stop import TrailingStopType, trailing_stop_engine
 from .utils.lazy_singleton import lazy_singleton
 
@@ -88,20 +88,93 @@ class TradeDecisionEngine:
         symbol = signals[0].symbol if signals else settings.default_symbol
         timestamp = datetime.datetime.now(datetime.UTC)
 
-        # Step 1: Validate signals
-        validation_result = strength_engine.validate_signal_sources(signals)
+        # Step 0 (F8-M-01): exclude unknown-source signals per-signal.
+        # Mixed-provenance windows are normal on a shared signal table;
+        # excluding individually with a loud audit trail keeps a stray
+        # untagged emission from vetoing the cycle. The exclusion is
+        # applied to the whole workflow (validation, direction selection,
+        # strength, breakdown) so an unknown-source signal can never
+        # influence the decision.
+        valid_signals, excluded_unknown = exclude_unknown_source_signals(signals)
+        for src in excluded_unknown:
+            logger.warning(
+                f"F8-M-01: excluded signal with unknown source {src!r} from "
+                f"decision workflow for {symbol}"
+            )
+        if excluded_unknown and settings.environment != "test":
+            # F8-M-01: audited exclusion — dual-write (SQLite + JSONL,
+            # SHA-256-chained) row. Best-effort: an audit-store failure is
+            # logged but never cascades into the cycle. Skipped under the
+            # test environment so unit tests stay hermetic (no writes to
+            # data/loats.db from unpatched tests).
+            try:
+                await db.async_log_audit(
+                    action="EXCLUDE",
+                    entity_type="signal",
+                    entity_id=f"{symbol}:{timestamp.isoformat()}",
+                    user="trade_decision_engine",
+                    metadata={
+                        "reason": "unknown_source_excluded",
+                        "excluded_unknown_sources": excluded_unknown,
+                        "total_signals": len(signals),
+                        "valid_signals": len(valid_signals),
+                    },
+                )
+            except Exception as e:
+                logger.error(
+                    f"Failed to write signal-exclusion audit row for {symbol}: {e}"
+                )
+
+        # Step 1: Validate signals (F8-M-01: per-signal unknown-source
+        # exclusion happens inside the validator; the batch is rejected
+        # only when known-source signals fall below the CMP minimums).
+        validation_result = strength_engine.validate_signal_sources(valid_signals)
         if not validation_result[0]:
+            rejected_details = validation_result[1]
+            # F8-M-01: audited rejection — dual-write (SQLite + JSONL,
+            # SHA-256-chained) row with the per-offender diagnostics so
+            # operators can trace exactly which producer was excluded and
+            # why the batch was rejected. Best-effort: an audit-store
+            # failure is logged but never cascades into the cycle. Skipped
+            # under the test environment so unit tests stay hermetic (no
+            # writes to data/loats.db from unpatched tests).
+            if settings.environment != "test":
+                try:
+                    await db.async_log_audit(
+                        action="REJECT",
+                        entity_type="signal_batch",
+                        entity_id=f"{symbol}:{timestamp.isoformat()}",
+                        user="trade_decision_engine",
+                        metadata={
+                            "reason": rejected_details.get("reason"),
+                            "details": rejected_details,
+                            "excluded_unknown_sources": rejected_details.get(
+                                "excluded_unknown_sources", []
+                            ),
+                        },
+                    )
+                except Exception as e:
+                    logger.error(
+                        f"Failed to write signal-batch rejection audit row "
+                        f"for {symbol}: {e}"
+                    )
             return None, {
                 "status": "rejected",
                 "reason": "signal_validation_failed",
-                "details": validation_result[1],
+                "details": rejected_details,
                 "symbol": symbol,
                 "timestamp": timestamp,
             }
 
+        # F8-M-01: stamp the workflow-level exclusion into the validation
+        # details persisted with the decision. The validator saw the
+        # pre-filtered list (its own count is 0); the authoritative
+        # offender record is the one from Step 0.
+        validation_result[1]["excluded_unknown_sources"] = excluded_unknown
+
         # Step 2: Calculate composite strength
         composite_strength, strength_details = (
-            strength_engine.calculate_composite_strength(signals)
+            strength_engine.calculate_composite_strength(valid_signals)
         )
         if (
             composite_strength <= settings.composite_strength_threshold
@@ -116,7 +189,7 @@ class TradeDecisionEngine:
             }
 
         # Determine decision type from strongest signal
-        strongest_signal = max(signals, key=lambda s: s.strength)
+        strongest_signal = max(valid_signals, key=lambda s: s.strength)
         decision_type = strongest_signal.signal_type
 
         # Step 3: Apply gating rules
@@ -207,11 +280,14 @@ class TradeDecisionEngine:
                 "method": var_analysis.method,
             },
             gating_rules_result=gating_result,
-            source_breakdown=strength_engine.get_source_strength_breakdown(signals),
+            source_breakdown=strength_engine.get_source_strength_breakdown(
+                valid_signals
+            ),
             metadata={
                 "sizing_details": sizing_details,
                 "strength_details": strength_details,
                 "validation_result": validation_result[1],
+                "excluded_unknown_sources": excluded_unknown,
                 "session": str(rules_engine.session_state),
             },
             status="PENDING",

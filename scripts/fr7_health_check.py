@@ -572,9 +572,17 @@ def probe_strength_gate(rep: Report) -> None:
         )
     )
 
-    bogus = call(["banana", "ta", "sentiment", "price_action"])
-    loud = (bogus[0] is False) and (
-        "unknown" in bogus[1].lower() or "invalid" in bogus[1].lower()
+    # F8-M-01 (2026-09-02): unknown-source handling is per-signal, not
+    # batch-fatal. A mixed batch (banana + 3 valid) now EXCLUDES the
+    # offender and validates the remainder — the loud rejection applies
+    # when the batch contains ONLY unknown sources. The exclusion is
+    # still loud: every offender is warned per-signal and reported in
+    # ``excluded_unknown_sources``. The original HC-16 intent (TODO-9:
+    # never silently collapse unknowns to a default source) is preserved:
+    # an all-unknown batch is rejected loudly with the offender list.
+    all_unknown = call(["banana", "ghost_source", "mystery_source"])
+    loud = (all_unknown[0] is False) and (
+        "unknown" in all_unknown[1].lower() or "invalid" in all_unknown[1].lower()
     )
     rep.add(
         Result(
@@ -582,8 +590,26 @@ def probe_strength_gate(rep: Report) -> None:
             "unknown source string loudly rejected",
             "TODO-9",
             "PASS" if loud else "FAIL",
-            f"reason: {bogus[1]} — expected explicit unknown/invalid rejection;"
+            f"reason: {all_unknown[1]} — expected explicit unknown/invalid rejection;"
             " silent TECHNICAL_ANALYSIS collapse fails this check",
+        )
+    )
+
+    # F8-M-01 companion assertion: a mixed batch excludes the offender
+    # per-signal (no batch-fatal veto) and validates the remainder.
+    mixed = call(["banana", "ta", "sentiment", "price_action", "volatility"])
+    excluded = (
+        mixed[0] is True
+        and "diversity" not in mixed[1].lower()
+        and "unknown" not in mixed[1].lower()
+    )
+    rep.add(
+        Result(
+            "HC-16",
+            "mixed batch excludes offender per-signal (F8-M-01)",
+            "F8-M-01",
+            "PASS" if excluded else "FAIL",
+            f"4 valid + 1 unknown -> {mixed[1]} (expect pass; offender excluded)",
         )
     )
 
