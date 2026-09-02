@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Eval for F8-H-02: 10-case behavioural matrix, BEFORE (baseline measured
-2026-09-02 at pre-fix HEAD 36d9175) vs AFTER (live measurement on the
-current tree). Exit 0 when AFTER == 10/10.
+"""Eval for F8-H-02: 10-case behavioural matrix, BEFORE re-derived live from
+pre-fix HEAD 36d9175 (via scripts/derive_f8h02_before.py) vs AFTER (live
+measurement on the current tree). Exit 0 when AFTER == 10/10.
 
 Each case is scored against the live code path it names — no source-string
 shortcuts: the engine + boundary are exercised for real (mocked broker).
@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import os
 import sqlite3
+import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -28,7 +29,6 @@ from unittest.mock import MagicMock, patch
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "src"))
 
-BEFORE_SCORE = 3
 BEFORE_CASES = {
     "C1_restart_survival": False,
     "C2_per_order_isolation": False,
@@ -41,6 +41,35 @@ BEFORE_CASES = {
     "C9_reset_on_closure": False,
     "C10_settings_value": True,
 }
+
+
+def _derive_before_score() -> int:
+    """Re-derive the pre-fix baseline live from git ref 36d9175."""
+    derive = REPO_ROOT / "scripts" / "derive_f8h02_before.py"
+    proc = subprocess.run(
+        [sys.executable, str(derive)],
+        cwd=str(REPO_ROOT),
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=180,
+        env={**os.environ, "PYTHONIOENCODING": "utf-8", "PYTHONUTF8": "1"},
+    )
+    for line in reversed(proc.stdout.splitlines()):
+        if line.strip().startswith("SCORE:"):
+            try:
+                return int(line.strip().split(":")[1].split("/")[0])
+            except (ValueError, IndexError):
+                break
+    # Fallback to the independently measured baseline if derivation fails.
+    print(
+        f"[WARN] BEFORE derivation failed (rc={proc.returncode}); using hard-coded 3/10"
+    )
+    if proc.returncode != 0:
+        print(proc.stderr, file=sys.stderr)
+    return 3
+
 
 os.environ.setdefault("OPENALGO_API_KEY", "eval_dummy")
 os.environ.setdefault("TELEGRAM_BOT_TOKEN", "eval_dummy")
@@ -223,8 +252,9 @@ def main() -> int:
 
     after = sum(1 for v in results.values() if v)
     print()
+    before_score = _derive_before_score()
     print(
-        f"BEFORE: {BEFORE_SCORE}/10   AFTER: {after}/10   delta: {after - BEFORE_SCORE:+d}"
+        f"BEFORE: {before_score}/10   AFTER: {after}/10   delta: {after - before_score:+d}"
     )
     mismatch = [k for k in BEFORE_CASES if k not in results]
     if mismatch:
