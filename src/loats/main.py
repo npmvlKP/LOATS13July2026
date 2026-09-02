@@ -150,17 +150,24 @@ class TradingSystem:
             raise
 
     async def run_once(self) -> None:
-        """Run all scans once testing."""
+        """Run all non-signal scheduler jobs once for testing.
+
+        F8-H-03: TA and sentiment signal scans have been retired from the
+        scheduler.  Signal generation is the sole responsibility of the
+        orchestrator's 100 ms trading cycle.  This test helper now only exercises
+        support jobs (market status, data cleanup, backtest sanity check) and
+        logs that the orchestrator owns signal production.
+        """
         try:
-            logger.info("Running all scans once")
-            await scheduler.run_ta_scan()
-            await scheduler.run_sentiment_scan()
-            # Note: Signal generation is handled by the orchestrator cycle loop,
-            # not by scheduler. The orchestrator runs signal generation in
-            # _execute_trading_cycle() when started via start_orchestrator().
-            logger.info("All scans completed")
+            logger.info("Running scheduler support jobs once")
+            await scheduler.run_once("market_status_check")
+            await scheduler.run_once("data_cleanup")
+            await scheduler.run_once("backtest_sanity_check")
+            logger.info(
+                "All support jobs completed; orchestrator owns signal generation"
+            )
         except Exception as e:
-            logger.error(f"Error running scans: {e}")
+            logger.error(f"Error running support jobs: {e}")
             raise
 
 
