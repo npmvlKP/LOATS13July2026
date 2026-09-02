@@ -1,6 +1,11 @@
 """Scheduler module LOATS13July2026.
 
 Implements APScheduler scan scheduling retry circuit breaker patterns.
+
+F8-H-03 architectural note: signal production is consolidated to the
+orchestrator's 100 ms trading cycle, which is the sole engine of record for
+CMP decisions.  The scheduler keeps market-status, data-cleanup and
+backtest-sanity support jobs, but does NOT emit trading signals.
 """
 
 import asyncio
@@ -16,17 +21,7 @@ from .alerts import alerts
 from .database import db
 from .lazy_settings import LazySettings
 from .loats_logging import get_logger
-from .metrics import record_signal, track_job
-from .models import (
-    HistoricalData,
-    QuoteData,
-    Signal,
-    SignalType,
-)
 from .openalgo import KillSwitchError, async_client
-from .sentiment import sentiment
-from .strength import StrengthSource
-from .ta import technical_analysis
 from .utils.circuit_breaker import (
     OPENALGO_CIRCUIT_BREAKER,
 )
@@ -165,23 +160,14 @@ class TradingScheduler:
             raise
 
     async def _add_jobs(self) -> None:
-        """Add scheduled jobs scheduler."""
-        # Technical Analysis scan (every 1 minute)
-        self.scheduler.add_job(
-            self.run_ta_scan,
-            IntervalTrigger(seconds=settings.ta_scan_interval),
-            id="ta_scan",
-            name="Technical Analysis Scan",
-            replace_existing=True,
-        )
-        # Sentiment scan (every 5 minutes)
-        self.scheduler.add_job(
-            self.run_sentiment_scan,
-            IntervalTrigger(seconds=settings.sentiment_scan_interval),
-            id="sentiment_scan",
-            name="Sentiment Analysis Scan",
-            replace_existing=True,
-        )
+        """Add scheduled jobs scheduler.
+
+        F8-H-03 (TODO-19 completion): signal production is consolidated to the
+        orchestrator's 100 ms cycle, which is the sole engine of record for CMP
+        decisions.  The scheduler therefore does NOT register ta_scan or
+        sentiment_scan signal-emitting jobs; it keeps market-status,
+        data-cleanup and backtest-sanity support jobs.
+        """
         # Market status checks (every 1 minute)
         self.scheduler.add_job(
             self.check_market_status,
@@ -208,15 +194,18 @@ class TradingScheduler:
         )
 
     async def start(self) -> None:
-        """Start scheduler."""
+        """Start scheduler.
+
+        F8-H-03: ta_scan and sentiment_scan are no longer scheduled; the
+        orchestrator produces all signals.  Only market-status is kicked off.
+        """
         if not self.running:
             try:
                 self.scheduler.start()
                 self.running = True
                 logger.info("Trading scheduler started")
-                # Run initial scans
-                await self.run_ta_scan()
-                await self.run_sentiment_scan()
+                # Run initial market-status check so open/close logic is current
+                await self.check_market_status()
             except Exception:
                 logger.exception("Failed start scheduler")
                 raise
@@ -254,20 +243,6 @@ class TradingScheduler:
                 logger.exception("Error shutting down scheduler")
                 raise
 
-    async def run_ta_scan(self) -> None:
-        """Run technical analysis scan."""
-        task_id = f"ta_scan_{datetime.datetime.now(datetime.UTC).isoformat()}"
-        try:
-            task = asyncio.create_task(self._ta_scan_task())
-            self.scan_tasks[task_id] = task
-            await task
-        except asyncio.CancelledError:
-            logger.info("TA scan task cancelled: %s", task_id)
-        except Exception:
-            logger.exception("TA scan task failed: %s", task_id)
-        finally:
-            self.scan_tasks.pop(task_id, None)
-
     @openalgo_circuit_breaker_retry_async
     async def _safe_get_history(
         self, symbol: str, interval: str, count: int | None = None
@@ -289,200 +264,6 @@ class TradingScheduler:
         except Exception:
             logger.error("Failed get quotes after retries")
             raise  # Re-raise to allow test to catch it
-
-    @track_job("ta_scan")
-    async def _ta_scan_task(self) -> None:
-        """Technical analysis scan task."""
-        start_time = datetime.datetime.now(datetime.UTC)
-        logger.info("Starting technical analysis scan")
-        try:
-            self._check_kill_switch()
-            symbol = settings.default_symbol
-            timeframe = settings.default_timeframe
-            history_data = await self._safe_get_history(symbol, timeframe)
-            if history_data is None:
-                logger.warning("Skipping scan, unable fetch historical data")
-                return
-
-            historical_data_objs = []
-            for item in history_data.get("data", []):
-                historical_data_objs.append(
-                    HistoricalData(
-                        symbol=symbol,
-                        timestamp=datetime.datetime.fromisoformat(item["timestamp"]),
-                        open=item["open"],
-                        high=item["high"],
-                        low=item["low"],
-                        close=item["close"],
-                        volume=item["volume"],
-                        interval=timeframe,
-                    )
-                )
-
-            await self.db.async_store_historical_data(historical_data_objs)
-            indicators = technical_analysis.calculate_indicators(historical_data_objs)
-            quotes = await self._safe_get_quotes([symbol])
-            if quotes is None:
-                logger.warning("Skipping signal generation, unable fetch quotes")
-                return
-
-            # Validate quote dict shape on entry (R5-F-09)
-            if not quotes.get("data"):
-                logger.warning("Skipping signal generation, quotes data missing")
-                return
-
-            quote_data = quotes.get("data", {}).get(symbol, {})
-            if not quote_data:
-                logger.warning(
-                    "Skipping signal generation, quote data for symbol missing"
-                )
-                return
-
-            # Validate required quote fields
-            required_fields = ["last_price", "open", "high", "low", "close", "volume"]
-            missing_fields = [f for f in required_fields if f not in quote_data]
-            if missing_fields:
-                logger.warning(
-                    "Skipping signal generation, "
-                    f"missing quote fields: {missing_fields}"
-                )
-                return
-            current_price = quote_data.get("last_price", 0)
-
-            signal_result = technical_analysis.generate_signal(
-                indicators, current_price
-            )
-            if signal_result:
-                signal_type, strength = signal_result
-                record_signal(signal_type, "ta")
-                signal = Signal(
-                    symbol=symbol,
-                    signal_type=SignalType(signal_type),
-                    strength=strength,
-                    timestamp=datetime.datetime.now(datetime.UTC),
-                    indicators={ind.name: ind.value for ind in indicators},
-                    confidence=strength,
-                    metadata={
-                        "scan_type": "ta",
-                        "timeframe": timeframe,
-                        "indicators_count": len(indicators),
-                        "source": StrengthSource.TECHNICAL_ANALYSIS.value,
-                    },
-                )
-                await self.db.async_create_signal(signal)
-                logger.info(
-                    "TA signal generated: %s, strength %.2f", signal_type, strength
-                )
-
-            quote = QuoteData(
-                symbol=symbol,
-                last_price=quote_data.get("last_price", 0),
-                open=quote_data.get("open", 0),
-                high=quote_data.get("high", 0),
-                low=quote_data.get("low", 0),
-                close=quote_data.get("close", 0),
-                volume=quote_data.get("volume", 0),
-                timestamp=datetime.datetime.now(datetime.UTC),
-                change=quote_data.get("change", 0),
-                change_percent=quote_data.get("change_percent", 0),
-            )
-            await self.db.async_store_quote(quote)
-        except KillSwitchError:
-            logger.warning("Kill switch active - TA scan aborted")
-            raise
-        except Exception:
-            logger.exception("Technical analysis scan failed")
-        finally:
-            duration = (
-                datetime.datetime.now(datetime.UTC) - start_time
-            ).total_seconds()
-            logger.info("Technical analysis scan completed %.2fms", duration * 1000)
-
-    async def run_sentiment_scan(self) -> None:
-        """Run sentiment analysis scan."""
-        task_id = f"sentiment_scan_{datetime.datetime.now(datetime.UTC).isoformat()}"
-        try:
-            task = asyncio.create_task(self._sentiment_scan_task())
-            self.scan_tasks[task_id] = task
-            await task
-        except asyncio.CancelledError:
-            logger.info("Sentiment scan task cancelled: %s", task_id)
-        except Exception:
-            logger.exception("Sentiment scan task failed: %s", task_id)
-        finally:
-            self.scan_tasks.pop(task_id, None)
-
-    @track_job("sentiment_scan")
-    async def _sentiment_scan_task(self) -> None:
-        """Sentiment analysis scan task."""
-        start_time = datetime.datetime.now(datetime.UTC)
-        logger.info("Starting sentiment analysis scan")
-        try:
-            self._check_kill_switch()
-            symbol = settings.default_symbol
-            # RSS feeds configurable via settings.rss_feeds (TODO-27d).
-            # BloombergQuint feed removed as defunct (404 / non-RSS).
-            # Replaced with Livemint markets feed; validated at runtime.
-            rss_feeds = settings.rss_feeds
-            # Runtime validation mirrors orchestrator to keep pipeline resilient
-            # against transient feed failures.
-            from .orchestrator import validate_rss_feed
-
-            valid_feeds: list[str] = []
-            for feed_url in rss_feeds:
-                if await validate_rss_feed(feed_url):
-                    valid_feeds.append(feed_url)
-                else:
-                    logger.warning("Skipping invalid RSS feed: %s", feed_url)
-            if not valid_feeds:
-                logger.warning("No valid RSS feeds available for sentiment scan")
-                return
-            result = await sentiment.analyze_symbol_sentiment(symbol, valid_feeds)
-            metadata = {
-                "scan_type": "sentiment",
-                "news_count": result.news_count,
-                "positive_count": result.positive_count,
-                "negative_count": result.negative_count,
-                "neutral_count": result.neutral_count,
-                "top_sources": [news.source for news in result.top_news],
-                "source": StrengthSource.SENTIMENT.value,
-            }
-            if result.sentiment_score > 0:
-                signal_type = SignalType.BUY
-            elif result.sentiment_score < 0:
-                signal_type = SignalType.SELL
-            else:
-                signal_type = SignalType.NEUTRAL
-
-            if abs(result.sentiment_score) < settings.sentiment_threshold:
-                signal_type = SignalType.NEUTRAL
-
-            record_signal(signal_type.value, "sentiment")
-            signal = Signal(
-                symbol=symbol,
-                signal_type=signal_type,
-                strength=abs(result.sentiment_score),
-                timestamp=datetime.datetime.now(datetime.UTC),
-                indicators={"sentiment_score": result.sentiment_score},
-                confidence=abs(result.sentiment_score),
-                metadata=metadata,
-            )
-            await self.db.async_create_signal(signal)
-            logger.info(
-                "Sentiment signal generated: %s, score %.2f",
-                signal_type,
-                result.sentiment_score,
-            )
-        except KillSwitchError:
-            logger.warning("Kill switch active - sentiment scan aborted")
-            raise
-        except Exception:
-            logger.exception("Sentiment analysis scan failed")
-        finally:
-            duration = (
-                datetime.datetime.now(datetime.UTC) - start_time
-            ).total_seconds()
-            logger.info("Sentiment analysis scan completed %.2fms", duration * 1000)
 
     @openalgo_circuit_breaker_retry_async
     async def _safe_get_position_book(self) -> dict[str, Any] | None:
@@ -519,34 +300,20 @@ class TradingScheduler:
             self.scan_tasks.pop(task_id, None)
 
     async def _market_status_check_task(self) -> None:
-        """Market status check task."""
+        """Market status check task.
+
+        F8-H-03: signal production (ta_scan / sentiment_scan) has been removed
+        from the scheduler.  This method now only logs market state; signal
+        producers live in the orchestrator's 100 ms cycle and are not dynamically
+        added or removed here.
+        """
         try:
             logger.debug("Checking market status")
             if not self.is_market_open():
                 logger.debug("Market closed")
-                for job_id in ["ta_scan", "sentiment_scan"]:
-                    if self.scheduler.get_job(job_id):
-                        try:
-                            self.scheduler.remove_job(job_id)
-                        except Exception:
-                            logger.warning("Failed remove job %s", job_id)
                 return
 
             logger.debug("Market open")
-            if not self.scheduler.get_job("ta_scan"):
-                self.scheduler.add_job(
-                    self.run_ta_scan,
-                    IntervalTrigger(seconds=settings.ta_scan_interval),
-                    id="ta_scan",
-                    name="Technical Analysis Scan",
-                )
-            if not self.scheduler.get_job("sentiment_scan"):
-                self.scheduler.add_job(
-                    self.run_sentiment_scan,
-                    IntervalTrigger(seconds=settings.sentiment_scan_interval),
-                    id="sentiment_scan",
-                    name="Sentiment Analysis Scan",
-                )
         except Exception:
             logger.exception("Market status check failed")
 
@@ -656,13 +423,21 @@ class TradingScheduler:
         await self._data_cleanup_task()
 
     async def run_once(self, job_id: str) -> None:
-        """Run specific job once immediately."""
+        """Run specific job once immediately.
+
+        F8-H-03: ``ta_scan`` and ``sentiment_scan`` are no longer supported;
+        they are retired with the dual-engine consolidation.  Only support jobs
+        (market_status_check, data_cleanup, backtest_sanity_check) remain.
+        """
         try:
-            if job_id == "ta_scan":
-                await self.run_ta_scan()
-            elif job_id == "sentiment_scan":
-                await self.run_sentiment_scan()
-            elif job_id == "market_status_check":
+            if job_id in {"ta_scan", "sentiment_scan"}:
+                logger.warning(
+                    "Job '%s' is retired; signal production is "
+                    "handled by the orchestrator",
+                    job_id,
+                )
+                return
+            if job_id == "market_status_check":
                 await self.check_market_status()
             elif job_id == "data_cleanup":
                 await self.run_data_cleanup()
