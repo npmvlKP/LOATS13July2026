@@ -31,6 +31,7 @@ from .models import (
     Trade,
     TradeDecision,
 )
+from .utils.lazy_singleton import lazy_singleton
 
 # Note: aiosqlite is imported locally in async methods where needed
 logger = get_logger(__name__)
@@ -2261,4 +2262,13 @@ class Database:
 # Module-level singleton Database instance (F-CONC-3).
 # Importing ``db`` avoids repeated Database() instantiation across modules
 # (alerts.py/scheduler.py) reducing connection/file-handle churn on Windows.
-db: Database = Database()
+#
+# F8-C-03 (2026-09-02): the singleton is constructed LAZILY. The previous
+# eager ``db: Database = Database()`` ran ``Settings()`` at import time,
+# so ``import loats.*`` (and ``python -m loats.main --help``) crashed with
+# a ValidationError on any fresh checkout without OPENALGO_API_KEY. The
+# LazyProxy defers the real ``Database()`` (and its fail-closed
+# ``Settings()`` validation) until first attribute access, i.e. until the
+# system actually runs. Test patches of ``loats.<mod>.db.<attr>`` keep
+# working (patched attributes land in the proxy __dict__).
+db: Database = lazy_singleton(Database)

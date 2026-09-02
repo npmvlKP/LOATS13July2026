@@ -60,6 +60,7 @@ from .models import (
 )
 from .utils.cache import cache_manager
 from .utils.circuit_breaker import OPENALGO_CIRCUIT_BREAKER
+from .utils.lazy_singleton import lazy_singleton
 from .utils.payload_builder import (
     build_modify_order_payload,
     build_place_order_payload,
@@ -1040,4 +1041,10 @@ class AsyncOpenAlgoClient:
         return await self._request("POST", "trade_book")
 
 
-async_client = AsyncOpenAlgoClient()
+# F8-C-03 (2026-09-02): ``AsyncOpenAlgoClient.__init__`` reads ``Settings()``
+# (fail-closed: a real client must have an API key), so the previous eager
+# ``async_client = AsyncOpenAlgoClient()`` crashed ``import loats.*`` on any
+# fresh checkout without OPENALGO_API_KEY. The LazyProxy defers construction
+# to first attribute access; ``patch("loats.openalgo.async_client.<attr>")``
+# keeps working (patched attributes land in the proxy __dict__).
+async_client: AsyncOpenAlgoClient = lazy_singleton(AsyncOpenAlgoClient)

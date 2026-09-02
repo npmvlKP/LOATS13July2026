@@ -28,6 +28,7 @@ from .lazy_settings import LazySettings
 from .loats_logging import get_logger
 from .models import NewsItem, SentimentAnalysisResult
 from .utils.cache import cache_manager
+from .utils.lazy_singleton import lazy_singleton
 
 # Lazy proxy module-level binding (TODO-18 / HC-21).
 # AST scanner for HC-21 sees a Call to LazySettings(),
@@ -205,4 +206,7 @@ class SentimentAnalyzer:
         return " ".join(text.split())
 
 
-sentiment = SentimentAnalyzer()
+# F8-C-03 (2026-09-02): __init__ reads Settings() (sentiment_threshold);
+# defer construction so imports stay credential-free (see
+# utils/lazy_singleton.py). Test patches keep working via proxy __dict__.
+sentiment: SentimentAnalyzer = lazy_singleton(SentimentAnalyzer)

@@ -1,5 +1,6 @@
 """Main entry point LOATS13July2026 trading system."""
 
+import argparse
 import asyncio
 import signal
 import sys
@@ -7,9 +8,9 @@ from collections.abc import Callable
 from typing import Any
 
 from .alerts import alerts
-from .database import Database
 
 # Module-level exports for testing (F-CONC-3)
+from .database import db
 from .lazy_settings import LazySettings
 from .loats_logging import logger
 from .metrics import metrics
@@ -20,12 +21,15 @@ from .utils.cache import close_cache, initialize_cache
 # Lazy proxy module-level binding (TODO-18 / HC-21).
 # AST scanner for HC-21 sees a Call to LazySettings(),
 # NOT get_settings(), so the eager count remains 0.
-settings: Any = LazySettings()  # LazySettings.__getattr__ proxies to Settings()
-db = Database(
-    db_path=settings.sqlite_db_path,
-    audit_log_path=settings.audit_log_path,
-    retention_days=settings.retention_days,
-)
+settings: Any = LazySettings()
+# F8-C-03 (2026-09-02): main.py previously built its OWN eager
+# ``Database(...)`` at import time (a second instance alongside the
+# database.py singleton -- a latent F-CONC-3 violation, and the direct
+# cause of ``python -m loats.main`` crashing on fresh checkouts without
+# OPENALGO_API_KEY, because reading ``settings.sqlite_db_path`` built
+# Settings() immediately). Bind the shared lazy singleton instead; the
+# real Database() is constructed on first attribute access at runtime.
+__all__ = ["TradingSystem", "db", "settings"]
 
 
 class TradingSystem:
@@ -172,8 +176,8 @@ async def main() -> None:
         sys.exit(1)
 
 
-def cli_main() -> None:
-    """CLI entry point that properly handles async main function."""
+def _run_entry() -> None:
+    """Shared asyncio entry used by ``cli_main`` and ``__main__``."""
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
@@ -181,13 +185,24 @@ def cli_main() -> None:
     except Exception as e:
         logger.error(f"Unexpected error: {e}")
         sys.exit(1)
+
+
+def cli_main() -> None:
+    """CLI entry point that properly handles async main function."""
+    parser = argparse.ArgumentParser(
+        prog="loats",
+        description="LOATS13July2026 algorithmic options trading system (LITE).",
+        add_help=True,
+    )
+    # parse_known_args: ``--help`` prints and exits 0; any other flags are
+    # deliberately ignored (historical behavior -- TradingSystem takes no
+    # CLI options today), so non-flag consumers are unaffected.
+    parser.parse_known_args()
+    _run_entry()
 
 
 if __name__ == "__main__":
-    try:
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        logger.info("Trading system stopped user")
-    except Exception as e:
-        logger.error(f"Unexpected error: {e}")
-        sys.exit(1)
+    # Route through cli_main() so ``python -m loats.main --help`` (the
+    # CI fresh-clone boot test) prints help and exits 0 instead of
+    # attempting a full system boot (F8-C-03).
+    cli_main()
