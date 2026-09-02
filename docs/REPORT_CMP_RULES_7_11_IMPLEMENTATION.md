@@ -4,6 +4,27 @@
 **Task:** 21.1 - Prioritized Improvement Roadmap (REVIEW ONLY — awaits USER APPROVAL)  
 **Focus:** CMP Rule 7 (Per-order modification limit) and CMP Rule 11 (Position limits)
 
+> **STATUS UPDATE (2026-09-02, F8-H-02):** The Rule 7 sections below are
+> **superseded historical record**. The code excerpts in this report were
+> never what shipped at HEAD: forensic finding F8-H-02 verified that the
+> implementation delivered a process-global in-memory counter
+> (`rules.py` `modification_counter`) with no `check_modification_limit`
+> anywhere in the tree, no per-order keying, and no persistence — the
+> per-order/persisted/fail-closed design documented here was silently
+> dropped. The corrected implementation now at HEAD:
+> - `modification_counts(order_id PRIMARY KEY, count, updated_at)` SQLite
+>   table (survives restarts, keyed per order);
+> - enforcement moved INTO `OpenAlgoClient.modify_order` /
+>   `AsyncOpenAlgoClient.modify_order` (reserve → broker → release-on-
+>   failure), so every caller is gated;
+> - fail-closed on counter DB errors (`Rule7StateError` refuses the
+>   modification); `Rule7ModificationLimitError` on the 26th attempt;
+> - budget reset on terminal order status (COMPLETED/CANCELLED/REJECTED);
+> - HC-23 extended to assert the table exists and the gate is wired at
+>   the modify boundary (the settings-number-only check that stayed green
+>   during the regression is gone).
+> Body preserved verbatim below as historical evidence.
+
 ## Executive Summary
 
 Successfully implemented CMP Rule 7 (per-order modification counter ≤25) and CMP Rule 11 (position limits 5 NIFTY / 3 BANKNIFTY) with full integration into the trading system. All quality gates (Black, Ruff, MyPy) passed.

@@ -19,7 +19,7 @@ from .loats_logging import get_logger
 from .metrics import record_cmp_chain_rejection, record_cycle_time
 from .models import HistoricalData, OptionContract, QuoteData, Signal
 from .openalgo import KillSwitchError, async_client
-from .rules import rules_engine
+from .rules import Rule7ModificationLimitError, rules_engine
 from .sentiment import sentiment
 from .strength import StrengthSource
 from .strike_selection import select_strikes
@@ -1298,11 +1298,12 @@ async def update_trailing_stops() -> None:
     This function implements the runtime driver for trailing stop updates
     as required by TODO-14 (F7-H-04 / CMP Rule 12).
 
-    Enforces Rule-7: ≤25 modifications per cycle.
+    Enforces Rule-7: ≤25 modifications per cycle (secondary guard). The
+    primary CMP Rule-7 control (F8-H-02) is per-order and persisted —
+    enforced inside ``AsyncOpenAlgoClient.modify_order``.
     Runs as part of the orchestrator risk step with <1ms budget.
     """
     try:
-        from .rules import rules_engine
         from .trailing_stop import trailing_stop_engine
 
         # Get all open positions from OpenAlgo position book
@@ -1373,12 +1374,31 @@ async def update_trailing_stops() -> None:
                         )
                         break
 
-                    # Modify order via OpenAlgo
-                    await async_client.modify_order(
-                        order_id=order_id,
-                        trigger_price=updated_config.get("trigger_price"),
-                        order_type="SL-M",
-                    )
+                    # Modify order via OpenAlgo. CMP Rule 7 (F8-H-02) is
+                    # enforced at this boundary (per-order, persisted): the
+                    # 26th modification raises Rule7ModificationLimitError.
+                    try:
+                        await async_client.modify_order(
+                            order_id=order_id,
+                            trigger_price=updated_config.get("trigger_price"),
+                            order_type="SL-M",
+                        )
+                    except Rule7ModificationLimitError as r7:
+                        # Budget exhausted for THIS order: stop ratcheting
+                        # it (fail-closed per F8-H-02) and audit the refusal.
+                        logger.warning(
+                            f"Rule-7 per-order budget exhausted for {order_id}: {r7}"
+                        )
+                        await db.async_log_audit(
+                            action="ratchet_refused_rule7",
+                            entity_type="order",
+                            entity_id=order_id,
+                            metadata={
+                                "reason": "rule7_modification_limit",
+                                "current_price": current_price,
+                            },
+                        )
+                        continue
 
                     # Record ratchet event for audit via generic async_log_audit
                     await db.async_log_audit(
@@ -1396,8 +1416,9 @@ async def update_trailing_stops() -> None:
                     db_position.metadata["trailing_config"] = updated_config
                     await asyncio.to_thread(db.store_position, db_position)
 
-                    # Increment modification counter
-                    rules_engine.increment_modification_counter()
+                    # Per-order Rule-7 counter is incremented inside
+                    # modify_order (F8-H-02); only the per-cycle secondary
+                    # guard is tracked here.
                     modifications_this_cycle += 1
 
                     logger.debug(

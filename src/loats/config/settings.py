@@ -95,10 +95,11 @@ class Settings(BaseSettings):
     )
     # Trading Configuration
     nifty_lot_size: int = Field(25, description="NIFTY lot size")
-    # CMP Rule 7 modification counter ceiling (HC-23). 25 keeps the rule
-    # chain within its weekly advance lock-step without over-ratcheting.
+    # CMP Rule 7 modification ceiling (HC-23). 25 modifications per order
+    # (broker-side control mirrored client-side, enforced at the
+    # modify_order boundary; F8-H-02).
     max_modifications: int = Field(
-        25, description="Maximum allowed Rule 7 modifications per week"
+        25, description="Maximum allowed Rule 7 modifications per order"
     )
     # Backward compatibility alias retained in HC-23 external verification.
     mods: int = Field(25, description="Maximum allowed Rule 7 modifications")

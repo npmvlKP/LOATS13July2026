@@ -35,6 +35,7 @@ remains the primary duplicate-order control.
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import threading
@@ -503,6 +504,14 @@ class OpenAlgoClient:
 
         Note: Circuit breaker is applied without retry to avoid duplicate modifications.
         When the circuit is open, this method fails fast with CircuitBreakerOpenError.
+
+        CMP Rule 7 (F8-H-02): a persisted, per-order modification budget
+        (settings.max_modifications, default 25) is enforced HERE, at the
+        API boundary, so every caller is gated — not just the trailing
+        driver. The slot is reserved before the broker call and released
+        if the broker request fails, so failed attempts never consume
+        budget. Counter state is read from SQLite (survives restarts); a
+        counter DB failure fails closed (modification refused).
         """
         _check_kill_switch()
         payload = build_modify_order_payload(
@@ -516,6 +525,12 @@ class OpenAlgoClient:
             trailing_stop_loss=trailing_stop_loss,
         )
 
+        # CMP Rule 7: reserve budget before touching the broker. Raises
+        # Rule7ModificationLimitError (refuse) or Rule7StateError (fail closed).
+        from .rules import rules_engine
+
+        rules_engine.reserve_modification(order_id)
+
         # Wrap order modification in circuit breaker without retry
         def _modify_order_impl() -> dict[str, Any]:
             return self._request(
@@ -525,7 +540,13 @@ class OpenAlgoClient:
                 idempotency_key=_get_idempotency_key(f"modify:{order_id}"),
             )
 
-        return OPENALGO_CIRCUIT_BREAKER.call(_modify_order_impl)
+        try:
+            return OPENALGO_CIRCUIT_BREAKER.call(_modify_order_impl)
+        except Exception:
+            # Broker/circuit failure: give the reserved slot back so the
+            # failed attempt does not consume Rule-7 budget.
+            rules_engine.release_modification(order_id)
+            raise
 
     def cancel_order(self, order_id: str) -> dict[str, Any]:
         """
@@ -945,6 +966,13 @@ class AsyncOpenAlgoClient:
         """
         await _async_check_kill_switch()
 
+        # CMP Rule 7 (F8-H-02): reserve budget before touching the broker.
+        # Raises Rule7ModificationLimitError (refuse) or Rule7StateError
+        # (fail closed) — identical semantics to the sync client.
+        from .rules import rules_engine
+
+        rules_engine.reserve_modification(order_id)
+
         # Wrap order modification in circuit breaker without retry
         async def _modify_order_impl() -> dict[str, Any]:
             # Convert enum parameter to value if needed
@@ -975,7 +1003,13 @@ class AsyncOpenAlgoClient:
                 idempotency_key=_get_idempotency_key(f"modify:{order_id}"),
             )
 
-        return await OPENALGO_CIRCUIT_BREAKER.call_async(_modify_order_impl)
+        try:
+            return await OPENALGO_CIRCUIT_BREAKER.call_async(_modify_order_impl)
+        except Exception:
+            # Broker/circuit failure: give the reserved slot back so the
+            # failed attempt does not consume Rule-7 budget.
+            await asyncio.to_thread(rules_engine.release_modification, order_id)
+            raise
 
     async def cancel_order(self, order_id: str) -> dict[str, Any]:
         """

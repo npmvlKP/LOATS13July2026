@@ -563,15 +563,22 @@ class TradeDecisionEngine:
         }
 
     def increment_modification_counter(self) -> int:
-        """Increment rule 7 modification counter."""
+        """Increment the legacy Rule-7 counter (no enforcement role).
+
+        .. deprecated:: F8-H-02
+            Delegates to the rules engine's legacy global counter. CMP
+            Rule 7 is enforced per-order at the ``modify_order`` boundary
+            with a persisted SQLite counter — see
+            ``CMPRulesEngine.reserve_modification``.
+        """
         return rules_engine.increment_modification_counter()
 
-    def get_modification_count(self) -> int:
-        """Get current modification counter value."""
-        return rules_engine.get_modification_count()
+    def get_modification_count(self, order_id: str | None = None) -> int:
+        """Get the Rule-7 count (per-order when order_id given)."""
+        return rules_engine.get_modification_count(order_id)
 
     def reset_modification_counter(self) -> None:
-        """Reset rule 7 modification counter."""
+        """Reset the legacy Rule-7 counter (no enforcement role)."""
         rules_engine.reset_modification_counter()
 
 

@@ -61,6 +61,17 @@ _PRAGMAS: tuple[str, ...] = (
     "PRAGMA busy_timeout=30000",  # ms; matches sqlite3.connect(timeout=30)
 )
 
+# CMP Rule 7 (F8-H-02): order statuses that close an order. Reaching one
+# resets the per-order modification budget (mirrors the broker-side
+# lifecycle; ids are rarely reused, but the reset keeps semantics clean).
+_RULE7_TERMINAL_ORDER_STATUSES: frozenset[str] = frozenset(
+    {"COMPLETED", "CANCELLED", "REJECTED"}
+)
+
+
+class Rule7StateError(RuntimeError):
+    """Rule-7 persisted counter state unavailable (DB failure) — fail closed."""
+
 
 class Database:
     """SQLite database audit trail functionality."""
@@ -355,7 +366,7 @@ class Database:
         """)
 
     def _create_cmp_tables(self, cursor: sqlite3.Cursor) -> None:
-        """Create trade_decisions table + indexes for CMP strategy."""
+        """Create trade_decisions + Rule-7 tables/indexes for CMP strategy."""
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS trade_decisions (
                 decision_id TEXT PRIMARY KEY,
@@ -395,6 +406,16 @@ class Database:
             "CREATE INDEX IF NOT EXISTS "
             "idx_trade_decisions_timestamp ON trade_decisions(timestamp)"
         )
+        # CMP Rule 7 (F8-H-02): per-order modification counter persisted in
+        # SQLite so the <=25 ceiling survives process restarts and is keyed
+        # by order_id (one order can no longer consume another's budget).
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS modification_counts (
+                order_id TEXT PRIMARY KEY,
+                count INTEGER NOT NULL DEFAULT 0,
+                updated_at TEXT NOT NULL
+            )
+        """)
 
     def _create_indexes(self, cursor: sqlite3.Cursor) -> None:
         """Create performance indexes on core tables."""
@@ -1641,7 +1662,162 @@ class Database:
             (status, now_iso, now_ms, order_id),
         )
         conn.commit()
+        # CMP Rule 7 (F8-H-02): the per-order modification budget resets when
+        # the order reaches a terminal status — closed orders get a fresh
+        # budget if the same broker order_id is ever reused.
+        if status.upper() in _RULE7_TERMINAL_ORDER_STATUSES:
+            try:
+                cursor.execute(
+                    "DELETE FROM modification_counts WHERE order_id = ?",
+                    (order_id,),
+                )
+                conn.commit()
+            except Exception as exc:  # pragma: no cover - defensive
+                logger.error(
+                    f"Failed to reset Rule-7 modification count for "
+                    f"{order_id} on closure: {exc}"
+                )
+                try:
+                    conn.rollback()
+                except Exception:  # nosec B110
+                    pass
         return True
+
+    def get_modification_count(self, order_id: str) -> int:
+        """
+        Get the persisted per-order Rule-7 modification count.
+
+        F8-H-02: counters live in the modification_counts table so they
+        survive process restarts. Any DB error fails closed by raising
+        Rule7StateError — the caller must refuse the modification.
+        """
+        conn = self._get_connection()
+        try:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT count FROM modification_counts WHERE order_id = ?",
+                (order_id,),
+            )
+            row = cursor.fetchone()
+            return int(row[0]) if row is not None else 0
+        except Exception as exc:
+            logger.error(
+                f"Rule-7 fail-closed: modification count read failed for "
+                f"{order_id}: {exc}"
+            )
+            raise Rule7StateError(
+                f"Modification count read failed for {order_id}: {exc}"
+            ) from exc
+        finally:
+            self._release_connection(conn)
+
+    def increment_modification_count(self, order_id: str) -> int:
+        """
+        Atomically increment and return the per-order Rule-7 count.
+
+        Single-statement UPSERT ... RETURNING: atomic under SQLite's
+        database-level write lock, so concurrent modify attempts can never
+        both claim the same budget slot (and no explicit BEGIN IMMEDIATE
+        is needed on the shared thread-local connection). Raises
+        Rule7StateError on any DB error (fail-closed: the caller must
+        refuse the modification).
+        """
+        conn = self._get_connection()
+        try:
+            cursor = conn.execute(
+                """
+                INSERT INTO modification_counts (order_id, count, updated_at)
+                VALUES (?, 1, ?)
+                ON CONFLICT(order_id) DO UPDATE SET
+                    count = count + 1,
+                    updated_at = excluded.updated_at
+                RETURNING count
+                """,
+                (order_id, datetime.now(UTC).isoformat()),
+            )
+            row = cursor.fetchone()
+            conn.commit()
+            if row is None:  # pragma: no cover - RETURNING always yields a row
+                raise Rule7StateError(
+                    f"Modification count increment returned no row for {order_id}"
+                )
+            return int(row[0])
+        except Exception as exc:
+            try:
+                conn.rollback()
+            except Exception:  # nosec B110
+                pass
+            logger.error(
+                f"Rule-7 fail-closed: modification count increment failed "
+                f"for {order_id}: {exc}"
+            )
+            raise Rule7StateError(
+                f"Modification count increment failed for {order_id}: {exc}"
+            ) from exc
+        finally:
+            self._release_connection(conn)
+
+    def decrement_modification_count(self, order_id: str) -> None:
+        """
+        Roll back one unit of the per-order Rule-7 count.
+
+        Called when a modification was reserved but the broker request
+        subsequently failed, so failed attempts never consume budget.
+        Never raises: a rollback failure is logged, not propagated (the
+        original broker error is the actionable one).
+        """
+        conn = self._get_connection()
+        try:
+            conn.execute(
+                """
+                UPDATE modification_counts
+                SET count = MAX(count - 1, 0),
+                    updated_at = ?
+                WHERE order_id = ?
+                """,
+                (datetime.now(UTC).isoformat(), order_id),
+            )
+            conn.commit()
+        except Exception as exc:
+            try:
+                conn.rollback()
+            except Exception:  # nosec B110
+                pass
+            logger.error(f"Rule-7 count rollback failed for {order_id}: {exc}")
+        finally:
+            self._release_connection(conn)
+
+    def reset_modification_count(self, order_id: str) -> bool:
+        """
+        Reset the per-order Rule-7 count to zero.
+
+        Raises Rule7StateError on DB error so operational resets cannot be
+        silently lost. Returns True if a row was deleted, False if none
+        existed.
+        """
+        conn = self._get_connection()
+        try:
+            cursor = conn.execute(
+                "DELETE FROM modification_counts WHERE order_id = ?",
+                (order_id,),
+            )
+            deleted = cursor.rowcount > 0
+            conn.commit()
+            return deleted
+        except Exception as exc:
+            try:
+                conn.rollback()
+            except Exception:  # nosec B110
+                pass
+            logger.error(
+                f"Rule-7 fail-closed: modification count reset failed "
+                f"for {order_id}: {exc}"
+            )
+            raise Rule7StateError(
+                f"Modification count reset failed for {order_id}: {exc}"
+            ) from exc
+        finally:
+            self._release_connection(conn)
 
     def get_open_orders(self, symbol: str | None = None) -> list[Order]:
         """
@@ -2192,6 +2368,22 @@ class Database:
                     f"aiosqlite update_order_status failed, falling back: {e}"
                 )
         return await asyncio.to_thread(self.update_order_status, order_id, status)
+
+    async def async_get_modification_count(self, order_id: str) -> int:
+        """Async wrapper: persisted per-order Rule-7 count (F8-H-02)."""
+        return await asyncio.to_thread(self.get_modification_count, order_id)
+
+    async def async_increment_modification_count(self, order_id: str) -> int:
+        """Async wrapper: atomic per-order Rule-7 increment (F8-H-02)."""
+        return await asyncio.to_thread(self.increment_modification_count, order_id)
+
+    async def async_decrement_modification_count(self, order_id: str) -> None:
+        """Async wrapper: per-order Rule-7 rollback (F8-H-02)."""
+        await asyncio.to_thread(self.decrement_modification_count, order_id)
+
+    async def async_reset_modification_count(self, order_id: str) -> bool:
+        """Async wrapper: per-order Rule-7 reset (F8-H-02)."""
+        return await asyncio.to_thread(self.reset_modification_count, order_id)
 
     async def async_create_trade_decision(self, decision: TradeDecision) -> bool:
         """Async create trade decision; prefers aiosqlite pool when available."""
