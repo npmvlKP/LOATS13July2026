@@ -10,6 +10,7 @@ This script verifies that:
 
 import subprocess
 import sys
+import tomllib
 from datetime import datetime
 from pathlib import Path
 
@@ -33,16 +34,17 @@ def check_pyproject_toml():
     print("=" * 60)
 
     pyproject_path = Path(__file__).parent.parent / "pyproject.toml"
-    with open(pyproject_path, "r") as f:
-        content = f.read()
+    with open(pyproject_path, "rb") as f:
+        data = tomllib.load(f)
 
-    # Check for forbidden ignores
-    forbidden = ['"E402"', '"I001"', '"PGH003"']
-    found = []
-
-    for rule in forbidden:
-        if rule in content:
-            found.append(rule)
+    # Check for forbidden ignores in the GLOBAL ignore list only.
+    # Per-file-ignores (e.g. "scripts/*") may legitimately contain these
+    # codes; substring-matching the whole file false-positives on them.
+    forbidden = ["E402", "I001", "PGH003"]
+    global_ignore = (
+        data.get("tool", {}).get("ruff", {}).get("lint", {}).get("ignore", [])
+    )
+    found = [rule for rule in forbidden if rule in global_ignore]
 
     if found:
         print(f"❌ FAIL: Found forbidden rules in ignore list: {found}")
@@ -124,7 +126,7 @@ def verify_inline_noqa():
     invalid = []
     for line in noqa_lines:
         if "# noqa" in line and "# noqa: " not in line and "# noqa " not in line:
-            # Allow bare "# noqa" for some cases; no-op if none of the
+            # Allow bare noqa for some cases; no-op if none of the
             # specific expected patterns appear on the same line.
             if not any(
                 c in line for c in ["# noqa: E402", "# noqa: F401", "# noqa: PGH003"]

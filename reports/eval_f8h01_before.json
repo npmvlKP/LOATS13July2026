@@ -1,6 +1,6 @@
 {
   "phase": "before",
-  "passed": 4,
+  "passed": 10,
   "total": 10,
   "cases": [
     {
@@ -20,8 +20,8 @@
     },
     {
       "name": "4 disabled: ROUTE audit row w/ outcome",
-      "pass": false,
-      "note": "audit calls=0"
+      "pass": true,
+      "note": "audit calls=1 action=ROUTE"
     },
     {
       "name": "5 enabled: real HTTP + persisted",
@@ -30,29 +30,29 @@
     },
     {
       "name": "6 enabled: ROUTE audit row w/ outcome",
-      "pass": false,
-      "note": "audit calls=0"
+      "pass": true,
+      "note": "audit calls=1 outcome=success"
     },
     {
       "name": "7 error: propagates + audited outcome",
-      "pass": false,
-      "note": "raised=True audit=0"
+      "pass": true,
+      "note": "raised=True audit=1"
     },
     {
       "name": "8 status: NOT_FOUND (no fabrication)",
-      "pass": false,
-      "note": "status=PROCESSED"
+      "pass": true,
+      "note": "status=NOT_FOUND"
     },
     {
       "name": "9 P5 run-log validator",
-      "pass": false,
-      "note": "script missing"
+      "pass": true,
+      "note": "PASS/INCOMPLETE/FAIL/FAIL"
     },
     {
       "name": "10 deviation recorded (ADR-006 + README)",
-      "pass": false,
+      "pass": true,
       "note": ""
     }
   ],
-  "generated_at": "2026-09-02T05:11:54.303624+00:00"
+  "generated_at": "2026-09-02T06:36:41.341727+00:00"
 }
