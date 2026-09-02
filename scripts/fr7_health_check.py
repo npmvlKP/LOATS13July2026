@@ -158,13 +158,40 @@ def check_structure(rep: Report) -> None:
         "pytest_output.txt",
     )
     junk = [n for n in forbidden if (REPO_ROOT / n).exists()]
+
+    # F8-C-02: delegate the tracked-set hygiene rules (venv patterns,
+    # tracked-file ceiling) to the single source of truth guard script.
+    guard_detail = ""
+    try:
+        proc = subprocess.run(
+            [
+                sys.executable,
+                str(REPO_ROOT / "scripts" / "check_repo_hygiene.py"),
+            ],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        if proc.returncode != 0:
+            junk.extend(
+                line.strip("- ").strip()
+                for line in proc.stdout.splitlines()
+                if line.strip().startswith("- ")
+            )
+            guard_detail = "tracked-set hygiene guard failed (F8-C-02)"
+    except Exception as exc:  # pragma: no cover - defensive
+        guard_detail = f"guard could not run: {exc!r}"
+
     rep.add(
         Result(
             "HC-26",
             "root junk artifacts absent",
             "TODO-21",
             "PASS" if not junk else "FAIL",
-            "tracked junk at repo root" if junk else "",
+            (f"tracked junk at repo root ({guard_detail})" if guard_detail else "")
+            if junk
+            else guard_detail,
             junk,
         )
     )

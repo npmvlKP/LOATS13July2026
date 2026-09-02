@@ -1,24 +1,37 @@
 # LOATS13July2026 Project Ignore Rules
 # Created: 15-Jul-2026
+# Updated: 02-Sep-2026 (F8-C-02 repo hygiene remediation)
 
 # Environment files
 .env
 .env.*
 !.env.example
-!.env.test
-.env.example
 secrets.env
 
 # Ruff-specific exclusions (env files are not Python)
 .ruffignore
 
-
-# Virtual environment
+# Virtual environments (F8-C-02): loatsNEW/ was swept into the index by a
+# `git add -A` during TODO-25 (commit 7a2ea233) - 9,939 machine-local,
+# absolute-path-bound files. Venvs are re-derivable from pyproject.toml and
+# requirements-*.txt; never track them.
+loatsNEW/
 .venv/
 venv/
 ENV/
 /loats/
 LOATS13July2026/
+
+# Literal `~` directory (PowerShell expansion mishap, F8-C-02)
+~/
+
+# Local tool lockfiles / manifests not part of the LITE stack (F8-C-02)
+package.json
+package-lock.json
+uv.lock
+
+# mypy HTML report output (F8-C-02)
+mypy-report/
 
 # Python cache and compiled files
 __pycache__/
@@ -38,6 +51,7 @@ htmlcov/
 .coverage
 .coverage.*
 *.egg-info/
+coverage.json
 
 # IDE and editor files
 .vscode/
@@ -65,7 +79,6 @@ audit_results.json
 bandit_alerts.txt
 cb_test_output.txt
 cov_output.txt
-coverage.json
 mypy_alerts.txt
 mypy_all_errors.txt
 mypy_errors.txt
@@ -96,8 +109,10 @@ qg_*.txt
 task_progress.md
 *_audit.md
 
-# Performance analysis reports (generated during runtime)
+# Performance analysis reports (generated during runtime; keep only the
+# canonical TODO-25 evidence file tracked, referenced by verify_todo25_*)
 reports/p1_analyze_latency_*.json
+!reports/p1_analyze_latency_20260828_084822.json
 
 # Health check intermediate run artifacts (keep health-final-*.json only)
 reports/health/health-fast-*.json

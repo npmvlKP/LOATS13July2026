@@ -7,7 +7,7 @@ probe required to close the acceptance matrix.
 
 Run from the project root with the project venv interpreter:
 
-    loatsNEW\Scripts\python.exe verify_acceptance_matrix.py
+    loatsNEW\Scripts\python.exe scripts\verify_acceptance_matrix.py
 
 Pass --full to also run a standalone pytest suite (the HC registry already
 includes coverage, so --full is optional).  The default mode is quick and
@@ -32,7 +32,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-REPO_ROOT = Path(__file__).resolve().parent
+REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
 def _resolve_python() -> str:

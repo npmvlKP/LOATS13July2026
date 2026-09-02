@@ -33,6 +33,17 @@ jobs:
       - name: Check dependency manifest sync
         run: python scripts/check_deps_sync.py
 
+  repo-hygiene:
+    name: repo-hygiene
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Reject tracked venvs / junk / env files (F8-C-02)
+        run: python scripts/check_repo_hygiene.py
+
   ruff-lint:
     name: ruff-lint
     runs-on: ubuntu-latest
