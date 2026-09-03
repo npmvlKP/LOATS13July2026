@@ -1,5 +1,6 @@
 import asyncio
 import datetime as dt
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -756,3 +757,184 @@ class TestSentimentSellSignal:
                         mdb.async_create_signal = AsyncMock()
                         await o._execute_sentiment_analysis()
                         mdb.async_create_signal.assert_called_once()
+
+
+class TestProducerWindowLifecycle:
+    """F8-M-02: producer tasks must never outlive the trading cycle.
+
+    "Timed out" must imply "producers stopped": a hung producer (e.g. the
+    volatility fetch) must be cancelled within the cycle, not left running
+    across windows where its late-arriving signal could pollute a later
+    cycle's gate input.
+    """
+
+    @staticmethod
+    def _patch_all_producers() -> dict[str, AsyncMock]:
+        """AsyncMock every producer; individual tests override the hanger."""
+        return {
+            name: AsyncMock()
+            for name in (
+                "_execute_ta_analysis",
+                "_execute_sentiment_analysis",
+                "_execute_volatility_analysis",
+                "_execute_price_action_analysis",
+                "_execute_market_data_update",
+            )
+        }
+
+    @staticmethod
+    def _assert_no_pending_tasks() -> None:
+        pending = [
+            t
+            for t in asyncio.all_tasks()
+            if t is not asyncio.current_task() and not t.done()
+        ]
+        assert pending == [], f"producer tasks outlived the cycle: {pending}"
+
+    @staticmethod
+    def _spy_producer_tasks() -> tuple[list[asyncio.Task[Any]], Any]:
+        """Capture the task handles the orchestrator creates for producers.
+
+        Returns (recorded_tasks, patcher_context). The spy delegates to the
+        real ``asyncio.create_task`` and records every task created inside
+        the trading cycle, so assertions can await the exact handles instead
+        of racing on loop ticks.
+        """
+        recorded: list[asyncio.Task[Any]] = []
+        real_create_task = asyncio.create_task
+
+        def spy(coro: Any, **kwargs: Any) -> asyncio.Task[Any]:
+            task = real_create_task(coro, **kwargs)
+            recorded.append(task)
+            return task
+
+        return recorded, patch(
+            "loats.orchestrator.asyncio.create_task", side_effect=spy
+        )
+
+    @staticmethod
+    async def _drain_and_check(recorded: list[asyncio.Task[Any]]) -> None:
+        """Assert every recorded producer reached a terminal state, none
+        still pending, and the hung one was cancelled (any cancelled task
+        among them proves cancellation was delivered)."""
+        assert recorded, "spy captured no producer tasks"
+        done, still_pending = await asyncio.wait(recorded, timeout=0.5)
+        assert not still_pending, f"producer tasks outlived the cycle: {still_pending}"
+        assert any(t.cancelled() for t in done), (
+            "no producer task was cancelled - hung producers were not stopped"
+        )
+
+    @pytest.mark.asyncio
+    async def test_timeout_cancels_all_producers_within_cycle(self):
+        """Hang volatility on an event that is never set; the 80ms window
+        times out; the hung producer must be cancelled within the cycle —
+        only cancellation (not any unblock) may end it (F8-M-02)."""
+        import contextlib
+
+        o = TradingOrchestrator()
+
+        async def hang_forever() -> None:
+            await asyncio.Event().wait()  # never set: cancellation must end this
+
+        patches = self._patch_all_producers()
+        patches["_execute_volatility_analysis"] = AsyncMock(side_effect=hang_forever)
+        ms = MagicMock()
+        ms.default_symbol = "NIFTY"
+
+        recorded, task_spy = self._spy_producer_tasks()
+        with contextlib.ExitStack() as stack:
+            for name, mock in patches.items():
+                stack.enter_context(patch.object(o, name, mock))
+            stack.enter_context(patch("loats.orchestrator.settings", ms))
+            stack.enter_context(patch("loats.orchestrator.record_cycle_time"))
+            stack.enter_context(
+                patch.object(o, "_execute_risk_management", new_callable=AsyncMock)
+            )
+            stack.enter_context(task_spy)
+            with patch("loats.rules.rules_engine") as mre:
+                mre.is_trading_allowed.return_value = False
+
+                await o._execute_trading_cycle()
+
+                # The producer never returned, so reaching here proves the
+                # 80ms timeout branch ran.
+                assert patches["_execute_volatility_analysis"].await_count == 1
+                await self._drain_and_check(recorded)
+
+    @pytest.mark.asyncio
+    async def test_exception_path_cancels_surviving_producers(self):
+        """A producer raising into the gather must not strand its siblings:
+        gather does NOT cancel surviving children when one raises, so the
+        cycle's error path must cancel them. This is the leak the pre-fix
+        tree really had — the timeout path was already closed by gather
+        cancellation propagation (F8-M-02)."""
+        import contextlib
+
+        o = TradingOrchestrator()
+
+        async def hang_forever() -> None:
+            await asyncio.Event().wait()  # never set: cancellation must end this
+
+        patches = self._patch_all_producers()
+        patches["_execute_market_data_update"] = AsyncMock(
+            side_effect=RuntimeError("boom")
+        )
+        patches["_execute_volatility_analysis"] = AsyncMock(side_effect=hang_forever)
+        ms = MagicMock()
+        ms.default_symbol = "NIFTY"
+
+        recorded, task_spy = self._spy_producer_tasks()
+        with contextlib.ExitStack() as stack:
+            for name, mock in patches.items():
+                stack.enter_context(patch.object(o, name, mock))
+            stack.enter_context(patch("loats.orchestrator.settings", ms))
+            stack.enter_context(patch("loats.orchestrator.record_cycle_time"))
+            stack.enter_context(task_spy)
+            with pytest.raises(RuntimeError, match="boom"):
+                await o._execute_trading_cycle()
+
+            # The hung volatility producer was still pending when the error
+            # path ran; it must have been cancelled there and must terminate
+            # without ever being unblocked.
+            await self._drain_and_check(recorded)
+
+    @pytest.mark.asyncio
+    async def test_no_hang_when_all_producers_finish_in_window(self):
+        """Fast-path invariant: when every producer completes inside the
+        budget, the cycle completes normally and no producer tasks remain."""
+        import contextlib
+
+        o = TradingOrchestrator()
+        patches = self._patch_all_producers()
+        ms = MagicMock()
+        ms.default_symbol = "NIFTY"
+
+        with contextlib.ExitStack() as stack:
+            for name, mock in patches.items():
+                stack.enter_context(patch.object(o, name, mock))
+            stack.enter_context(patch("loats.orchestrator.settings", ms))
+            stack.enter_context(patch("loats.orchestrator.record_cycle_time"))
+            stack.enter_context(
+                patch.object(o, "_execute_risk_management", new_callable=AsyncMock)
+            )
+            with patch("loats.rules.rules_engine") as mre:
+                mre.is_trading_allowed.return_value = False
+                await o._execute_trading_cycle()
+
+        self._assert_no_pending_tasks()
+
+    def test_cancel_pending_producers_helper_semantics(self):
+        """Unit: helper cancels only pending tasks; done tasks untouched."""
+        from loats.orchestrator import _cancel_pending_producers
+
+        async def run() -> tuple[int, int]:
+            done = asyncio.create_task(asyncio.sleep(0))
+            await done  # deterministic: the task is fully finished
+            pending = asyncio.create_task(asyncio.sleep(3600))
+            _cancel_pending_producers((done, pending))
+            await asyncio.gather(pending, return_exceptions=True)
+            return int(done.cancelled()), int(pending.cancelled())
+
+        done_cancelled, pending_cancelled = asyncio.run(run())
+        assert done_cancelled == 0
+        assert pending_cancelled == 1

@@ -148,6 +148,22 @@ async def validate_rss_feed(url: str, timeout: int = 5) -> bool:
         return False
 
 
+def _cancel_pending_producers(producers: tuple[asyncio.Task[Any], ...]) -> None:
+    """Cancel every not-yet-done producer task in place (F8-M-02).
+
+    Cancelling a done or already-cancelled task is a no-op, so this is
+    safe on every path. Holding the task references in ``producers`` also
+    keeps them strongly referenced for the lifetime of the cycle, so no
+    producer can be garbage-collected mid-flight (the GC-hazard class
+    documented in F6-H-05.3). Awaits nothing: cancellation is delivered
+    on the next loop iteration and each producer's own error handling
+    absorbs CancelledError.
+    """
+    for task in producers:
+        if not task.done():
+            task.cancel()
+
+
 class TradingOrchestrator:
     """High-performance trading orchestrator with <100ms cycle guarantee."""
 
@@ -225,6 +241,7 @@ class TradingOrchestrator:
     async def _execute_trading_cycle(self) -> None:
         """Execute a complete trading cycle with parallel execution."""
         cycle_start = datetime.datetime.now(datetime.UTC)
+        producers: tuple[asyncio.Task[Any], ...] = ()
 
         try:
             # Lazy load settings to avoid import-time failures
@@ -241,29 +258,33 @@ class TradingOrchestrator:
                 self._execute_price_action_analysis()
             )
             market_data_task = asyncio.create_task(self._execute_market_data_update())
+            producers = (
+                ta_task,
+                sentiment_task,
+                volatility_task,
+                price_action_task,
+                market_data_task,
+            )
 
             try:
                 await asyncio.wait_for(
-                    asyncio.gather(
-                        ta_task,
-                        sentiment_task,
-                        volatility_task,
-                        price_action_task,
-                        market_data_task,
-                    ),
+                    asyncio.gather(*producers),
                     timeout=0.08,
                 )
             except TimeoutError:
                 logger.warning(
                     "Trading cycle tasks timed out - continuing with partial results"
                 )
-                # Volatility and price-action producers are deliberately NOT
-                # cancelled: they are the diversity-critical sources for the
-                # CMP gate and must persist their signals past the budget
-                # window (F8-C-01).
-                for task in [ta_task, sentiment_task, market_data_task]:
-                    if not task.done():
-                        task.cancel()
+                # Cancel every producer still running so "timed out" implies
+                # "producers stopped" (F8-M-02). The earlier comment exempted
+                # volatility/price-action in the name of F8-C-01 diversity,
+                # but that exemption was dead code: wait_for cancels the
+                # gather on timeout and gather cancellation propagates to all
+                # children, so no signal ever outlived the window anyway.
+                # Diversity is a Step-1 gate property of the stored-signal
+                # set (producers persist signals before the window closes),
+                # not a producer-lifetime property.
+                _cancel_pending_producers(producers)
 
             # Execute sequential operations
             await self._execute_risk_management()
@@ -278,6 +299,12 @@ class TradingOrchestrator:
 
         except Exception as e:
             logger.error(f"Error in trading cycle execution: {e}")
+            # If a producer raised into the gather, gather does NOT cancel
+            # its surviving children - without this, a hung volatility (or
+            # any) fetch would keep running across cycles and its late
+            # signal could land in a later window (F8-M-02). Cancelling
+            # already-done/cancelled tasks is a no-op.
+            _cancel_pending_producers(producers)
             raise
 
         finally:
