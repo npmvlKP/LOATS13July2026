@@ -159,3 +159,14 @@ FORMENSIC_REVIEW.md
 
 # Archived audit scripts
 reports/archived-audit/
+
+# AI / session-agent working artifacts (F8-M-02 hygiene follow-up): tooling
+# state from pair-programming assistants is machine-local, re-derivable, and
+# must never re-enter the index (they crept back in and breached the
+# F8-C-02 tracked-file ratchet).
+.harness-memory/
+.opencode/
+.clinerules/
+.clineignore
+.cline/
+@workspace/

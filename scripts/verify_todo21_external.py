@@ -292,7 +292,12 @@ class ExternalValidator:
         # after TODO-21's 343, so 343 had gone stale; the ratchet intent --
         # "no venv-class blowups" -- is preserved (10,414 tracked at the F8-C-02
         # finding; 394 after remediation).
-        baseline_count = 369
+        # F8-M-02 hygiene follow-up (2026-09-03): 16 session-agent files
+        # untracked; tree re-measured at 411 and the ratchet re-pinned to 415
+        # in lockstep with scripts/check_repo_hygiene.py and
+        # scripts/verify_f8c02_external.py (single-source intent: no
+        # venv/junk-class re-entry; see the hygiene guard for the classes).
+        baseline_count = 415
         count_after_commit = current_count - staged_deletions
         reduction = baseline_count - count_after_commit
         percentage = (reduction / baseline_count * 100) if baseline_count > 0 else 0

@@ -60,11 +60,14 @@ FORBIDDEN_PATTERNS: tuple[str, ...] = (
     ".env.development",
 )
 
-# Hard ceiling on tracked files. 369 = measured count at commit 7a2ea233^
-# (the legitimate tree immediately before the TODO-25 venv sweep). The
-# TODO-21 ratchet (<=343) went stale after TODO-22..27 additions; this
-# ceiling preserves the ratchet intent without freezing legitimate growth.
-TRACKED_FILE_CEILING = 425
+# Hard ceiling on tracked files. History: 369 = measured count at commit
+# 7a2ea233^ (the legitimate tree immediately before the TODO-25 venv sweep);
+# the TODO-21 ratchet (<=343) went stale after TODO-22..27 additions. The
+# F8-M-02 hygiene follow-up (2026-09-03) untracked 16 session-agent files
+# (.harness-memory/, .opencode/, .clinerules/, .clineignore, @workspace/),
+# leaving 411 tracked; the ceiling is re-pinned to 415 so the ratchet
+# tightens with the tree and venv-class blowups stay impossible.
+TRACKED_FILE_CEILING = 415
 
 # Tracked paths that would match FORBIDDEN_PATTERNS but are deliberate.
 ALLOWLIST: frozenset[str] = frozenset(
