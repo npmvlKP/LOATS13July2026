@@ -11,7 +11,9 @@ Verifies:
 2. Required exports and functions
 3. Scheduler weekly job wiring
 4. On-demand execution (run_once)
-5. Health check integration (HC-30)
+5. Health check integration (backtest-sanity coverage floor gate; the
+   TODO-26-era HC-30 entry was folded away in the HC-01..HC-27
+   re-catalogue, commit 138d376)
 6. CMP P4 exit gate compliance
 
 Usage:
@@ -241,8 +243,17 @@ class TODO26Verifier:
 
         scheduler_content = scheduler_path.read_text(encoding="utf-8", errors="ignore")
 
+        # F8-M-06: the backtest_sanity import moved out of module level
+        # ("from .backtest_sanity import ...") into the task body as
+        # "import loats.backtest_sanity as _backtest_sanity" - deliberate,
+        # it breaks the scheduler -> backtest_sanity import cycle and is
+        # bound for reliable test patching. Assert the surviving outcome
+        # (the import happens inside the task), not the old idiom.
         checks = [
-            ("backtest_sanity import", "from .backtest_sanity import"),
+            (
+                "Function-level backtest_sanity import",
+                "import loats.backtest_sanity as _backtest_sanity",
+            ),
             ("Job registration", '"backtest_sanity_check"'),
             ("Method definition", "async def run_backtest_sanity_check"),
             ("CronTrigger", "CronTrigger"),
@@ -315,36 +326,39 @@ class TODO26Verifier:
         return True
 
     def verify_health_check_integration(self) -> bool:
-        """Verify health check integration."""
-        print_section("7. HEALTH CHECK INTEGRATION (HC-30)")
+        """Verify health check integration (post-re-catalogue)."""
+        print_section("7. HEALTH CHECK INTEGRATION (backtest-sanity gate)")
 
-        health_check_path = self.paths.scripts / "fr7_health_check.py"
-        if not health_check_path.exists():
-            print_error("fr7_health_check.py NOT FOUND")
+        # F8-M-06: the TODO-26-era "HC-30 Backtest Sanity Driver Wired"
+        # entry no longer exists - the health-check catalogue was
+        # re-catalogued to HC-01..HC-27 (commit 138d376) and the driver
+        # gate moved to the per-module coverage floor (backtest_sanity
+        # >= 80%) plus dedicated walk-forward/no-look-ahead tests
+        # (a22d6ca). Assert the surviving outcome: the backtest_sanity
+        # floor is present in the enforced gate map.
+        floor_map_path = self.paths.scripts / "check_per_module_coverage.py"
+        if not floor_map_path.exists():
+            print_error("check_per_module_coverage.py NOT FOUND")
             self.results.add_check(
-                "Health check file", False, "fr7_health_check.py not found"
+                "Coverage floor map", False, "check_per_module_coverage.py not found"
             )
             return False
 
-        health_check_content = health_check_path.read_text(
-            encoding="utf-8", errors="ignore"
-        )
+        floor_map_content = floor_map_path.read_text(encoding="utf-8", errors="ignore")
 
         checks = [
-            ("HC-30 entry", '"HC-30"'),
-            ("HC-30 name", '"Backtest Sanity Driver Wired"'),
-            ("HC-30 description", "TODO-26 / F7-L-06"),
-            ("Verification script", "verify_todo26_external.py"),
+            ("Floor map", "FR_FLOOR_MAP"),
+            ("backtest_sanity floor 80%", '"backtest_sanity.py": 80.0,'),
         ]
 
         all_passed = True
         for name, pattern in checks:
-            if pattern in health_check_content:
+            if pattern in floor_map_content:
                 print_success(f"{name}: present")
-                self.results.add_check(f"HC-30: {name}", True)
+                self.results.add_check(f"Backtest gate: {name}", True)
             else:
                 print_error(f"{name}: NOT present")
-                self.results.add_check(f"HC-30: {name}", False)
+                self.results.add_check(f"Backtest gate: {name}", False)
                 all_passed = False
 
         return all_passed
