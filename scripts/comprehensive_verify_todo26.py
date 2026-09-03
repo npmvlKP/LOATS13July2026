@@ -184,7 +184,12 @@ def check_scheduler_wiring() -> bool:
     scheduler_content = scheduler_path.read_text(encoding="utf-8", errors="ignore")
 
     checks = [
-        ("backtest_sanity import", "from .backtest_sanity import"),
+        # F8-M-06: import idiom moved to function level (cycle-break);
+        # assert the surviving outcome, not the pre-restructure idiom.
+        (
+            "Function-level backtest_sanity import",
+            "import loats.backtest_sanity as _backtest_sanity",
+        ),
         ("backtest_sanity job registration", '"backtest_sanity_check"'),
         ("run_backtest_sanity_check method", "async def run_backtest_sanity_check"),
         ("weekly cron trigger", "CronTrigger"),
@@ -228,28 +233,30 @@ def check_run_once_integration() -> bool:
 
 
 def check_health_check_integration() -> bool:
-    """Verify HC-30 added to fr7_health_check.py."""
-    print(f"\n{INFO_MARK} Checking HC-30 health check...")
+    """Verify the backtest-sanity gate that superseded HC-30.
 
-    health_check_path = PROJECT_ROOT / "scripts" / "fr7_health_check.py"
-    if not health_check_path.exists():
-        print(f"  {X_MARK} fr7_health_check.py not found")
+    F8-M-06: the TODO-26-era "HC-30 Backtest Sanity Driver Wired" entry
+    was folded away in the HC-01..HC-27 re-catalogue (commit 138d376);
+    the driver gate lives in the enforced per-module coverage floor map
+    (FR_FLOOR_MAP) plus dedicated walk-forward/no-look-ahead tests.
+    """
+    print(f"\n{INFO_MARK} Checking backtest-sanity coverage floor gate...")
+
+    floor_map_path = PROJECT_ROOT / "scripts" / "check_per_module_coverage.py"
+    if not floor_map_path.exists():
+        print(f"  {X_MARK} check_per_module_coverage.py not found")
         return False
 
-    health_check_content = health_check_path.read_text(
-        encoding="utf-8", errors="ignore"
-    )
+    floor_map_content = floor_map_path.read_text(encoding="utf-8", errors="ignore")
 
     checks = [
-        ("HC-30 entry", '"HC-30"'),
-        ("HC-30 name", '"Backtest Sanity Driver Wired"'),
-        ("HC-30 description", "TODO-26 / F7-L-06"),
-        ("verification script", "verify_todo26_external.py"),
+        ("Floor map", "FR_FLOOR_MAP"),
+        ("backtest_sanity floor 80%", '"backtest_sanity.py": 80.0,'),
     ]
 
     all_present = True
     for name, pattern in checks:
-        if pattern in health_check_content:
+        if pattern in floor_map_content:
             print(f"  {CHECK_MARK} {name}: found")
         else:
             print(f"  {X_MARK} {name}: NOT found")
@@ -392,7 +399,9 @@ def run_all_verifications() -> bool:
         print("  • backtest_sanity module: src/loats/backtest_sanity.py")
         print("  • Weekly scheduler: Sunday 4:00 AM (CronTrigger)")
         print("  • On-demand execution: scheduler.run_once('backtest_sanity_check')")
-        print("  • Health check: HC-30 in fr7_health_check.py")
+        print(
+            "  • Health check: backtest_sanity 80% floor in FR_FLOOR_MAP (supersedes the pre-re-catalogue HC-30 entry)"
+        )
         print("  • Exit gate: backtest_sanity_pass_gate() with 80% threshold")
         return True
     else:
