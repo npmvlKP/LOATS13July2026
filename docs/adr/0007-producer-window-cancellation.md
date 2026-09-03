@@ -59,3 +59,25 @@ boundary.
   (RED) and its absence on the fixed tree (GREEN), using a
   `create_task` spy to assert on the exact producer handles without
   loop-tick races.
+
+## Amendment (2026-09-03, Remaining-Risk review): settle, don't fire-and-cancel
+
+The original `_cancel_pending_producers` requested cancellation without
+awaiting it, leaving a residual risk: a producer whose ``finally`` block
+ran slow cleanup could still be executing when the next cycle tick began.
+The helper is upgraded to `async def _settle_cancelled_producers`:
+
+1. Cancel all pending producers, then `asyncio.wait(pending, timeout=0.05)`
+   — a **bounded 50 ms grace** (half the 100 ms cycle budget) so a hung
+   cleanup can never compound one hung fetch into a hung engine; a grace
+   expiry logs a CRITICAL diagnostic naming the abandoned tasks.
+2. Retrieve exceptions of finished, non-cancelled producers so a
+   concurrently-failed sibling never surfaces as "exception was never
+   retrieved" GC noise (the first error is re-raised by the enclosing
+   gather; the rest are observed here).
+
+Trade-off recorded: the settle can cost up to 50 ms inside the exception /
+timeout boundary, but only when producers are actually mid-cleanup — the
+fast path (all producers done) returns immediately. Cycle liveness is
+ranked above cleanup completeness; telemetry covers the gap.
+

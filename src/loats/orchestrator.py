@@ -148,20 +148,44 @@ async def validate_rss_feed(url: str, timeout: int = 5) -> bool:
         return False
 
 
-def _cancel_pending_producers(producers: tuple[asyncio.Task[Any], ...]) -> None:
-    """Cancel every not-yet-done producer task in place (F8-M-02).
+async def _settle_cancelled_producers(producers: tuple[asyncio.Task[Any], ...]) -> None:
+    """Cancel every not-yet-done producer and await their terminal states.
 
-    Cancelling a done or already-cancelled task is a no-op, so this is
-    safe on every path. Holding the task references in ``producers`` also
-    keeps them strongly referenced for the lifetime of the cycle, so no
-    producer can be garbage-collected mid-flight (the GC-hazard class
-    documented in F6-H-05.3). Awaits nothing: cancellation is delivered
-    on the next loop iteration and each producer's own error handling
-    absorbs CancelledError.
+    F8-M-02 upgraded per Remaining-Risk review: cancellation is not merely
+    requested but *settled* — every producer's ``finally`` block (timing,
+    logging, DB-write cleanup) completes inside the boundary, before the
+    next cycle tick, so a slow-cleanup producer can never stretch into a
+    subsequent window. Cancelling a done or already-cancelled task is a
+    no-op, so this is safe on every path. Holding the task references in
+    ``producers`` also keeps them strongly referenced for the lifetime of
+    the cycle, so no producer can be garbage-collected mid-flight (the
+    GC-hazard class documented in F6-H-05.3).
+
+    ``asyncio.wait`` re-raises nothing: producer exceptions were already
+    observed by the enclosing gather (first error) or are intrinsically
+    CancelledError here; the return value is ignored. The settle is bounded
+    by a 50 ms grace (half the cycle budget): if a producer's cleanup itself
+    hangs, the cycle logs a CRITICAL diagnostic and stays live rather than
+    compounding one hung fetch into a hung engine.
     """
+    pending = tuple(t for t in producers if not t.done())
+    for task in pending:
+        task.cancel()
+    if pending:
+        _, still_pending = await asyncio.wait(pending, timeout=0.05)
+        if still_pending:
+            logger.critical(
+                "Producer cleanup exceeded 50ms grace after cancellation - "
+                "abandoning %d slow producer(s) to keep the cycle live: %s",
+                len(still_pending),
+                [t.get_name() for t in still_pending],
+            )
+    # Retrieve producer exceptions so concurrently-failed siblings never
+    # surface as "exception was never retrieved" GC noise: the first error
+    # was re-raised by the enclosing gather, the rest are observed here.
     for task in producers:
-        if not task.done():
-            task.cancel()
+        if task.done() and not task.cancelled():
+            task.exception()
 
 
 class TradingOrchestrator:
@@ -275,7 +299,8 @@ class TradingOrchestrator:
                 logger.warning(
                     "Trading cycle tasks timed out - continuing with partial results"
                 )
-                # Cancel every producer still running so "timed out" implies
+                # Cancel every producer still running and settle their
+                # cleanup before continuing, so "timed out" implies
                 # "producers stopped" (F8-M-02). The earlier comment exempted
                 # volatility/price-action in the name of F8-C-01 diversity,
                 # but that exemption was dead code: wait_for cancels the
@@ -284,7 +309,7 @@ class TradingOrchestrator:
                 # Diversity is a Step-1 gate property of the stored-signal
                 # set (producers persist signals before the window closes),
                 # not a producer-lifetime property.
-                _cancel_pending_producers(producers)
+                await _settle_cancelled_producers(producers)
 
             # Execute sequential operations
             await self._execute_risk_management()
@@ -302,9 +327,10 @@ class TradingOrchestrator:
             # If a producer raised into the gather, gather does NOT cancel
             # its surviving children - without this, a hung volatility (or
             # any) fetch would keep running across cycles and its late
-            # signal could land in a later window (F8-M-02). Cancelling
-            # already-done/cancelled tasks is a no-op.
-            _cancel_pending_producers(producers)
+            # signal could land in a later window (F8-M-02). Settled here so
+            # cleanup finishes inside the boundary; cancelling already-done
+            # or already-cancelled tasks is a no-op.
+            await _settle_cancelled_producers(producers)
             raise
 
         finally:
