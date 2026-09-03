@@ -151,15 +151,53 @@ def test_vix_gate_paths() -> None:
     assert eng.get_vix_level() is None
 
 
+def test_vix_gate_uses_settings_threshold(monkeypatch: pytest.MonkeyPatch) -> None:
+    """F8-M-07: gate thresholds must come from Settings, not inline literals.
+
+    Pins CMP Rule 10 semantics against the settings-derived threshold:
+    SELL passes strictly above, BUY strictly below, boundary blocks both.
+    """
+    from loats import rules as rules_mod
+
+    # Capture the real settings BEFORE monkeypatching; falling through to
+    # rules_mod.settings inside __getattr__ would resolve to the proxy
+    # itself and recurse infinitely.
+    real_settings = rules_mod.settings
+
+    class _ThresholdProxy:
+        def __getattr__(self, name: str) -> object:
+            if name == "vix_gate_threshold":
+                return 10.0
+            return getattr(real_settings, name)
+
+    monkeypatch.setattr(rules_mod, "settings", _ThresholdProxy())
+    eng = CMPRulesEngine()
+    eng.set_vix_level(10.0)
+    # Boundary: VIX == threshold blocks BOTH directions (strict compare).
+    assert eng.check_vix_gate("BUY") is False
+    assert eng.check_vix_gate("SELL") is False
+    eng.set_vix_level(11.0)
+    assert eng.check_vix_gate("SELL") is True
+    assert eng.check_vix_gate("BUY") is False
+    eng.set_vix_level(9.0)
+    assert eng.check_vix_gate("BUY") is True
+    assert eng.check_vix_gate("SELL") is False
+
+
 def test_vix_fail_mode_block_buy(monkeypatch: pytest.MonkeyPatch) -> None:
     eng = CMPRulesEngine()
     from loats import rules as rules_mod
+
+    # Capture the real settings BEFORE monkeypatching; falling through to
+    # rules_mod.settings inside __getattr__ would resolve to the proxy
+    # itself and recurse infinitely.
+    real_settings = rules_mod.settings
 
     class _SettingsProxy:
         def __getattr__(self, name: str) -> object:
             if name == "vix_fail_mode":
                 return "block_buy"
-            return getattr(rules_mod.settings, name)
+            return getattr(real_settings, name)
 
     monkeypatch.setattr(rules_mod, "settings", _SettingsProxy())
     eng._vix_level = None

@@ -296,11 +296,13 @@ class CMPRulesEngine:
             logger.error("Unexpected vix=None after None branches; blocking")
             return False
         if direction == "SELL":
-            passes = vix > 15
+            # CMP Rule 10: SELL requires VIX above the configured threshold.
+            passes: bool = vix > settings.vix_gate_threshold
             logger.debug(f"VIX gate SELL: VIX={vix:.2f}, passes={passes}")
             return passes
         if direction == "BUY":
-            passes = vix < 15
+            # CMP Rule 10: BUY requires VIX below the configured threshold.
+            passes = vix < settings.vix_gate_threshold
             logger.debug(f"VIX gate BUY: VIX={vix:.2f}, passes={passes}")
             return passes
         logger.error(f"Invalid direction for VIX gate: {direction}")
