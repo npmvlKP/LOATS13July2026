@@ -24,6 +24,13 @@ import subprocess
 import sys
 from pathlib import Path
 
+# win32_root_junk lives next to this script; import works both when run
+# as a script (sys.path[0] = scripts/) and when loaded as a module via
+# importlib (tests/verifiers) after sys.path is seeded here.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import win32_root_junk  # noqa: F401  (lockstep pin via guard.win32_root_junk)
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 # Patterns matched against tracked paths (fnmatch, forward slashes).
@@ -81,15 +88,9 @@ ALLOWLIST: frozenset[str] = frozenset(
 # Paths that must not appear untracked-but-present at the repo root either
 # (workspace cleanliness probe - informational when untracked, since
 # .gitignore already covers them; enforced on the tracked set above).
-ROOT_JUNK_NAMES: tuple[str, ...] = (
-    "-p",
-    "G......",
-    "0.21.0",
-    "$null",
-    "[100%]",
-    "tmp_schema.db",
-    "pytest_output.txt",
-)
+# The name list itself lives in scripts/win32_root_junk.py (F8-M-03) and is
+# imported above, so the hygiene guard, fr7_health_check HC-26, and the HC
+# registry verifier share one Win32-safe detection implementation.
 
 
 def _tracked_files() -> list[str]:
@@ -125,8 +126,13 @@ def _violations(paths: list[str]) -> list[tuple[str, str]]:
 
 
 def _root_junk() -> list[str]:
-    """Return forbidden root junk names that exist on disk."""
-    return [n for n in ROOT_JUNK_NAMES if (REPO_ROOT / n).exists()]
+    """Return forbidden root junk names that exist on disk (Win32-safe)."""
+    # F8-M-03: delegate to the shared Win32-safe detector. Path.exists()
+    # misses trailing-dot names on Windows (and aliases onto dot-stripped
+    # phantom siblings); os.scandir membership is sound in both directions.
+    from win32_root_junk import forbidden_root_junk
+
+    return forbidden_root_junk(REPO_ROOT)
 
 
 def main() -> int:

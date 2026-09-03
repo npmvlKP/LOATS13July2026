@@ -148,16 +148,15 @@ def check_structure(rep: Report) -> None:
     )
 
     # HC-26 — root junk artifacts (FR-26 forbidden root names)
-    forbidden = (
-        "-p",
-        "G......",
-        "0.21.0",
-        "$null",
-        "[100%]",
-        "tmp_schema.db",
-        "pytest_output.txt",
-    )
-    junk = [n for n in forbidden if (REPO_ROOT / n).exists()]
+    # F8-M-03: Win32-safe detection shared with check_repo_hygiene.py and
+    # verify_hc_registry.py. Path.exists() cannot see trailing-dot names
+    # on Windows (e.g. a literal "G......" created by NT-native APIs) and
+    # aliases onto dot-stripped phantom siblings; os.scandir membership
+    # is sound in both directions. sys.path is pre-seeded with scripts/
+    # at module import (fr7 runner layout).
+    from win32_root_junk import forbidden_root_junk
+
+    junk = forbidden_root_junk(REPO_ROOT)
 
     # F8-C-02: delegate the tracked-set hygiene rules (venv patterns,
     # tracked-file ceiling) to the single source of truth guard script.

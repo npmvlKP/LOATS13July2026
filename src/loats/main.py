@@ -18,9 +18,10 @@ from .orchestrator import start_orchestrator, stop_orchestrator
 from .scheduler import scheduler
 from .utils.cache import close_cache, initialize_cache
 
-# Lazy proxy module-level binding (TODO-18 / HC-21).
-# AST scanner for HC-21 sees a Call to LazySettings(),
-# NOT get_settings(), so the eager count remains 0.
+# Lazy settings binding (TODO-18 / HC-21).
+# Behavioral contract: importing this module builds NO Settings
+# instance -- first attribute access proxies through get_settings(),
+# so bare-env imports (no OPENALGO_API_KEY) stay clean.
 settings: Any = LazySettings()
 # F8-C-03 (2026-09-02): main.py previously built its OWN eager
 # ``Database(...)`` at import time (a second instance alongside the
