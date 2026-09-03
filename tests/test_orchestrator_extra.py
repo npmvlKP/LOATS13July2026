@@ -923,18 +923,45 @@ class TestProducerWindowLifecycle:
 
         self._assert_no_pending_tasks()
 
-    def test_cancel_pending_producers_helper_semantics(self):
-        """Unit: helper cancels only pending tasks; done tasks untouched."""
-        from loats.orchestrator import _cancel_pending_producers
+    @pytest.mark.asyncio
+    async def test_settle_cancelled_producers_helper_semantics(self):
+        """Unit: settle cancels only pending tasks; done tasks untouched."""
+        from loats.orchestrator import _settle_cancelled_producers
 
-        async def run() -> tuple[int, int]:
-            done = asyncio.create_task(asyncio.sleep(0))
-            await done  # deterministic: the task is fully finished
-            pending = asyncio.create_task(asyncio.sleep(3600))
-            _cancel_pending_producers((done, pending))
-            await asyncio.gather(pending, return_exceptions=True)
-            return int(done.cancelled()), int(pending.cancelled())
+        done = asyncio.create_task(asyncio.sleep(0))
+        await done  # deterministic: the task is fully finished
+        pending = asyncio.create_task(asyncio.sleep(3600))
+        await _settle_cancelled_producers((done, pending))
+        assert done.cancelled() is False
+        assert pending.cancelled() is True
 
-        done_cancelled, pending_cancelled = asyncio.run(run())
-        assert done_cancelled == 0
-        assert pending_cancelled == 1
+    @pytest.mark.asyncio
+    async def test_settle_bounded_when_producer_cleanup_hangs(self, caplog):
+        """Remaining-risk fix: a producer whose ``finally`` block itself
+        hangs must not stall the cycle — settle returns after the 50 ms
+        grace and logs a CRITICAL diagnostic instead of waiting forever."""
+        import logging
+
+        from loats.orchestrator import _settle_cancelled_producers
+
+        cleanup_hung = asyncio.Event()
+
+        async def slow_cleanup_producer() -> None:
+            try:
+                await asyncio.sleep(3600)
+            finally:
+                await cleanup_hung.wait()  # cleanup itself hangs
+
+        task = asyncio.create_task(slow_cleanup_producer())
+        await asyncio.sleep(0)  # let the producer reach its wait
+        with caplog.at_level(logging.CRITICAL, logger="loats.orchestrator"):
+            await _settle_cancelled_producers((task,))
+
+        assert any("50ms grace" in record.getMessage() for record in caplog.records), (
+            f"expected CRITICAL grace diagnostic, got {caplog.records}"
+        )
+
+        # Un-block and let the abandoned task finish so no pending-task
+        # warnings leak out of the test.
+        cleanup_hung.set()
+        await asyncio.wait([task], timeout=0.1)
