@@ -223,16 +223,42 @@ def stage_3_evidence_file() -> tuple[int, int, dict[str, Any]]:
     return p, t, data
 
 
-def stage_4_gate_compliance(evidence: dict[str, Any]) -> tuple[int, int]:
+def stage_4_gate_compliance(doc: dict[str, Any]) -> tuple[int, int]:
     header("STAGE 4: P1 GATE COMPLIANCE")
     checks: list[tuple[bool, str, str]] = []
 
+    evidence = doc.get("evidence", {})
     if not evidence:
         checks.append((False, "Evidence data available", "No evidence from Stage 3"))
         return run_stage(checks)
 
     rt_stats = evidence.get("round_trip_statistics", {})
     gate = evidence.get("gate_compliance", {})
+
+    # F8-L-03: P1 requires live-endpoint evidence. Analysis-scope-only
+    # artifacts measure the in-process loop (TA + local DB), not an
+    # OpenAlgo round trip, and must not discharge P1.
+    metadata = doc.get("metadata", {})
+    measurement_scope = str(metadata.get("measurement_scope", ""))
+    scope_is_live = (
+        measurement_scope.startswith("live-endpoint")
+        and not (measurement_scope.startswith("live-endpoint (FAILED"))
+        and "live_evidence" in doc
+    )
+    checks.append(
+        (
+            scope_is_live,
+            "Evidence is live-endpoint scope (F8-L-03)",
+            (
+                f"scope: {measurement_scope}"
+                if scope_is_live
+                else (
+                    f"scope: {measurement_scope or 'missing'} — re-run "
+                    f"collect_p1_phase_gate_evidence.py --live-endpoint"
+                )
+            ),
+        )
+    )
 
     checks.append((bool(rt_stats), "Round-trip statistics exist", ""))
     checks.append((bool(gate), "Gate compliance metrics exist", ""))
@@ -332,7 +358,7 @@ def main() -> None:
     total_passed += p
     total_checks += t
 
-    p, t = stage_4_gate_compliance(evidence_data.get("evidence", {}))
+    p, t = stage_4_gate_compliance(evidence_data)
     total_passed += p
     total_checks += t
 
