@@ -524,10 +524,12 @@ def _check_hc26() -> tuple[Verdict, str]:
     # Windows (a literal "G......" at this repo root was PASS-invisible to
     # the old probe) and aliases onto dot-stripped phantom siblings;
     # os.scandir membership is sound in both directions.
+    # F8-M-04: root_junk_findings adds the class-wide Win32-hostile name
+    # scan (trailing dots/spaces, colons, reserved device names).
     sys.path.insert(0, str(REPO_ROOT / "scripts"))
-    from win32_root_junk import forbidden_root_junk
+    from win32_root_junk import root_junk_findings
 
-    present = forbidden_root_junk(REPO_ROOT)
+    present = root_junk_findings(REPO_ROOT)
     t19 = REPO_ROOT / "TODO19_VERIFICATION_REPORT.md"
     if t19.exists() and t19.stat().st_size == 0:
         present.append("TODO19_VERIFICATION_REPORT.md(0B)")

@@ -154,9 +154,11 @@ def check_structure(rep: Report) -> None:
     # aliases onto dot-stripped phantom siblings; os.scandir membership
     # is sound in both directions. sys.path is pre-seeded with scripts/
     # at module import (fr7 runner layout).
-    from win32_root_junk import forbidden_root_junk
+    # F8-M-04: root_junk_findings adds the class-wide Win32-hostile
+    # name scan (trailing dots/spaces, colons, reserved device names).
+    from win32_root_junk import root_junk_findings
 
-    junk = forbidden_root_junk(REPO_ROOT)
+    junk = root_junk_findings(REPO_ROOT)
 
     # F8-C-02: delegate the tracked-set hygiene rules (venv patterns,
     # tracked-file ceiling) to the single source of truth guard script.
