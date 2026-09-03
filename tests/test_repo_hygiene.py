@@ -208,6 +208,62 @@ class TestCompactRepoDocs:
         )
 
 
+class TestSrcAsciiGate:
+    """F8-M-06: scripts/check_src_ascii.py must propagate its verdict.
+
+    The historical defect: __main__ called check_ascii_files() and
+    discarded the bool, so the process exited 0 even when violations
+    were found. The scan may legitimately report violations (the src
+    tree currently contains non-ASCII emoji in alert message payloads
+    and typographic punctuation in docstrings), so only the exit-code
+    propagation is gated here, both directions, via live-tree runs.
+    """
+
+    SCRIPT = REPO_ROOT / "scripts" / "check_src_ascii.py"
+
+    def _run(self) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            [sys.executable, str(self.SCRIPT)],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+
+    def test_exit_code_matches_reported_state(self):
+        proc = self._run()
+        found = "non-ASCII" in proc.stdout and "Found" in proc.stdout
+        clean = "only ASCII" in proc.stdout
+        assert found != clean, f"unparsable gate output: {proc.stdout!r}"
+        if clean:
+            assert proc.returncode == 0, proc.stdout
+        else:
+            assert proc.returncode == 1, (
+                f"violations reported but exit code {proc.returncode} "
+                f"(discarded-result regression): {proc.stdout[:300]}"
+            )
+
+    def test_ascii_source_addition_flips_exit_code(self):
+        probe = REPO_ROOT / "src" / "loats" / "_tmp_ascii_gate_probe.py"
+        try:
+            probe.write_text("# non-ascii mutation ✓\n", encoding="utf-8")
+            proc = self._run()
+        finally:
+            probe.unlink(missing_ok=True)
+        assert proc.returncode == 1, (
+            f"non-ASCII source file must fail the gate, got rc={proc.returncode}"
+        )
+        assert "_tmp_ascii_gate_probe" in proc.stdout
+
+    def test_gate_runs_without_stderr(self):
+        # Ordering-independent follow-up to the flip test: after the
+        # probe file is removed the gate must run cleanly (no tracebacks
+        # on stderr) and propagate its verdict either way.
+        proc = self._run()
+        assert proc.returncode in (0, 1)
+        assert proc.stderr == "", proc.stderr
+
+
 def _load_helper():
     spec = importlib.util.spec_from_file_location("win32_root_junk", HELPER_PATH)
     assert spec is not None and spec.loader is not None
