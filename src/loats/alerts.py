@@ -663,6 +663,24 @@ class AlertSystem:
                 f"<b>Status:</b> {status}\n"
                 f"<b>Timestamp:</b> {datetime.now(UTC).strftime('%Y-%m-%d %H:%M:%S')}"
             )
+            # Per-source breaker states (CMP P5 / F8-L-01): surface open
+            # sources so operators see producer-level isolation live.
+            try:
+                from .utils.per_source_breakers import get_source_breaker_status
+
+                source_status = get_source_breaker_status()
+                open_sources = [
+                    name
+                    for name, st in source_status.items()
+                    if st.get("state") == "open"
+                ]
+                message += "\n\n<b>Source breakers:</b>"
+                if open_sources:
+                    message += "\n🔴 " + html.escape(", ".join(sorted(open_sources)))
+                else:
+                    message += "\n🟢 all closed"
+            except Exception as cb_error:
+                logger.debug(f"Source breaker status unavailable: {cb_error}")
             if update.message:
                 await update.message.reply_text(message, parse_mode="HTML")
         except Exception as e:

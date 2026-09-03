@@ -92,12 +92,31 @@ def _breaker_config() -> CircuitBreakerConfig:
 
 
 class PerSourceBreakerRegistry:
-    """Registry mapping each ``StrengthSource`` to its own breaker.
+    """Registry mapping each *active* ``StrengthSource`` to its own breaker.
 
-    Thread-safe: breakers are created eagerly under a lock at construction
-    (one per enum member) and lazily for members added later; ``get`` on an
-    existing member never mutates state.
+    CMP P5 / F8-L-01 scope: only sources with a real producer (an
+    emission site in ``orchestrator.py``) get a breaker. Dormant enum
+    members (``FUNDAMENTAL`` / ``MACHINE_LEARNING`` / ``OPTIONS_FLOW`` —
+    zero-weight placeholders per the F7-L-03 disposition, no production
+    emitter) are deliberately NOT tracked: a breaker that can never be
+    exercised is fleet-status noise, and its state would silently read
+    "closed" while measuring nothing. When a producer for a dormant
+    source lands, add its member here — ``get`` fail-closes until then.
+
+    Thread-safe: breakers are created eagerly under a lock at
+    construction; ``get`` on an existing member never mutates state.
     """
+
+    #: Enum members with a live producer in orchestrator.py. Order is
+    #: irrelevant; membership is what defines the breaker fleet scope.
+    ACTIVE_SOURCES: frozenset[StrengthSource] = frozenset(
+        {
+            StrengthSource.TECHNICAL_ANALYSIS,
+            StrengthSource.SENTIMENT,
+            StrengthSource.VOLATILITY,
+            StrengthSource.PRICE_ACTION,
+        }
+    )
 
     def __init__(self) -> None:
         self._lock = threading.Lock()
@@ -107,7 +126,7 @@ class PerSourceBreakerRegistry:
     def _build_breakers(self) -> None:
         with self._lock:
             config = _breaker_config()
-            for source in StrengthSource:
+            for source in sorted(self.ACTIVE_SOURCES):
                 self._breakers[source] = CircuitBreaker(
                     name=f"source:{source.value}",
                     config=CircuitBreakerConfig(
@@ -118,24 +137,22 @@ class PerSourceBreakerRegistry:
                 )
 
     def get(self, source: StrengthSource) -> CircuitBreaker:
-        """Return the breaker for ``source`` (created on first access)."""
+        """Return the breaker for ``source``.
+
+        Fail-closed on dormant sources: a ``StrengthSource`` without a
+        production producer (not in ``ACTIVE_SOURCES``) raises
+        ``ValueError`` rather than silently returning a breaker that
+        could never be exercised.
+        """
         key = StrengthSource(source)
+        if key not in self.ACTIVE_SOURCES:
+            raise ValueError(
+                f"source '{key.value}' has no producer; per-source breakers "
+                "track active producers only (add the member to "
+                "PerSourceBreakerRegistry.ACTIVE_SOURCES when a producer lands)"
+            )
         with self._lock:
-            breaker = self._breakers.get(key)
-            if breaker is None:
-                # Member first seen after construction — lazily catch up
-                # (``StrengthSource(source)`` above already validated it).
-                config = _breaker_config()
-                breaker = CircuitBreaker(
-                    name=f"source:{key.value}",
-                    config=CircuitBreakerConfig(
-                        failure_threshold=config.failure_threshold,
-                        success_threshold=config.success_threshold,
-                        timeout=config.timeout,
-                    ),
-                )
-                self._breakers[key] = breaker
-            return breaker
+            return self._breakers[key]
 
     def get_status(self) -> dict[str, Any]:
         """Status for every source breaker (monitoring/alerting)."""
