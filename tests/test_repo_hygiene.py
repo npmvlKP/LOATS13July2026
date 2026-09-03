@@ -231,6 +231,110 @@ class TestWin32RootJunkDetector:
         (root / "0.21.0").mkdir()
         assert helper.forbidden_root_junk(root) == ["0.21.0"]
 
+    # ---- F8-M-04: class-wide Win32-hostile name detection ----
+
+    def test_hostile_classification_unit(self, helper):
+        """Pure-name classification: hostile classes vs legit names."""
+        # Hostile: trailing dots/spaces (the F8-M-04 artifact class).
+        for hostile in ("G......", "out.txt.", "x ", "weird.."):
+            assert helper.is_hostile_root_name(hostile) is True, hostile
+        # Hostile: reserved device names, optionally dot-extensioned.
+        for hostile in ("NUL", "NUL.txt", "COM1", "com4.zip", "LPT9"):
+            assert helper.is_hostile_root_name(hostile) is True, hostile
+        # Hostile: colon (NT stream separator).
+        assert helper.is_hostile_root_name("stream:ads") is True
+        # Legitimate repo-root names must NOT be flagged.
+        for legit in (
+            "src",
+            "tests",
+            "pyproject.toml",
+            "README.md",
+            "docker-compose.prod.yml",
+            ".env.example",
+            "verify_acceptance_matrix.log",
+            ".gitignore",
+        ):
+            assert helper.is_hostile_root_name(legit) is False, legit
+
+    def test_findings_fail_closed_on_unenumerable_root(self, helper):
+        missing_root = (
+            "C:\\definitely\\not\\a\\dir\\xyz"
+            if IS_WINDOWS
+            else "/definitely/not/a/dir/xyz"
+        )
+        with pytest.raises(RuntimeError, match="cannot enumerate"):
+            helper.root_junk_findings(missing_root)
+
+    def test_future_mishap_detected_class_wide(self, helper, root):
+        """A NEW trailing-dot artifact (not in ROOT_JUNK_NAMES) must fail
+        the union entry point -- the F8-M-04 regression class."""
+        name = "weird.."
+        if IS_WINDOWS:
+            # Ordinary Win32 create strips trailing dots; only the
+            # NT-extended namespace materializes the verbatim name.
+            extended = f"\\\\?\\{root}{os.sep}{name}"
+            fd = os.open(extended, os.O_CREAT | os.O_WRONLY, 0o644)
+        else:
+            fd = os.open(str(root / name), os.O_CREAT | os.O_WRONLY, 0o644)
+        os.write(fd, b"x")
+        os.close(fd)
+        on_disk = {entry.name for entry in os.scandir(root)}
+        assert name in on_disk, f"precondition: verbatim name, got {on_disk}"
+        assert helper.root_junk_findings(root) == [name]
+
+    @pytest.mark.skipif(not IS_WINDOWS, reason="Win32 phantom-creation semantics")
+    def test_phantom_sibling_not_flagged_class_wide(self, helper, root):
+        """os.open('weird..') creates 'weird' on Win32 (dots stripped).
+
+        The class-wide scan must NOT flag the dot-stripped sibling --
+        same soundness contract as the pinned-name scan (F8-M-03).
+        """
+        fd = os.open(str(root / "weird.."), os.O_CREAT | os.O_WRONLY, 0o644)
+        os.write(fd, b"x")
+        os.close(fd)
+        on_disk = [entry.name for entry in os.scandir(root)]
+        assert on_disk == ["weird"], f"precondition: phantom sibling, got {on_disk}"
+        assert helper.hostile_root_names(root) == []
+
+    def test_colon_and_reserved_names_detected(self, helper, root):
+        """Colon / reserved-device names: classification on Win32 (the
+        legacy namespace cannot create them there), on-disk detection on
+        POSIX -- where a Windows-hostile name committed from a POSIX
+        mishap materializes verbatim and must fail CI's ubuntu job."""
+        if IS_WINDOWS:
+            assert helper.is_hostile_root_name("bad:name") is True
+            assert helper.is_hostile_root_name("NUL.txt") is True
+            return
+        (root / "bad:name").write_text("x", encoding="utf-8")
+        (root / "NUL.txt").write_text("x", encoding="utf-8")
+        assert helper.hostile_root_names(root) == ["NUL.txt", "bad:name"]
+
+    @pytest.mark.skipif(not IS_WINDOWS, reason="Win32 dot-stripping semantics")
+    def test_union_dedupes_pinned_and_hostile(self, helper, root):
+        """'G......' matches BOTH the pinned list and the hostile class;
+        the union entry point must report it exactly once."""
+        name = "G......"
+        extended = f"\\\\?\\{root}{os.sep}{name}"
+        fd = os.open(extended, os.O_CREAT | os.O_WRONLY, 0o644)
+        os.write(fd, b"junk")
+        os.close(fd)
+        assert name in helper.forbidden_root_junk(root)  # pinned path
+        assert name in helper.hostile_root_names(root)  # class-wide path
+        assert helper.root_junk_findings(root) == [name]  # deduped union
+
+    def test_guard_root_junk_uses_class_wide_scan(self, guard, tmp_path, monkeypatch):
+        """Wire-level proof: the guard's _root_junk must surface a
+        Win32-hostile name that is NOT in ROOT_JUNK_NAMES (F8-M-04)."""
+        name = "weird.."
+        if IS_WINDOWS:
+            extended = f"\\\\?\\{tmp_path}{os.sep}{name}"
+            fd = os.open(extended, os.O_CREAT | os.O_WRONLY, 0o644)
+        else:
+            fd = os.open(str(tmp_path / name), os.O_CREAT | os.O_WRONLY, 0o644)
+        os.close(fd)
+        monkeypatch.setattr(guard, "REPO_ROOT", tmp_path)
+        assert guard._root_junk() == [name]
+
 
 class TestHC15MutationNet:
     """F8-M-03 test (2): deleting a producer emission site must fail HC-15.

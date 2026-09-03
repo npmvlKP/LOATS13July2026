@@ -130,9 +130,13 @@ def _root_junk() -> list[str]:
     # F8-M-03: delegate to the shared Win32-safe detector. Path.exists()
     # misses trailing-dot names on Windows (and aliases onto dot-stripped
     # phantom siblings); os.scandir membership is sound in both directions.
-    from win32_root_junk import forbidden_root_junk
+    # F8-M-04: root_junk_findings additionally flags the CLASS of
+    # Win32-hostile verbatim names (trailing dots/spaces, colons,
+    # reserved device names), so a future shell-redirection mishap with
+    # a NEW junk name fails here instead of materializing invisibly.
+    from win32_root_junk import root_junk_findings
 
-    return forbidden_root_junk(REPO_ROOT)
+    return root_junk_findings(REPO_ROOT)
 
 
 def main() -> int:
