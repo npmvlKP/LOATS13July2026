@@ -24,6 +24,7 @@ After scores are measured live.
 from __future__ import annotations
 
 import asyncio
+import json
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
@@ -282,7 +283,11 @@ def main() -> None:
             for name, fn, _ in CASES
         ],
     }
-    Path("reports/todo27_eval.json").write_text(str(out), encoding="utf-8")
+    # F8-M-06: str(out) emitted a Python repr (single quotes), which is
+    # not parseable JSON; downstream json.load() consumers crashed.
+    Path("reports/todo27_eval.json").write_text(
+        json.dumps(out, indent=2), encoding="utf-8"
+    )
 
 
 if __name__ == "__main__":
