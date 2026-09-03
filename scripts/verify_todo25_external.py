@@ -12,7 +12,9 @@ This script validates:
 1. P1 evidence file exists and is valid JSON
 2. P1 evidence contains required metadata and statistics
 3. P1 gate compliance meets requirements
-4. P5 is properly blocked (waiting for TODO-13)
+4. P1 evidence is live-endpoint scope (F8-L-03): analysis-scope-only
+   evidence measures the in-process loop and does NOT discharge P1
+5. P5 is properly blocked (waiting for TODO-13)
 """
 
 import argparse
@@ -197,6 +199,36 @@ def verify_p1_gate_compliance(evidence_data: dict[str, Any]) -> dict[str, Any]:
     evidence = evidence_data.get("evidence", {})
     gate_compliance = evidence.get("gate_compliance", {})
     round_trip_stats = evidence.get("round_trip_statistics", {})
+    metadata = evidence_data.get("metadata", {})
+
+    # Check 0 (F8-L-03): P1 requires live-endpoint evidence.
+    # Analysis-scope-only artifacts measure the in-process loop (TA + local
+    # DB) and must not discharge P1.
+    checks_total += 1
+    measurement_scope = str(metadata.get("measurement_scope", ""))
+    live_stats_present = "live_evidence" in evidence_data
+    scope_is_live = (
+        measurement_scope.startswith("live-endpoint")
+        and not (measurement_scope.startswith("live-endpoint (FAILED"))
+        and live_stats_present
+    )
+    if scope_is_live:
+        checks_passed += 1
+        print_check(
+            "Evidence is live-endpoint scope (F8-L-03)",
+            True,
+            f"scope: {measurement_scope}",
+        )
+    else:
+        print_check(
+            "Evidence is live-endpoint scope (F8-L-03)",
+            False,
+            (
+                f"scope: {measurement_scope or 'missing'}. Analysis-scope-only "
+                "evidence measures the in-process loop, not an OpenAlgo round "
+                "trip; re-run collect_p1_phase_gate_evidence.py --live-endpoint"
+            ),
+        )
 
     # Check 1: Round-trip statistics exist
     checks_total += 1
@@ -269,6 +301,7 @@ def verify_p1_gate_compliance(evidence_data: dict[str, Any]) -> dict[str, Any]:
         "checks_passed": checks_passed,
         "checks_total": checks_total,
         "passed": passed,
+        "scope_ok": scope_is_live,
         "rt_pass_rate": rt_pass_rate,
         "mean_latency": mean_latency,
         "p95_latency": p95_latency,
@@ -340,6 +373,11 @@ def print_final_report(results: dict[str, Any]) -> None:
         print(
             f"  Checks: {gate_result.get('checks_passed', 0)}/{gate_result.get('checks_total', 0)}"
         )
+        if not gate_result.get("scope_ok", False):
+            print(
+                f"  {Color.YELLOW}Scope: analysis-scope only — does NOT discharge P1 "
+                f"(F8-L-03); re-run collector with --live-endpoint{Color.RESET}"
+            )
         if "rt_pass_rate" in gate_result:
             print(f"  Round-trip pass rate: {gate_result['rt_pass_rate']:.2f}%")
         if "mean_latency" in gate_result:
@@ -376,14 +414,23 @@ def print_final_report(results: dict[str, Any]) -> None:
         print(
             f"{Color.GREEN}{Color.BOLD}[PASS] TODO-25 (F7-L-05) VERIFICATION: PASSED{Color.RESET}"
         )
-        print(f"{Color.GREEN}P1 evidence collected and validated{Color.RESET}")
+        print(
+            f"{Color.GREEN}P1 evidence collected and validated (live-endpoint scope){Color.RESET}"
+        )
         print(f"{Color.GREEN}P5 properly blocked on TODO-13{Color.RESET}")
     else:
         print(
             f"{Color.RED}{Color.BOLD}[FAIL] TODO-25 (F7-L-05) VERIFICATION: FAILED{Color.RESET}"
         )
         if not gate_result.get("passed", False):
-            print(f"{Color.RED}P1 gate compliance below threshold{Color.RESET}")
+            if not gate_result.get("scope_ok", False):
+                print(
+                    f"{Color.RED}P1 evidence is analysis-scope only — it does NOT "
+                    f"discharge P1 (F8-L-03). Re-run the collector with "
+                    f"--live-endpoint against a live OpenAlgo endpoint.{Color.RESET}"
+                )
+            else:
+                print(f"{Color.RED}P1 gate compliance below threshold{Color.RESET}")
 
     print("=" * 70 + "\n")
 

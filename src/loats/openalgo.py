@@ -241,6 +241,15 @@ class OpenAlgoClient:
     ) -> dict[str, Any]:
         client = self._ensure_client()
         url = f"/api/v1/{endpoint.lstrip('/')}"
+        if method.upper() == "POST":
+            # OpenAlgo deployments validate `apikey` as a REQUIRED JSON body
+            # field (F8-L-03 live verification: header-only auth fails schema
+            # on every endpoint with 400 "Missing data for required field").
+            # Inject it into the JSON body so the client works against both
+            # body-auth (current deployments) and header-auth deployments.
+            json_body = dict(kwargs.pop("json", None) or {})
+            json_body.setdefault("apikey", self.api_key)
+            kwargs["json"] = json_body
         if idempotency_key is not None:
             headers = dict(kwargs.pop("headers", None) or {})
             headers["Idempotency-Key"] = idempotency_key
@@ -347,8 +356,16 @@ class OpenAlgoClient:
         )
 
     def get_quotes(self, symbols: list[str]) -> dict[str, Any]:
-        payload = {"symbols": symbols}
-        return self._request("POST", "quotes", json=payload)
+        # Deployment contract (verified live, F8-L-03): POST /quotes accepts a
+        # SINGLE {apikey, exchange, symbol} body — batch quotes belong to
+        # /multiquotes. Fan out sequentially and reshape into the canonical
+        # {"data": {symbol: {...}}} form every caller parses.
+        data: dict[str, Any] = {}
+        for symbol in symbols:
+            payload = {"exchange": "NSE", "symbol": symbol}
+            result = self._request("POST", "quotes", json=payload)
+            data.update(result.get("data") or {})
+        return {"status": "success", "data": data}
 
     def get_history(
         self,
@@ -621,6 +638,15 @@ class AsyncOpenAlgoClient:
     ) -> dict[str, Any]:
         client = await self._ensure_client()
         url = f"/api/v1/{endpoint.lstrip('/')}"
+        if method.upper() == "POST":
+            # OpenAlgo deployments validate `apikey` as a REQUIRED JSON body
+            # field (F8-L-03 live verification: header-only auth fails schema
+            # on every endpoint with 400 "Missing data for required field").
+            # Inject it into the JSON body so the client works against both
+            # body-auth (current deployments) and header-auth deployments.
+            json_body = dict(kwargs.pop("json", None) or {})
+            json_body.setdefault("apikey", self.api_key)
+            kwargs["json"] = json_body
         if idempotency_key is not None:
             headers = dict(kwargs.pop("headers", None) or {})
             headers["Idempotency-Key"] = idempotency_key
@@ -655,6 +681,11 @@ class AsyncOpenAlgoClient:
             raise OpenAlgoError(f"Request failed: {e}") from e
 
     async def get_quotes(self, symbols: list[str]) -> dict[str, Any]:
+        # Deployment contract (verified live, F8-L-03): POST /quotes accepts a
+        # SINGLE {apikey, exchange, symbol} body — batch quotes belong to
+        # /multiquotes. Fan out per symbol and reshape into the canonical
+        # {"data": {symbol: {...}}} form every caller parses. The synthesized
+        # result is cached under the pre-existing digest key (60s TTL).
         symbols_sorted = sorted(symbols)
         symbols_digest = hashlib.sha256(
             ",".join(symbols_sorted).encode("utf-8")
@@ -667,14 +698,21 @@ class AsyncOpenAlgoClient:
                 return json.loads(cached_result)  # type: ignore[no-any-return]
             except Exception as e:
                 logger.warning(f"Failed parse cached quotes: {e}")
-        payload = {"symbols": symbols}
-        result = await self._request("POST", "quotes", json=payload)
+
+        data: dict[str, Any] = {}
+        result: dict[str, Any] = {}
+        for symbol in symbols_sorted:
+            payload = {"exchange": "NSE", "symbol": symbol}
+            result = await self._request("POST", "quotes", json=payload)
+            data.update(result.get("data") or {})
+        merged = {**result, "data": data}
+
         try:
-            await cache_manager.set(cache_key, json.dumps(result), ttl=60)
+            await cache_manager.set(cache_key, json.dumps(merged), ttl=60)
             logger.debug(f"Cached quotes {symbols}")
         except Exception as e:
             logger.warning(f"Failed cache quotes: {e}")
-        return result
+        return merged
 
     async def get_history(
         self,
