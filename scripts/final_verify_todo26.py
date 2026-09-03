@@ -477,7 +477,9 @@ class TODO26Verifier:
         """Verify documentation exists."""
         print_section("12. DOCUMENTATION CHECK")
 
-        doc_path = self.paths.docs / "TODO26_FINAL_REPORT.md"
+        # F8-M-05: completion reports are archived under docs/audit-history/,
+        # not kept at the docs/ top level (compact-repo rule, CMP §4/§8).
+        doc_path = self.paths.docs / "audit-history" / "TODO26_FINAL_REPORT.md"
 
         if not doc_path.exists():
             print_warning("TODO26_FINAL_REPORT.md NOT present (optional)")
