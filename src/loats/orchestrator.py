@@ -16,7 +16,11 @@ from .alerts import alerts
 from .config import get_settings
 from .database import db
 from .loats_logging import get_logger
-from .metrics import record_cmp_chain_rejection, record_cycle_time
+from .metrics import (
+    record_cmp_chain_rejection,
+    record_cycle_time,
+    set_circuit_breaker_status,
+)
 from .models import HistoricalData, OptionContract, QuoteData, Signal
 from .openalgo import KillSwitchError, async_client
 from .rules import Rule7ModificationLimitError, rules_engine
@@ -256,7 +260,11 @@ class TradingOrchestrator:
         try:
             return await self._guarded_source_call(source, fetch, *args, **kwargs)
         except CircuitBreakerOpenError as e:
-            logger.warning(f"{source.value} source breaker open — degraded fetch: {e}")
+            logger.warning(f"{source.value} source breaker open, degraded fetch: {e}")
+            # Mirror the open state onto the :8001 metrics surface so
+            # operator dashboards (RUNBOOK "Circuit Breaker Status") see
+            # per-source isolation, not just the global breakers.
+            set_circuit_breaker_status(f"source:{source.value}", True)
             return degraded
 
     async def _source_guarded_history(

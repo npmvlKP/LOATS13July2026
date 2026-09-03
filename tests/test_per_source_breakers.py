@@ -9,7 +9,7 @@ Acceptance criteria (F8-L-01):
 import asyncio
 import logging
 from typing import Any
-from unittest.mock import patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -48,7 +48,7 @@ def open_breaker(breaker: CircuitBreaker, failures: int) -> None:
 class TestRegistry:
     def test_one_breaker_per_enum_member(self):
         registry = get_source_breaker_registry()
-        for source in StrengthSource:
+        for source in registry.ACTIVE_SOURCES:
             breaker = registry.get(source)
             assert isinstance(breaker, CircuitBreaker)
             assert breaker.name == f"source:{source.value}"
@@ -60,14 +60,50 @@ class TestRegistry:
         )
 
     def test_breakers_are_independent_instances(self):
-        seen = {source: get_source_breaker(source) for source in StrengthSource}
-        assert len({id(b) for b in seen.values()}) == len(StrengthSource)
+        seen = {
+            source: get_source_breaker(source)
+            for source in get_source_breaker_registry().ACTIVE_SOURCES
+        }
+        assert len({id(b) for b in seen.values()}) == len(seen)
 
-    def test_status_covers_every_source(self):
+    def test_status_covers_active_producer_sources(self):
         status = get_source_breaker_status()
-        assert set(status.keys()) == {s.value for s in StrengthSource}
+        assert set(status.keys()) == {
+            "ta",
+            "sentiment",
+            "volatility",
+            "price_action",
+        }
         for source_status in status.values():
             assert source_status["state"] == CircuitState.CLOSED.value
+
+    def test_active_sources_match_production_emitters(self):
+        """Fleet scope must equal the orchestrator's producer set (4)."""
+        registry = get_source_breaker_registry()
+        assert registry.ACTIVE_SOURCES == frozenset(
+            {
+                StrengthSource.TECHNICAL_ANALYSIS,
+                StrengthSource.SENTIMENT,
+                StrengthSource.VOLATILITY,
+                StrengthSource.PRICE_ACTION,
+            }
+        )
+
+    def test_dormant_sources_fail_closed(self):
+        """F7-L-03 dormant enum members get NO breaker: a breaker that can
+        never be exercised is fleet-status noise; ``get`` fail-closes."""
+        registry = get_source_breaker_registry()
+        for dormant in (
+            StrengthSource.FUNDAMENTAL,
+            StrengthSource.MACHINE_LEARNING,
+            StrengthSource.OPTIONS_FLOW,
+        ):
+            with pytest.raises(ValueError, match="has no producer"):
+                registry.get(dormant)
+        # Status never advertises dormant sources.
+        assert "fundamental" not in registry.get_status()
+        assert "ml" not in registry.get_status()
+        assert "options_flow" not in registry.get_status()
 
     def test_config_from_settings(self):
         registry = PerSourceBreakerRegistry()
@@ -102,7 +138,12 @@ class TestRegistry:
         registry = PerSourceBreakerRegistry()
         with pytest.raises(ValueError, match="is not a valid StrengthSource"):
             registry.get("ghost_probe")  # type: ignore[arg-type]
-        assert set(registry.get_status().keys()) == {s.value for s in StrengthSource}
+        assert set(registry.get_status().keys()) == {
+            "ta",
+            "sentiment",
+            "volatility",
+            "price_action",
+        }
 
 
 class TestIsolation:
@@ -113,7 +154,7 @@ class TestIsolation:
         open_breaker(ta_breaker, ta_breaker.config.failure_threshold)
         assert ta_breaker.state == CircuitState.OPEN
 
-        for source in StrengthSource:
+        for source in get_source_breaker_registry().ACTIVE_SOURCES:
             if source is StrengthSource.TECHNICAL_ANALYSIS:
                 continue
             assert get_source_breaker(source).state == CircuitState.CLOSED
@@ -136,7 +177,7 @@ class TestIsolation:
         assert "source:sentiment" in str(exc_info.value)
 
         # Every other source still executes normally.
-        for source in StrengthSource:
+        for source in get_source_breaker_registry().ACTIVE_SOURCES:
             if source is StrengthSource.SENTIMENT:
                 continue
             assert await source_breaker_call_async(source, ok) == "ok"
@@ -161,7 +202,8 @@ class TestIsolation:
             open_breaker(breaker, breaker.config.failure_threshold)
         reset_source_breakers()
         assert all(
-            get_source_breaker(s).state == CircuitState.CLOSED for s in StrengthSource
+            get_source_breaker(s).state == CircuitState.CLOSED
+            for s in get_source_breaker_registry().ACTIVE_SOURCES
         )
 
 
@@ -217,7 +259,7 @@ class TestOrchestratorWiring:
     def test_orchestrator_status_accessor(self):
         orch = TradingOrchestrator()
         status = orch.get_source_breaker_status()
-        assert set(status.keys()) == {s.value for s in StrengthSource}
+        assert set(status.keys()) == {"ta", "sentiment", "volatility", "price_action"}
 
     async def test_safe_get_history_records_rejection_on_source_breaker(self, caplog):
         """Fetch failures must be recorded by the per-source breaker.
@@ -322,3 +364,77 @@ class TestOrchestratorWiring:
             )
             == "feeds-ok"
         )
+
+    async def test_degraded_fetch_mirrors_open_state_to_metrics(self):
+        """A source-breaker rejection must flip the :8001 gauge so operator
+        dashboards see the open breaker without scraping logs."""
+        orch = TradingOrchestrator()
+        captured: dict[str, bool] = {}
+
+        async def already_open(*args: Any, **kwargs: Any) -> Any:
+            raise CircuitBreakerOpenError("source:volatility", 60.0)
+
+        with patch("loats.orchestrator.set_circuit_breaker_status") as mock_set:
+            mock_set.side_effect = lambda component, open_status: captured.update(
+                {component: open_status}
+            )
+            result = await orch._guarded_source_get(
+                StrengthSource.VOLATILITY,
+                already_open,
+            )
+        assert result is None  # degraded
+        assert captured == {"source:volatility": True}
+
+
+class TestTelegramStatusSurface:
+    def test_status_message_lists_source_breakers(self):
+        """/status must surface per-source breaker states (RUNBOOK
+        "Circuit Breaker Status" operator surface)."""
+        from loats.alerts import AlertSystem
+
+        alert_system = AlertSystem.__new__(AlertSystem)
+        alert_system.kill_switch_active = False
+        alert_system.alert_cooldown = {}
+
+        captured: dict[str, str] = {}
+
+        async def fake_reply(message: str, **kwargs: Any) -> None:
+            captured["message"] = message
+
+        update = MagicMock()
+        update.message.reply_text = AsyncMock(side_effect=fake_reply)
+        context = MagicMock()
+
+        import asyncio
+
+        asyncio.run(alert_system._status(update, context))
+        message = captured["message"]
+        assert "Source breakers:" in message
+        assert "all closed" in message  # fresh registry, nothing open
+
+    def test_status_message_lists_open_sources(self):
+        """Open breakers are named explicitly, HTML-escaped."""
+        from loats.alerts import AlertSystem
+
+        alert_system = AlertSystem.__new__(AlertSystem)
+        alert_system.kill_switch_active = False
+        alert_system.alert_cooldown = {}
+
+        captured: dict[str, str] = {}
+
+        async def fake_reply(message: str, **kwargs: Any) -> None:
+            captured["message"] = message
+
+        update = MagicMock()
+        update.message.reply_text = AsyncMock(side_effect=fake_reply)
+        context = MagicMock()
+
+        ta = get_source_breaker(StrengthSource.TECHNICAL_ANALYSIS)
+        open_breaker(ta, ta.config.failure_threshold)
+
+        import asyncio
+
+        asyncio.run(alert_system._status(update, context))
+        message = captured["message"]
+        assert "source breakers open" in message or "ta" in message
+        assert "🔴" in message
