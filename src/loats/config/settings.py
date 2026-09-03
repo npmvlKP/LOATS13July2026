@@ -173,6 +173,22 @@ class Settings(BaseSettings):
         100,
         description="Max size for TradeDecision queue (bounded)",
     )
+    # Per-source circuit breakers (CMP P5 / F8-L-01): one breaker per
+    # StrengthSource producer, isolated from the global service breakers.
+    source_breaker_failure_threshold: int = Field(
+        3,
+        description=(
+            "Consecutive producer failures before a source breaker opens"
+            " (mirrors the global OpenAlgo breaker posture)"
+        ),
+    )
+    source_breaker_timeout_seconds: float = Field(
+        60.0,
+        description=(
+            "Seconds before an open source breaker may attempt recovery"
+            " (mirrors the global OpenAlgo breaker posture)"
+        ),
+    )
     rss_feeds: list[str] = Field(
         default=[
             "https://economictimes.indiatimes.com/markets/rssfeeds/1977021501.cms",
@@ -204,6 +220,22 @@ class Settings(BaseSettings):
         """Validate retention days."""
         if v < 0:
             raise ValueError("Retention days must be non-negative")
+        return v
+
+    @field_validator("source_breaker_failure_threshold")
+    @classmethod
+    def validate_source_breaker_threshold(cls, v: int) -> int:
+        """Validate per-source breaker failure threshold."""
+        if v < 1:
+            raise ValueError("source_breaker_failure_threshold must be >= 1")
+        return v
+
+    @field_validator("source_breaker_timeout_seconds")
+    @classmethod
+    def validate_source_breaker_timeout(cls, v: float) -> float:
+        """Validate per-source breaker recovery timeout."""
+        if v <= 0:
+            raise ValueError("source_breaker_timeout_seconds must be positive")
         return v
 
     @field_validator(
