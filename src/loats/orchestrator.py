@@ -26,7 +26,15 @@ from .strike_selection import select_strikes
 from .ta import technical_analysis
 from .trade_decision import trade_decision_engine
 from .utils.cache import cache_manager
-from .utils.circuit_breaker import OPENALGO_CIRCUIT_BREAKER
+from .utils.circuit_breaker import (
+    OPENALGO_CIRCUIT_BREAKER,
+    CircuitBreakerOpenError,
+)
+from .utils.per_source_breakers import (
+    get_source_breaker,
+    get_source_breaker_status,
+    reset_source_breakers,
+)
 from .utils.resilience import openalgo_circuit_breaker_retry_async
 
 logger = get_logger(__name__)
@@ -208,6 +216,88 @@ class TradingOrchestrator:
         self._last_session_state = ""
         self._insufficient_signals_warning_interval = 60.0  # Log every 60 seconds
 
+    @staticmethod
+    async def _guarded_source_call(
+        source: StrengthSource,
+        func: Any,
+        /,
+        *args: Any,
+        **kwargs: Any,
+    ) -> Any:
+        """Await ``func`` behind ``source``'s dedicated circuit breaker.
+
+        CMP P5 / F8-L-01: each signal producer's external fetch is isolated
+        by its own breaker — one source's failures open only that source's
+        breaker; every other producer keeps calling through its own.
+        """
+        breaker = get_source_breaker(source)
+        return await breaker.call_async(func, *args, **kwargs)
+
+    async def _guarded_source_get(
+        self,
+        source: StrengthSource,
+        fetch: Any,
+        *args: Any,
+        degraded: Any = None,
+        **kwargs: Any,
+    ) -> Any:
+        """Fetch behind ``source``'s breaker with graceful degradation.
+
+        Composition order is the F8-L-01 root-cause fix: the per-source
+        breaker wraps the fetch FIRST, and degradation to ``degraded``
+        happens only for that source's own rejections (breaker open).
+        Failures raised by the fetch itself propagate to the breaker, so
+        the source breaker actually counts them — the previous shape
+        (``except Exception: return None`` INSIDE the breaker-wrapped
+        method) made every failure look like a successful ``None`` result
+        and no breaker, global or per-source, ever tripped on producer
+        fetch failures.
+        """
+        try:
+            return await self._guarded_source_call(source, fetch, *args, **kwargs)
+        except CircuitBreakerOpenError as e:
+            logger.warning(f"{source.value} source breaker open — degraded fetch: {e}")
+            return degraded
+
+    async def _source_guarded_history(
+        self, source: StrengthSource, symbol: str, interval: str
+    ) -> dict[str, Any] | None:
+        """History fetch behind ``source``'s breaker + global protection.
+
+        ``_safe_get_history`` is the innermost fetch seam (existing tests
+        patch it); the global breaker+retry and the per-source breaker wrap
+        AROUND it, so degradation happens outside both breakers and both
+        count real failures.
+        """
+        result: dict[str, Any] | None = await self._guarded_source_get(
+            source,
+            openalgo_circuit_breaker_retry_async(self._safe_get_history),
+            symbol,
+            interval,
+        )
+        return result
+
+    async def _source_guarded_quotes(
+        self, source: StrengthSource, symbols: list[str]
+    ) -> dict[str, Any] | None:
+        """Quotes fetch behind ``source``'s breaker + global protection."""
+        result: dict[str, Any] | None = await self._guarded_source_get(
+            source,
+            openalgo_circuit_breaker_retry_async(self._safe_get_quotes),
+            symbols,
+        )
+        return result
+
+    @staticmethod
+    def get_source_breaker_status() -> dict[str, Any]:
+        """Per-source circuit breaker status (CMP P5 / F8-L-01 monitoring)."""
+        return get_source_breaker_status()
+
+    @staticmethod
+    def reset_source_breakers() -> None:
+        """Reset every per-source breaker (operational recovery path)."""
+        reset_source_breakers()
+
     async def initialize(self) -> None:
         """Initialize the orchestrator."""
         logger.info("Initializing TradingOrchestrator")
@@ -356,8 +446,12 @@ class TradingOrchestrator:
             symbol = settings.default_symbol
             timeframe = settings.default_timeframe
 
-            # Get historical data with circuit breaker protection
-            history_data = await self._safe_get_history(symbol, timeframe)
+            # Get historical data with per-source + global breaker protection
+            history_data = await self._source_guarded_history(
+                StrengthSource.TECHNICAL_ANALYSIS,
+                symbol,
+                timeframe,
+            )
             if not history_data:
                 return
 
@@ -382,7 +476,10 @@ class TradingOrchestrator:
             indicators = technical_analysis.calculate_indicators(historical_data_objs)
 
             # Generate TA signal
-            quotes = await self._safe_get_quotes([symbol])
+            quotes = await self._source_guarded_quotes(
+                StrengthSource.TECHNICAL_ANALYSIS,
+                [symbol],
+            )
             if quotes:
                 quote_data = quotes.get("data", {}).get(symbol, {})
                 current_price = quote_data.get("last_price", 0)
@@ -407,6 +504,12 @@ class TradingOrchestrator:
                         },
                     )
                     await db.async_create_signal(signal)
+
+        except CircuitBreakerOpenError as e:
+            # This source's breaker is open — skip the producer for this
+            # cycle without failing the gather (which would cancel sibling
+            # producers). Other sources keep their own breakers.
+            logger.warning(f"TA analysis skipped: source breaker open: {e}")
 
         except Exception as e:
             logger.error(f"TA analysis failed: {e}")
@@ -440,7 +543,12 @@ class TradingOrchestrator:
             # Validate RSS feeds and filter out invalid ones
             valid_feeds = []
             for feed_url in rss_feeds:
-                if await validate_rss_feed(feed_url):
+                if await self._guarded_source_get(
+                    StrengthSource.SENTIMENT,
+                    validate_rss_feed,
+                    feed_url,
+                    degraded=False,
+                ):
                     valid_feeds.append(feed_url)
                 else:
                     logger.warning(f"Skipping invalid RSS feed: {feed_url}")
@@ -450,7 +558,16 @@ class TradingOrchestrator:
                 return
 
             # Call the async sentiment analysis function directly with validated feeds
-            result = await sentiment.analyze_symbol_sentiment(symbol, valid_feeds)
+            result = await self._guarded_source_get(
+                StrengthSource.SENTIMENT,
+                sentiment.analyze_symbol_sentiment,
+                symbol,
+                valid_feeds,
+                degraded=None,
+            )
+            if result is None:
+                # Source breaker open — skip signal generation this cycle.
+                return
 
             # Generate sentiment signal
             if result.sentiment_score > 0:
@@ -477,6 +594,10 @@ class TradingOrchestrator:
                     },
                 )
                 await db.async_create_signal(signal)
+
+        except CircuitBreakerOpenError as e:
+            # Source breaker open — skip gracefully (see TA handler).
+            logger.warning(f"Sentiment analysis skipped: source breaker open: {e}")
 
         except Exception as e:
             logger.error(f"Sentiment analysis failed: {e}")
@@ -507,7 +628,11 @@ class TradingOrchestrator:
             symbol = settings.default_symbol
             timeframe = settings.default_timeframe
 
-            historical_data_raw = await self._safe_get_history(symbol, timeframe)
+            historical_data_raw = await self._source_guarded_history(
+                StrengthSource.VOLATILITY,
+                symbol,
+                timeframe,
+            )
 
             if not historical_data_raw or not historical_data_raw.get("data"):
                 logger.warning("No historical data for volatility analysis")
@@ -614,6 +739,9 @@ class TradingOrchestrator:
             )
             await db.async_create_signal(signal)
 
+        except CircuitBreakerOpenError as e:
+            # Source breaker open — skip gracefully (see TA handler).
+            logger.warning(f"Volatility analysis skipped: source breaker open: {e}")
         except Exception as e:
             logger.error(f"Volatility analysis failed: {e}")
             raise
@@ -654,7 +782,11 @@ class TradingOrchestrator:
             symbol = settings.default_symbol
             timeframe = settings.default_timeframe
 
-            historical_data_raw = await self._safe_get_history(symbol, timeframe)
+            historical_data_raw = await self._source_guarded_history(
+                StrengthSource.PRICE_ACTION,
+                symbol,
+                timeframe,
+            )
             if not historical_data_raw or not historical_data_raw.get("data"):
                 logger.debug("No historical data for price-action analysis")
                 return
@@ -779,6 +911,9 @@ class TradingOrchestrator:
             )
             await db.async_create_signal(signal)
 
+        except CircuitBreakerOpenError as e:
+            # Source breaker open — skip gracefully (see TA handler).
+            logger.warning(f"Price-action analysis skipped: source breaker open: {e}")
         except Exception as e:
             logger.error(f"Price-action analysis failed: {e}")
             raise
@@ -1236,25 +1371,58 @@ class TradingOrchestrator:
             logger.error("Kill switch active - trading operations blocked")
             raise KillSwitchError()
 
-    @openalgo_circuit_breaker_retry_async
     async def _safe_get_history(
         self, symbol: str, interval: str
     ) -> dict[str, Any] | None:
-        """Get history with circuit breaker protection."""
+        """Get history with circuit breaker protection.
+
+        The innermost fetch seam for producer call sites
+        (``_source_guarded_history`` layers the per-source breaker and a
+        fresh global breaker+retry around this method, so both count real
+        failures); direct non-producer callers get the global breaker here
+        with degradation to ``None`` OUTSIDE the breaker.
+        """
         try:
-            return await async_client.get_history(symbol=symbol, interval=interval)
+            return await openalgo_circuit_breaker_retry_async(self._fetch_history_bare)(
+                symbol, interval
+            )
+        except CircuitBreakerOpenError:
+            # Global breaker open — degrade without disturbing source stats.
+            logger.error("Failed to get history: global circuit breaker open")
+            return None
         except Exception:
             logger.error("Failed to get history after retries")
             return None
 
-    @openalgo_circuit_breaker_retry_async
+    async def _fetch_history_bare(self, symbol: str, interval: str) -> dict[str, Any]:
+        """Bare history fetch — no breaker, no swallow; raises to caller."""
+        return await async_client.get_history(symbol=symbol, interval=interval)
+
     async def _safe_get_quotes(self, symbols: list[str]) -> dict[str, Any] | None:
-        """Get quotes with circuit breaker protection."""
+        """Get quotes with circuit breaker protection.
+
+        The innermost fetch seam for producer call sites
+        (``_source_guarded_quotes`` layers the per-source breaker and a
+        fresh global breaker+retry around this method, so both count real
+        failures); direct non-producer callers get the global breaker here
+        with degradation to ``None`` OUTSIDE the breaker — mirroring
+        ``_safe_get_history``.
+        """
         try:
-            return await async_client.get_quotes(symbols)
+            return await openalgo_circuit_breaker_retry_async(self._fetch_quotes_bare)(
+                symbols
+            )
+        except CircuitBreakerOpenError:
+            # Global breaker open — degrade without disturbing source stats.
+            logger.error("Failed to get quotes: global circuit breaker open")
+            return None
         except Exception:
             logger.error("Failed to get quotes after retries")
             return None
+
+    async def _fetch_quotes_bare(self, symbols: list[str]) -> dict[str, Any]:
+        """Bare quotes fetch — no breaker, no swallow; raises to caller."""
+        return await async_client.get_quotes(symbols)
 
     @openalgo_circuit_breaker_retry_async
     async def _safe_get_position_book(self) -> dict[str, Any] | None:
