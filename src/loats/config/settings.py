@@ -160,6 +160,13 @@ class Settings(BaseSettings):
     vix_stale_threshold_seconds: int = Field(
         60, description="Threshold for considering VIX data stale (seconds)"
     )
+    vix_gate_threshold: float = Field(
+        15.0,
+        description=(
+            "VIX gate threshold: SELL requires VIX above, BUY requires VIX below"
+            " (CMP Rule 10)"
+        ),
+    )
 
     # Decision Queue Configuration (TODO-27c bounded queue + backpressure)
     decision_queue_maxsize: int = Field(
