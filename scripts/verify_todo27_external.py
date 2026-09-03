@@ -482,15 +482,22 @@ def check_bloomberg_feed() -> list[tuple[str, bool, str]]:
     except Exception as e:
         results.append(("orchestrator feed check", False, str(e)))
 
-    # 3. scheduler uses settings.rss_feeds and validates
+    # 3. scheduler RSS posture (F8-M-06, post-F8-H-03): the scheduler
+    # was restructured to a support-job-only module — it consumes NO
+    # RSS feeds and emits NO signals (orchestrator is the single
+    # signal engine of record; see ADR-0005). The pre-restructure
+    # checks ("scheduler uses settings.rss_feeds" / "scheduler
+    # validates feeds") asserted the old dual-engine architecture.
+    # The surviving outcomes: no RSS consumption left behind AND no
+    # hardcoded bloombergquint anywhere in the module.
     try:
         sched_text = (SRC / "loats" / "scheduler.py").read_text(encoding="utf-8")
-        uses_settings_sched = "settings.rss_feeds" in sched_text
+        sched_rss_free = "rss_feeds" not in sched_text
         results.append(
             (
-                "scheduler uses settings.rss_feeds",
-                uses_settings_sched,
-                "found" if uses_settings_sched else "still hardcoded",
+                "scheduler is RSS-free (single-engine, F8-H-03)",
+                sched_rss_free,
+                "clean" if sched_rss_free else "rss_feeds reference remains",
             )
         )
         has_bq_sched = "bloombergquint.com/markets-feed" in sched_text
@@ -499,14 +506,6 @@ def check_bloomberg_feed() -> list[tuple[str, bool, str]]:
                 "scheduler hardcoded bloombergquint removed",
                 not has_bq_sched,
                 "still hardcoded!" if has_bq_sched else "clean",
-            )
-        )
-        has_validate_sched = "validate_rss_feed" in sched_text
-        results.append(
-            (
-                "scheduler validates feeds (validate_rss_feed)",
-                has_validate_sched,
-                "found" if has_validate_sched else "missing",
             )
         )
     except Exception as e:
