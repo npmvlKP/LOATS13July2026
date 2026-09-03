@@ -12,8 +12,9 @@ file.
 WHY
 ---
 * Satisfies HC-21 (zero module-level eager get_settings() in src/).
-* AST scanner for HC-21 sees a Call to ``LazySettings()`` (not
-  ``get_settings()``), so the eager count remains 0.
+* Behavioral contract: module import builds no ``Settings``
+  instance; first attribute access proxies through
+  ``get_settings()``.
 * Resolves at runtime via ``LazySettings.__getattr__`` proxying
   through ``get_settings()`` to the cached ``Settings()`` instance.
 """
@@ -43,9 +44,10 @@ TARGETS: tuple[str, ...] = (
 BLOCK = (
     "from .lazy_settings import LazySettings\n"
     "\n"
-    "# Lazy proxy module-level binding (TODO-18 / HC-21).\n"
-    "# AST scanner for HC-21 sees a Call to LazySettings(),\n"
-    "# NOT get_settings(), so the eager count remains 0.\n"
+    "# Lazy settings binding (TODO-18 / HC-21).\n"
+    "# Behavioral contract: importing this module builds NO Settings\n"
+    "# instance -- first attribute access proxies through get_settings(),\n"
+    "# so bare-env imports (no OPENALGO_API_KEY) stay clean.\n"
     "settings: Any = LazySettings()  # LazySettings.__getattr__ proxies to Settings()\n"
 )
 
