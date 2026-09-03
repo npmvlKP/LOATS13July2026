@@ -7,12 +7,17 @@ tracked-file ceiling, the allowlist, and live repository invariants
 F8-M-03 additions: outcome-scoped verification of the shared Win32-safe
 root junk detector (scripts/win32_root_junk.py), the HC-15 production
 emission mutation net, and the HC-21 bare-env behavioral contract.
+
+F8-M-05 additions: compact-repo rules for evidence reports — completion
+reports live only under docs/audit-history/, never at the docs/ top
+level, and reports/health/ tracks only curated health-final-*.json.
 """
 
 from __future__ import annotations
 
 import importlib.util
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -142,6 +147,65 @@ class TestLiveRepository:
         for path in ("loatsNEW/Scripts/python.exe", ".env.test", "package.json"):
             proc = subprocess.run(["git", "check-ignore", "-q", path], cwd=REPO_ROOT)
             assert proc.returncode == 0, f"{path} not ignored"
+
+
+class TestCompactRepoDocs:
+    """F8-M-05: evidence reports are archived, never left at docs/ top level.
+
+    Completion/fix/verification reports produced per work item belong in
+    docs/audit-history/ (CMP §4/§8). The docs/ top level is a curated
+    set of living documentation; reports/health/ tracks only the
+    curated health-final-*.json finals.
+    """
+
+    EVIDENCE_NAME = re.compile(
+        r"^(TODO|FR7|MCP_FIX|MYPY|PERFORMANCE_REVIEW|PRODUCTION_READINESS"
+        r"|RISK_MATRIX|TECHNICAL_DEBT|THREAD_SAFETY)|_REPORT",
+        re.IGNORECASE,
+    )
+
+    def _tracked(self) -> list[str]:
+        out = subprocess.run(
+            ["git", "ls-files"], cwd=REPO_ROOT, capture_output=True, text=True
+        )
+        return out.stdout.splitlines()
+
+    def test_no_evidence_reports_at_docs_top_level(self):
+        strays = [
+            p
+            for p in self._tracked()
+            if p.startswith("docs/")
+            and p.count("/") == 1
+            and self.EVIDENCE_NAME.search(Path(p).name)
+        ]
+        assert strays == [], (
+            "evidence reports must be archived under docs/audit-history/ "
+            f"(F8-M-05), found at docs/ top level: {strays}"
+        )
+
+    def test_completion_reports_are_archived(self):
+        archived = [
+            p for p in self._tracked() if p.startswith("docs/audit-history/TODO")
+        ]
+        assert len(archived) >= 10, (
+            "expected the F8-M-05 archived completion reports under "
+            f"docs/audit-history/, found only {len(archived)}"
+        )
+
+    def test_health_snapshots_curated(self):
+        tracked = sorted(p for p in self._tracked() if p.startswith("reports/health/"))
+        assert all(p.startswith("reports/health/health-final-") for p in tracked), (
+            f"non-curated health snapshots tracked: {tracked}"
+        )
+
+    def test_todo26_verifier_reads_archived_report(self):
+        src = (REPO_ROOT / "scripts" / "final_verify_todo26.py").read_text(
+            encoding="utf-8"
+        )
+        assert "audit-history" in src, (
+            "final_verify_todo26 must read TODO26_FINAL_REPORT.md from "
+            "docs/audit-history/ (F8-M-05 relocation)"
+        )
 
 
 def _load_helper():
