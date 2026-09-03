@@ -11,7 +11,8 @@ Standalone, self-contained verifier proving the F8-C-01 remediation:
   4. The REAL four producers, driven together, store >=4 signals whose
      sources satisfy ``validate_signal_sources`` - Step 1 of
      ``create_trade_decision`` passes on production-path output.
-  5. Scheduler signal metadata carries enum-valid source tags (static).
+  5. Single-engine invariant: scheduler emits zero signals (F8-H-03) and
+    the orchestrator retains the full 4-enum production source set (static).
   6. A full decision cycle: real producer signals -> _execute_cmp_strategy
      -> TradeDecision persisted (gating rules mocked; ANALYZE-safe).
   7. Mutation safety: a mutated COPY of the orchestrator (price_action
@@ -329,28 +330,31 @@ def check_4_all_four_producers_stored_set() -> None:
 
 
 def check_5_scheduler_tags() -> None:
+    """Check 5 (stale-check remediation, F8-M-02 follow-up).
+
+    F8-H-03 retired all scheduler signal-emitting jobs — the orchestrator
+    is the sole signal engine of record, so the old grep for scheduler
+    ``scan_type``/source tags could never pass again. The invariant it
+    was proxying is now asserted directly: the scheduler must contain
+    ZERO signal-emission tokens, and the full production source set
+    (4 enum tags, all emitted by the orchestrator) must remain present.
+    """
     sched = (REPO_ROOT / "src" / "loats" / "scheduler.py").read_text(encoding="utf-8")
-    has_ta = re.search(
-        r'"scan_type"\s*:\s*"ta"[^}]*"source"\s*:\s*'
-        r"StrengthSource\.TECHNICAL_ANALYSIS\.value",
-        sched,
-        re.DOTALL,
-    )
-    has_sent = re.search(
-        r'"scan_type"\s*:\s*"sentiment"[^}]*"source"\s*:\s*'
-        r"StrengthSource\.SENTIMENT\.value",
-        sched,
-        re.DOTALL,
-    )
-    if has_ta and has_sent:
+    signal_tokens = re.findall(r"StrengthSource|scan_type|\bSignal\b", sched)
+    orch = (REPO_ROOT / "src" / "loats" / "orchestrator.py").read_text(encoding="utf-8")
+    sites = set(re.findall(r"StrengthSource\.([A-Z_]+)\.value", orch))
+    missing = set(REQUIRED_SOURCES) - sites
+    if not signal_tokens and not missing:
         ok(
-            "5. scheduler source tags",
-            "ta -> TECHNICAL_ANALYSIS, sentiment -> SENTIMENT (enum-valid)",
+            "5. single-engine source tags",
+            "scheduler emits zero signals (F8-H-03); orchestrator retains "
+            f"{len(sites)} enum sources: {sorted(sites)}",
         )
     else:
         bad(
-            "5. scheduler source tags",
-            f"ta_tag={bool(has_ta)} sentiment_tag={bool(has_sent)}",
+            "5. single-engine source tags",
+            f"scheduler signal tokens={signal_tokens[:5]} "
+            f"orchestrator missing={sorted(missing)}",
         )
 
 
