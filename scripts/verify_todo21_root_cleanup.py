@@ -223,6 +223,7 @@ def check_tracking_count_reduction(verbose: bool = False) -> dict:
     # scripts/check_repo_hygiene.py, which now enforces a hard ceiling).
     # F8-M-02 hygiene follow-up (2026-09-03): re-measured at 411 after
     # untracking session-agent files; ratchet re-pinned to 415 in lockstep.
+    # 2026-09-03 re-pin: 416 (+1 F8-L-03 closure doc).
     # F8-M-03 (2026-09-03): the old secondary margin branch
     # ("reduction >= removed_count - 5", i.e. a >= 16-file further
     # reduction) was a stale TODO-21-day expectation that became
@@ -234,7 +235,7 @@ def check_tracking_count_reduction(verbose: bool = False) -> dict:
     # branch inverted that direction (it demanded the tree KEEP
     # shrinking), so it is removed; the baseline bound below is the
     # outcome-scoped assertion.
-    baseline_count = 415
+    baseline_count = 416
 
     count_after_commit = current_count - staged_deletions
 

@@ -297,7 +297,8 @@ class ExternalValidator:
         # in lockstep with scripts/check_repo_hygiene.py and
         # scripts/verify_f8c02_external.py (single-source intent: no
         # venv/junk-class re-entry; see the hygiene guard for the classes).
-        baseline_count = 415
+        # 2026-09-03 re-pin: 416 (+1 F8-L-03 closure doc).
+        baseline_count = 416
         count_after_commit = current_count - staged_deletions
         reduction = baseline_count - count_after_commit
         percentage = (reduction / baseline_count * 100) if baseline_count > 0 else 0
