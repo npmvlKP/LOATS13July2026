@@ -338,10 +338,12 @@ class TestOrchestratorWiring:
             await orch._validate_rss_startup_gate()
         mock_gate.assert_awaited_once_with(live=False)  # inline pass is offline-only
         assert orch._rss_drift_task is not None
-        # The detached pass re-enters run_startup_gate with live=True; keep it
-        # mocked while awaiting so the test stays hermetic and cannot flake on
-        # real network latency under suite load (live feeds are reachable here,
-        # so an unpatched await performed actual HTTP and raced the 5s budget).
+        # The detached pass MUST be re-patched before awaiting: a fire-and-
+        # forget task body necessarily runs AFTER the schedule-point context
+        # exits, so a single mock spanning the whole test was tried here and
+        # PROVEN to leak live HTTP (await_args_list showed only the inline
+        # entry while real feeds were fetched). Re-patching keeps the test
+        # hermetic and immune to network latency under suite load.
         live_gate = AsyncMock(return_value=True)
         with patch("loats.rss_validation.run_startup_gate", live_gate):
             await asyncio.wait_for(orch._rss_drift_task, timeout=5)
