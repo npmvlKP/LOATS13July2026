@@ -50,6 +50,7 @@ logs/
 htmlcov/
 .coverage
 .coverage.*
+coverage.xml
 *.egg-info/
 coverage.json
 pytest-report.xml
