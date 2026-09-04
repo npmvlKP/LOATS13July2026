@@ -44,6 +44,28 @@ jobs:
       - name: Reject tracked venvs / junk / env files (F8-C-02)
         run: python scripts/check_repo_hygiene.py
 
+  rss-feeds:
+    name: rss-feeds (F8-L-05 recorded fallback)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+      # H1 (adversarial review 2026-09-04): the validator imports the loats
+      # package (structlog, pydantic_settings), so deps MUST be installed
+      # even though feed validation itself needs no feed network.
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install .
+      - name: Validate recorded RSS manifest (no feed network required)
+        run: python scripts/validate_rss_feeds.py --offline
+      # The manifest <-> settings.rss_feeds lockstep and defunct-feed guard
+      # are asserted by tests/test_rss_validation.py::TestLiveRepositoryContract,
+      # executed by the pytest-coverage job.
+
   ruff-lint:
     name: ruff-lint
     runs-on: ubuntu-latest

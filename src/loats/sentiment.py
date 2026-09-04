@@ -7,22 +7,32 @@ import asyncio
 import hashlib
 import json
 import os
+import re
 import warnings
 from datetime import UTC, datetime
 from typing import Any, cast
 from urllib.parse import urlparse
 
+# F8-L-06 root cause: this knob MUST be read from the process environment
+# BEFORE the newspaper import below. newspaper4k's parsers module emits the
+# benign "nltk is not installed" UserWarning at *import* time when the
+# optional [nlp] extra is absent, so a filter installed after that import is
+# a verified no-op (regression-tested in tests/test_sentiment.py::
+# TestNltkWarningSuppression). The filter is scoped to that exact message;
+# no other warning is silenced. The knob works only via the process
+# environment: pydantic-settings loads .env into the Settings model, never
+# into os.environ, so a .env line cannot reach this guard. The durable fix
+# is installing the optional extra once:  pip install 'newspaper4k[nlp]'
+if os.environ.get("LOATS_SUPPRESS_NLTK_WARNING") == "1":
+    warnings.filterwarnings(
+        "ignore",
+        message=re.escape("nltk is not installed"),
+        category=UserWarning,
+    )
+
 import feedparser
 from newspaper import Article
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
-
-# Suppress the dev-only newspaper4k/nltk "punkt" tokenizer warning if requested.
-# Users can either download the model once in development (nltk.download("punkt"))
-# or set LOATS_SUPPRESS_NLTK_WARNING=1 to silence the warning.
-# We check the env var before Settings() is loaded; Settings() also exposes the
-# same flag via settings.loats_suppress_nltk_warning for runtime consistency.
-if os.environ.get("LOATS_SUPPRESS_NLTK_WARNING") == "1":
-    warnings.filterwarnings("ignore", category=UserWarning)
 
 from .lazy_settings import LazySettings
 from .loats_logging import get_logger

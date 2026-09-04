@@ -78,7 +78,7 @@ python scripts/fr7_health_snapshot.py --verbose
 | S01 | TODO-27a | options_math exists + parity | Hand-rolled Black-Scholes src/loats/options_math.py exists and parity <1e-6 (replaces vollib) |
 | S02 | TODO-27b | ta library dropped | src/loats/ta.py custom, no `from ta.` import in src, pyproject has no ta dep |
 | S03 | TODO-27c | bounded decision queue | settings.decision_queue_maxsize + Queue(maxsize) + put_nowait+QueueFull backpressure |
-| S04 | TODO-27d | rss feeds re-validated | settings.rss_feeds centralizes feeds, no active bloombergquint feed, livemint present |
+| S04 | TODO-27d | rss feeds re-validated | settings.rss_feeds centralizes feeds, no active bloombergquint feed, livemint present; F8-L-05 closed: recorded-fallback manifest validated offline at startup (orchestrator gate), by HC-28, and by the CI rss-feeds job |
 | S05 | TODO-26 | backtest sanity driver wired | src/loats/backtest_sanity.py exists and scheduler wires weekly job |
 | S06 | TODO-21 | root file hygiene | git ls-files root contains no junk ($null, coverage json, reports) |
 | S07 | TODO-23 | dead weight removed | FUNDAMENTAL/MACHINE_LEARNING/OPTIONS_FLOW removed from source_weights |

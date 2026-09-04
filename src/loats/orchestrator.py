@@ -219,6 +219,8 @@ class TradingOrchestrator:
         self._insufficient_signals_count = 0
         self._last_session_state = ""
         self._insufficient_signals_warning_interval = 60.0  # Log every 60 seconds
+        # F8-L-05: detached live-drift task (see _validate_rss_startup_gate)
+        self._rss_drift_task: asyncio.Task[None] | None = None
 
     @staticmethod
     async def _guarded_source_call(
@@ -324,9 +326,65 @@ class TradingOrchestrator:
 
         if not self.running:
             await self.initialize()
+        await self._validate_rss_startup_gate()
         logger.info("Starting TradingOrchestrator cycle")
         self._cycle_task = asyncio.create_task(self._run_cycle_loop())
         self._cycle_task.add_done_callback(self._handle_cycle_task_completion)
+
+    async def _validate_rss_startup_gate(self) -> None:
+        """F8-L-05: recorded-fallback RSS feed validation at startup.
+
+        The offline manifest validation is authoritative and runs inline:
+        it is deterministic, needs no network, and a structural failure must
+        be loud BEFORE trading starts. The live drift pass is advisory only,
+        so it runs as a DETACHED task -- awaiting it inline would let a dead
+        network stall trading startup for the full per-feed HTTP timeout
+        (3 feeds x ~20s worst case). Failures inside the detached task
+        degrade to WARNING; they can never block or crash startup.
+        """
+        try:
+            from .rss_validation import run_startup_gate
+
+            ok = await run_startup_gate(live=False)
+        except Exception as exc:
+            logger.error("RSS startup gate error: %s", exc)
+            # H3 (adversarial review): a gate error is operationally visible
+            # -- alert, but never block startup on the alert path itself.
+            try:
+                await alerts.send_system_alert(
+                    f"RSS startup gate error: {exc}", "error"
+                )
+            except Exception:
+                logger.warning("RSS gate alert delivery failed")
+            return
+        if not ok:
+            logger.error(
+                "RSS startup gate FAILED: recorded manifest invalid -- sentiment "
+                "source list unvalidated; fix tests/fixtures/rss/recorded-sources.json"
+            )
+            # H3: surface the failure through the alert channel (Telegram /
+            # system alerts) so it is not just a log line at startup.
+            try:
+                await alerts.send_system_alert(
+                    "RSS startup gate FAILED: recorded manifest invalid -- "
+                    "sentiment source list unvalidated",
+                    "error",
+                )
+            except Exception:
+                logger.warning("RSS gate alert delivery failed")
+            return
+        self._rss_drift_task = asyncio.create_task(self._rss_live_drift_pass())
+
+    async def _rss_live_drift_pass(self) -> None:
+        """Advisory live re-validation of the recorded sources (detached)."""
+        try:
+            from .rss_validation import run_startup_gate
+
+            await run_startup_gate(live=True)
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            logger.warning("RSS live drift pass error (advisory only): %s", exc)
 
     async def _run_cycle_loop(self) -> None:
         """Main trading cycle loop with <100ms target."""
@@ -1370,6 +1428,15 @@ class TradingOrchestrator:
                 self._cycle_task.cancel()
             except asyncio.CancelledError:
                 pass
+
+        # F8-L-05: cancel the detached advisory live-drift task if present
+        if self._rss_drift_task is not None and not self._rss_drift_task.done():
+            self._rss_drift_task.cancel()
+            try:
+                await self._rss_drift_task
+            except asyncio.CancelledError:
+                pass
+            self._rss_drift_task = None
 
         logger.info("TradingOrchestrator shutdown complete")
 

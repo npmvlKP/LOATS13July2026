@@ -29,6 +29,10 @@ async def test_trading_system_initialization(trading_system):
             "loats.main.scheduler.initialize", new_callable=AsyncMock
         ) as mock_scheduler_init,
         patch("loats.main.metrics.start_server") as mock_metrics_start,
+        # F8-L-05: orchestrator.start() now runs the RSS startup gate (live
+        # HTTP drift pass); keep this unit test hermetic by stubbing the
+        # module-level start_orchestrator reference in loats.main.
+        patch("loats.main.start_orchestrator", new_callable=AsyncMock),
     ):
         await trading_system.initialize()
         mock_db_init.assert_called_once()
