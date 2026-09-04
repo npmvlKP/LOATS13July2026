@@ -232,19 +232,36 @@ def stage_4_gate_compliance(doc: dict[str, Any]) -> tuple[int, int]:
         checks.append((False, "Evidence data available", "No evidence from Stage 3"))
         return run_stage(checks)
 
-    rt_stats = evidence.get("round_trip_statistics", {})
-    gate = evidence.get("gate_compliance", {})
-
     # F8-L-03: P1 requires live-endpoint evidence. Analysis-scope-only
     # artifacts measure the in-process loop (TA + local DB), not an
     # OpenAlgo round trip, and must not discharge P1.
     metadata = doc.get("metadata", {})
     measurement_scope = str(metadata.get("measurement_scope", ""))
+    live_block = doc.get("live_evidence")
     scope_is_live = (
         measurement_scope.startswith("live-endpoint")
         and not (measurement_scope.startswith("live-endpoint (FAILED"))
-        and "live_evidence" in doc
+        and isinstance(live_block, dict)
+        and bool(live_block)
     )
+
+    # Scope-correct gating (F8 wave 2026-09-04): when discharging, the
+    # round-trip verdicts come from the live block, never from the
+    # analysis-scope blocks (which previously let a 480 ms endpoint pass
+    # on a 10 ms in-process mean). TA remains an analysis-scope gate.
+    analysis_gate = evidence.get("gate_compliance", {})
+    rt_stats = evidence.get("round_trip_statistics", {})
+    gate: dict[str, Any] = dict(analysis_gate)
+    if scope_is_live:
+        assert live_block is not None
+        live_gate = live_block.get("gate_compliance") or {}
+        rt_stats = live_block.get("round_trip_statistics") or {}
+        gate = {
+            "round_trip_gate_pass_rate": live_gate.get(
+                "live_round_trip_gate_pass_rate", 0
+            ),
+        }
+
     checks.append(
         (
             scope_is_live,
@@ -263,11 +280,60 @@ def stage_4_gate_compliance(doc: dict[str, Any]) -> tuple[int, int]:
     checks.append((bool(rt_stats), "Round-trip statistics exist", ""))
     checks.append((bool(gate), "Gate compliance metrics exist", ""))
 
+    # Live summary blocks must agree with the per-sample measurements
+    # (collector rounds to 2 decimals; ±0.51 tolerance).
+    if scope_is_live:
+        assert live_block is not None
+        live_measurements = live_block.get("measurements") or []
+        durations = [
+            m["live_duration_ms"]
+            for m in live_measurements
+            if isinstance(m, dict)
+            and isinstance(m.get("live_duration_ms"), (int, float))
+        ]
+        passes = sum(
+            1
+            for m in live_measurements
+            if isinstance(m, dict) and m.get("passes_live_gate")
+        )
+        recomputed_mean = (
+            round(sum(durations) / len(durations), 2) if durations else None
+        )
+        recomputed_rate = (
+            round(passes / len(live_measurements) * 100, 2)
+            if live_measurements
+            else None
+        )
+        reported_mean = rt_stats.get("mean")
+        reported_rate = gate.get("round_trip_gate_pass_rate", 0)
+        consistent = (
+            recomputed_mean is not None
+            and reported_mean is not None
+            and abs(recomputed_mean - reported_mean) <= 0.51
+            and recomputed_rate is not None
+            and abs(recomputed_rate - reported_rate) <= 0.51
+        )
+        checks.append(
+            (
+                consistent,
+                "Live statistics consistent with per-sample measurements",
+                (
+                    f"recomputed mean {recomputed_mean}ms / rate {recomputed_rate}%"
+                    if consistent
+                    else (
+                        f"reported mean {reported_mean}ms / rate {reported_rate}% "
+                        f"vs recomputed {recomputed_mean}ms / {recomputed_rate}% "
+                        f"— evidence is inconsistent"
+                    )
+                ),
+            )
+        )
+
     mean = rt_stats.get("mean", 0)
     p95 = rt_stats.get("p95", 0)
     p99 = rt_stats.get("p99", 0)
     rt_rate = gate.get("round_trip_gate_pass_rate", 0)
-    ta_rate = gate.get("ta_gate_pass_rate", 0)
+    ta_rate = analysis_gate.get("ta_gate_pass_rate", 0)
 
     checks.append((mean <= 100.0, "Mean latency <= 100ms", f"{mean:.2f}ms"))
     checks.append((p95 <= 200.0, "P95 latency <= 200ms", f"{p95:.2f}ms"))

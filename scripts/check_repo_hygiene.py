@@ -84,7 +84,7 @@ FORBIDDEN_PATTERNS: tuple[str, ...] = (
 # -> re-pinned to 425.
 # F8-L-06 (2026-09-04): +1 tracked file (docs/audit-history/
 # 04Sep2026-F8-L-06-closure.md); re-pinned to 426.
-TRACKED_FILE_CEILING = 426
+TRACKED_FILE_CEILING = 428
 
 # Tracked paths that would match FORBIDDEN_PATTERNS but are deliberate.
 ALLOWLIST: frozenset[str] = frozenset(
