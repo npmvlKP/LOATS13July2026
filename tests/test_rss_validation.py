@@ -338,7 +338,14 @@ class TestOrchestratorWiring:
             await orch._validate_rss_startup_gate()
         mock_gate.assert_awaited_once_with(live=False)  # inline pass is offline-only
         assert orch._rss_drift_task is not None
-        await asyncio.wait_for(orch._rss_drift_task, timeout=5)
+        # The detached pass re-enters run_startup_gate with live=True; keep it
+        # mocked while awaiting so the test stays hermetic and cannot flake on
+        # real network latency under suite load (live feeds are reachable here,
+        # so an unpatched await performed actual HTTP and raced the 5s budget).
+        live_gate = AsyncMock(return_value=True)
+        with patch("loats.rss_validation.run_startup_gate", live_gate):
+            await asyncio.wait_for(orch._rss_drift_task, timeout=5)
+        live_gate.assert_awaited_once_with(live=True)
 
     @pytest.mark.asyncio
     async def test_detached_live_pass_swallows_gate_exception(self):
