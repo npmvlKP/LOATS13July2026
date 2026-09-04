@@ -2,22 +2,15 @@
 """External verification script for F8-H-04 coverage-floor integrity.
 
 Runs independently of the agent; uses the project venv python if available,
-otherwise falls back to sys.executable. Re-run with:
-
-    G:/.OA/LOATS-13July2026/LOATS13July2026/loatsNEW/Scripts/python.exe reports/verify_f8h04_external.py
-
-or from Git-Bash:
+otherwise falls back to sys.executable. Re-run with (from the repo root):
 
     ./loatsNEW/Scripts/python.exe reports/verify_f8h04_external.py
 """
 
-import json
 import os
-import shutil
 import subprocess
 import sys
 from pathlib import Path
-
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -41,7 +34,11 @@ PASS_SYM = "[PASS]"
 FAIL_SYM = "[FAIL]"
 
 
-def _run(cmd: list[str], cwd: Path = REPO_ROOT, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
+def _run(
+    cmd: list[str],
+    cwd: Path = REPO_ROOT,
+    env: dict[str, str] | None = None,
+) -> subprocess.CompletedProcess[str]:
     """Run a command list with UTF-8 capture and a 10-minute timeout."""
     return subprocess.run(
         cmd,
@@ -57,7 +54,7 @@ def _run(cmd: list[str], cwd: Path = REPO_ROOT, env: dict[str, str] | None = Non
 
 def step_run_tests() -> bool:
     """Run the full test suite."""
-    print(f"\n=== Step 1: pytest tests/ ===")
+    print("\n=== Step 1: pytest tests/ ===")
     result = _run([PY, "-m", "pytest", "tests/", "-q", "--tb=line", "--no-header"])
     if result.returncode != 0:
         print(f"{FAIL_SYM} pytest failed")
@@ -76,7 +73,7 @@ def step_generate_coverage() -> bool:
     coverage.json from the full test run. If it is missing, run a targeted subset
     that produces the file quickly.
     """
-    print(f"\n=== Step 2: coverage.json present ===")
+    print("\n=== Step 2: coverage.json present ===")
     if (REPO_ROOT / "coverage.json").exists():
         print(f"{PASS_SYM} coverage.json already available")
         return True
@@ -114,7 +111,7 @@ def step_generate_coverage() -> bool:
 
 def step_per_module_coverage() -> bool:
     """Run the FR-specified per-module floor checker."""
-    print(f"\n=== Step 3: scripts/check_per_module_coverage.py ===")
+    print("\n=== Step 3: scripts/check_per_module_coverage.py ===")
     result = _run([PY, "scripts/check_per_module_coverage.py"])
     if result.returncode != 0:
         print(f"{FAIL_SYM} per-module coverage gate failed")
@@ -128,7 +125,7 @@ def step_per_module_coverage() -> bool:
 
 def step_floor_map_tests() -> bool:
     """Run the regression tests that guard the floor map content."""
-    print(f"\n=== Step 4: pytest tests/test_coverage_floor_map.py tests/test_check_per_module_coverage.py ===")
+    print("\n=== Step 4: floor-map guard tests (pytest) ===")
     result = _run(
         [
             PY,
@@ -151,7 +148,7 @@ def step_floor_map_tests() -> bool:
 
 def step_lint() -> bool:
     """Run ruff on changed source and test files."""
-    print(f"\n=== Step 5: ruff check src/ tests/ scripts/ ===")
+    print("\n=== Step 5: ruff check src/ tests/ scripts/ ===")
     result = _run([PY, "-m", "ruff", "check", "src/", "tests/", "scripts/"])
     if result.returncode != 0:
         print(f"{FAIL_SYM} ruff found issues")
@@ -163,7 +160,7 @@ def step_lint() -> bool:
 
 def step_mypy() -> bool:
     """Run mypy on the changed modules."""
-    print(f"\n=== Step 6: mypy changed modules ===")
+    print("\n=== Step 6: mypy changed modules ===")
     modules = [
         "src/loats/alerts.py",
         "src/loats/scheduler.py",
@@ -183,7 +180,7 @@ def step_mypy() -> bool:
 
 def step_bandit() -> bool:
     """Run bandit on changed modules."""
-    print(f"\n=== Step 7: bandit changed modules ===")
+    print("\n=== Step 7: bandit changed modules ===")
     modules = [
         "src/loats/alerts.py",
         "src/loats/scheduler.py",
@@ -203,13 +200,14 @@ def step_bandit() -> bool:
 
 def step_pip_audit() -> bool:
     """Run pip-audit on the environment."""
-    print(f"\n=== Step 8: pip-audit ===")
+    print("\n=== Step 8: pip-audit ===")
     result = _run([PY, "-m", "pip_audit", "--format=json", "--desc"])
     if result.returncode != 0:
         print(f"{FAIL_SYM} pip-audit found vulnerabilities")
         print(result.stdout[-2000:])
         return False
-    print(f"{PASS_SYM} pip-audit clean ({result.stdout.strip() or 'No known vulnerabilities found'})")
+    summary = result.stdout.strip() or "No known vulnerabilities found"
+    print(f"{PASS_SYM} pip-audit clean ({summary})")
     return True
 
 
