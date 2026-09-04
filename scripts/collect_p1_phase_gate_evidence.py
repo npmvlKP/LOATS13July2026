@@ -178,8 +178,12 @@ class P1EvidenceCollector:
                 try:
                     live_start = datetime.now(UTC)
                     # Bypass the 60s quotes cache so every sample measures a
-                    # real HTTP round trip, not an in-process cache hit.
-                    await cache_manager.clear("quotes:*")
+                    # real HTTP round trip. CacheManager.clear() matches by
+                    # SUBSTRING (pattern in key) or prefix:<pattern> — a
+                    # glob-style "quotes:*" matches nothing (the '*' is
+                    # literal), which silently turned samples 2..N into
+                    # 0.0ms cache hits (caught in RECHECK 2026-09-04).
+                    await cache_manager.clear("quotes:")
                     await client.get_quotes([symbol])
                     live_duration_ms = (
                         datetime.now(UTC) - live_start
@@ -265,10 +269,14 @@ class P1EvidenceCollector:
             return (
                 "broker-permission: the broker relayed 'Insufficient permission "
                 "for that call' (Kite Connect PermissionException via the "
-                "OpenAlgo Zerodha plugin). The Kite Connect app needs the "
-                "market-data entitlement — order APIs and data APIs are "
-                "subscribed separately on Kite Connect. Nothing to fix in this "
-                "repository."
+                "OpenAlgo Zerodha plugin). The app that minted the current "
+                "broker session lacks the market-data entitlement — order APIs "
+                "and data APIs are subscribed separately on Kite Connect. After "
+                "enabling the data subscription on the Kite Connect app, "
+                "RESTART OpenAlgo and RE-LOGIN the Zerodha broker session "
+                "(access tokens keep the entitlements of the app that issued "
+                "them); then verify /quotes works before re-running. Nothing "
+                "to fix in this repository."
             )
         if "not found for exchange" in joined:
             return (

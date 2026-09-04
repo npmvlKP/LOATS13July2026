@@ -74,7 +74,9 @@ FORBIDDEN_PATTERNS: tuple[str, ...] = (
 # (.harness-memory/, .opencode/, .clinerules/, .clineignore, @workspace/),
 # leaving 411 tracked; the ceiling is re-pinned to 415 so the ratchet
 # tightens with the tree and venv-class blowups stay impossible.
-TRACKED_FILE_CEILING = 415
+# 2026-09-03: +1 for docs/audit-history/03Sep2026-F8-L-03-closure.md
+# (F8-L-03 closure record); re-pinned to 416 in lockstep.
+TRACKED_FILE_CEILING = 416
 
 # Tracked paths that would match FORBIDDEN_PATTERNS but are deliberate.
 ALLOWLIST: frozenset[str] = frozenset(

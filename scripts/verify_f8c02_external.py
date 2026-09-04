@@ -74,11 +74,11 @@ def main() -> int:
 
     tracked = _tracked()
 
-    # 1. tracked count ceiling (F8-M-02 follow-up re-pin: 415, in lockstep
-    # with scripts/check_repo_hygiene.py TRACKED_FILE_CEILING)
+    # 1. tracked count ceiling (2026-09-03 re-pin: 416 — +1 F8-L-03 closure
+    # doc, in lockstep with scripts/check_repo_hygiene.py TRACKED_FILE_CEILING)
     record(
-        len(tracked) <= 415,
-        "1. tracked files <= 415",
+        len(tracked) <= 416,
+        "1. tracked files <= 416",
         f"count={len(tracked)}",
     )
 
@@ -204,11 +204,12 @@ def main() -> int:
     )
 
     # 12. TODO-21 ratchet re-baseline (kept in lockstep: the TODO-21
-    # verifiers and this verifier must pin the same measured count)
+    # verifiers and this verifier must pin the same measured count;
+    # 2026-09-03 re-pin: 416 — +1 F8-L-03 closure doc)
     t21a = _read("scripts/verify_todo21_external.py")
     t21b = _read("scripts/verify_todo21_root_cleanup.py")
-    rebased = "baseline_count = 415" in t21a and "baseline_count = 415" in t21b
-    record(rebased, "12. TODO-21 ratchet re-baselined to 415")
+    rebased = "baseline_count = 416" in t21a and "baseline_count = 416" in t21b
+    record(rebased, "12. TODO-21 ratchet re-baselined to 416")
 
     # Summary
     print("=" * 72)
