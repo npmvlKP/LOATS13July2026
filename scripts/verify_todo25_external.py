@@ -191,7 +191,16 @@ def verify_p1_evidence_file(evidence_path: Path) -> dict[str, Any] | None:
 
 
 def verify_p1_gate_compliance(evidence_data: dict[str, Any]) -> dict[str, Any]:
-    """Verify P1 gate compliance."""
+    """Verify P1 gate compliance.
+
+    F8 wave (2026-09-04): the numeric gates are scope-correct. When the
+    evidence is live-endpoint scope, mean/P95/pass-rate are read from —
+    and cross-checked against the per-sample measurements of — the
+    ``live_evidence`` block, never from the analysis-scope blocks. The
+    previous behaviour gated the in-process loop numbers (e.g. a 10 ms
+    analysis mean) even while the live block described a 480 ms endpoint,
+    letting a dead-slow endpoint discharge P1.
+    """
     print_header("P1 GATE COMPLIANCE VERIFICATION")
 
     checks_passed = 0
@@ -206,13 +215,25 @@ def verify_p1_gate_compliance(evidence_data: dict[str, Any]) -> dict[str, Any]:
     # DB) and must not discharge P1.
     checks_total += 1
     measurement_scope = str(metadata.get("measurement_scope", ""))
-    live_stats_present = "live_evidence" in evidence_data
+    live_block = evidence_data.get("live_evidence")
+    live_stats_present = isinstance(live_block, dict) and bool(live_block)
     scope_is_live = (
         measurement_scope.startswith("live-endpoint")
         and not (measurement_scope.startswith("live-endpoint (FAILED"))
         and live_stats_present
     )
     if scope_is_live:
+        # Scope-correct gating: every numeric verdict below comes from the
+        # live scope, never from the analysis-scope blocks.
+        assert live_block is not None
+        live_gate = live_block.get("gate_compliance") or {}
+        live_stats = live_block.get("round_trip_statistics") or {}
+        round_trip_stats = live_stats
+        gate_compliance = {
+            "round_trip_gate_pass_rate": live_gate.get(
+                "live_round_trip_gate_pass_rate", 0
+            ),
+        }
         checks_passed += 1
         print_check(
             "Evidence is live-endpoint scope (F8-L-03)",
@@ -230,11 +251,12 @@ def verify_p1_gate_compliance(evidence_data: dict[str, Any]) -> dict[str, Any]:
             ),
         )
 
-    # Check 1: Round-trip statistics exist
+    # Check 1: Round-trip statistics exist (live scope when discharging)
     checks_total += 1
     if round_trip_stats:
         checks_passed += 1
-        print_check("Round-trip statistics exist", True)
+        scope_label = "live" if scope_is_live else "analysis"
+        print_check("Round-trip statistics exist", True, f"scope: {scope_label}")
     else:
         print_check("Round-trip statistics exist", False)
         return {
@@ -243,21 +265,81 @@ def verify_p1_gate_compliance(evidence_data: dict[str, Any]) -> dict[str, Any]:
             "passed": False,
         }
 
-    # Check 2: Gate compliance metrics exist
+    # Check 2: Gate compliance metrics exist (scope-matched keys)
     checks_total += 1
-    required_metrics = [
-        "ta_gate_pass_rate",
-        "db_gate_pass_rate",
-        "round_trip_gate_pass_rate",
-        "all_gates_pass_rate",
-    ]
-    if all(m in gate_compliance for m in required_metrics):
+    if scope_is_live:
+        metrics_ok = "live_round_trip_gate_pass_rate" in (live_block or {}).get(
+            "gate_compliance", {}
+        )
+    else:
+        required_metrics = [
+            "ta_gate_pass_rate",
+            "db_gate_pass_rate",
+            "round_trip_gate_pass_rate",
+            "all_gates_pass_rate",
+        ]
+        metrics_ok = all(m in gate_compliance for m in required_metrics)
+    if metrics_ok:
         checks_passed += 1
         print_check("Gate compliance metrics exist", True)
     else:
         print_check("Gate compliance metrics exist", False)
 
-    # Check 3: Round-trip gate pass rate (P1 primary gate)
+    # Check 2b (F8 wave): live stats must be consistent with the per-sample
+    # measurements. Summary blocks alone are not evidence; the recomputed
+    # mean and pass rate from the measurement list must match what the
+    # summary claims (collector rounds to 2 decimals, hence the tolerance).
+    if scope_is_live:
+        checks_total += 1
+        live_measurements = (live_block or {}).get("measurements") or []
+        durations = [
+            m["live_duration_ms"]
+            for m in live_measurements
+            if isinstance(m, dict)
+            and isinstance(m.get("live_duration_ms"), (int, float))
+        ]
+        passes = sum(
+            1
+            for m in live_measurements
+            if isinstance(m, dict) and m.get("passes_live_gate")
+        )
+        recomputed_mean = (
+            round(sum(durations) / len(durations), 2) if durations else None
+        )
+        reported_mean = round_trip_stats.get("mean")
+        reported_rate = gate_compliance.get("round_trip_gate_pass_rate", 0)
+        recomputed_rate = (
+            round(passes / len(live_measurements) * 100, 2)
+            if live_measurements
+            else None
+        )
+        consistent = (
+            recomputed_mean is not None
+            and reported_mean is not None
+            and abs(recomputed_mean - reported_mean) <= 0.51
+            and recomputed_rate is not None
+            and abs(recomputed_rate - reported_rate) <= 0.51
+        )
+        if consistent:
+            checks_passed += 1
+            print_check(
+                "Live statistics consistent with per-sample measurements",
+                True,
+                f"recomputed mean {recomputed_mean}ms / rate {recomputed_rate}%",
+            )
+        else:
+            print_check(
+                "Live statistics consistent with per-sample measurements",
+                False,
+                (
+                    f"reported mean {reported_mean}ms / rate {reported_rate}% vs "
+                    f"recomputed {recomputed_mean}ms / {recomputed_rate}% from "
+                    f"{len(live_measurements)} measurements — evidence is "
+                    f"inconsistent"
+                ),
+            )
+
+    # Check 3: Round-trip gate pass rate (P1 primary gate; live scope)
     checks_total += 1
     rt_pass_rate = gate_compliance.get("round_trip_gate_pass_rate", 0)
     rt_threshold = 80.0  # 80% pass rate required for P1

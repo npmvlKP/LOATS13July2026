@@ -298,7 +298,10 @@ class ExternalValidator:
         # scripts/verify_f8c02_external.py (single-source intent: no
         # venv/junk-class re-entry; see the hygiene guard for the classes).
         # 2026-09-03 re-pin: 416 (+1 F8-L-03 closure doc).
-        baseline_count = 416
+        # 2026-09-04 re-pin: 426 (+10 F8-L-05 RSS wave files); lockstep with
+        # scripts/check_repo_hygiene.py TRACKED_FILE_CEILING and
+        # scripts/verify_f8c02_external.py.
+        baseline_count = 428
         count_after_commit = current_count - staged_deletions
         reduction = baseline_count - count_after_commit
         percentage = (reduction / baseline_count * 100) if baseline_count > 0 else 0

@@ -860,6 +860,29 @@ def probe_rss_feeds(rep: Report) -> None:
     )
 
 
+# ----------------------------------------------------------------- HC-29 ----
+
+
+def probe_hc29(rep: Report) -> None:
+    """HC-29 — TODO-25 (F7-L-05) P1/P5 phase-gate evidence verification.
+
+    Restored 2026-09-04: the TODO-28 mypy sweep deleted the catalogue
+    entry silently and ``--only HC-29`` vacuously exited 0 afterwards,
+    so the deletion went unnoticed and verify_todo25_final.py Stage 6
+    failed on genuine evidence. Runs the CI-wired external verifier
+    out-of-process, exactly like the other external gates. The verifier
+    itself enforces the F8-L-03 live-endpoint scope rule.
+    """
+    run_gate(
+        rep,
+        "HC-29",
+        "TODO-25",
+        "P1/P5 phase-gate evidence (live-endpoint scope)",
+        [sys.executable, str(REPO_ROOT / "scripts" / "verify_todo25_external.py")],
+        timeout=120,
+    )
+
+
 # ------------------------------------------------------------ gate runner ----
 
 
@@ -1125,7 +1148,7 @@ def check_module_floors(rep: Report) -> None:
 # ------------------------------------------------------------------ main ----
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument(
         "--fast",
@@ -1138,10 +1161,48 @@ def main() -> int:
     ap.add_argument(
         "--json", default="", help="write machine-readable report to this path"
     )
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
 
     only = {x.strip().upper() for x in args.only.split(",") if x.strip()}
     rep = Report()
+    known_ids = {
+        "HC-01",
+        "HC-02",
+        "HC-03",
+        "HC-04",
+        "HC-05",
+        "HC-06",
+        "HC-07",
+        "HC-08",
+        "HC-09",
+        "HC-10",
+        "HC-11",
+        "HC-12",
+        "HC-13",
+        "HC-14",
+        "HC-15",
+        "HC-16",
+        "HC-17",
+        "HC-18",
+        "HC-20",
+        "HC-21",
+        "HC-22",
+        "HC-23",
+        "HC-24",
+        "HC-25",
+        "HC-26",
+        "HC-27",
+        "HC-28",
+        "HC-29",
+    }
+    unknown = only - known_ids
+    if unknown:
+        print(
+            "ERROR: --only selected no known checks: "
+            + ", ".join(sorted(unknown))
+            + " (a selection that runs nothing must fail loudly, not exit 0)"
+        )
+        return 2
     print(
         f"# FR7 health check — {REPO_ROOT.name} @ {os.environ.get('COMPUTERNAME', '')}"
     )
@@ -1168,6 +1229,8 @@ def main() -> int:
         probe_config(rep)
     if wants("HC-28"):
         probe_rss_feeds(rep)
+    if wants("HC-29"):
+        probe_hc29(rep)
     if not only or wants(
         "HC-04",
         "HC-05",
