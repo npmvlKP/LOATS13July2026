@@ -7,7 +7,13 @@ ignore =
     E226,
     W503,
 max-line-length = 88
+# Frozen audit evidence archived verbatim (mirrors pyproject.toml per-file-ignores,
+# which carry the same rationale): these directories are historical verification
+# artifacts and must not be mutated to satisfy lint. Excluded from repository-root
+# flake8 sweeps only; the CI gate scope remains src/ tests/ scripts/ (unchanged).
 exclude =
+    docs/audit-history,
+    reports/ai-generated,
     .git,
     __pycache__,
     .venv,
