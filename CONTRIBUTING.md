@@ -111,6 +111,31 @@ the full root-level lint battery (`ruff check .`, `ruff format`,
 (`scripts/check_repo_hygiene.py`). Never edit a file in place under the
 frozen directories to satisfy lint.
 
+### Gate-Tool Upgrade Procedure (Version Lockstep)
+
+Every gate tool (ruff, mypy, isort, flake8, bandit, pip-audit) is pinned
+(`==`) to the version the tree was verified against. A deliberate upgrade
+must touch **all surfaces in one commit** and keep `pytest
+tests/test_repo_hygiene.py -q` green:
+
+1. Verify the upstream tag exists (e.g. `git ls-remote --tags
+   https://github.com/astral-sh/ruff-pre-commit refs/tags/vX.Y.Z`).
+2. Bump the `==` pin in `pyproject.toml` `[project.optional-dependencies]
+   dev`, install it into the venv, and run the full gate battery locally.
+3. Mirror the pin into every `ci.yml` install line for that tool
+   (`ruff` ×3; `isort`, `flake8`, `bandit`, `pip-audit` ×1 each; mypy
+   rides `.[dev]`).
+4. Mirror the pin into `.pre-commit-config.yaml` (`ruff-pre-commit` rev
+   = ruff pin, `PyCQA/flake8` rev = flake8 pin; mypy, bandit and
+   pip-audit run as `language: system` local hooks and inherit the venv
+   pins automatically).
+5. Run the battery: `ruff check .`, `ruff format --check src/ tests/
+   scripts/`, `flake8 .`, `mypy --strict src`, `pytest
+   tests/test_repo_hygiene.py -q`, then the full suite.
+
+`TestLintVersionLockstep` fails if any surface is missed, so a partial
+upgrade cannot land.
+
 ## Code Review
 
 All changes require review and approval before merging. The QA team will perform final validation and declare production readiness. Branch protection and pre-commit hook configuration are checked manually by maintainers (TODO-5 / TODO-6).

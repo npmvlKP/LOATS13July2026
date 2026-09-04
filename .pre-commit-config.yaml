@@ -18,17 +18,20 @@ repos:
         args: [--fix, --exit-non-zero-on-fix]
       - id: ruff-format
 
-  # mypy: Re-enabled - mypy src/ --strict passes with zero errors.
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.10.0
+  # mypy: Behavioral + version lockstep with CI. A language:system local
+  # hook runs the venv's pinned mypy (== pyproject pin) with the same
+  # config and directory target as the CI mypy job, avoiding both the
+  # dual module naming (loats.* vs src.loats.*) a file-path target
+  # produces under mypy 2.x and the dependency duplication of
+  # additional_dependencies in the isolated hook env.
+  - repo: local
     hooks:
       - id: mypy
-        additional_dependencies:
-          - pydantic>=2.10.0
-          - pydantic-settings>=2.7.0
-          - types-python-dateutil
-        args: [--strict, --show-error-codes, --namespace-packages, --explicit-package-bases]
-        exclude: "^tests/"
+        name: mypy (strict, pyproject config)
+        entry: python -m mypy
+        args: [--strict, --config-file, pyproject.toml, src/]
+        language: system
+        pass_filenames: false
 
   - repo: https://github.com/PyCQA/flake8
     rev: 7.3.0

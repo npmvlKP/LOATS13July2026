@@ -12,10 +12,11 @@ F8-M-05 additions: compact-repo rules for evidence reports — completion
 reports live only under docs/audit-history/, never at the docs/ top
 level, and reports/health/ tracks only curated health-final-*.json.
 
-F8-L-04-R2 additions: lint version lockstep — the ruff version must be
-the single pinned value across pyproject dev-deps, every CI ruff job,
-and the ruff-pre-commit hook rev, so no gate surface drifts onto a
-different rule set than the one the tree was verified against.
+F8-L-04-R2 additions: lint version lockstep — every gate tool (ruff,
+mypy, isort, flake8, bandit, pip-audit) must be the single pinned value
+across pyproject dev-deps, CI installs, and the pre-commit config, so
+no gate surface drifts onto a different rule set than the one the tree
+was verified against.
 """
 
 from __future__ import annotations
@@ -49,43 +50,60 @@ def _repo_relative(p: Path) -> str:
 
 @pytest.mark.skipif(not CI_YML.exists(), reason="CI workflow absent")
 class TestLintVersionLockstep:
-    """Ruff version must be a single pinned value across all gate surfaces.
+    """Gate-tool versions must be single pinned values across all surfaces.
 
-    A version drift between pyproject dev-deps, the CI ruff jobs, and the
-    pre-commit hook rev means a gate can pass on one surface and fail on
-    another with zero source changes. These tests assert agreement, not a
-    specific version, so deliberate upgrades stay green.
+    A version drift between pyproject dev-deps, the CI installs, and the
+    pre-commit config means a gate can pass on one surface and fail on
+    another with zero source changes. These tests assert agreement, not
+    specific versions, so deliberate upgrades stay green. bandit and
+    pip-audit run in pre-commit via language:system local hooks, so their
+    pre-commit surface is the project venv itself (covered by the
+    pyproject pins); isort has no pre-commit surface (CI-only); mypy rides
+    `.[dev]` in CI, so no bare-install assertion applies to it there.
     """
 
-    def test_pyproject_pins_ruff(self) -> None:
-        text = _repo_relative(PYPROJECT_TOML)
-        pins = [
-            ln for ln in text.splitlines() if fnmatch.fnmatch(ln.strip(), '"ruff==*')
-        ]
-        assert len(pins) == 1, f"expected exactly one pinned ruff dev-dep: {pins}"
-        assert not fnmatch.fnmatch(text, '*"ruff>=*'), (
-            "ruff dev-dep must be pinned (==), not lower-bounded (>=)"
-        )
+    GATE_TOOLS = ("ruff", "mypy", "isort", "flake8", "bandit", "pip-audit")
 
-    def test_ci_ruff_jobs_use_pinned_install(self) -> None:
+    def test_pyproject_pins_all_gate_tools(self) -> None:
+        text = _repo_relative(PYPROJECT_TOML)
+        for tool in self.GATE_TOOLS:
+            spec = f'"{tool}=='
+            pins = [ln for ln in text.splitlines() if ln.strip().startswith(spec)]
+            assert len(pins) == 1, f"{tool}: expected exactly one pin, got {pins}"
+            assert not fnmatch.fnmatch(text, f'*"{tool}>=*'), (
+                f"{tool} dev-dep must be pinned (==), not lower-bounded (>=)"
+            )
+
+    def test_ci_installs_are_pinned(self) -> None:
         text = _repo_relative(CI_YML)
-        assert 'pip install "ruff==' in text, (
+        for tool in self.GATE_TOOLS:
+            bare = re.compile(rf"^\s*pip install {re.escape(tool)}\s*$", re.M)
+            assert not bare.search(text), (
+                f"unpinned 'pip install {tool}' remains in ci.yml"
+            )
+        # The three ruff jobs each pin explicitly (ruff gates the repo-root
+        # scope, so this count is the frozen-dir contract's install spine).
+        assert text.count('pip install "ruff==') >= 1, (
             'CI must install ruff via a pinned spec like pip install "ruff==X.Y.Z"'
         )
-        assert not re.search(r"^\s*pip install ruff\s*$", text, flags=re.M), (
-            "unpinned 'pip install ruff' remains in ci.yml"
-        )
 
-    def test_precommit_rev_matches_ci_pin(self) -> None:
-        pin = ""
+    def test_precommit_revs_match_pyproject_pins(self) -> None:
+        pins: dict[str, str] = {}
         for ln in PYPROJECT_TOML.read_text(encoding="utf-8").splitlines():
             stripped = ln.strip()
-            if stripped.startswith('"ruff=='):
-                pin = stripped[len('"ruff==') :].strip().rstrip('",').strip()
-                break
-        assert pin, "could not read pinned ruff version from pyproject.toml"
-        assert f"rev: v{pin}" in _repo_relative(PRECOMMIT_YML), (
-            f"ruff-pre-commit rev is not v{pin} (lockstep broken)"
+            for tool in self.GATE_TOOLS:
+                spec = f'"{tool}=='
+                if stripped.startswith(spec):
+                    pins[tool] = stripped[len(spec) :].strip().rstrip('",').strip()
+        assert set(pins) == set(self.GATE_TOOLS), f"unreadable pins: {pins}"
+        text = _repo_relative(PRECOMMIT_YML)
+        assert f"rev: v{pins['ruff']}" in text, "ruff-pre-commit rev != pyproject pin"
+        assert f"rev: {pins['flake8']}" in text, "flake8 hook rev != pyproject pin"
+        # mypy, bandit and pip-audit run as language:system local hooks,
+        # so their pre-commit surface IS the venv pinned by pyproject.
+        entries = {ln.strip() for ln in text.splitlines()}
+        assert "entry: python -m mypy" in entries, (
+            "mypy local hook (language: system) missing from pre-commit config"
         )
 
 
