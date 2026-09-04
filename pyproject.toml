@@ -189,6 +189,10 @@ ignore_missing_imports = true
 asyncio_mode = "auto"
 testpaths = ["tests"]
 addopts = "-v"
+# Escalate RuntimeWarning to error: never-awaited coroutines (AsyncMock on
+# sync APIs) previously shipped invisibly through CI. UserWarning stays
+# non-fatal (third-party noise, e.g. newspaper/nltk).
+filterwarnings = ["error::RuntimeWarning"]
 
 [tool.coverage.run]
 source = ["src"]
