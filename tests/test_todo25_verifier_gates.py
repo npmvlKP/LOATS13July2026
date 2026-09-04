@@ -437,3 +437,61 @@ class TestRatchetLockstep:
             f"verify_todo21_root_cleanup.py fails on the live tree:\n"
             f"{proc.stdout[-1500:]}\n{proc.stderr[-300:]}"
         )
+
+    def test_todo21_external_leniency_branch_removed(self) -> None:
+        """One failed check must make TODO-21-external verdict FAIL.
+
+        RED at HEAD: generate_report() had 'elif not self.strict and
+        failed_checks <= 1: overall_status = PASS' — a single fault was
+        reported PASS (which is how the stale 416 pin hid for a day).
+        """
+        spec = importlib.util.spec_from_file_location(
+            "verify_todo21_external_under_test",
+            REPO_ROOT / "scripts" / "verify_todo21_external.py",
+        )
+        assert spec is not None and spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = module
+        spec.loader.exec_module(module)
+
+        validator = module.ExternalValidator(project_root=REPO_ROOT, strict=False)
+        validator.checks = [
+            module.CheckResult(
+                name="Synthetic failing check",
+                description="one fault must fail the report",
+                passed=False,
+                details={},
+                timestamp="2026-09-04T00:00:00",
+                duration_ms=0,
+            )
+        ]
+        report = validator.generate_report()
+        assert report.overall_status == "FAIL", (
+            "single failed check still yields overall PASS — leniency "
+            f"branch survived (failed_checks={report.failed_checks})"
+        )
+
+    def test_genuine_p1_evidence_is_tracked(self) -> None:
+        """The discharging live-scope evidence must travel with the repo.
+
+        RED at HEAD: reports/p1_analyze_latency_20260904_040609.json
+        (100/100 live TCS round trips, the F8-L-03 discharge artifact)
+        was gitignored, so a clone could not reproduce the HC-29 PASS.
+        """
+        out = subprocess.run(
+            ["git", "ls-files", "reports/"],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        tracked = set(out.stdout.split())
+        required = {
+            "reports/p1_analyze_latency_20260828_084822.json",
+            "reports/p1_analyze_latency_20260904_040609.json",
+        }
+        missing = required - tracked
+        assert not missing, (
+            f"canonical P1 evidence not tracked: {sorted(missing)} — the "
+            "F8-L-03 discharge cannot be verified from a fresh clone"
+        )
