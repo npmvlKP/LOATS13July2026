@@ -298,10 +298,12 @@ class ExternalValidator:
         # scripts/verify_f8c02_external.py (single-source intent: no
         # venv/junk-class re-entry; see the hygiene guard for the classes).
         # 2026-09-03 re-pin: 416 (+1 F8-L-03 closure doc).
-        # 2026-09-04 re-pin: 426 (+10 F8-L-05 RSS wave files); lockstep with
+        # 2026-09-04 re-pin: 426 (+10 F8-L-05 RSS wave files), then 428/429
+        # (TODO-25 gate-integrity wave + F8-L-03 discharge evidence,
+        # benchmark artifacts untracked); lockstep with
         # scripts/check_repo_hygiene.py TRACKED_FILE_CEILING and
         # scripts/verify_f8c02_external.py.
-        baseline_count = 428
+        baseline_count = 429
         count_after_commit = current_count - staged_deletions
         reduction = baseline_count - count_after_commit
         percentage = (reduction / baseline_count * 100) if baseline_count > 0 else 0
@@ -464,10 +466,10 @@ class ExternalValidator:
         }
 
         overall_status = "PASS" if failed_checks == 0 else "FAIL"
-        if self.strict and failed_checks > 0:
-            overall_status = "FAIL"
-        elif not self.strict and failed_checks <= 1:
-            overall_status = "PASS"
+        # F8 wave (2026-09-04): the previous non-strict leniency branch
+        # ("failed_checks <= 1 -> PASS") reported a single fault as PASS,
+        # which is exactly how the stale 416 tracked-file pin survived a
+        # day as a false PASS. Any failed check fails the verdict.
 
         return VerificationReport(
             verification_id=self.verification_id,
