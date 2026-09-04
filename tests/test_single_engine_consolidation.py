@@ -153,7 +153,10 @@ class TestSchedulerDoesNotEmitSignals:
     @pytest.mark.asyncio
     async def test_scheduler_adds_only_support_jobs(self):
         sched = TradingScheduler()
-        mock_add_job = AsyncMock()
+        # AsyncIOScheduler.add_job is synchronous; an AsyncMock here creates
+        # never-awaited coroutines and RuntimeWarnings per run (pattern
+        # introduced by 11ad240, missed by a22d6ca's mock-contract sweep).
+        mock_add_job = MagicMock()
         sched.scheduler.add_job = mock_add_job
         await sched._add_jobs()
 
