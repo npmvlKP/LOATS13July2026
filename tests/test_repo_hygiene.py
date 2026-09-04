@@ -11,10 +11,16 @@ emission mutation net, and the HC-21 bare-env behavioral contract.
 F8-M-05 additions: compact-repo rules for evidence reports — completion
 reports live only under docs/audit-history/, never at the docs/ top
 level, and reports/health/ tracks only curated health-final-*.json.
+
+F8-L-04-R2 additions: lint version lockstep — the ruff version must be
+the single pinned value across pyproject dev-deps, every CI ruff job,
+and the ruff-pre-commit hook rev, so no gate surface drifts onto a
+different rule set than the one the tree was verified against.
 """
 
 from __future__ import annotations
 
+import fnmatch
 import importlib.util
 import os
 import re
@@ -29,8 +35,58 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 GUARD_PATH = REPO_ROOT / "scripts" / "check_repo_hygiene.py"
 HELPER_PATH = REPO_ROOT / "scripts" / "win32_root_junk.py"
 HC15_PROBE = REPO_ROOT / "scripts" / "probe_hc15_strength_gate.py"
+CI_YML = REPO_ROOT / ".github" / "workflows" / "ci.yml"
+PRECOMMIT_YML = REPO_ROOT / ".pre-commit-config.yaml"
+PYPROJECT_TOML = REPO_ROOT / "pyproject.toml"
 
 IS_WINDOWS = sys.platform == "win32"
+
+
+def _repo_relative(p: Path) -> str:
+    """Config-file text with forward slashes and CRLF stripped (POSIX+Windows)."""
+    return p.read_text(encoding="utf-8").replace("\r\n", "\n").replace("\\", "/")
+
+
+@pytest.mark.skipif(not CI_YML.exists(), reason="CI workflow absent")
+class TestLintVersionLockstep:
+    """Ruff version must be a single pinned value across all gate surfaces.
+
+    A version drift between pyproject dev-deps, the CI ruff jobs, and the
+    pre-commit hook rev means a gate can pass on one surface and fail on
+    another with zero source changes. These tests assert agreement, not a
+    specific version, so deliberate upgrades stay green.
+    """
+
+    def test_pyproject_pins_ruff(self) -> None:
+        text = _repo_relative(PYPROJECT_TOML)
+        pins = [
+            ln for ln in text.splitlines() if fnmatch.fnmatch(ln.strip(), '"ruff==*')
+        ]
+        assert len(pins) == 1, f"expected exactly one pinned ruff dev-dep: {pins}"
+        assert not fnmatch.fnmatch(text, '*"ruff>=*'), (
+            "ruff dev-dep must be pinned (==), not lower-bounded (>=)"
+        )
+
+    def test_ci_ruff_jobs_use_pinned_install(self) -> None:
+        text = _repo_relative(CI_YML)
+        assert 'pip install "ruff==' in text, (
+            'CI must install ruff via a pinned spec like pip install "ruff==X.Y.Z"'
+        )
+        assert not re.search(r"^\s*pip install ruff\s*$", text, flags=re.M), (
+            "unpinned 'pip install ruff' remains in ci.yml"
+        )
+
+    def test_precommit_rev_matches_ci_pin(self) -> None:
+        pin = ""
+        for ln in PYPROJECT_TOML.read_text(encoding="utf-8").splitlines():
+            stripped = ln.strip()
+            if stripped.startswith('"ruff=='):
+                pin = stripped[len('"ruff==') :].strip().rstrip('",').strip()
+                break
+        assert pin, "could not read pinned ruff version from pyproject.toml"
+        assert f"rev: v{pin}" in _repo_relative(PRECOMMIT_YML), (
+            f"ruff-pre-commit rev is not v{pin} (lockstep broken)"
+        )
 
 
 def _load_guard():
