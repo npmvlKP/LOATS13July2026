@@ -76,7 +76,15 @@ FORBIDDEN_PATTERNS: tuple[str, ...] = (
 # tightens with the tree and venv-class blowups stay impossible.
 # 2026-09-03: +1 for docs/audit-history/03Sep2026-F8-L-03-closure.md
 # (F8-L-03 closure record); re-pinned to 416 in lockstep.
-TRACKED_FILE_CEILING = 416
+# F8-L-05 (2026-09-04): +9 tracked files (src/loats/rss_validation.py,
+# scripts/validate_rss_feeds.py, scripts/eval_f8l05.py,
+# tests/test_rss_validation.py,
+# tests/fixtures/rss/recorded-sources.json + 3 recorded .xml fixtures,
+# docs/audit-history/04Sep2026-F8-L-05-closure.md)
+# -> re-pinned to 425.
+# F8-L-06 (2026-09-04): +1 tracked file (docs/audit-history/
+# 04Sep2026-F8-L-06-closure.md); re-pinned to 426.
+TRACKED_FILE_CEILING = 426
 
 # Tracked paths that would match FORBIDDEN_PATTERNS but are deliberate.
 ALLOWLIST: frozenset[str] = frozenset(

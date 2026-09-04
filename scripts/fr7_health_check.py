@@ -838,6 +838,28 @@ def probe_config(rep: Report) -> None:
     )
 
 
+def probe_rss_feeds(rep: Report) -> None:
+    """HC-28 — F8-L-05 RSS recorded-fallback feed validation.
+
+    Runs scripts/validate_rss_feeds.py --offline out-of-process: the
+    recorded-source manifest is the fallback safety net for the sentiment
+    pipeline, so its integrity is verified in a subprocess exactly like the
+    other external gates. Network is never required.
+    """
+    run_gate(
+        rep,
+        "HC-28",
+        "F8-L-05",
+        "RSS recorded-fallback feed validation",
+        [
+            sys.executable,
+            str(REPO_ROOT / "scripts" / "validate_rss_feeds.py"),
+            "--offline",
+        ],
+        timeout=60,
+    )
+
+
 # ------------------------------------------------------------ gate runner ----
 
 
@@ -1144,6 +1166,8 @@ def main() -> int:
         probe_strength_gate(rep)
     if wants("HC-23"):
         probe_config(rep)
+    if wants("HC-28"):
+        probe_rss_feeds(rep)
     if not only or wants(
         "HC-04",
         "HC-05",

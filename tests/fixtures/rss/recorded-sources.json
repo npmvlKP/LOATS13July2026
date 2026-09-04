@@ -1,0 +1,42 @@
+{
+  "meta": {
+    "purpose": "F8-L-05 recorded RSS fallback: curl-verified live payloads captured for offline feed validation (CI + startup recorded fallback).",
+    "recorded_at": "2026-09-04",
+    "recorded_from": [
+      "https://economictimes.indiatimes.com/markets/rssfeeds/1977021501.cms",
+      "https://www.moneycontrol.com/rss/latestnews.xml",
+      "https://www.livemint.com/rss/markets"
+    ],
+    "verification": "curl -sL --max-time 15 <url>; each response HTTP 200, XML content-type, RSS 2.0 <rss><channel> with <item> entries",
+    "validator": "scripts/validate_rss_feeds.py --offline"
+  },
+  "sources": [
+    {
+      "name": "Economic Times Markets",
+      "url": "https://economictimes.indiatimes.com/markets/rssfeeds/1977021501.cms",
+      "fixture": "tests/fixtures/rss/economictimes-markets.xml",
+      "http_status": 200,
+      "content_type": "text/xml;charset=UTF-8",
+      "items_observed": 50,
+      "note": "settings.rss_feeds entry 1; recorded payload has 50 <item> entries"
+    },
+    {
+      "name": "Moneycontrol Latest News",
+      "url": "https://www.moneycontrol.com/rss/latestnews.xml",
+      "fixture": "tests/fixtures/rss/moneycontrol-latestnews.xml",
+      "http_status": 200,
+      "content_type": "application/xml",
+      "items_observed": 15,
+      "note": "settings.rss_feeds entry 2; channel <link> is site root (https://www.moneycontrol.com), same host identity. Upstream serves a stale-cached feed: two independent 2026-09-04 fetches (13:51 and 15:05 IST) returned byte-identical payloads with Apr-2024 pubDates. Fixture is a faithful recording of the live endpoint; staleness is upstream behavior, recheck on refresh."
+    },
+    {
+      "name": "Livemint Markets",
+      "url": "https://www.livemint.com/rss/markets",
+      "fixture": "tests/fixtures/rss/livemint-markets.xml",
+      "http_status": 200,
+      "content_type": "application/xml;charset=UTF-8",
+      "items_observed": 35,
+      "note": "settings.rss_feeds entry 3; added in TODO-27d replacing defunct bloombergquint"
+    }
+  ]
+}
