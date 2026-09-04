@@ -21,6 +21,12 @@ os.environ.setdefault("OPENALGO_API_KEY", "test_api_key")
 os.environ.setdefault("OPENALGO_BASE_URL", "https://test.openalgo.com")
 os.environ.setdefault("TELEGRAM_BOT_TOKEN", "test_bot_token")
 os.environ.setdefault("TELEGRAM_CHAT_ID", "123456789")
+# Adopt the documented F8-L-06 suppression knob so the benign newspaper4k
+# "nltk is not installed" UserWarning does not fire during the suite (the
+# optional [nlp] extra is intentionally not installed here). The suppression
+# regression tests copy os.environ and control the knob explicitly, so both
+# sides of their contract stay observable.
+os.environ.setdefault("LOATS_SUPPRESS_NLTK_WARNING", "1")
 
 from loats.database import Database
 from loats.models import (
