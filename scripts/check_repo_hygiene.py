@@ -84,7 +84,11 @@ FORBIDDEN_PATTERNS: tuple[str, ...] = (
 # -> re-pinned to 425.
 # F8-L-06 (2026-09-04): +1 tracked file (docs/audit-history/
 # 04Sep2026-F8-L-06-closure.md); re-pinned to 426.
-TRACKED_FILE_CEILING = 428
+# TODO-25 gate-integrity wave (2026-09-04): +3 (gate-integrity note,
+# regression tests, and a stray benchmark run artifact that was later
+# untracked) then +1 again for the F8-L-03 discharge evidence
+# (reports/p1_analyze_latency_20260904_040609.json) -> re-pinned to 429.
+TRACKED_FILE_CEILING = 429
 
 # Tracked paths that would match FORBIDDEN_PATTERNS but are deliberate.
 ALLOWLIST: frozenset[str] = frozenset(
