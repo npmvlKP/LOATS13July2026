@@ -36,15 +36,17 @@ maintainability surface. Measurement at HEAD `1c41c7c` (branch
 
 ## Decision
 1. **Delete the 48 dead scripts and 7 orphaned artifacts** (55 tracked
-   files). Keep-decisions
-   at the zero-external-reference boundary: `stress_rule7_concurrency.py`
+   files). Keep-decisions at the zero-external-reference boundary:
+   `stress_rule7_concurrency.py`
    (live test wiring — `tests/test_rule7_concurrency.py` shells out to it),
    `collect_p1_phase_gate_evidence.py` (generator of
    the tracked P1 evidence of record), `eval_f8l05.py` (guard-wired in
    `check_repo_hygiene.py`), `probe_hc14_ops_limiter.py` (consumed by
-   `verify_hc_registry.py`, cited by ADR-006), `utils.py` +
-   `pip_audit_wrapper.py` (audit-narrative citations only — the rot class
-   itself, kept deliberately until their waves document alternatives).
+   `verify_hc_registry.py`, cited by ADR-006).
+   [F8-L-07 correction, 2026-09-05: an earlier revision listed
+   `utils.py` + `pip_audit_wrapper.py` as deliberately kept on
+   audit-narrative citations; commit `e24579d` in fact deleted both —
+   see ADR-0009.]
 2. **Make orphaned scripts a machine-checkable failure**:
    `scripts/check_scripts_wiring.py` computes liveness to a fixpoint from
    live citation roots (CI, pre-commit, tests/, src/, pyproject, .flake8,
@@ -81,6 +83,10 @@ maintainability surface. Measurement at HEAD `1c41c7c` (branch
 * The ratchet ceiling stays 377 until the next wave re-pins all four
   surfaces in lockstep (net file count: 429 - 55 deletions + 3 additions:
   the guard, its regression net, this ADR).
+  [F8-L-07 (ADR-0009) supersedes this consequence: the ceiling now has a
+  single imported source — `scripts/ratchet_baseline.py` — so a re-pin is
+  a one-site edit plus the module's own history line; ceiling re-pinned
+  377 -> 379 when the module and ADR-0009 landed.]
 
 ## Evidence (all commands executed live on Windows, 2026-09-05)
 * `python scripts/check_scripts_wiring.py` → `OK scripts wiring clean

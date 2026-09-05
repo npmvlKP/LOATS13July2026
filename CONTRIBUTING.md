@@ -114,8 +114,9 @@ To revive an archived script, **promote it out of the frozen directory**
 into `scripts/` (or `src/`/`tests/` as appropriate), repair it to pass
 the full root-level lint battery (`ruff check .`, `ruff format`,
 `flake8 .`), and account for it in the `TRACKED_FILE_CEILING` ratchet
-(`scripts/check_repo_hygiene.py`). Never edit a file in place under the
-frozen directories to satisfy lint.
+(`scripts/ratchet_baseline.py` — the single pinned value; re-pin there
+and append its history line in the same commit). Never edit a file in
+place under the frozen directories to satisfy lint.
 
 ### Gate-Tool Upgrade Procedure (Version Lockstep)
 
