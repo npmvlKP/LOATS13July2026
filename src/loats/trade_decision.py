@@ -65,6 +65,15 @@ class TradeDecisionEngine:
         self.analyzer_routing_enabled = cfg.analyzer_routing_enabled
         self.decision_timeout = datetime.timedelta(minutes=5)
         self._processor_task: asyncio.Task[None] | None = None
+        # P5/F8-H-01 evidence counters: lifetime Analyzer-routing outcomes,
+        # incremented only when a routing call actually resolves. The P5
+        # supervisor reads these (via get_routing_stats) instead of
+        # fabricating activity numbers in the run log.
+        self.routing_counters: dict[str, int] = {
+            "success": 0,
+            "disabled": 0,
+            "error": 0,
+        }
 
     async def create_trade_decision(
         self,
@@ -375,6 +384,7 @@ class TradeDecisionEngine:
             logger.info(
                 f"Analyzer routing disabled for decision {trade_decision.decision_id}"
             )
+            self.routing_counters["disabled"] += 1
             return response
 
         # Routing enabled - make real HTTP call to Analyzer (no simulation).
@@ -386,6 +396,7 @@ class TradeDecisionEngine:
             logger.info(
                 f"Successfully routed decision {trade_decision.decision_id} to Analyzer"
             )
+            self.routing_counters["success"] += 1
             return {
                 "status": "success",
                 "decision_id": trade_decision.decision_id,
@@ -402,6 +413,7 @@ class TradeDecisionEngine:
                 "error_type": type(e).__name__,
                 "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
             }
+            self.routing_counters["error"] += 1
             await self._persist_routing_outcome(trade_decision, response)
             raise
 
@@ -547,6 +559,15 @@ class TradeDecisionEngine:
             "queue_full": self.decision_queue.full(),
             "queue_empty": self.decision_queue.empty(),
         }
+
+    def get_routing_stats(self) -> dict[str, Any]:
+        """Return lifetime Analyzer-routing outcome counters (P5/F8-H-01).
+
+        The P5 forward-test supervisor aggregates these into the run log so
+        graded activity reflects real routing outcomes (success / disabled
+        / error), never estimates.
+        """
+        return dict(self.routing_counters)
 
     async def start_decision_processor(self) -> None:
         """Start the decision processing task."""
