@@ -43,6 +43,8 @@ jobs:
           python-version: '3.12'
       - name: Reject tracked venvs / junk / env files (F8-C-02)
         run: python scripts/check_repo_hygiene.py
+      - name: Reject orphan scripts / back-references (F8-L-06-R2)
+        run: python scripts/check_scripts_wiring.py
 
   rss-feeds:
     name: rss-feeds (F8-L-05 recorded fallback)

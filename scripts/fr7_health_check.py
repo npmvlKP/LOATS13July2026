@@ -883,6 +883,31 @@ def probe_hc29(rep: Report) -> None:
     )
 
 
+# ----------------------------------------------------------------- HC-30 ----
+
+
+def probe_hc30(rep: Report) -> None:
+    """HC-30 — scripts/ wiring ratchet (F8-L-06-R2, maintainability review).
+
+    Every tracked ``scripts/*.py`` must be reachable from a live citation
+    surface (CI, pre-commit, tests, src, pyproject, living docs, pinned
+    evidence artifacts, or another live script); ``src/``/``tests/`` must
+    not reach back into ``scripts/``. Introduced after the maintainability
+    review measured 49 of 90 scripts/ files as dead one-wave verifiers —
+    cited only from frozen archives — and removed them. Delegates to the
+    same guard the CI ``repo-hygiene`` job runs, so HC-30 can never drift
+    from CI by construction.
+    """
+    run_gate(
+        rep,
+        "HC-30",
+        "F8-L-06-R2",
+        "scripts wiring ratchet (no orphans, no back-refs)",
+        [sys.executable, str(REPO_ROOT / "scripts" / "check_scripts_wiring.py")],
+        timeout=120,
+    )
+
+
 # ------------------------------------------------------------ gate runner ----
 
 
@@ -1184,6 +1209,7 @@ def main(argv: list[str] | None = None) -> int:
         "HC-16",
         "HC-17",
         "HC-18",
+        "HC-19",
         "HC-20",
         "HC-21",
         "HC-22",
@@ -1194,6 +1220,7 @@ def main(argv: list[str] | None = None) -> int:
         "HC-27",
         "HC-28",
         "HC-29",
+        "HC-30",
     }
     unknown = only - known_ids
     if unknown:
@@ -1231,6 +1258,8 @@ def main(argv: list[str] | None = None) -> int:
         probe_rss_feeds(rep)
     if wants("HC-29"):
         probe_hc29(rep)
+    if wants("HC-30"):
+        probe_hc30(rep)
     if not only or wants(
         "HC-04",
         "HC-05",
