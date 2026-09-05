@@ -46,6 +46,12 @@ MIN_SPAN_DAYS = 14
 # never estimated.
 _SAMPLE_INTERVAL_S = 60.0
 
+# ``--status`` honesty threshold: a live-shape log whose last sample is
+# older than this is almost certainly an abandoned run (the supervised
+# loop samples every _SAMPLE_INTERVAL_S). Status still reports the log,
+# but flags the staleness instead of implying the run is accumulating.
+_STALE_WARN_S = 600.0
+
 PASS_SYM, FAIL_SYM = "[PASS]", "[FAIL]"
 
 
@@ -94,13 +100,24 @@ def _utcnow_iso() -> str:
 
 
 def _find_run_log(path: Path | None) -> Path | None:
-    """Return the given path or the newest existing run log."""
+    """Return the given path or the default-selection run log.
+
+    Default selection is delegated to the validator's
+    ``select_default_run_log`` (single source of policy): the live
+    evidence run wins over newer smoke-test stubs, so ``--status`` cannot
+    mis-grade a dry-run stub while the supervised run is ongoing — the
+    mis-gradation observed live 2026-09-05 (stub 170809 shadowed the
+    resumed 063556 evidence run).
+    """
     if path is not None:
         return path if path.exists() else None
-    candidates = sorted(
-        RUN_LOG_DIR.glob(RUN_LOG_GLOB), key=lambda p: p.stat().st_mtime, reverse=True
-    )
-    return candidates[0] if candidates else None
+    validator = _load_validator()
+    if validator is None:
+        raise RuntimeError(
+            "P5 validator (scripts/verify_p5_forward_test.py) failed to load; "
+            "cannot select the default run log"
+        )
+    return validator.select_default_run_log(RUN_LOG_DIR)
 
 
 def _init_run_log(reason: str, dry_run: bool) -> Path:
@@ -532,6 +549,21 @@ def _status(path: Path | None) -> int:
         print("activity  : none recorded (legacy log — no live sampling)")
     process = "ongoing" if not ended else "ended"
     print(f"ended_at  : {ended or '(ongoing)'} [{process}]")
+    if not ended:
+        sampled = data.get("last_sampled_at")
+        sampled_ts = datetime.datetime.fromisoformat(sampled) if sampled else None
+        now = datetime.datetime.now(datetime.UTC)
+        if sampled_ts is not None:
+            if sampled_ts.tzinfo is None:
+                sampled_ts = sampled_ts.replace(tzinfo=datetime.UTC)
+            age = (now - sampled_ts).total_seconds()
+            if age > _STALE_WARN_S:
+                print(
+                    f"WARNING   : last sample {age / 3600:.1f}h ago "
+                    f"(supervisor samples every {_SAMPLE_INTERVAL_S:.0f}s) — "
+                    "no supervisor is writing to this run log; "
+                    "resume it: python scripts/run_p5_forward_test.py --resume"
+                )
     print(f"span      : {span} (required >= {MIN_SPAN_DAYS}d)")
     print(f"exceptions: {data.get('unhandled_exceptions')}")
     print(f"counters  : {counters}")

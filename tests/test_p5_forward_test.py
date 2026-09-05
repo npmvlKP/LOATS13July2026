@@ -832,6 +832,144 @@ class TestResumeBaseline:
         finally:
             runner.RUN_LOG_DIR = original_dir
 
+    def test_select_default_prefers_live_run_over_newer_stub(
+        self, tmp_path: Path
+    ) -> None:
+        """Default selection must surface the ongoing evidence run.
+
+        A dry-run smoke stub with a newer mtime (e.g. one written by an
+        external cron) must not shadow the live supervised run — exactly
+        the mis-gradation observed live 2026-09-05 when ``--status``
+        graded a dry-run stub while the evidence run was ongoing.
+        """
+        validator = _load_validator()
+        live = tmp_path / "p5_forward_test_001.json"
+        self._write_log(live, ended=False)
+        older_mtime = time.time() - 300
+        os.utime(live, (older_mtime, older_mtime))
+
+        ended = tmp_path / "p5_forward_test_002.json"
+        self._write_log(ended, ended=True)
+
+        stub = tmp_path / "p5_forward_test_003.json"
+        self._write_log(stub, dry_run=True, ended=False)
+
+        assert validator.select_default_run_log(tmp_path) == live
+
+    def test_select_default_prefers_fresh_sample_over_stale(
+        self, tmp_path: Path
+    ) -> None:
+        """Among live-shape logs, a fresh sample outranks a newer mtime."""
+        validator = _load_validator()
+        now = datetime.datetime.now(datetime.UTC)
+
+        def write_live(path: Path, sampled_at: datetime.datetime) -> None:
+            record = {
+                "metadata": {"phase_gate": "P5", "dry_run": False},
+                "routing": {"enabled_at_start": True},
+                "started_at": (now - datetime.timedelta(days=1)).isoformat(),
+                "ended_at": None,
+                "unhandled_exceptions": 0,
+                "restarts": 0,
+                "cycles_completed": 1,
+                "cycles_completed_baseline": 0,
+                "counters": {"success": 0, "disabled": 0, "error": 0},
+                "counters_baseline": {"success": 0, "disabled": 0, "error": 0},
+                "last_sampled_at": sampled_at.isoformat(),
+                "events": [],
+            }
+            path.write_text(json.dumps(record), encoding="utf-8")
+
+        stale = tmp_path / "p5_forward_test_001.json"
+        write_live(stale, now - datetime.timedelta(hours=2))
+        fresh = tmp_path / "p5_forward_test_002.json"
+        write_live(fresh, now - datetime.timedelta(seconds=30))
+        newest_mtime = time.time()
+        os.utime(stale, (newest_mtime, newest_mtime))
+        older_mtime = newest_mtime - 600
+        os.utime(fresh, (older_mtime, older_mtime))
+
+        assert validator.select_default_run_log(tmp_path) == fresh
+
+    def test_select_default_prefers_readable_over_unreadable(
+        self, tmp_path: Path
+    ) -> None:
+        """Newest unreadable file must not hide the newest readable log."""
+        validator = _load_validator()
+        good = tmp_path / "p5_forward_test_001.json"
+        self._write_log(good, ended=True)
+        older_mtime = time.time() - 300
+        os.utime(good, (older_mtime, older_mtime))
+
+        junk = tmp_path / "p5_forward_test_002.json"
+        junk.write_text("{not json", encoding="utf-8")
+
+        assert validator.select_default_run_log(tmp_path) == good
+
+    def test_select_default_empty_dir_returns_none(self, tmp_path: Path) -> None:
+        validator = _load_validator()
+        assert validator.select_default_run_log(tmp_path) is None
+
+    def test_status_targets_live_run_not_newer_stub(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """``--status`` must grade the ongoing live run, not a newer stub.
+
+        Runs in-process with ``RUN_LOG_DIR`` pointed at a tmp directory —
+        status only reads, so it cannot spawn a supervisor as a side
+        effect (unlike ``--resume``, see
+        test_resume_cli_refuses_when_no_eligible_log).
+        """
+        runner: Any = _load_runner()
+        live = tmp_path / "p5_forward_test_001.json"
+        self._write_log(live, ended=False)
+        older_mtime = time.time() - 300
+        os.utime(live, (older_mtime, older_mtime))
+
+        stub = tmp_path / "p5_forward_test_002.json"
+        self._write_log(stub, dry_run=True, ended=False)
+
+        original_dir = runner.RUN_LOG_DIR
+        original_argv = sys.argv
+        runner.RUN_LOG_DIR = tmp_path
+        sys.argv = [str(RUNNER), "--status"]
+        try:
+            rc = runner.main()
+        finally:
+            runner.RUN_LOG_DIR = original_dir
+            sys.argv = original_argv
+        out = capsys.readouterr().out
+        assert rc == 0
+        assert str(live) in out
+        assert str(stub) not in out
+
+    def test_status_warns_when_live_sample_is_stale(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """An ongoing log with no recent sample must say so, loudly."""
+        runner: Any = _load_runner()
+        live = tmp_path / "p5_forward_test_001.json"
+        self._write_log(live, ended=False)
+        record = json.loads(live.read_text(encoding="utf-8"))
+        record["last_sampled_at"] = (
+            datetime.datetime.now(datetime.UTC) - datetime.timedelta(hours=3)
+        ).isoformat()
+        live.write_text(json.dumps(record), encoding="utf-8")
+
+        original_dir = runner.RUN_LOG_DIR
+        original_argv = sys.argv
+        runner.RUN_LOG_DIR = tmp_path
+        sys.argv = [str(RUNNER), "--status"]
+        try:
+            rc = runner.main()
+        finally:
+            runner.RUN_LOG_DIR = original_dir
+            sys.argv = original_argv
+        out = capsys.readouterr().out
+        assert rc == 0
+        assert "WARNING" in out
+        assert "no supervisor is writing" in out
+
     def test_resume_cli_refuses_when_no_eligible_log(self, tmp_path, capsys) -> None:
         """``--resume`` with no eligible log refuses with exit code 2.
 

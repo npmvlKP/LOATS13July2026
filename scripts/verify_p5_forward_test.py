@@ -144,6 +144,75 @@ def grade_run_log(run_log: dict[str, Any]) -> Grade:
     )
 
 
+RUN_LOG_GLOB = "p5_forward_test_*.json"
+
+# A supervised run folds live counters into its run log every
+# run_p5_forward_test._SAMPLE_INTERVAL_S (60 s). A live-shape log whose
+# last sample is older than this is an abandoned run (supervisor died);
+# it still outranks smoke stubs as the evidence carrier, but a fresher
+# live run outranks it.
+_LIVE_SAMPLE_STALE_S = 1800.0
+
+
+def _read_log_dict(path: Path) -> dict[str, Any] | None:
+    """Read one run-log file; return None when unreadable or not a dict."""
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def select_default_run_log(root: Path | None = None) -> Path | None:
+    """Pick the run log that default grading / ``--status`` must surface.
+
+    Single source of default-selection policy (shared with
+    run_p5_forward_test.py). Preference order:
+
+    1. a live-shape run log (``dry_run`` false, ``ended_at`` null) with a
+       fresh ``last_sampled_at`` — an actively supervised run is always
+       the current story;
+    2. the newest live-shape log — an abandoned ongoing run (supervisor
+       died mid-span) is the evidence carrier and must NOT be shadowed by
+       smoke-test stubs that merely have newer mtimes;
+    3. the newest readable log of any kind (e.g. an ended supervised run);
+    4. the newest file outright, so a corrupt tree still surfaces its
+       newest log for grading (the FAIL reason shows the corruption)
+       instead of reporting "no logs found".
+
+    Returns None only when no matching file exists at all.
+    """
+    root = root if root is not None else REPO_ROOT / "reports"
+    candidates = sorted(
+        root.glob(RUN_LOG_GLOB), key=lambda p: p.stat().st_mtime, reverse=True
+    )
+    if not candidates:
+        return None
+    live: list[Path] = []
+    readable: list[Path] = []
+    for path in candidates:
+        data = _read_log_dict(path)
+        if data is None:
+            continue
+        readable.append(path)
+        metadata = data.get("metadata") or {}
+        if not metadata.get("dry_run") and data.get("ended_at") is None:
+            live.append(path)
+    now = datetime.datetime.now(datetime.UTC)
+    for path in live:
+        data = _read_log_dict(path)
+        sampled = _parse_ts((data or {}).get("last_sampled_at"))
+        if sampled is not None and (now - sampled).total_seconds() <= (
+            _LIVE_SAMPLE_STALE_S
+        ):
+            return path
+    if live:
+        return live[0]
+    if readable:
+        return readable[0]
+    return candidates[0]
+
+
 def _load(path: Path) -> dict[str, Any] | None:
     """Load a run-log JSON file, returning None on parse failure."""
     try:
@@ -168,16 +237,12 @@ def main() -> int:
 
     paths = list(args.logs)
     if not paths:
-        candidates = sorted(
-            (REPO_ROOT / "reports").glob("p5_forward_test_*.json"),
-            key=lambda p: p.stat().st_mtime,
-            reverse=True,
-        )
-        if not candidates:
-            print(f"{FAIL_SYM} no reports/p5_forward_test_*.json run logs found")
+        selected = select_default_run_log()
+        if selected is None:
+            print(f"{FAIL_SYM} no reports/{RUN_LOG_GLOB} run logs found")
             print("  Run scripts/run_p5_forward_test.py to begin the P5 forward test")
             return 1
-        paths = [candidates[0]]
+        paths = [selected]
 
     verdicts: list[tuple[Path, Grade]] = []
     for path in paths:
