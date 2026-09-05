@@ -541,7 +541,7 @@ class TestRoutingCounters:
         assert stats["success"] == 0
 
 
-def _load_runner():
+def _load_runner() -> Any:
     spec = importlib.util.spec_from_file_location("p5_runner_mod", RUNNER)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
@@ -832,13 +832,49 @@ class TestResumeBaseline:
         finally:
             runner.RUN_LOG_DIR = original_dir
 
-    def test_resume_cli_refuses_when_no_eligible_log(self) -> None:
+    def test_resume_cli_refuses_when_no_eligible_log(self, tmp_path, capsys) -> None:
+        """``--resume`` with no eligible log refuses with exit code 2.
+
+        Runs in-process with ``RUN_LOG_DIR`` pointed at an empty directory.
+        A bare ``--resume`` subprocess against the real ``reports/`` would
+        RESUME (not refuse) on a gate host with an ongoing live run — the
+        required production state — spawning a second live supervisor as a
+        test side effect (observed live 2026-09-05: the stray supervisor
+        ended the run under supervision).
+        """
+        runner: Any = _load_runner()
+        original_dir = runner.RUN_LOG_DIR
+        original_argv = sys.argv
+        runner.RUN_LOG_DIR = tmp_path
+        sys.argv = [str(RUNNER), "--resume"]
+        try:
+            rc = runner.main()
+        finally:
+            runner.RUN_LOG_DIR = original_dir
+            sys.argv = original_argv
+        assert rc == 2
+        assert "no resumable run log" in capsys.readouterr().err
+
+    def test_resume_cli_exit_code_contract_via_subprocess(self, tmp_path: Path) -> None:
+        """``--resume --run-log <missing>`` refuses with exit code 2 through
+        the real ``sys.exit(main())`` entry point.
+
+        Side-effect-free by construction: a missing explicit target can
+        never resolve to a live run log, so the subprocess cannot spawn a
+        second supervisor on a gate host.
+        """
         result = subprocess.run(
-            [sys.executable, str(RUNNER), "--resume"],
+            [
+                sys.executable,
+                str(RUNNER),
+                "--resume",
+                "--run-log",
+                str(tmp_path / "missing.json"),
+            ],
             capture_output=True,
             text=True,
             cwd=REPO_ROOT,
-            timeout=120,
+            timeout=60,
         )
         assert result.returncode == 2
-        assert "no resumable run log" in result.stderr
+        assert "resume target not found" in result.stderr
