@@ -6,19 +6,20 @@ Run from anywhere (resolves the repo root from this file's location):
     loatsNEW\\Scripts\\python.exe scripts\\verify_f8c02_external.py
 
 Checks (12):
- 1.  tracked file count <= 415 (ratchet ceiling re-pinned by the F8-M-02
-     hygiene follow-up; 411 measured after untracking session-agent files)
+ 1.  tracked file count <= 429 (ratchet ceiling re-pinned 2026-09-04
+     for the TODO-25 gate-integrity wave; see TRACKED_FILE_CEILING in
+     scripts/check_repo_hygiene.py — all ratchet surfaces must agree)
  2.  no tracked path under loatsNEW/ (the 9,939-file venv)
  3.  no tracked path under a literal `~/` directory
  4.  no tracked pyvenv.cfg / Scripts/python.exe anywhere
  5.  .env.test untracked, .env.example still tracked
  6.  package.json / package-lock.json / uv.lock / mypy-report/ untracked
  7.  reports/health/ tracks only health-final-*.json
- 8.  only the canonical P1 evidence file is tracked
+ 8.  only the two canonical P1 evidence files are tracked
  9.  .gitignore ignores the F8-C-02 classes (live check-ignore probes)
 10.  hygiene guard script passes on the live tree (exit 0)
 11.  guard wired into CI, pre-commit, and HC-26 (source greps)
-12.  TODO-21 verifiers re-baselined to 415 (source grep)
+12.  TODO-21 verifiers re-baselined to 429 (source grep; lockstep-tested)
 
 Exit 0 = all checks pass; 1 = failure. ASCII-only output, shell=False,
 absolute interpreter paths (Windows-safe per project conventions).
@@ -79,8 +80,8 @@ def main() -> int:
     # untracked; lockstep with scripts/check_repo_hygiene.py
     # TRACKED_FILE_CEILING and both TODO-21 verifiers)
     record(
-        len(tracked) <= 429,
-        "1. tracked files <= 429",
+        len(tracked) <= 377,
+        "1. tracked files <= 377",
         f"count={len(tracked)}",
     )
 
@@ -216,8 +217,8 @@ def main() -> int:
     # 2026-09-03 re-pin: 416 — +1 F8-L-03 closure doc)
     t21a = _read("scripts/verify_todo21_external.py")
     t21b = _read("scripts/verify_todo21_root_cleanup.py")
-    rebased = "baseline_count = 429" in t21a and "baseline_count = 429" in t21b
-    record(rebased, "12. TODO-21 ratchet re-baselined to 429")
+    rebased = "baseline_count = 377" in t21a and "baseline_count = 377" in t21b
+    record(rebased, "12. TODO-21 ratchet re-baselined to 377")
 
     # Summary
     print("=" * 72)

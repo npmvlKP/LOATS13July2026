@@ -88,7 +88,14 @@ FORBIDDEN_PATTERNS: tuple[str, ...] = (
 # regression tests, and a stray benchmark run artifact that was later
 # untracked) then +1 again for the F8-L-03 discharge evidence
 # (reports/p1_analyze_latency_20260904_040609.json) -> re-pinned to 429.
-TRACKED_FILE_CEILING = 429
+# F8-L-06-R2 maintainability wave (2026-09-05): -55 (48 dead one-wave
+# scripts + 7 orphaned report artifacts, see ADR-0008; a 49th dead
+# script, stress_rule7_concurrency.py, was restored after the full
+# suite caught its live test wiring), +3 (the wiring guard, its
+# regression net, ADR-0008) -> re-pinned to 377, the measured count.
+# scripts/ orphans are now separately ratcheted by
+# scripts/check_scripts_wiring.py (CI repo-hygiene, pre-commit, HC-30).
+TRACKED_FILE_CEILING = 377
 
 # Tracked paths that would match FORBIDDEN_PATTERNS but are deliberate.
 ALLOWLIST: frozenset[str] = frozenset(
