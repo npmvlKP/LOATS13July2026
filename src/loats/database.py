@@ -8,10 +8,11 @@ import hashlib
 import json
 import sqlite3
 import threading
+import time
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, TypeVar, cast
+from typing import IO, TYPE_CHECKING, Any, TypeVar, cast
 
 from pydantic import BaseModel
 
@@ -106,6 +107,14 @@ class Database:
         # correctly applied when new connections opened.
         self._pragmas_applied: set[int] = set()
         self._pragmas_lock = threading.Lock()
+        # FIX-F-PERF-2: persistent audit JSONL append handle.
+        # Re-opening the audit file per entry measured ~22 ms/call on Windows
+        # (handle open/close dominates), collapsing trade-insert throughput
+        # below the 50 inserts/sec benchmark gate. A long-lived append handle
+        # flushed after every entry keeps crash durability identical (data is
+        # handed to the OS on each write) while removing the per-call open.
+        self._audit_fh: IO[str] | None = None
+        self._audit_lock = threading.RLock()
         # Ensure directories exist
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self.audit_log_path.parent.mkdir(parents=True, exist_ok=True)
@@ -683,6 +692,18 @@ class Database:
         data_str = self._canonical_serialize(data)
         return hashlib.sha256(data_str.encode()).hexdigest()
 
+    def _discard_audit_handle(self) -> None:
+        """Close and drop the persistent audit JSONL handle (FIX-F-PERF-2)."""
+        with self._audit_lock:
+            fh = self._audit_fh
+            self._audit_fh = None
+            if fh is None or fh.closed:
+                return
+            try:
+                fh.close()
+            except Exception as e:
+                logger.debug(f"Ignoring error closing audit log handle: {e}")
+
     def _log_audit(
         self,
         action: str,
@@ -744,6 +765,7 @@ class Database:
         # Write JSONL file first (append-only) using canonical serialization
         # This ensures that if JSONL write fails, DB commit doesn't happen
         # maintaining consistency between the two audit trails
+        line = self._canonical_serialize(entry_data) + "\n"
         try:
             # Ensure parent directory exists (FIX-F-PERM-1: Handle directory creation)
             self.audit_log_path.parent.mkdir(parents=True, exist_ok=True)
@@ -752,15 +774,21 @@ class Database:
             retry_delay = 0.1  # seconds
             for attempt in range(max_retries):
                 try:
-                    # Ensure parent directory exists
-                    # (FIX-F-PERM-1: Handle directory creation)
-                    self.audit_log_path.parent.mkdir(parents=True, exist_ok=True)
-                    # Use append mode with explicit error handling
-                    # for file operations
-                    with Path(self.audit_log_path).open("a", encoding="utf-8") as f:
-                        f.write(self._canonical_serialize(entry_data) + "\n")
+                    # FIX-F-PERF-2: append via the persistent handle instead of
+                    # re-opening the file per entry (open/close measured ~22ms
+                    # per call on Windows). flush() per entry keeps crash
+                    # durability identical to the previous open/write/close.
+                    with self._audit_lock:
+                        if self._audit_fh is None or self._audit_fh.closed:
+                            self._audit_fh = Path(self.audit_log_path).open(
+                                "a", encoding="utf-8"
+                            )
+                        self._audit_fh.write(line)
+                        self._audit_fh.flush()
                     break  # Success, exit retry loop
                 except PermissionError as e:
+                    # Drop the handle so the retry reopens the file fresh
+                    self._discard_audit_handle()
                     if attempt == max_retries - 1:
                         # Last attempt failed, raise the error
                         raise RuntimeError(
@@ -769,11 +797,16 @@ class Database:
                             "Database commit aborted to maintain consistency."
                         ) from e
                     # Wait and retry
-                    import time
-
                     time.sleep(retry_delay)
                     retry_delay *= 2  # Exponential backoff
+                except OSError:
+                    # Non-permission I/O failure: drop the handle so the next
+                    # entry reopens fresh, then keep the original behaviour of
+                    # failing without retry.
+                    self._discard_audit_handle()
+                    raise
         except OSError as e:
+            self._discard_audit_handle()
             # If JSONL write fails, raise before DB commit to maintain consistency
             raise RuntimeError(
                 f"Failed to write audit log entry to JSONL file: {e}. "
@@ -2211,6 +2244,10 @@ class Database:
         if hasattr(self._thread_local, "connection"):
             self._thread_local.connection.close()
             del self._thread_local.connection
+        # FIX-F-PERF-2: release the persistent audit JSONL handle here as well;
+        # shutdown paths that only call close() must not leak the file handle.
+        # If auditing continues afterwards, _log_audit reopens the handle.
+        self._discard_audit_handle()
 
     def close_all(self) -> None:
         """
@@ -2237,6 +2274,16 @@ class Database:
                 except Exception as e:
                     logger.warning(f"Error closing connection thread {thread_id}: {e}")
             self._thread_registry.clear()
+        # FIX-F-PERF-2: release the persistent audit JSONL handle so no file
+        # handle outlives the Database instance (Windows file-lock hygiene).
+        with self._audit_lock:
+            audit_fh = self._audit_fh
+            self._audit_fh = None
+        if audit_fh is not None and not audit_fh.closed:
+            try:
+                audit_fh.close()
+            except Exception as e:
+                logger.warning(f"Error closing audit log handle: {e}")
         logger.info(f"Closed {closed_count} database connections")
         # Additional cleanup: ensure thread-local storage reset prevents
         # potential issues with thread reuse
