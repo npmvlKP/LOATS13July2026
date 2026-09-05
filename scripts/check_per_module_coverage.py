@@ -10,7 +10,15 @@ accepts a narrowed gate.
 
 import json
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
+
+# Staleness guard (root-cause fix, 2026-09-05): a floor gate graded
+# against a stale, gitignored coverage.json is a false PASS. CI always
+# regenerates the artifact in the same job (see .github/workflows/ci.yml),
+# so this bound only bites local/interactive invocations that would
+# otherwise silently reuse an old artifact.
+MAX_COVERAGE_AGE_HOURS = 24.0
 
 # F8-H-04 canonical FR-specified floor map. Kept in one place so the fallback
 # and the tracked json file cannot drift apart.
@@ -117,12 +125,33 @@ def check_floor_map_thresholds(
 
 def main() -> None:
     """Main function to check per-module coverage against floor map."""
-    coverage_file = Path("coverage.json")
+    # Optional argv[1] = explicit coverage.json path (used by
+    # fr7_health_check.py HC-13 to grade its own freshly generated
+    # reports/health/coverage.json). Without it, the CI/root default
+    # ./coverage.json is graded. The argument was previously accepted and
+    # silently ignored — HC-13 unknowingly graded the root artifact.
+    coverage_file = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("coverage.json")
     floor_map_file = Path("coverage_floor_map.json")
 
     if not coverage_file.exists():
         print("Error: coverage.json file not found.")
         print("Please run pytest with coverage first to generate coverage data.")
+        sys.exit(1)
+
+    # Staleness guard (root-cause fix, 2026-09-05): coverage.json is a
+    # gitignored artifact that can survive from an older suite run. A PASS
+    # graded against a stale artifact is a false read, so the gate demands
+    # the artifact be younger than MAX_COVERAGE_AGE_HOURS. Delete and
+    # regenerate (pytest --cov) to clear.
+    coverage_stat = coverage_file.stat()
+    age_h = (datetime.now(UTC).timestamp() - coverage_stat.st_mtime) / 3600.0
+    if age_h > MAX_COVERAGE_AGE_HOURS:
+        print(
+            f"Error: coverage.json is stale (age {age_h:.1f}h > "
+            f"max {MAX_COVERAGE_AGE_HOURS:.0f}h). A floor gate PASS must "
+            "measure the current tree — regenerate it with "
+            "`pytest --cov=src/loats --cov-report=json:coverage.json`."
+        )
         sys.exit(1)
 
     # Load coverage data
