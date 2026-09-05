@@ -86,3 +86,42 @@ the mandate cares about. The eval harness `scripts/eval_f8h01.py` grades
 the ten observable behaviors from the finding (before: 4/10 → after:
 10/10), and the external verifier `scripts/verify_f8h01_external.py`
 re-checks the same facts from a clean process without the test suite.
+
+## Amendment (2026-09-05, P5 evidence integrity: measured activity + freshness)
+
+Preparing the supervised run exposed an evidence-integrity shortfall in
+the P5 machinery itself: the supervisor wrote only literal zeros for
+``cycles_completed``/``counters`` (dead schema — the ~130 dry-run smoke
+logs on disk were grade-identical to a 2-week live run), and the
+validator's PASS criteria ignored activity entirely, so a 14-day run in
+which nothing ever routed would still grade PASS.
+
+1. **Routing counters are live engine state.**
+   ``TradeDecisionEngine.routing_counters`` (success / disabled / error)
+   increments only when a routing call actually resolves, exposed via
+   ``get_routing_stats()`` — the same zero-fabrication standard as the
+   ROUTE audit rows (§4).
+
+2. **The supervisor samples instead of asserting.**
+   ``run_p5_forward_test.py`` captures baselines at run start and folds
+   live deltas (``orchestrator.cycle_count``, routing counters, kill-switch
+   state, ``system.running``) into the run log every 60 s via
+   ``_sample_live_activity`` / ``_supervise_live``. Supervision ends on
+   duration, system-task exit, or gate-pass detection (re-grading the log
+   "pretend-ended" via the official validator, so detection can never
+   drift from the grader).
+
+3. **PASS requires measured activity.** When a run log carries
+   ``cycles_completed``/``counters``, zero total activity is a hard FAIL
+   ("run measures nothing"); logs without those fields (legacy) grade
+   unchanged. ``last_sampled_at`` yields a reported data-freshness delta.
+
+4. **``--status`` reports measured activity, freshness, and the live
+   verdict**, so an operator can watch a multi-day run without hand-parsing
+   JSON.
+
+Run logs written by the upgraded supervisor are the P5 phase-gate
+evidence; dry-run smoke logs now grade INCOMPLETE/FAIL on span and (for
+upgraded writers) would fail the activity requirement rather than
+masquerading as live evidence.
+
