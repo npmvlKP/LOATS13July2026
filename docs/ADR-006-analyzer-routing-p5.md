@@ -120,6 +120,21 @@ which nothing ever routed would still grade PASS.
    verdict**, so an operator can watch a multi-day run without hand-parsing
    JSON.
 
+5. **Restart continuity: ``--resume`` (2026-09-05).** A 14-day supervised
+   run cannot assume the host stays up; a single reboot must not destroy
+   the span. ``--resume`` continues the newest ongoing live run log (or the
+   ``--run-log`` target) in a fresh process: ``started_at`` is preserved,
+   ``restarts`` is incremented, routing is re-enabled, and the new
+   process's counters are shifted via ``_effective_resume_baseline``
+   (baseline = max(live − logged, 0)): seamless continuation when live ≥
+   logged, floor-at-live when a counter reset happened across the restart
+   — a drop in the log, never inflation. Refused (exit 2) for dry-run or
+   ended logs: resuming either would fabricate a span.
+
+6. **Exit-code contract.** ``run_p5_forward_test.py`` previously called
+   bare ``main()``, discarding its return value — a failed live run exited
+   0 to Task Scheduler. The entry point now ``sys.exit(main())``.
+
 Run logs written by the upgraded supervisor are the P5 phase-gate
 evidence; dry-run smoke logs now grade INCOMPLETE/FAIL on span and (for
 upgraded writers) would fail the activity requirement rather than
