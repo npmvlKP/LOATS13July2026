@@ -303,7 +303,9 @@ class ExternalValidator:
         # benchmark artifacts untracked); lockstep with
         # scripts/check_repo_hygiene.py TRACKED_FILE_CEILING and
         # scripts/verify_f8c02_external.py.
-        baseline_count = 429
+        # 2026-09-05 re-pin: 377 (F8-L-06-R2: -48 dead one-wave scripts,
+        # -7 orphaned report artifacts, +3 wiring-guard files; ADR-0008).
+        baseline_count = 377
         count_after_commit = current_count - staged_deletions
         reduction = baseline_count - count_after_commit
         percentage = (reduction / baseline_count * 100) if baseline_count > 0 else 0
