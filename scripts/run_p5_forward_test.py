@@ -178,6 +178,92 @@ def _capture_live_baseline(system: Any) -> dict[str, Any]:
     }
 
 
+def _effective_resume_baseline(
+    raw: dict[str, Any], logged_cycles: int, logged_counters: dict[str, int]
+) -> dict[str, Any]:
+    """Shift a fresh process's live counters so a resumed run log continues
+    from where the previous process's last sample left off.
+
+    Per key: baseline = max(live_now - logged, 0). When live >= logged the
+    log continues seamlessly (deltas keep accumulating); when a counter
+    RESET happened across the restart (live < logged) the baseline floors
+    at the live value, so only post-resume activity is counted — a drop in
+    the log, never inflation.
+    """
+    live_counters = raw["counters"]
+    return {
+        "cycles_completed": max(int(raw["cycles_completed"]) - int(logged_cycles), 0),
+        "counters": {
+            key: max(
+                int(live_counters.get(key, 0)) - int(logged_counters.get(key, 0)),
+                0,
+            )
+            for key in ("success", "disabled", "error")
+        },
+    }
+
+
+def _resolve_resume_target(path: Path | None) -> Path | None:
+    """Validate an explicit resume target, or find the newest eligible one.
+
+    Eligible = structurally readable run log, dry_run false, still ongoing
+    (``ended_at`` null). Prints the reason and returns None when nothing is
+    resumable — resuming a dry-run or an ended run would fabricate a span.
+    """
+    candidates: list[Path]
+    if path is not None:
+        candidates = [path]
+    else:
+        candidates = sorted(
+            RUN_LOG_DIR.glob(RUN_LOG_GLOB),
+            key=lambda p: p.stat().st_mtime,
+            reverse=True,
+        )
+    for candidate in candidates:
+        if not candidate.exists():
+            if path is not None:
+                print(
+                    f"{FAIL_SYM} resume target not found: {candidate}", file=sys.stderr
+                )
+                return None
+            continue
+        try:
+            data = json.loads(candidate.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            if path is not None:
+                print(
+                    f"{FAIL_SYM} resume target unreadable: {candidate}", file=sys.stderr
+                )
+                return None
+            continue
+        metadata = data.get("metadata") or {}
+        if metadata.get("dry_run"):
+            if path is not None:
+                print(
+                    f"{FAIL_SYM} {candidate.name}: dry-run log — nothing to resume",
+                    file=sys.stderr,
+                )
+                return None
+            continue
+        if data.get("ended_at") is not None:
+            if path is not None:
+                print(
+                    f"{FAIL_SYM} {candidate.name}: run already ended — "
+                    "start a new run instead",
+                    file=sys.stderr,
+                )
+                return None
+            continue
+        return candidate
+    if path is None:
+        print(
+            f"{FAIL_SYM} no resumable run log (dry_run=false, ended_at=null) "
+            f"under {RUN_LOG_DIR}",
+            file=sys.stderr,
+        )
+    return None
+
+
 def _sample_live_activity(system: Any, run_log: Path, baseline: dict[str, Any]) -> None:
     """Fold live system counters into the run log (deltas over baseline).
 
@@ -267,12 +353,26 @@ async def _supervise_live(
     return unhandled
 
 
-async def _run(dry_run: bool, reason: str, duration: float | None) -> int:
-    """Supervise one P5 forward-test run with routing enabled."""
+async def _run(
+    dry_run: bool, reason: str, duration: float | None, resume_log: Path | None = None
+) -> int:
+    """Supervise one P5 forward-test run with routing enabled.
+
+    With ``resume_log`` set, continue that ongoing run log in this fresh
+    process instead of starting a new one — the 14-day span must survive
+    host restarts. Counter continuity is guaranteed by
+    ``_effective_resume_baseline`` (continues seamlessly, never inflates).
+    """
     from loats.trade_decision import trade_decision_engine
 
-    run_log = _init_run_log(reason, dry_run)
-    print(f"[P5] run log: {run_log}")
+    resumed = resume_log is not None and not dry_run
+    if resumed:
+        assert resume_log is not None
+        run_log = resume_log
+        print(f"[P5] resuming run log: {run_log}")
+    else:
+        run_log = _init_run_log(reason, dry_run)
+        print(f"[P5] run log: {run_log}")
     print(f"[P5] dry_run={dry_run} duration={duration or 'until stopped'}")
 
     unhandled = 0
@@ -300,15 +400,42 @@ async def _run(dry_run: bool, reason: str, duration: float | None) -> int:
             await system.initialize()
             # Enable routing for the supervised run (default stays OFF).
             trade_decision_engine.enable_analyzer_routing()
-            _append_event(run_log, "routing_enabled", "live supervised run")
-            baseline = _capture_live_baseline(system)
-            _update_run_log(
-                run_log,
-                {
-                    "cycles_completed_baseline": baseline["cycles_completed"],
-                    "counters_baseline": dict(baseline["counters"]),
-                },
-            )
+            if resumed:
+                _append_event(
+                    run_log, "routing_enabled", "live supervised run (resumed)"
+                )
+                prior = json.loads(run_log.read_text(encoding="utf-8"))
+                logged_cycles = int(prior.get("cycles_completed") or 0)
+                logged_counters_raw = prior.get("counters") or {}
+                logged_counters = {
+                    key: int(logged_counters_raw.get(key) or 0)
+                    for key in ("success", "disabled", "error")
+                }
+                prior_restarts = int(prior.get("restarts") or 0)
+                baseline = _effective_resume_baseline(
+                    _capture_live_baseline(system),
+                    logged_cycles,
+                    logged_counters,
+                )
+                _update_run_log(
+                    run_log,
+                    {
+                        "restarts": prior_restarts + 1,
+                        "cycles_completed_baseline": baseline["cycles_completed"],
+                        "counters_baseline": dict(baseline["counters"]),
+                        "last_sampled_at": _utcnow_iso(),
+                    },
+                )
+            else:
+                _append_event(run_log, "routing_enabled", "live supervised run")
+                baseline = _capture_live_baseline(system)
+                _update_run_log(
+                    run_log,
+                    {
+                        "cycles_completed_baseline": baseline["cycles_completed"],
+                        "counters_baseline": dict(baseline["counters"]),
+                    },
+                )
             task = asyncio.create_task(system.start())
             unhandled += await _supervise_live(
                 system, run_log, baseline, duration, task
@@ -433,6 +560,15 @@ def main() -> int:
         ),
     )
     mode.add_argument("--status", action="store_true", help="inspect run log")
+    mode.add_argument(
+        "--resume",
+        action="store_true",
+        help=(
+            "resume the newest ongoing live run (or the --run-log target) in "
+            "this process — survives host restarts without breaking the "
+            "14-day span; refused for dry-run or ended logs"
+        ),
+    )
     parser.add_argument(
         "--run-log",
         type=Path,
@@ -456,6 +592,19 @@ def main() -> int:
     if args.dry_run:
         return asyncio.run(_run(dry_run=True, reason=args.reason, duration=None))
 
+    if args.resume:
+        target = _resolve_resume_target(args.run_log)
+        if target is None:
+            return 2
+        return asyncio.run(
+            _run(
+                dry_run=False,
+                reason=args.reason,
+                duration=args.duration,
+                resume_log=target,
+            )
+        )
+
     if not args.ack_live_endpoint:
         print(
             f"{FAIL_SYM} live run requires --ack-live-endpoint "
@@ -467,4 +616,8 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    main()
+    # Exit-code contract (2026-09-05): main()'s return value is the process
+    # exit code. Previously the bare main() call discarded it, so a failed
+    # live run (unhandled exceptions) exited 0 — invisible to Task
+    # Scheduler / CI / any wrapper scripting on the outcome.
+    sys.exit(main())

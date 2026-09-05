@@ -19,8 +19,10 @@ import asyncio
 import datetime
 import importlib.util
 import json
+import os
 import subprocess
 import sys
+import time
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -741,3 +743,102 @@ class TestSupervisorLiveSampling:
         data = json.loads(run_log.read_text(encoding="utf-8"))
         kinds = [event["kind"] for event in data["events"]]
         assert "unhandled_exception" in kinds
+
+
+class TestResumeBaseline:
+    """Resume must continue the span without inflating measured activity."""
+
+    def test_seamless_continuation_after_restart(self) -> None:
+        runner = _load_runner()
+        raw = {
+            "cycles_completed": 10,
+            "counters": {"success": 4, "disabled": 1, "error": 0},
+        }
+        baseline = runner._effective_resume_baseline(
+            raw,
+            logged_cycles=7,
+            logged_counters={"success": 2, "disabled": 1, "error": 0},
+        )
+        assert baseline["cycles_completed"] == 3
+        assert baseline["counters"] == {"success": 2, "disabled": 0, "error": 0}
+
+    def test_counter_reset_never_inflates(self) -> None:
+        runner = _load_runner()
+        raw = {
+            "cycles_completed": 2,
+            "counters": {"success": 1, "disabled": 0, "error": 0},
+        }
+        baseline = runner._effective_resume_baseline(
+            raw,
+            logged_cycles=7,
+            logged_counters={"success": 4, "disabled": 1, "error": 0},
+        )
+        assert baseline["cycles_completed"] == 0
+        assert baseline["counters"] == {"success": 0, "disabled": 0, "error": 0}
+
+    @staticmethod
+    def _write_log(path: Path, *, dry_run: bool = False, ended: bool = True) -> None:
+        start = datetime.datetime.now(datetime.UTC) - datetime.timedelta(days=15)
+        record = {
+            "metadata": {"phase_gate": "P5", "dry_run": dry_run},
+            "routing": {"enabled_at_start": True},
+            "started_at": start.isoformat(),
+            "ended_at": (
+                (start + datetime.timedelta(hours=1)).isoformat() if ended else None
+            ),
+            "unhandled_exceptions": 0,
+            "restarts": 0,
+            "cycles_completed": 3,
+            "cycles_completed_baseline": 0,
+            "counters": {"success": 2, "disabled": 0, "error": 0},
+            "counters_baseline": {"success": 0, "disabled": 0, "error": 0},
+            "events": [],
+        }
+        path.write_text(json.dumps(record), encoding="utf-8")
+
+    def test_resolve_explicit_target_rejects_ineligible(self, tmp_path: Path) -> None:
+        runner = _load_runner()
+        missing = tmp_path / "missing.json"
+        assert runner._resolve_resume_target(missing) is None
+
+        unreadable = tmp_path / "unreadable.json"
+        unreadable.write_text("{not json", encoding="utf-8")
+        assert runner._resolve_resume_target(unreadable) is None
+
+        dry = tmp_path / "dry.json"
+        self._write_log(dry, dry_run=True, ended=False)
+        assert runner._resolve_resume_target(dry) is None
+
+        ended = tmp_path / "ended.json"
+        self._write_log(ended, ended=True)
+        assert runner._resolve_resume_target(ended) is None
+
+    def test_resolve_auto_picks_newest_eligible(self, tmp_path: Path) -> None:
+        runner = _load_runner()
+        original_dir = runner.RUN_LOG_DIR
+        runner.RUN_LOG_DIR = tmp_path
+        try:
+            valid = tmp_path / "p5_forward_test_001.json"
+            self._write_log(valid, ended=False)
+            older_mtime = time.time() - 300
+            os.utime(valid, (older_mtime, older_mtime))
+
+            dry = tmp_path / "p5_forward_test_002.json"
+            self._write_log(dry, dry_run=True, ended=False)
+            ended = tmp_path / "p5_forward_test_003.json"
+            self._write_log(ended, ended=True)
+
+            assert runner._resolve_resume_target(None) == valid
+        finally:
+            runner.RUN_LOG_DIR = original_dir
+
+    def test_resume_cli_refuses_when_no_eligible_log(self) -> None:
+        result = subprocess.run(
+            [sys.executable, str(RUNNER), "--resume"],
+            capture_output=True,
+            text=True,
+            cwd=REPO_ROOT,
+            timeout=120,
+        )
+        assert result.returncode == 2
+        assert "no resumable run log" in result.stderr
