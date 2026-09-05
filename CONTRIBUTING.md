@@ -31,18 +31,24 @@ Instead of claiming deployment readiness, use descriptive language about what wa
 
 ### Commit Message Format
 
-Use the following format for commit messages:
+Use the following format for commit messages (enforced by the
+`commit-message-check` pre-commit hook since F8-L-06-R2, 2026-09-05):
 
 ```
-<type>: <subject>
+<type>(<optional scope>)!: <subject>
 
 <body>
 ```
 
 Where:
-- **type**: One of `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `chore`
-- **subject**: Brief description of changes (50 characters or less)
+- **type**: One of `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `chore`, `build`, `ci`
+- **scope**: Optional area, e.g. `fix(p5):`; `!` after the type/scope marks a breaking change
+- **subject**: Brief description of the change (the 50-character guidance is a convention, not enforced — wave evidence belongs in reports/ and docs/audit-history/, not the subject line)
 - **body**: Detailed explanation of what was changed and why
+
+Merge and revert commits are exempt (git generates their first line).
+The hook rejects status-essay subjects (`Update: ...`) — a commit subject
+describes the change; the commit body carries the evidence.
 
 ### Examples
 
