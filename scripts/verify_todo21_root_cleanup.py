@@ -19,6 +19,13 @@ import subprocess
 import sys
 from pathlib import Path
 
+# Canonical tracked-file ceiling (F8-L-07): scripts/ is not a package,
+# so seed sys.path with this directory (mirrors check_repo_hygiene.py)
+# and import the single-source constant.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from ratchet_baseline import TRACKED_FILE_CEILING
+
 
 def run_command(cmd: list[str], capture: bool = True) -> tuple[int, str, str]:
     """Run a command and return exit code, stdout, stderr."""
@@ -216,33 +223,25 @@ def check_tracking_count_reduction(verbose: bool = False) -> dict:
     )
     staged_deletions = len(deleted_files.split("\n")) if deleted_files else 0
 
-    # F8-C-02 (2026-09-02): baseline re-set from 343 to 369, the measured
-    # tracked-file count at commit 7a2ea233^ (immediately before the venv
-    # sweep). TODO-22..27 legitimately added ~26 tracked files after
-    # TODO-21's cleanup; the ratchet intent is preserved (see
-    # scripts/check_repo_hygiene.py, which now enforces a hard ceiling).
-    # F8-M-02 hygiene follow-up (2026-09-03): re-measured at 411 after
-    # untracking session-agent files; ratchet re-pinned to 415 in lockstep.
-    # 2026-09-03 re-pin: 416 (+1 F8-L-03 closure doc).
-    # 2026-09-04 re-pin: 426 (+10 F8-L-05 RSS wave files), then 428/429
-    # (TODO-25 gate-integrity wave + F8-L-03 discharge evidence,
-    # benchmark artifacts untracked); lockstep with
-    # scripts/check_repo_hygiene.py TRACKED_FILE_CEILING and
-    # scripts/verify_f8c02_external.py.
-    # 2026-09-05 re-pin: 377 (F8-L-06-R2: -48 dead one-wave scripts,
-    # -7 orphaned report artifacts, +3 wiring-guard files; ADR-0008).
+    # F8-L-07 (2026-09-05): the baseline is now IMPORTED from
+    # scripts/ratchet_baseline.py (TRACKED_FILE_CEILING, re-pinned to
+    # 377 by F8-L-06-R2) instead of hand-pinned here; the historic
+    # hand-sync chain (343 -> ... -> 429 -> 377) produced the
+    # 416-vs-426 lockstep split. Pin history lives in
+    # scripts/ratchet_baseline.py.
+    #
     # F8-M-03 (2026-09-03): the old secondary margin branch
     # ("reduction >= removed_count - 5", i.e. a >= 16-file further
     # reduction) was a stale TODO-21-day expectation that became
     # unsatisfiable on any mature tree the moment the baseline was
     # re-pinned to the live count; it failed at HEAD~ before this change.
     # The ratchet INTENT -- tracked count never exceeds the pinned
-    # baseline (the hard ceiling in scripts/check_repo_hygiene.py,
-    # enforced in lockstep) -- is what this check verifies. The margin
-    # branch inverted that direction (it demanded the tree KEEP
+    # baseline (the hard ceiling enforced by the hygiene guard in
+    # lockstep) -- is what this check verifies. The margin branch
+    # inverted that direction (it demanded the tree KEEP
     # shrinking), so it is removed; the baseline bound below is the
     # outcome-scoped assertion.
-    baseline_count = 377
+    baseline_count = TRACKED_FILE_CEILING
 
     count_after_commit = current_count - staged_deletions
 

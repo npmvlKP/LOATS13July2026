@@ -30,6 +30,13 @@ from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
 
+# Canonical tracked-file ceiling (F8-L-07): scripts/ is not a package,
+# so seed sys.path with this directory (mirrors check_repo_hygiene.py)
+# and import the single-source constant.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from ratchet_baseline import TRACKED_FILE_CEILING
+
 
 @dataclass
 class CheckResult:
@@ -67,7 +74,12 @@ class ExternalValidator:
     """External validation for TODO-21 root cleanup."""
 
     def __init__(self, project_root: Path | None = None, strict: bool = False):
-        self.project_root = project_root or Path.cwd()
+        # Default to the repository this script lives in (F8-L-07): a bare
+        # invocation from an arbitrary CWD previously resolved the root to
+        # that CWD and failed confusingly (probed live from a Temp dir
+        # during adversarial verification). Mirrors the REPO_ROOT
+        # convention of scripts/verify_f8c02_external.py.
+        self.project_root = project_root or Path(__file__).resolve().parent.parent
         self.strict = strict
         self.verification_id = f"TODO-21-{datetime.now().strftime('%Y%m%d%H%M%S')}"
         self.start_time = datetime.now()
@@ -286,26 +298,15 @@ class ExternalValidator:
         )
         staged_deletions = len(deleted_files.split("\n")) if deleted_files else 0
 
-        # F8-C-02 (2026-09-02): baseline re-set from 343 to 369, the measured
-        # tracked-file count at commit 7a2ea233^ (immediately before the venv
-        # sweep). The TODO-22..27 waves legitimately added ~26 tracked files
-        # after TODO-21's 343, so 343 had gone stale; the ratchet intent --
-        # "no venv-class blowups" -- is preserved (10,414 tracked at the F8-C-02
-        # finding; 394 after remediation).
-        # F8-M-02 hygiene follow-up (2026-09-03): 16 session-agent files
-        # untracked; tree re-measured at 411 and the ratchet re-pinned to 415
-        # in lockstep with scripts/check_repo_hygiene.py and
-        # scripts/verify_f8c02_external.py (single-source intent: no
-        # venv/junk-class re-entry; see the hygiene guard for the classes).
-        # 2026-09-03 re-pin: 416 (+1 F8-L-03 closure doc).
-        # 2026-09-04 re-pin: 426 (+10 F8-L-05 RSS wave files), then 428/429
-        # (TODO-25 gate-integrity wave + F8-L-03 discharge evidence,
-        # benchmark artifacts untracked); lockstep with
-        # scripts/check_repo_hygiene.py TRACKED_FILE_CEILING and
-        # scripts/verify_f8c02_external.py.
-        # 2026-09-05 re-pin: 377 (F8-L-06-R2: -48 dead one-wave scripts,
-        # -7 orphaned report artifacts, +3 wiring-guard files; ADR-0008).
-        baseline_count = 377
+        # F8-L-07 (2026-09-05): the baseline is now IMPORTED from
+        # scripts/ratchet_baseline.py (TRACKED_FILE_CEILING, re-pinned
+        # to 377 by F8-L-06-R2) instead of hand-pinned here. The
+        # historic 343 -> 369 -> 415 -> 416 -> 425 -> 426 -> 428/429 ->
+        # 377 hand-sync chain produced the 416-vs-426 lockstep split
+        # (two committed gates failing on a clean tree); importing the
+        # canonical constant makes that drift class structurally
+        # impossible. Pin history lives in scripts/ratchet_baseline.py.
+        baseline_count = TRACKED_FILE_CEILING
         count_after_commit = current_count - staged_deletions
         reduction = baseline_count - count_after_commit
         percentage = (reduction / baseline_count * 100) if baseline_count > 0 else 0
@@ -557,7 +558,14 @@ def main():
 
     args = parser.parse_args()
 
-    project_root = Path(args.project_root) if args.project_root else Path.cwd()
+    # Default to the repository this script lives in (F8-L-07, mirrors
+    # ExternalValidator): Path.cwd() resolved to the caller's arbitrary
+    # directory and validated the wrong tree.
+    project_root = (
+        Path(args.project_root)
+        if args.project_root
+        else Path(__file__).resolve().parent.parent
+    )
 
     if not project_root.exists():
         print(f"Error: Project root directory not found: {project_root}")

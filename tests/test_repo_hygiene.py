@@ -172,6 +172,45 @@ class TestForbiddenPatterns:
         assert guard._violations(["environment.md"]) == []
 
 
+class TestRatchetSingleSource:
+    """F8-L-07: one canonical tracked-file ceiling, imported everywhere.
+
+    The 416-vs-426 split class: four gate scripts hand-pinned the same
+    integer; re-pinning one surface without the others left committed
+    gates red on a clean tree. scripts/ratchet_baseline.py now owns
+    TRACKED_FILE_CEILING and every ratchet surface imports it, so
+    lockstep is structural rather than procedural.
+    """
+
+    CANONICAL_PATH = REPO_ROOT / "scripts" / "ratchet_baseline.py"
+
+    @pytest.fixture()
+    def canonical(self):
+        spec = importlib.util.spec_from_file_location(
+            "ratchet_single_source_canonical", self.CANONICAL_PATH
+        )
+        assert spec is not None and spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    def test_canonical_module_exists_and_pins_one_value(self, canonical, guard):
+        assert canonical.TRACKED_FILE_CEILING == guard.TRACKED_FILE_CEILING
+        assert 350 <= canonical.TRACKED_FILE_CEILING <= 510
+
+    def test_hygiene_guard_imports_canonical(self):
+        src = (REPO_ROOT / "scripts" / "check_repo_hygiene.py").read_text(
+            encoding="utf-8"
+        )
+        assert "ratchet_baseline" in src, (
+            "hygiene guard must take the ceiling from scripts/"
+            "ratchet_baseline.py (F8-L-07)"
+        )
+        assert not re.search(r"TRACKED_FILE_CEILING\s*=\s*\d+", src), (
+            "hygiene guard must not re-pin the ceiling with a local literal"
+        )
+
+
 class TestCeiling:
     def test_ceiling_is_sane(self, guard):
         assert 350 <= guard.TRACKED_FILE_CEILING <= 510

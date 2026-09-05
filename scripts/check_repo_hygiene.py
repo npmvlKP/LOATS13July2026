@@ -30,6 +30,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import win32_root_junk  # noqa: F401  (lockstep pin via guard.win32_root_junk)
+from ratchet_baseline import TRACKED_FILE_CEILING
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -67,35 +68,16 @@ FORBIDDEN_PATTERNS: tuple[str, ...] = (
     ".env.development",
 )
 
-# Hard ceiling on tracked files. History: 369 = measured count at commit
-# 7a2ea233^ (the legitimate tree immediately before the TODO-25 venv sweep);
-# the TODO-21 ratchet (<=343) went stale after TODO-22..27 additions. The
-# F8-M-02 hygiene follow-up (2026-09-03) untracked 16 session-agent files
-# (.harness-memory/, .opencode/, .clinerules/, .clineignore, @workspace/),
-# leaving 411 tracked; the ceiling is re-pinned to 415 so the ratchet
-# tightens with the tree and venv-class blowups stay impossible.
-# 2026-09-03: +1 for docs/audit-history/03Sep2026-F8-L-03-closure.md
-# (F8-L-03 closure record); re-pinned to 416 in lockstep.
-# F8-L-05 (2026-09-04): +9 tracked files (src/loats/rss_validation.py,
-# scripts/validate_rss_feeds.py, scripts/eval_f8l05.py,
-# tests/test_rss_validation.py,
-# tests/fixtures/rss/recorded-sources.json + 3 recorded .xml fixtures,
-# docs/audit-history/04Sep2026-F8-L-05-closure.md)
-# -> re-pinned to 425.
-# F8-L-06 (2026-09-04): +1 tracked file (docs/audit-history/
-# 04Sep2026-F8-L-06-closure.md); re-pinned to 426.
-# TODO-25 gate-integrity wave (2026-09-04): +3 (gate-integrity note,
-# regression tests, and a stray benchmark run artifact that was later
-# untracked) then +1 again for the F8-L-03 discharge evidence
-# (reports/p1_analyze_latency_20260904_040609.json) -> re-pinned to 429.
-# F8-L-06-R2 maintainability wave (2026-09-05): -55 (48 dead one-wave
-# scripts + 7 orphaned report artifacts, see ADR-0008; a 49th dead
-# script, stress_rule7_concurrency.py, was restored after the full
-# suite caught its live test wiring), +3 (the wiring guard, its
-# regression net, ADR-0008) -> re-pinned to 377, the measured count.
-# scripts/ orphans are now separately ratcheted by
+# Hard ceiling on tracked files: single source of truth in
+# scripts/ratchet_baseline.py (F8-L-07). This constant was previously
+# hand-pinned here AND in three verifier scripts; re-pinning one surface
+# without the others left committed gates failing on a clean tree (the
+# 416-vs-426 lockstep split). Re-pin protocol: edit
+# ratchet_baseline.TRACKED_FILE_CEILING only, run the lockstep tests
+# (tests/test_repo_hygiene.py::TestRatchetSingleSource,
+# tests/test_todo25_verifier_gates.py::TestRatchetLockstep).
+# scripts/ orphans are separately ratcheted by
 # scripts/check_scripts_wiring.py (CI repo-hygiene, pre-commit, HC-30).
-TRACKED_FILE_CEILING = 377
 
 # Tracked paths that would match FORBIDDEN_PATTERNS but are deliberate.
 ALLOWLIST: frozenset[str] = frozenset(

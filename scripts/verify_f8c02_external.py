@@ -6,9 +6,9 @@ Run from anywhere (resolves the repo root from this file's location):
     loatsNEW\\Scripts\\python.exe scripts\\verify_f8c02_external.py
 
 Checks (12):
- 1.  tracked file count <= 429 (ratchet ceiling re-pinned 2026-09-04
-     for the TODO-25 gate-integrity wave; see TRACKED_FILE_CEILING in
-     scripts/check_repo_hygiene.py — all ratchet surfaces must agree)
+ 1.  tracked file count <= TRACKED_FILE_CEILING (single source of truth:
+     scripts/ratchet_baseline.py — the hygiene guard, this verifier,
+     and both TODO-21 verifiers all resolve the same constant; F8-L-07)
  2.  no tracked path under loatsNEW/ (the 9,939-file venv)
  3.  no tracked path under a literal `~/` directory
  4.  no tracked pyvenv.cfg / Scripts/python.exe anywhere
@@ -19,7 +19,8 @@ Checks (12):
  9.  .gitignore ignores the F8-C-02 classes (live check-ignore probes)
 10.  hygiene guard script passes on the live tree (exit 0)
 11.  guard wired into CI, pre-commit, and HC-26 (source greps)
-12.  TODO-21 verifiers re-baselined to 429 (source grep; lockstep-tested)
+12.  TODO-21 verifiers re-baselined to TRACKED_FILE_CEILING (source
+     grep; lockstep-tested)
 
 Exit 0 = all checks pass; 1 = failure. ASCII-only output, shell=False,
 absolute interpreter paths (Windows-safe per project conventions).
@@ -32,6 +33,13 @@ import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+
+# Canonical tracked-file ceiling (F8-L-07): scripts/ is not a package,
+# so seed sys.path with this directory (mirrors check_repo_hygiene.py)
+# and import the single-source constant.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from ratchet_baseline import TRACKED_FILE_CEILING
 
 
 def _resolve_python() -> str:
@@ -75,13 +83,13 @@ def main() -> int:
 
     tracked = _tracked()
 
-    # 1. tracked count ceiling (2026-09-04 re-pin: 429 — TODO-25 gate-
-    # integrity wave + F8-L-03 discharge evidence, benchmark artifacts
-    # untracked; lockstep with scripts/check_repo_hygiene.py
-    # TRACKED_FILE_CEILING and both TODO-21 verifiers)
+    # 1. tracked count ceiling — single source of truth
+    # (scripts/ratchet_baseline.py; lockstep is structural since F8-L-07:
+    # the hygiene guard and both TODO-21 verifiers import the same
+    # constant)
     record(
-        len(tracked) <= 377,
-        "1. tracked files <= 377",
+        len(tracked) <= TRACKED_FILE_CEILING,
+        f"1. tracked files <= {TRACKED_FILE_CEILING}",
         f"count={len(tracked)}",
     )
 
@@ -214,11 +222,26 @@ def main() -> int:
 
     # 12. TODO-21 ratchet re-baseline (kept in lockstep: the TODO-21
     # verifiers and this verifier must pin the same measured count;
-    # 2026-09-03 re-pin: 416 — +1 F8-L-03 closure doc)
+    # F8-L-07: the baseline is imported from scripts/ratchet_baseline.py
+    # rather than hand-pinned, so the historic 416-vs-426 drift class is
+    # structurally impossible)
     t21a = _read("scripts/verify_todo21_external.py")
     t21b = _read("scripts/verify_todo21_root_cleanup.py")
-    rebased = "baseline_count = 377" in t21a and "baseline_count = 377" in t21b
-    record(rebased, "12. TODO-21 ratchet re-baselined to 377")
+    rebased = (
+        "from ratchet_baseline import TRACKED_FILE_CEILING" in t21a
+        and "from ratchet_baseline import TRACKED_FILE_CEILING" in t21b
+        and "baseline_count = TRACKED_FILE_CEILING" in t21a
+        and "baseline_count = TRACKED_FILE_CEILING" in t21b
+    )
+    record(
+        rebased,
+        f"12. TODO-21 ratchet re-baselined to {TRACKED_FILE_CEILING}",
+        ""
+        if rebased
+        else "expected: `from ratchet_baseline import TRACKED_FILE_CEILING` "
+        "and `baseline_count = TRACKED_FILE_CEILING` on its own line in "
+        "both TODO-21 verifiers",
+    )
 
     # Summary
     print("=" * 72)

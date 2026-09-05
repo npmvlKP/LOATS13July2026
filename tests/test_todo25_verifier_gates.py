@@ -369,36 +369,78 @@ class TestHC29Registration:
 
 
 class TestRatchetLockstep:
+    """Ratchet surfaces must agree on the tracked-file baseline.
+
+    The historic 2026-09-03 defect this net guards against:
+    check_repo_hygiene.py was re-pinned 416 -> 426 while
+    verify_f8c02_external.py and both TODO-21 verifiers stayed at
+    416, leaving two committed gates failing on a clean tree.
+    F8-L-07 moved the single value into
+    scripts/ratchet_baseline.py; this test loads the canonical
+    module, the guard, and the F8-C-02 verifier as live modules and
+    asserts agreement, so the split class cannot recur. The TODO-21
+    pins are resolved from source text with EOL-anchored patterns
+    (comments and arithmetic suffixes cannot mask a drift).
+    """
+
+    def _load(self, rel: str, name: str):
+        scripts_dir = REPO_ROOT / "scripts"
+        # NOTE: no sys.path mutation — importlib spec-loading resolves
+        # everything from the scripts/ directory and the pytest process
+        # namespace stays clean (module-shadowing hygiene).
+        spec = importlib.util.spec_from_file_location(name, scripts_dir / rel)
+        assert spec is not None and spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
     def test_all_tracked_file_ratchets_agree(self) -> None:
-        """Every tracked-file ratchet surface must pin the same baseline.
-
-        RED at HEAD: check_repo_hygiene.py was re-pinned 416 -> 426 while
-        verify_f8c02_external.py and both TODO-21 verifiers stayed at
-        416, leaving two committed gates failing on a clean tree.
-        """
-        pins: dict[str, int] = {}
-        guard = (REPO_ROOT / "scripts" / "check_repo_hygiene.py").read_text(
-            encoding="utf-8"
-        )
-        m = re.search(r"TRACKED_FILE_CEILING\s*=\s*(\d+)", guard)
-        assert m, "TRACKED_FILE_CEILING not found in hygiene guard"
-        pins["check_repo_hygiene"] = int(m.group(1))
-
-        f8c02 = (REPO_ROOT / "scripts" / "verify_f8c02_external.py").read_text(
-            encoding="utf-8"
-        )
-        m = re.search(r"len\(tracked\) <= (\d+)", f8c02)
-        assert m, "tracked-count ceiling not found in verify_f8c02_external.py"
-        pins["verify_f8c02_external"] = int(m.group(1))
+        """Every tracked-file ratchet surface must pin the same baseline."""
+        canonical = self._load("ratchet_baseline.py", "lockstep_canonical")
+        guard = self._load("check_repo_hygiene.py", "lockstep_guard")
+        f8c02 = self._load("verify_f8c02_external.py", "lockstep_f8c02")
+        pins: dict[str, int] = {
+            "ratchet_baseline": canonical.TRACKED_FILE_CEILING,
+            "check_repo_hygiene": guard.TRACKED_FILE_CEILING,
+            "verify_f8c02_external": f8c02.TRACKED_FILE_CEILING,
+        }
 
         for name in (
             "verify_todo21_external.py",
             "verify_todo21_root_cleanup.py",
         ):
             text = (REPO_ROOT / "scripts" / name).read_text(encoding="utf-8")
-            m = re.search(r"baseline_count\s*=\s*(\d+)", text)
-            assert m, f"baseline_count not found in {name}"
-            pins[name] = int(m.group(1))
+            # Normalize CRLF so the EOL anchors below hold on either
+            # checkout style.
+            text = text.replace("\r\n", "\n")
+            imported = re.search(
+                r"^[ \t]*baseline_count\s*=\s*(?:ratchet_baseline\.)?"
+                r"TRACKED_FILE_CEILING[ \t]*(?:#[^\n]*)?$",
+                text,
+                re.M,
+            )
+            literal = re.search(
+                r"^[ \t]*baseline_count\s*=\s*(\d+)[ \t]*(?:#[^\n]*)?$",
+                text,
+                re.M,
+            )
+            # A surface may pin EXACTLY ONE way. Import + stray literal
+            # would let a stale literal hide behind the imported branch
+            # (the laxer-number direction silently widens the ratchet),
+            # so the combination itself is a failure.
+            if imported:
+                assert literal is None, (
+                    f"{name}: imported canonical pin AND stray literal "
+                    f"'{literal.group(0) if literal else ''}' — baseline "
+                    "must be pinned exactly once"
+                )
+                pins[name] = canonical.TRACKED_FILE_CEILING
+            else:
+                assert literal is not None, (
+                    f"{name}: baseline pin not found (neither imported "
+                    "from ratchet_baseline nor a literal)"
+                )
+                pins[name] = int(literal.group(1))
 
         assert len(set(pins.values())) == 1, (
             f"ratchet surfaces disagree (the 416/426 split class): {pins}"
@@ -494,4 +536,30 @@ class TestRatchetLockstep:
         assert not missing, (
             f"canonical P1 evidence not tracked: {sorted(missing)} — the "
             "F8-L-03 discharge cannot be verified from a fresh clone"
+        )
+
+
+class TestVerifierCwdIndependence:
+    """F8-L-07: verifier scripts must not depend on the caller's CWD.
+
+    Found by adversarial verification of this wave: t21a resolved its
+    project root from Path.cwd(), so a bare invocation from any other
+    directory validated the wrong tree (or failed confusingly).
+    """
+
+    def test_todo21_external_defaults_to_script_repo(self) -> None:
+        spec = importlib.util.spec_from_file_location(
+            "verify_todo21_external_cwd",
+            REPO_ROOT / "scripts" / "verify_todo21_external.py",
+        )
+        assert spec is not None and spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+
+        # A bare invocation (no explicit root) must validate the
+        # repository this script lives in, never the caller's CWD.
+        validator = module.ExternalValidator()
+        assert validator.project_root == REPO_ROOT, (
+            f"default project root resolved to {validator.project_root}, "
+            f"expected the script's repository {REPO_ROOT}"
         )
