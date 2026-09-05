@@ -22,6 +22,7 @@ import json
 import subprocess
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 from unittest.mock import AsyncMock, patch
 
@@ -347,6 +348,67 @@ class TestP5ValidatorGrading:
         assert any("started_at" in r for r in grade.reasons)
 
 
+class TestP5ActivityGate:
+    """A PASS without measured activity proves nothing (2026-09-05)."""
+
+    @staticmethod
+    def _fixture(
+        cycles: int | None = 5, success: int = 5, legacy: bool = False
+    ) -> dict[str, Any]:
+        start = datetime.datetime(2026, 9, 1, tzinfo=datetime.UTC)
+        record: dict[str, Any] = {
+            "routing": {"enabled_at_start": True},
+            "started_at": start.isoformat(),
+            "ended_at": (start + datetime.timedelta(days=15)).isoformat(),
+            "unhandled_exceptions": 0,
+            "restarts": 0,
+        }
+        if not legacy:
+            record["cycles_completed"] = cycles
+            record["counters"] = {
+                "success": success,
+                "disabled": 0,
+                "error": 0,
+            }
+        return record
+
+    def test_legacy_log_without_activity_fields_still_passes(self) -> None:
+        mod = _load_validator()
+        grade = mod.grade_run_log(self._fixture(legacy=True))
+        assert grade.verdict == "PASS", grade.reasons
+        assert grade.activity_recorded is None
+
+    def test_zero_activity_fails_hard(self) -> None:
+        mod = _load_validator()
+        grade = mod.grade_run_log(self._fixture(cycles=0, success=0))
+        assert grade.verdict == "FAIL"
+        assert grade.activity_recorded is False
+        assert any("no measured activity" in r for r in grade.reasons)
+
+    def test_measured_activity_sets_signal(self) -> None:
+        mod = _load_validator()
+        grade = mod.grade_run_log(self._fixture(cycles=3, success=2))
+        assert grade.verdict == "PASS", grade.reasons
+        assert grade.activity_recorded is True
+
+    def test_data_freshness_reported_when_sampled(self) -> None:
+        mod = _load_validator()
+        fixture = self._fixture()
+        fixture["last_sampled_at"] = fixture["ended_at"]
+        grade = mod.grade_run_log(fixture)
+        assert grade.verdict == "PASS", grade.reasons
+        assert grade.data_freshness is not None
+        assert grade.data_freshness == "0s"
+
+    def test_bad_counter_types_do_not_crash_grader(self) -> None:
+        mod = _load_validator()
+        fixture = self._fixture()
+        fixture["counters"] = {"success": "not-an-int"}
+        grade = mod.grade_run_log(fixture)
+        assert grade.verdict == "FAIL"
+        assert grade.activity_recorded is False
+
+
 class TestP5RunnerSmoke:
     """Runner dry-run must exit 0 and produce a gradeable run log."""
 
@@ -414,3 +476,268 @@ def test_module_importable_without_side_effects() -> None:
     assert callable(module.main)
     assert module.MIN_SPAN_DAYS == 14
     _ = asyncio
+
+
+class TestRoutingCounters:
+    """Routing counters must reflect resolved routing calls only."""
+
+    @pytest.mark.asyncio
+    async def test_success_increments_success_counter(self, engine) -> None:
+        with (
+            patch.object(engine, "analyzer_routing_enabled", True),
+            patch("loats.trade_decision.AsyncOpenAlgoClient", lambda: FakeClient()),
+            patch(
+                "loats.database.db.async_get_trade_decision",
+                AsyncMock(return_value=None),
+            ),
+            patch("loats.database.db.async_create_trade_decision", AsyncMock()),
+            patch("loats.database.db.async_log_audit", AsyncMock()),
+        ):
+            resp = await engine.route_to_analyzer(make_decision())
+
+        assert resp["status"] == "success"
+        assert engine.get_routing_stats() == {
+            "success": 1,
+            "disabled": 0,
+            "error": 0,
+        }
+
+    @pytest.mark.asyncio
+    async def test_disabled_increments_disabled_counter(self, engine) -> None:
+        with (
+            patch(
+                "loats.database.db.async_get_trade_decision",
+                AsyncMock(return_value=None),
+            ),
+            patch("loats.database.db.async_create_trade_decision", AsyncMock()),
+            patch("loats.database.db.async_log_audit", AsyncMock()),
+        ):
+            resp = await engine.route_to_analyzer(make_decision())
+
+        assert resp["status"] == "disabled"
+        stats = engine.get_routing_stats()
+        assert stats["disabled"] == 1
+        assert stats["success"] == 0
+
+    @pytest.mark.asyncio
+    async def test_error_increments_error_counter_and_raises(self, engine) -> None:
+        with (
+            patch.object(engine, "analyzer_routing_enabled", True),
+            patch("loats.trade_decision.AsyncOpenAlgoClient", lambda: FailingClient()),
+            patch(
+                "loats.database.db.async_get_trade_decision",
+                AsyncMock(return_value=None),
+            ),
+            patch("loats.database.db.async_create_trade_decision", AsyncMock()),
+            patch("loats.database.db.async_log_audit", AsyncMock()),
+        ):
+            with pytest.raises(RuntimeError):
+                await engine.route_to_analyzer(make_decision())
+
+        stats = engine.get_routing_stats()
+        assert stats["error"] == 1
+        assert stats["success"] == 0
+
+
+def _load_runner():
+    spec = importlib.util.spec_from_file_location("p5_runner_mod", RUNNER)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+class _FakeSystem:
+    def __init__(self) -> None:
+        self.running = False
+
+
+class TestSupervisorLiveSampling:
+    """Supervisor folds live singleton counters into the run log."""
+
+    @staticmethod
+    def _write_run_log(path: Path) -> None:
+        start = datetime.datetime.now(datetime.UTC) - datetime.timedelta(days=15)
+        record = {
+            "routing": {"enabled_at_start": True},
+            "started_at": start.isoformat(),
+            "ended_at": None,
+            "unhandled_exceptions": 0,
+            "restarts": 0,
+            "cycles_completed": 0,
+            "cycles_completed_baseline": 0,
+            "counters": {"success": 0, "disabled": 0, "error": 0},
+            "counters_baseline": {"success": 0, "disabled": 0, "error": 0},
+            "events": [],
+        }
+        path.write_text(json.dumps(record), encoding="utf-8")
+
+    @pytest.mark.asyncio
+    async def test_sample_folds_live_deltas_into_run_log(self, tmp_path: Path) -> None:
+        runner = _load_runner()
+        run_log = tmp_path / "run.json"
+        self._write_run_log(run_log)
+        system = _FakeSystem()
+        baseline = {
+            "cycles_completed": 0,
+            "counters": {"success": 0, "disabled": 0, "error": 0},
+        }
+        with (
+            patch(
+                "loats.orchestrator.orchestrator",
+                SimpleNamespace(cycle_count=7),
+            ),
+            patch(
+                "loats.trade_decision.trade_decision_engine",
+                SimpleNamespace(
+                    get_routing_stats=lambda: {
+                        "success": 4,
+                        "disabled": 1,
+                        "error": 0,
+                    }
+                ),
+            ),
+            patch(
+                "loats.alerts.alerts",
+                SimpleNamespace(is_kill_switch_active=lambda: False),
+            ),
+        ):
+            runner._sample_live_activity(system, run_log, baseline)
+
+        data = json.loads(run_log.read_text(encoding="utf-8"))
+        assert data["cycles_completed"] == 7
+        assert data["counters"] == {"success": 4, "disabled": 1, "error": 0}
+        assert data["system_healthy"] == {
+            "system_running": False,
+            "kill_switch_active": False,
+        }
+        assert "last_sampled_at" in data
+
+    @pytest.mark.asyncio
+    async def test_counter_reset_mid_run_clamps_to_zero(self, tmp_path: Path) -> None:
+        runner = _load_runner()
+        run_log = tmp_path / "run.json"
+        self._write_run_log(run_log)
+        system = _FakeSystem()
+        baseline = {
+            "cycles_completed": 5,
+            "counters": {"success": 3, "disabled": 0, "error": 0},
+        }
+        with (
+            patch(
+                "loats.orchestrator.orchestrator",
+                SimpleNamespace(cycle_count=2),
+            ),
+            patch(
+                "loats.trade_decision.trade_decision_engine",
+                SimpleNamespace(
+                    get_routing_stats=lambda: {
+                        "success": 1,
+                        "disabled": 0,
+                        "error": 0,
+                    }
+                ),
+            ),
+            patch(
+                "loats.alerts.alerts",
+                SimpleNamespace(is_kill_switch_active=lambda: False),
+            ),
+        ):
+            runner._sample_live_activity(system, run_log, baseline)
+
+        data = json.loads(run_log.read_text(encoding="utf-8"))
+        assert data["cycles_completed"] == 0
+        assert data["counters"]["success"] == 0
+
+    @pytest.mark.asyncio
+    async def test_supervise_stops_when_gate_passes(self, tmp_path: Path) -> None:
+        runner = _load_runner()
+        run_log = tmp_path / "run.json"
+        start = datetime.datetime.now(datetime.UTC) - datetime.timedelta(days=15)
+        record = {
+            "routing": {"enabled_at_start": True},
+            "started_at": start.isoformat(),
+            "ended_at": None,
+            "unhandled_exceptions": 0,
+            "restarts": 0,
+            "cycles_completed": 12,
+            "cycles_completed_baseline": 0,
+            "counters": {"success": 5, "disabled": 0, "error": 0},
+            "counters_baseline": {"success": 0, "disabled": 0, "error": 0},
+            "events": [],
+        }
+        run_log.write_text(json.dumps(record), encoding="utf-8")
+        system = _FakeSystem()
+        baseline = {
+            "cycles_completed": 0,
+            "counters": {"success": 0, "disabled": 0, "error": 0},
+        }
+        with (
+            patch(
+                "loats.orchestrator.orchestrator",
+                SimpleNamespace(cycle_count=12),
+            ),
+            patch(
+                "loats.trade_decision.trade_decision_engine",
+                SimpleNamespace(
+                    get_routing_stats=lambda: {
+                        "success": 5,
+                        "disabled": 0,
+                        "error": 0,
+                    }
+                ),
+            ),
+            patch(
+                "loats.alerts.alerts",
+                SimpleNamespace(is_kill_switch_active=lambda: False),
+            ),
+        ):
+            unhandled = await runner._supervise_live(
+                system, run_log, baseline, None, None
+            )
+
+        assert unhandled == 0
+        data = json.loads(run_log.read_text(encoding="utf-8"))
+        kinds = [event["kind"] for event in data["events"]]
+        assert "gate_pass_detected" in kinds
+
+    @pytest.mark.asyncio
+    async def test_supervise_records_system_task_failure(self, tmp_path: Path) -> None:
+        runner = _load_runner()
+        run_log = tmp_path / "run.json"
+        self._write_run_log(run_log)
+        system = _FakeSystem()
+        baseline = {
+            "cycles_completed": 0,
+            "counters": {"success": 0, "disabled": 0, "error": 0},
+        }
+
+        async def _die() -> None:
+            raise RuntimeError("orchestrator exploded")
+
+        task = asyncio.create_task(_die())
+        with (
+            patch(
+                "loats.orchestrator.orchestrator",
+                SimpleNamespace(cycle_count=0),
+            ),
+            patch(
+                "loats.trade_decision.trade_decision_engine",
+                SimpleNamespace(
+                    get_routing_stats=lambda: {"success": 0, "disabled": 0, "error": 0}
+                ),
+            ),
+            patch(
+                "loats.alerts.alerts",
+                SimpleNamespace(is_kill_switch_active=lambda: False),
+            ),
+        ):
+            unhandled = await runner._supervise_live(
+                system, run_log, baseline, None, task
+            )
+
+        assert unhandled == 1
+        data = json.loads(run_log.read_text(encoding="utf-8"))
+        kinds = [event["kind"] for event in data["events"]]
+        assert "unhandled_exception" in kinds
