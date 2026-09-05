@@ -1,8 +1,10 @@
 """F8-H-04: mutation tests for the per-module coverage checker."""
 
 import json
+import os
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -110,3 +112,46 @@ def test_missing_coverage_json_fails(tmp_workspace: Path) -> None:
     result = _run_script(tmp_workspace)
     assert result.returncode == 1, result.stdout + result.stderr
     assert "not found" in result.stdout.lower()
+
+
+def test_stale_coverage_json_fails(tmp_workspace: Path) -> None:
+    """coverage.json older than the freshness bound -> exit 1 (2026-09-05).
+
+    Root cause being fixed: a stale, gitignored coverage.json once produced
+    a misleading floor PASS because the gate never checked artifact age.
+    """
+    stale = time.time() - 25 * 3600
+    os.utime(tmp_workspace / "coverage.json", (stale, stale))
+    result = _run_script(tmp_workspace)
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "stale" in result.stdout.lower()
+
+
+def test_explicit_coverage_path_argument_honored(tmp_workspace: Path) -> None:
+    """argv[1] selects the graded artifact (HC-13 contract, 2026-09-05).
+
+    The health check passes reports/health/coverage.json explicitly; that
+    argument used to be silently ignored while the root artifact was graded.
+    """
+    result = subprocess.run(
+        [sys.executable, str(SCRIPT), str(tmp_workspace / "coverage.json")],
+        cwd=tmp_workspace,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "PASSED" in result.stdout
+
+
+def test_explicit_stale_coverage_path_fails(tmp_workspace: Path) -> None:
+    """The freshness bound applies to the explicit path too."""
+    stale = time.time() - 30 * 3600
+    os.utime(tmp_workspace / "coverage.json", (stale, stale))
+    result = subprocess.run(
+        [sys.executable, str(SCRIPT), str(tmp_workspace / "coverage.json")],
+        cwd=tmp_workspace,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "stale" in result.stdout.lower()
