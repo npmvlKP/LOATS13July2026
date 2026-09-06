@@ -66,7 +66,7 @@ class TestCircuitBreakerRetryComposition:
         retry_config = RetryConfig(max_attempts=3)
 
         # Manually open the circuit
-        cb._state = cb._state.OPEN  # type: ignore
+        cb._state = cb._state.OPEN  # type: ignore[assignment]
         # Set opened_at to a future time to prevent transition to HALF_OPEN
         cb._opened_at = time.monotonic() + 3600  # 1 hour in the future
 
@@ -155,7 +155,7 @@ class TestCircuitBreakerRetryComposition:
         retry_config = RetryConfig(max_attempts=3)
 
         # Manually open the circuit
-        cb._state = cb._state.OPEN  # type: ignore
+        cb._state = cb._state.OPEN  # type: ignore[assignment]
         cb._opened_at = time.monotonic() + 3600  # 1 hour in the future
 
         call_count = 0

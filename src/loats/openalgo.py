@@ -35,6 +35,7 @@ remains the primary duplicate-order control.
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import threading
@@ -60,6 +61,7 @@ from .models import (
 )
 from .utils.cache import cache_manager
 from .utils.circuit_breaker import OPENALGO_CIRCUIT_BREAKER
+from .utils.lazy_singleton import lazy_singleton
 from .utils.payload_builder import (
     build_modify_order_payload,
     build_place_order_payload,
@@ -239,6 +241,15 @@ class OpenAlgoClient:
     ) -> dict[str, Any]:
         client = self._ensure_client()
         url = f"/api/v1/{endpoint.lstrip('/')}"
+        if method.upper() == "POST":
+            # OpenAlgo deployments validate `apikey` as a REQUIRED JSON body
+            # field (F8-L-03 live verification: header-only auth fails schema
+            # on every endpoint with 400 "Missing data for required field").
+            # Inject it into the JSON body so the client works against both
+            # body-auth (current deployments) and header-auth deployments.
+            json_body = dict(kwargs.pop("json", None) or {})
+            json_body.setdefault("apikey", self.api_key)
+            kwargs["json"] = json_body
         if idempotency_key is not None:
             headers = dict(kwargs.pop("headers", None) or {})
             headers["Idempotency-Key"] = idempotency_key
@@ -345,8 +356,16 @@ class OpenAlgoClient:
         )
 
     def get_quotes(self, symbols: list[str]) -> dict[str, Any]:
-        payload = {"symbols": symbols}
-        return self._request("POST", "quotes", json=payload)
+        # Deployment contract (verified live, F8-L-03): POST /quotes accepts a
+        # SINGLE {apikey, exchange, symbol} body — batch quotes belong to
+        # /multiquotes. Fan out sequentially and reshape into the canonical
+        # {"data": {symbol: {...}}} form every caller parses.
+        data: dict[str, Any] = {}
+        for symbol in symbols:
+            payload = {"exchange": "NSE", "symbol": symbol}
+            result = self._request("POST", "quotes", json=payload)
+            data.update(result.get("data") or {})
+        return {"status": "success", "data": data}
 
     def get_history(
         self,
@@ -502,6 +521,14 @@ class OpenAlgoClient:
 
         Note: Circuit breaker is applied without retry to avoid duplicate modifications.
         When the circuit is open, this method fails fast with CircuitBreakerOpenError.
+
+        CMP Rule 7 (F8-H-02): a persisted, per-order modification budget
+        (settings.max_modifications, default 25) is enforced HERE, at the
+        API boundary, so every caller is gated — not just the trailing
+        driver. The slot is reserved before the broker call and released
+        if the broker request fails, so failed attempts never consume
+        budget. Counter state is read from SQLite (survives restarts); a
+        counter DB failure fails closed (modification refused).
         """
         _check_kill_switch()
         payload = build_modify_order_payload(
@@ -515,6 +542,12 @@ class OpenAlgoClient:
             trailing_stop_loss=trailing_stop_loss,
         )
 
+        # CMP Rule 7: reserve budget before touching the broker. Raises
+        # Rule7ModificationLimitError (refuse) or Rule7StateError (fail closed).
+        from .rules import rules_engine
+
+        rules_engine.reserve_modification(order_id)
+
         # Wrap order modification in circuit breaker without retry
         def _modify_order_impl() -> dict[str, Any]:
             return self._request(
@@ -524,7 +557,13 @@ class OpenAlgoClient:
                 idempotency_key=_get_idempotency_key(f"modify:{order_id}"),
             )
 
-        return OPENALGO_CIRCUIT_BREAKER.call(_modify_order_impl)
+        try:
+            return OPENALGO_CIRCUIT_BREAKER.call(_modify_order_impl)
+        except Exception:
+            # Broker/circuit failure: give the reserved slot back so the
+            # failed attempt does not consume Rule-7 budget.
+            rules_engine.release_modification(order_id)
+            raise
 
     def cancel_order(self, order_id: str) -> dict[str, Any]:
         """
@@ -599,6 +638,15 @@ class AsyncOpenAlgoClient:
     ) -> dict[str, Any]:
         client = await self._ensure_client()
         url = f"/api/v1/{endpoint.lstrip('/')}"
+        if method.upper() == "POST":
+            # OpenAlgo deployments validate `apikey` as a REQUIRED JSON body
+            # field (F8-L-03 live verification: header-only auth fails schema
+            # on every endpoint with 400 "Missing data for required field").
+            # Inject it into the JSON body so the client works against both
+            # body-auth (current deployments) and header-auth deployments.
+            json_body = dict(kwargs.pop("json", None) or {})
+            json_body.setdefault("apikey", self.api_key)
+            kwargs["json"] = json_body
         if idempotency_key is not None:
             headers = dict(kwargs.pop("headers", None) or {})
             headers["Idempotency-Key"] = idempotency_key
@@ -633,6 +681,11 @@ class AsyncOpenAlgoClient:
             raise OpenAlgoError(f"Request failed: {e}") from e
 
     async def get_quotes(self, symbols: list[str]) -> dict[str, Any]:
+        # Deployment contract (verified live, F8-L-03): POST /quotes accepts a
+        # SINGLE {apikey, exchange, symbol} body — batch quotes belong to
+        # /multiquotes. Fan out per symbol and reshape into the canonical
+        # {"data": {symbol: {...}}} form every caller parses. The synthesized
+        # result is cached under the pre-existing digest key (60s TTL).
         symbols_sorted = sorted(symbols)
         symbols_digest = hashlib.sha256(
             ",".join(symbols_sorted).encode("utf-8")
@@ -645,14 +698,21 @@ class AsyncOpenAlgoClient:
                 return json.loads(cached_result)  # type: ignore[no-any-return]
             except Exception as e:
                 logger.warning(f"Failed parse cached quotes: {e}")
-        payload = {"symbols": symbols}
-        result = await self._request("POST", "quotes", json=payload)
+
+        data: dict[str, Any] = {}
+        result: dict[str, Any] = {}
+        for symbol in symbols_sorted:
+            payload = {"exchange": "NSE", "symbol": symbol}
+            result = await self._request("POST", "quotes", json=payload)
+            data.update(result.get("data") or {})
+        merged = {**result, "data": data}
+
         try:
-            await cache_manager.set(cache_key, json.dumps(result), ttl=60)
+            await cache_manager.set(cache_key, json.dumps(merged), ttl=60)
             logger.debug(f"Cached quotes {symbols}")
         except Exception as e:
             logger.warning(f"Failed cache quotes: {e}")
-        return result
+        return merged
 
     async def get_history(
         self,
@@ -944,6 +1004,13 @@ class AsyncOpenAlgoClient:
         """
         await _async_check_kill_switch()
 
+        # CMP Rule 7 (F8-H-02): reserve budget before touching the broker.
+        # Raises Rule7ModificationLimitError (refuse) or Rule7StateError
+        # (fail closed) — identical semantics to the sync client.
+        from .rules import rules_engine
+
+        rules_engine.reserve_modification(order_id)
+
         # Wrap order modification in circuit breaker without retry
         async def _modify_order_impl() -> dict[str, Any]:
             # Convert enum parameter to value if needed
@@ -974,7 +1041,13 @@ class AsyncOpenAlgoClient:
                 idempotency_key=_get_idempotency_key(f"modify:{order_id}"),
             )
 
-        return await OPENALGO_CIRCUIT_BREAKER.call_async(_modify_order_impl)
+        try:
+            return await OPENALGO_CIRCUIT_BREAKER.call_async(_modify_order_impl)
+        except Exception:
+            # Broker/circuit failure: give the reserved slot back so the
+            # failed attempt does not consume Rule-7 budget.
+            await asyncio.to_thread(rules_engine.release_modification, order_id)
+            raise
 
     async def cancel_order(self, order_id: str) -> dict[str, Any]:
         """
@@ -997,6 +1070,38 @@ class AsyncOpenAlgoClient:
 
         return await OPENALGO_CIRCUIT_BREAKER.call_async(_cancel_order_impl)
 
+    async def place_analyzer_request(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """
+        Submit a TradeDecision payload to the Analyzer service for analysis.
+
+        Routes the decision payload via OpenAlgo's ANALYZE mode endpoint.
+        Returns the real response from the Analyzer service without fabrication.
+
+        Args:
+            payload: TradeDecision payload from decision.to_analyzer_payload()
+
+        Returns:
+            Real response from Analyzer service
+
+        Raises:
+            OpenAlgoError: If the Analyzer request fails (propagated, not fabricated)
+            OpenAlgoAPIError: If the API returns an error status
+            CircuitBreakerOpenError: If circuit breaker is open
+
+        Note:
+            - No asyncio.sleep simulation - real HTTP call
+            - Errors propagate, no fabricated success responses
+            - Uses circuit breaker pattern for resilience
+        """
+
+        # Analyzer requests don't require kill switch check (analysis-only, not trading)
+        # Use circuit breaker with retry for analyzer requests
+        # (idempotent GET-like behavior)
+        async def _analyze_impl() -> dict[str, Any]:
+            return await self._request("POST", "analyze", json=payload)
+
+        return await OPENALGO_CIRCUIT_BREAKER.call_async(_analyze_impl)
+
     async def get_order_status(self, order_id: str) -> dict[str, Any]:
         payload = {"order_id": order_id}
         return await self._request("POST", "order_status", json=payload)
@@ -1008,4 +1113,10 @@ class AsyncOpenAlgoClient:
         return await self._request("POST", "trade_book")
 
 
-async_client = AsyncOpenAlgoClient()
+# F8-C-03 (2026-09-02): ``AsyncOpenAlgoClient.__init__`` reads ``Settings()``
+# (fail-closed: a real client must have an API key), so the previous eager
+# ``async_client = AsyncOpenAlgoClient()`` crashed ``import loats.*`` on any
+# fresh checkout without OPENALGO_API_KEY. The LazyProxy defers construction
+# to first attribute access; ``patch("loats.openalgo.async_client.<attr>")``
+# keeps working (patched attributes land in the proxy __dict__).
+async_client: AsyncOpenAlgoClient = lazy_singleton(AsyncOpenAlgoClient)

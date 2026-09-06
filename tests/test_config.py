@@ -26,6 +26,8 @@ class TestConfig:
             assert test_settings.default_timeframe == "1min"
             assert test_settings.sentiment_threshold == 0.05
             assert test_settings.request_timeout == 30.0
+            # F8-M-07: VIX gate threshold is settings-derived (CMP Rule 10).
+            assert test_settings.vix_gate_threshold == 15.0
 
     def test_settings_from_env(self) -> None:
         """Test Settings initialization environment variables."""

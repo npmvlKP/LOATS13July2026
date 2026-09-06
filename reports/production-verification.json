@@ -1,0 +1,237 @@
+{
+  "timestamp": "2026-08-31T05:50:05.813180+00:00",
+  "timestamp_utc": "2026-08-31T05:50:05.813180+00:00",
+  "repo_root": "G:\\.OA\\LOATS-13July2026\\LOATS13July2026",
+  "python": "G:\\.OA\\LOATS-13July2026\\LOATS13July2026\\loatsNEW\\Scripts\\python.exe",
+  "deployment": {
+    "status": "APPROVED WITH WARNINGS",
+    "approved": true,
+    "exit_code": 2
+  },
+  "summary": {
+    "total": 17,
+    "critical": 15,
+    "critical_passed": 15,
+    "critical_failed": 0,
+    "critical_timeout": 0,
+    "informational": 2,
+    "informational_passed": 0,
+    "informational_warnings": 2,
+    "total_duration_seconds": 60.86
+  },
+  "categories": {
+    "GATE": {
+      "total": 3,
+      "critical": 3,
+      "critical_passed": 3,
+      "critical_failed": 0
+    },
+    "LIVE-PROBE": {
+      "total": 5,
+      "critical": 4,
+      "critical_passed": 4,
+      "critical_failed": 0
+    },
+    "STATIC": {
+      "total": 7,
+      "critical": 6,
+      "critical_passed": 6,
+      "critical_failed": 0
+    },
+    "STRUCTURAL": {
+      "total": 2,
+      "critical": 2,
+      "critical_passed": 2,
+      "critical_failed": 0
+    }
+  },
+  "results": [
+    {
+      "name": "S01: Options Math Parity",
+      "category": "STRUCTURAL",
+      "critical": true,
+      "status": "PASS",
+      "message": "Check passed successfully",
+      "duration_seconds": 1.994,
+      "exit_code": 0,
+      "stdout_tail": "parity c=12.1115814350 delta=0.5216016340\n",
+      "stderr_tail": ""
+    },
+    {
+      "name": "S07: Dead Weight Removal",
+      "category": "STRUCTURAL",
+      "critical": true,
+      "status": "PASS",
+      "message": "Check passed successfully",
+      "duration_seconds": 0.098,
+      "exit_code": 0,
+      "stdout_tail": "==================================\nTODO-23 (F7-L-03) External Verification\n============================================================\n\nChecking: Dead weights removed from source_weights\n[PASS] Dead weight entries removed from source_weights\n\nChecking: Enum values still defined\n[PASS] Enum values still defined (ready for future producers)\n\n============================================================\n[PASS] TODO-23 VERIFICATION PASSED\n============================================================\n",
+      "stderr_tail": ""
+    },
+    {
+      "name": "T01: Ruff Linting",
+      "category": "STATIC",
+      "critical": true,
+      "status": "PASS",
+      "message": "Check passed successfully",
+      "duration_seconds": 0.156,
+      "exit_code": 0,
+      "stdout_tail": "All checks passed!\n",
+      "stderr_tail": ""
+    },
+    {
+      "name": "T02: Ruff Formatting",
+      "category": "STATIC",
+      "critical": true,
+      "status": "PASS",
+      "message": "Check passed successfully",
+      "duration_seconds": 0.167,
+      "exit_code": 0,
+      "stdout_tail": "109 files already formatted\n",
+      "stderr_tail": ""
+    },
+    {
+      "name": "T03: Mypy Strict (Changed Files)",
+      "category": "STATIC",
+      "critical": true,
+      "status": "PASS",
+      "message": "Check passed successfully",
+      "duration_seconds": 0.651,
+      "exit_code": 0,
+      "stdout_tail": "pyproject.toml: note: unused section(s): module = ['feedparser.*', 'newspaper.*', 'numba.*', 'vaderSentiment.*']\nSuccess: no issues found in 3 source files\n",
+      "stderr_tail": ""
+    },
+    {
+      "name": "T05: Bandit Security",
+      "category": "STATIC",
+      "critical": true,
+      "status": "PASS",
+      "message": "Check passed successfully",
+      "duration_seconds": 1.413,
+      "exit_code": 0,
+      "stdout_tail": "",
+      "stderr_tail": ""
+    },
+    {
+      "name": "T06: Gitleaks Secrets",
+      "category": "STATIC",
+      "critical": true,
+      "status": "PASS",
+      "message": "Check passed successfully",
+      "duration_seconds": 0.854,
+      "exit_code": 0,
+      "stdout_tail": "",
+      "stderr_tail": "\n    \u25cb\n    \u2502\u2572\n    \u2502 \u25cb\n    \u25cb \u2591\n    \u2591    gitleaks\n\n\u001b[90m11:19AM\u001b[0m \u001b[32mINF\u001b[0m \u001b[1mscanned ~13016244 bytes (13.02 MB) in 511ms\u001b[0m\n\u001b[90m11:19AM\u001b[0m \u001b[32mINF\u001b[0m \u001b[1mno leaks found\u001b[0m\n"
+    },
+    {
+      "name": "T07: Import Validation",
+      "category": "STATIC",
+      "critical": true,
+      "status": "PASS",
+      "message": "Check passed successfully",
+      "duration_seconds": 3.726,
+      "exit_code": 0,
+      "stdout_tail": "imports ok: loats, loats.options_math, loats.options, loats.ta, loats.trade_decision, loats.orchestrator, loats.scheduler, loats.sentiment, loats.sizing, loats.rules, loats.config.settings\n",
+      "stderr_tail": "ghtweight metrics manager initialized [loats.metrics] [loats.metrics]\nG:\\.OA\\LOATS-13July2026\\LOATS13July2026\\loatsNEW\\Lib\\site-packages\\newspaper\\parsers.py:19: UserWarning: nltk is not installed. Some NLP features will be unavailable. Install it with: pip install 'newspaper4k[nlp]'\n  from . import text as txt\n2026-08-31T05:49:13.599250Z [info     ] Using requests library for http requests (alternative cloudscraper library is recommended for bypassing Cloudflare protection) [newspaper.network]\n"
+    },
+    {
+      "name": "L04: Trailing Stop Runtime",
+      "category": "LIVE-PROBE",
+      "critical": true,
+      "status": "PASS",
+      "message": "Check passed successfully",
+      "duration_seconds": 1.251,
+      "exit_code": 0,
+      "stdout_tail": "================\nplatform win32 -- Python 3.12.7, pytest-9.1.1, pluggy-1.6.0\nrootdir: G:\\.OA\\LOATS-13July2026\\LOATS13July2026\nconfigfile: pyproject.toml\nplugins: anyio-4.14.2, asyncio-1.4.0, cov-7.1.0\nasyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function\ncollected 1 item\n\ntests\\test_trailing_stop_runtime.py .                                    [100%]\n\n============================== 1 passed in 0.06s ==============================\n",
+      "stderr_tail": ""
+    },
+    {
+      "name": "L05: Audit Dual-Write",
+      "category": "LIVE-PROBE",
+      "critical": true,
+      "status": "PASS",
+      "message": "Check passed successfully",
+      "duration_seconds": 1.438,
+      "exit_code": 0,
+      "stdout_tail": "===============\nplatform win32 -- Python 3.12.7, pytest-9.1.1, pluggy-1.6.0\nrootdir: G:\\.OA\\LOATS-13July2026\\LOATS13July2026\nconfigfile: pyproject.toml\nplugins: anyio-4.14.2, asyncio-1.4.0, cov-7.1.0\nasyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function\ncollected 3 items\n\ntests\\test_audit_dual_write.py ...                                       [100%]\n\n============================== 3 passed in 0.16s ==============================\n",
+      "stderr_tail": ""
+    },
+    {
+      "name": "L07: Rate Limiter",
+      "category": "LIVE-PROBE",
+      "critical": true,
+      "status": "PASS",
+      "message": "Check passed successfully",
+      "duration_seconds": 0.687,
+      "exit_code": 0,
+      "stdout_tail": "rate limiter ok 3/5\n",
+      "stderr_tail": ""
+    },
+    {
+      "name": "L08: Queue Backpressure",
+      "category": "LIVE-PROBE",
+      "critical": true,
+      "status": "PASS",
+      "message": "Check passed successfully",
+      "duration_seconds": 2.449,
+      "exit_code": 0,
+      "stdout_tail": "queue probe r1=queued r2=queued r3=rejected\n",
+      "stderr_tail": "2026-08-31T05:49:19.649134Z [warning  ] 2026-08-31T05:49:19.649134Z [warning  ] Decision queue full \u2014 rejecting decision decision_20260831054919649134_2029670a (size=2, maxsize=2) [loats.trade_decision] [loats.trade_decision]\n"
+    },
+    {
+      "name": "G01: Pytest Sanity",
+      "category": "GATE",
+      "critical": true,
+      "status": "PASS",
+      "message": "Check passed successfully",
+      "duration_seconds": 3.708,
+      "exit_code": 0,
+      "stdout_tail": "anyio-4.14.2, asyncio-1.4.0, cov-7.1.0\nasyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function\ncollected 60 items\n\ntests\\test_trade_decision.py ...........................                 [ 45%]\ntests\\test_options.py ..............                                     [ 68%]\ntests\\test_ta.py ...................                                     [100%]\n\n============================= 60 passed in 2.04s ==============================\n",
+      "stderr_tail": ""
+    },
+    {
+      "name": "G02: Per-Module Coverage",
+      "category": "GATE",
+      "critical": true,
+      "status": "PASS",
+      "message": "Check passed successfully",
+      "duration_seconds": 0.117,
+      "exit_code": 0,
+      "stdout_tail": "statements missed)\n[INFO] utils/connection_pool.py: 90.7% (6 statements missed)\n[INFO] utils/payload_builder.py: 100.0% (0 statements missed)\n[INFO] utils/rate_limiter.py: 83.8% (27 statements missed)\n[INFO] utils/resilience.py: 89.2% (6 statements missed)\n[INFO] utils/retry.py: 87.0% (8 statements missed)\n\n======================================================================\n\nAll floor-mapped modules meet their coverage thresholds!\nAggregate coverage: 78.2%\nFloor-mapped coverage gates: PASSED\n",
+      "stderr_tail": ""
+    },
+    {
+      "name": "G08: TODO-27 Integration",
+      "category": "GATE",
+      "critical": true,
+      "status": "PASS",
+      "message": "Check passed successfully",
+      "duration_seconds": 2.551,
+      "exit_code": 0,
+      "stdout_tail": " contain bloombergquint -- clean\n  [PASS] runtime rss_feeds contains livemint -- found\n  [PASS] runtime rss_feeds all http/https -- ['https://economictimes.indiatimes.com/markets/rssfeeds/1977021501.cms', 'https://www.moneycontrol.com/rss/latestnews.xml', 'https://www.livemint.com/rss/markets']\n\n========================================================================\nTOTAL: 42/42 passed, 0 failed\n========================================================================\nAll TODO-27 checks PASSED.\n",
+      "stderr_tail": "2026-08-31T05:49:25.993956Z [warning  ] 2026-08-31T05:49:25.993956Z [warning  ] Decision queue full \u2014 rejecting decision decision_20260831054925993956_e5d345eb (size=2, maxsize=2) [loats.trade_decision] [loats.trade_decision]\n"
+    },
+    {
+      "name": "T04: Mypy Strict (Full Source)",
+      "category": "STATIC",
+      "critical": false,
+      "status": "WARNING",
+      "message": "Non-critical check failed (exit=1)",
+      "duration_seconds": 0.742,
+      "exit_code": 1,
+      "stdout_tail": "o attribute \"trailing_config\"  [attr-defined]\nsrc\\loats\\orchestrator.py:1195: error: \"Position\" has no attribute \"order_id\"  [attr-defined]\nsrc\\loats\\orchestrator.py:1201: error: \"Database\" has no attribute \"async_record_ratchet_event\"  [attr-defined]\nsrc\\loats\\orchestrator.py:1202: error: \"Position\" has no attribute \"order_id\"  [attr-defined]\nsrc\\loats\\orchestrator.py:1209: error: \"Position\" has no attribute \"trailing_config\"  [attr-defined]\nFound 45 errors in 8 files (checked 34 source files)\n",
+      "stderr_tail": ""
+    },
+    {
+      "name": "L06: CMP Chain E2E",
+      "category": "LIVE-PROBE",
+      "critical": false,
+      "status": "WARNING",
+      "message": "Non-critical check failed (exit=1)",
+      "duration_seconds": 38.861,
+      "exit_code": 1,
+      "stdout_tail": "spaper\\parsers.py:19: UserWarning: nltk is not installed. Some NLP features will be unavailable. Install it with: pip install 'newspaper4k[nlp]'\n    from . import text as txt\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n=========================== short test summary info ===========================\nFAILED tests/test_e2e_cmp_chain.py::TestE2ECMPChain::test_cmp_chain_with_production_signals\n=================== 1 failed, 3 passed, 1 warning in 37.08s ===================\n",
+      "stderr_tail": ""
+    }
+  ]
+}

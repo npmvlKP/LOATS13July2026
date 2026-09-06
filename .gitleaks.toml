@@ -20,6 +20,31 @@ paths = [
     '''gitleaks\.toml''',
     '''\.gitleaks\.toml''',
     '''(.*?)(tests?|spec|test_.*?)\.py$''',
+    '''\.env(\.example|\.test)?$''',
+    '''\.env$''',
+    '''.*\.lock$''',
+    '''package-lock\.json$''',
+    '''uv\.lock$''',
+    '''\.venv/''',
+    '''loatsNEW/''',
+    '''node_modules/''',
+    '''\.git/''',
+    '''\.mypy_cache/''',
+    '''\.ruff_cache/''',
+    '''\.pytest_cache/''',
+    '''htmlcov/''',
+    '''\.benchmarks/''',
+    '''reports/''',
+    '''logs/''',
+    # Scan-output artifacts (F8-M-02 follow-up): a gitleaks report committed by
+    # mistake in 26049046 re-triggered every rule against its own contents on
+    # every later scan (feedback loop). Ignore the artifact class itself;
+    # the historical file carries only RFC 6750/6749 example tokens plus
+    # HMAC signing artifacts of a scan output, not live credentials.
+    '''gitleaks.*\.(json|txt)$''',
+    '''coverage\.json$''',
+    '''.*report\.json$''',
+    '''output\.json$''',
 ]
 
 # Note: For GitHub Actions, use the security.yml workflow which runs

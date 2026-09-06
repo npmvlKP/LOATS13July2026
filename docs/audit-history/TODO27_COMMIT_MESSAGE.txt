@@ -1,0 +1,55 @@
+feat(TODO-27): vollib→hand-rolled, drop ta, bound queue, re-validate feeds
+
+Closes the four longest-carried hygiene debts (F6-L-06 since FR1,
+F6-L-07, F7-L-06, queue note at trade_decision.py:324-332).
+
+(a) vollib → hand-rolled Black-Scholes (Phase 2 of VOLLIB_MIGRATION_PLAN):
+    - Add src/loats/options_math.py (293 LOC, pure numpy+scipy): d1/d2,
+      black_scholes, delta/gamma/vega(*0.01)/theta(/365)/rho(*0.01) — byte-
+      for-byte parity with vollib (Hull 17.1,17.2,17.4,17.6,17.7, diff <1e-11),
+      implied_volatility via brentq→newton→0.2.
+    - Refactor src/loats/options.py to import from .options_math, drop
+      vollib imports, keep scipy.stats.norm for VaR.
+    - Remove vollib from pyproject.toml/requirements-core.txt and mypy
+      override; add ADR-0004.
+    - Parity: 12.1115814350 (c 100/90/.5/.01/.2) diff 3e-11, IV round-trip
+      diff 2e-7, pytest 40/40.
+
+(b) ta drop-or-adopt:
+    - Decision: drop (ADR-0003). src/loats/ta.py is custom (RSI/MACD/ATR/
+      Supertrend+numba/VWAP/CMF) and never imported ta library.
+    - Remove ta>=0.11.0 from pyproject.toml/requirements-core.txt.
+    - Verification: grep -rn "from ta." src/loats → none, 19 ta tests pass.
+
+(c) Bounded decision queue + backpressure:
+    - settings.decision_queue_maxsize: int=100 (validated 1..10000, env
+      DECISION_QUEUE_MAXSIZE, rss_feeds-style parsing).
+    - TradeDecisionEngine Queue(maxsize=N) (N from settings or __init__(maxsize)
+      override for tests), put_nowait + QueueFull → rejected queue_full,
+      get_queue_stats() helper, _processor_task typed.
+    - Live test: 2 queued, 3rd rejected (not blocked) — prevents OOM if
+      enqueues outpace lazy process_decision_queue.
+    - Tests: fix test_enqueue_error (put→put_nowait), add
+      test_enqueue_backpressure_full + test_queue_stats_and_maxsize (27/27).
+
+(d) bloombergquint re-validation:
+    - Hardcoded https://www.bloombergquint.com/markets-feed was 404/non-RSS
+      (domain now NDTV Profit). Replace with https://www.livemint.com/rss/markets
+      (validated ET + Moneycontrol remain).
+    - Centralize via settings.rss_feeds: list[str] default=[ET, Moneycontrol,
+      Livemint] with JSON/CSV env parsing, validated via validate_rss_feed
+      in both orchestrator and scheduler (scheduler now validates, was
+      unvalidated). .env.example documents RSS_FEEDS + DECISION_QUEUE_MAXSIZE.
+    - Verification: runtime len=3 all https, no bloombergquint, livemint present.
+
+Quality gates (changed files):
+- ruff check src/loats/options_math.py ... → All checks passed
+- mypy --strict src/loats/options_math.py ... → Success: no issues in 3 files
+- pytest relevant 92 passed, integration 43 passed
+- verify_todo27_external.py 42/42, verify_todo27_eval.py 10/10 (before 3/10)
+- Imports: ok
+
+Remaining: full mypy 17 errors (Trade.current_price etc.) and ruff 47 E501
+in trailing_stop are pre-existing (TODO-28). Changed files are green.
+
+Refs: TODO-27, VOLLIB_MIGRATION_PLAN Phase 2, F6-L-06/07, F7-L-06, ADR-0003/0004

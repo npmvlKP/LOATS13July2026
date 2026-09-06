@@ -4,6 +4,7 @@ Test logging functionality LOATS13July2026.
 
 import logging
 import os
+from pathlib import Path
 from unittest.mock import patch
 
 
@@ -44,25 +45,29 @@ def test_configure_logging_test_mode():
     assert len(console_handlers) > 0, "Console handler not configured"
 
 
-def test_configure_logging_production_mode():
+def test_configure_logging_production_mode(tmp_path, monkeypatch):
     """Test logging configured correctly production mode."""
     # Reset logging configuration avoid interference
     logging.root.handlers = []
 
-    # Ensure we're not test environment
-    if "ENVIRONMENT" in os.environ:
-        del os.environ["ENVIRONMENT"]
+    # Ensure we're not test environment (monkeypatch restores afterwards)
+    monkeypatch.delenv("ENVIRONMENT", raising=False)
 
     # Import after setting environment
     from loats.loats_logging import configure_logging
 
-    # Mock Path.mkdir avoid creating actual directories
-    with patch("pathlib.Path.mkdir") as mock_mkdir:
-        # Configure logging production mode
-        configure_logging(test_mode=False)
+    # Run in a hermetic cwd: a fresh checkout has no logs/ directory, and
+    # production mode must create it. The real directory creation is the
+    # behavior under test -- mocking Path.mkdir away (the old pattern)
+    # starves the RotatingFileHandler and dictConfig fails with
+    # "Unable to configure handler 'file'" on a fresh environment.
+    monkeypatch.chdir(tmp_path)
 
-        # Check mkdir called create logs directory
-        mock_mkdir.assert_called_once()
+    # Configure logging production mode
+    configure_logging(test_mode=False)
+
+    # Check logs directory was created for real
+    assert Path("logs").is_dir()
 
     # Check both console file handlers configured
     root_logger = logging.getLogger()
@@ -79,6 +84,11 @@ def test_configure_logging_production_mode():
 
     assert len(file_handlers) > 0, "File handler configured production mode"
     assert len(console_handlers) > 0, "Console handler configured production mode"
+
+    # Release the file handles on the temp directory.
+    for handler in file_handlers:
+        handler.close()
+        root_logger.removeHandler(handler)
 
 
 def test_logs_directory_not_created_in_test_mode():
@@ -101,31 +111,40 @@ def test_logs_directory_not_created_in_test_mode():
         mock_mkdir.assert_not_called()
 
 
-def test_logs_directory_created_in_production_mode():
+def test_logs_directory_created_in_production_mode(tmp_path, monkeypatch):
     """Test logs directory created production mode."""
     # Reset logging configuration avoid interference
     logging.root.handlers = []
 
-    # Ensure we're not test environment
-    if "ENVIRONMENT" in os.environ:
-        del os.environ["ENVIRONMENT"]
+    # Ensure we're not test environment (monkeypatch restores afterwards)
+    monkeypatch.delenv("ENVIRONMENT", raising=False)
 
     # Import after setting environment
     from loats.loats_logging import configure_logging
 
-    # Mock Path.mkdir detect it's called
-    with patch("pathlib.Path.mkdir") as mock_mkdir:
-        # Configure logging production mode
-        configure_logging(test_mode=False)
+    # Hermetic cwd: assert the real directory creation (see
+    # test_configure_logging_production_mode for why mkdir is not mocked).
+    monkeypatch.chdir(tmp_path)
 
-        # Check mkdir called
-        mock_mkdir.assert_called_once()
+    # Configure logging production mode
+    configure_logging(test_mode=False)
+
+    # Check logs directory created
+    assert Path("logs").is_dir()
+
+    # Release the file handles on the temp directory.
+    root_logger = logging.getLogger()
+    for handler in [
+        h for h in root_logger.handlers if isinstance(h, logging.FileHandler)
+    ]:
+        handler.close()
+        root_logger.removeHandler(handler)
 
 
-def test_environment_based_logging_configuration():
+def test_environment_based_logging_configuration(tmp_path, monkeypatch):
     """Test logging configuration based ENVIRONMENT variable."""
     # Test ENVIRONMENT=test verify logs directory created
-    os.environ["ENVIRONMENT"] = "test"
+    monkeypatch.setenv("ENVIRONMENT", "test")
 
     # Mock Path.mkdir detect it's called
     with patch("pathlib.Path.mkdir") as mock_mkdir:
@@ -133,8 +152,7 @@ def test_environment_based_logging_configuration():
         mock_mkdir.assert_not_called()
 
     # Test ENVIRONMENT notset (production) verify logs directory created
-    if "ENVIRONMENT" in os.environ:
-        del os.environ["ENVIRONMENT"]
+    monkeypatch.delenv("ENVIRONMENT", raising=False)
 
     # Test actual functionality instead mkdir call
     # Reset logging configuration avoid interference
@@ -143,10 +161,19 @@ def test_environment_based_logging_configuration():
     # Import configure logging explicitly test production mode
     from loats.loats_logging import configure_logging
 
-    # Mock Path.mkdir detect it's called
-    with patch("pathlib.Path.mkdir") as mock_mkdir:
-        # Configure logging production mode
-        configure_logging(test_mode=False)
+    # Hermetic cwd (see test_configure_logging_production_mode).
+    monkeypatch.chdir(tmp_path)
 
-        # Check mkdir called (this indicates production mode)
-        mock_mkdir.assert_called_once()
+    # Configure logging production mode
+    configure_logging(test_mode=False)
+
+    # Check logs directory created (this indicates production mode)
+    assert Path("logs").is_dir()
+
+    # Release the file handles on the temp directory.
+    root_logger = logging.getLogger()
+    for handler in [
+        h for h in root_logger.handlers if isinstance(h, logging.FileHandler)
+    ]:
+        handler.close()
+        root_logger.removeHandler(handler)

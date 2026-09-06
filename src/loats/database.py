@@ -8,14 +8,18 @@ import hashlib
 import json
 import sqlite3
 import threading
+import time
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, TypeVar
+from typing import IO, TYPE_CHECKING, Any, TypeVar, cast
 
 from pydantic import BaseModel
 
 from .config import get_settings
+
+if TYPE_CHECKING:
+    from .utils.connection_pool import SimpleConnectionPool
 from .loats_logging import get_logger
 from .models import (
     AuditLogEntry,
@@ -28,12 +32,11 @@ from .models import (
     Trade,
     TradeDecision,
 )
+from .utils.lazy_singleton import lazy_singleton
 
 # Note: aiosqlite is imported locally in async methods where needed
 logger = get_logger(__name__)
-
 T = TypeVar("T", bound=BaseModel)
-
 # -------------------------------------------------------------------------
 # FIX-F-PERF-1:
 #   PRAGMAs in SQLite are **per-connection** settings; opening a new
@@ -51,13 +54,24 @@ T = TypeVar("T", bound=BaseModel)
 #   - Thread-local reuse means a *thread* only pays the PRAGMA cost once.
 #   - A fine-grained lock (per-instance) guards the check-and-set to keep
 #     it race-free across worker threads.
-
 _PRAGMAS: tuple[str, ...] = (
     "PRAGMA journal_mode=WAL",
     "PRAGMA synchronous=NORMAL",
     "PRAGMA temp_store=MEMORY",
     "PRAGMA cache_size=-10000",  # 10MB cache
+    "PRAGMA busy_timeout=30000",  # ms; matches sqlite3.connect(timeout=30)
 )
+
+# CMP Rule 7 (F8-H-02): order statuses that close an order. Reaching one
+# resets the per-order modification budget (mirrors the broker-side
+# lifecycle; ids are rarely reused, but the reset keeps semantics clean).
+_RULE7_TERMINAL_ORDER_STATUSES: frozenset[str] = frozenset(
+    {"COMPLETED", "CANCELLED", "REJECTED"}
+)
+
+
+class Rule7StateError(RuntimeError):
+    """Rule-7 persisted counter state unavailable (DB failure) — fail closed."""
 
 
 class Database:
@@ -80,39 +94,92 @@ class Database:
         self.db_path = db_path or Path(settings.sqlite_db_path)
         self.audit_log_path = audit_log_path or Path(settings.audit_log_path)
         self.retention_days = retention_days or settings.retention_days
-
         self._thread_local = threading.local()
-
         # Thread registry track all connections across threads
         # enables proper cleanup all connections shutdown
         # (FIX-WINDOWS-SHUTDOWN: Connections held APScheduler worker threads
         # must closed prevent file-handle leaks Windows)
         self._thread_registry: dict[int, sqlite3.Connection] = {}
         self._registry_lock = threading.Lock()
-
         # Per-instance PRAGMA tracking (F-PERF-1)
         # Each distinct connection object keyed id(conn)
         # PRAGMAs applied exactly once per connection lifecycle, while
         # correctly applied when new connections opened.
         self._pragmas_applied: set[int] = set()
         self._pragmas_lock = threading.Lock()
-
+        # FIX-F-PERF-2: persistent audit JSONL append handle.
+        # Re-opening the audit file per entry measured ~22 ms/call on Windows
+        # (handle open/close dominates), collapsing trade-insert throughput
+        # below the 50 inserts/sec benchmark gate. A long-lived append handle
+        # flushed after every entry keeps crash durability identical (data is
+        # handed to the OS on each write) while removing the per-call open.
+        self._audit_fh: IO[str] | None = None
+        self._audit_lock = threading.RLock()
         # Ensure directories exist
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self.audit_log_path.parent.mkdir(parents=True, exist_ok=True)
-
-        # Create audit log file doesn't exist
+        # Create audit log file if it doesn't exist
         if not self.audit_log_path.exists():
             self.audit_log_path.touch()
-
-        # Initialize database
+        # Initialize database schema
         self._initialize_database()
-
+        # Initialize ratchet_events table
+        self._initialize_ratchet_events_table()
         # Async connection pool
-        self._async_pool: Any | None = (
-            None  # SimpleConnectionPool or aiosqlite.ConnectionPool
-        )
+        self._async_pool: SimpleConnectionPool | None = None
         self._async_pool_lock = asyncio.Lock()
+
+    def _initialize_ratchet_events_table(self) -> None:
+        """Initialize the ratchet_events table if it doesn't exist."""
+        conn = self._get_connection()
+        try:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS ratchet_events (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    event_type TEXT NOT NULL,
+                    order_id TEXT NOT NULL,
+                    old_sl REAL NOT NULL,
+                    new_sl REAL NOT NULL,
+                    current_price REAL NOT NULL,
+                    timestamp TEXT NOT NULL
+                )
+                """
+            )
+            conn.commit()
+        except Exception as e:
+            logger.error(f"Failed to initialize ratchet_events table: {e}")
+            conn.rollback()
+        finally:
+            self._release_connection(conn)
+
+    def _store_ratchet_event(self, event: dict[str, Any]) -> None:
+        """Store ratchet event in the database."""
+        conn = self._get_connection()
+        try:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                INSERT INTO ratchet_events (
+                    event_type, order_id, old_sl, new_sl, current_price, timestamp
+                ) VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    event["event_type"],
+                    event["order_id"],
+                    event["old_sl"],
+                    event["new_sl"],
+                    event["current_price"],
+                    event["timestamp"],
+                ),
+            )
+            conn.commit()
+        except Exception as e:
+            logger.error(f"Failed to store ratchet event: {e}")
+            conn.rollback()
+        finally:
+            self._release_connection(conn)
 
     def initialize(self) -> None:
         """Initialize database schema (public alias for _initialize_database)."""
@@ -123,17 +190,33 @@ class Database:
         self._cleanup_old_data()
 
     def vacuum(self) -> None:
-        """Vacuum database reclaim space."""
-        conn = self._get_connection()
-        conn.execute("VACUUM")
-        conn.commit()
+        """Vacuum database reclaim space.
+
+        VACUUM cannot run inside an explicit transaction.  We therefore open a
+        dedicated autocommit connection for this maintenance operation.
+        """
+        conn = sqlite3.connect(self.db_path, isolation_level=None)
+        try:
+            conn.execute("PRAGMA journal_mode=WAL;")
+            conn.execute("VACUUM")
+        finally:
+            conn.close()
 
     def _initialize_database(self) -> None:
-        """Initialize database schema."""
+        """Initialize database schema (tables, indexes, migrations)."""
         conn = self._get_connection()
         cursor = conn.cursor()
+        self._create_core_tables(cursor)
+        self._create_market_tables(cursor)
+        self._create_position_tables(cursor)
+        self._create_cmp_tables(cursor)
+        self._create_indexes(cursor)
+        conn.commit()
+        # Ensure schema is up to date (migrate old databases)
+        self._migrate_schema(conn)
 
-        # Create tables don't exist
+    def _create_core_tables(self, cursor: sqlite3.Cursor) -> None:
+        """Create trades / signals / audit_log tables if missing."""
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS trades (
                 trade_id TEXT PRIMARY KEY,
@@ -190,6 +273,9 @@ class Database:
                 timestamp_ms INTEGER NOT NULL DEFAULT 0
             )
         """)
+
+    def _create_market_tables(self, cursor: sqlite3.Cursor) -> None:
+        """Create historical_data / quotes tables if missing."""
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS historical_data (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -226,6 +312,9 @@ class Database:
                 UNIQUE(symbol, timestamp)
             )
         """)
+
+    def _create_position_tables(self, cursor: sqlite3.Cursor) -> None:
+        """Create positions / funds / orders tables if missing."""
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS positions (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -285,7 +374,8 @@ class Database:
             )
         """)
 
-        # Create trade_decisions table for CMP strategy
+    def _create_cmp_tables(self, cursor: sqlite3.Cursor) -> None:
+        """Create trade_decisions + Rule-7 tables/indexes for CMP strategy."""
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS trade_decisions (
                 decision_id TEXT PRIMARY KEY,
@@ -312,7 +402,6 @@ class Database:
                 timestamp_ms INTEGER NOT NULL DEFAULT 0
             )
         """)
-
         # Create index for trade_decisions
         cursor.execute(
             "CREATE INDEX IF NOT EXISTS "
@@ -326,8 +415,19 @@ class Database:
             "CREATE INDEX IF NOT EXISTS "
             "idx_trade_decisions_timestamp ON trade_decisions(timestamp)"
         )
+        # CMP Rule 7 (F8-H-02): per-order modification counter persisted in
+        # SQLite so the <=25 ceiling survives process restarts and is keyed
+        # by order_id (one order can no longer consume another's budget).
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS modification_counts (
+                order_id TEXT PRIMARY KEY,
+                count INTEGER NOT NULL DEFAULT 0,
+                updated_at TEXT NOT NULL
+            )
+        """)
 
-        # Create indexes performance
+    def _create_indexes(self, cursor: sqlite3.Cursor) -> None:
+        """Create performance indexes on core tables."""
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_trades_symbol ON trades(symbol)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_trades_status ON trades(status)")
         cursor.execute(
@@ -348,10 +448,6 @@ class Database:
         cursor.execute(
             "CREATE INDEX IF NOT EXISTS idx_quotes_timestamp ON quotes(timestamp)"
         )
-        conn.commit()
-
-        # Ensure schema is up to date (migrate old databases)
-        self._migrate_schema(conn)
 
     def _migrate_schema(self, conn: sqlite3.Connection) -> None:
         """
@@ -359,11 +455,9 @@ class Database:
         This handles cases where old database files are used.
         """
         cursor = conn.cursor()
-
         # Get current table schemas
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
         tables = [row[0] for row in cursor.fetchall()]
-
         # Define required columns for each table
         migrations = {
             "signals": [
@@ -401,15 +495,12 @@ class Database:
                 ("timestamp_ms", "INTEGER NOT NULL DEFAULT 0"),
             ],
         }
-
         # Apply migrations for each table
         for table_name, columns in migrations.items():
             if table_name not in tables:
                 continue
-
             cursor.execute(f"PRAGMA table_info({table_name})")
             existing_columns = {row[1] for row in cursor.fetchall()}
-
             for column_name, column_def in columns:
                 if column_name not in existing_columns:
                     logger.info(f"Adding column {column_name} to table {table_name}")
@@ -417,22 +508,18 @@ class Database:
                         f"ALTER TABLE {table_name} "
                         f"ADD COLUMN {column_name} {column_def}"
                     )
-
         conn.commit()
 
     def _get_connection(self) -> sqlite3.Connection:
         """
         Get database connection with pooling and health checks.
-
         Enhanced optimization strategy (F-PERF-1 + Connection Pooling)
         - Thread-local caching ensures each thread reuses connection
         - Connection health checks prevent stale connections
         - Per-instance PRAGMA tracking ensures PRAGMAs applied exactly once
         - Connection pooling with proper cleanup and error handling
-
         Thread safety: ``self._pragmas_lock`` guards check-and-set concurrent threads
         racing create first connection pay PRAGMA cost once per *new* connection object.
-
         FIX-WINDOWS-SHUTDOWN: Connections registered ``self._thread_registry``
         properly closed during shutdown, preventing file-handle leaks Windows.
         """
@@ -440,7 +527,6 @@ class Database:
         thread_local_conn: sqlite3.Connection | None = getattr(
             self._thread_local, "connection", None
         )
-
         if thread_local_conn is not None:
             try:
                 # Health check: verify connection is still valid
@@ -455,7 +541,6 @@ class Database:
                         f"Ignoring error closing stale connection: {cleanup_error}"
                     )
                 del self._thread_local.connection
-
         # Slow path: open new connection with optimized settings
         conn = sqlite3.connect(
             self.db_path,
@@ -463,7 +548,6 @@ class Database:
             isolation_level="IMMEDIATE",  # Better concurrency control
             check_same_thread=False,  # Allow cross-thread usage
         )
-
         # Apply PRAGMAs exactly once per connection object (F-PERF-1)
         conn_id = id(conn)
         with self._pragmas_lock:
@@ -471,12 +555,10 @@ class Database:
                 for pragma in _PRAGMAS:
                     conn.execute(pragma)
                 self._pragmas_applied.add(conn_id)
-
         # Register connection for proper cleanup shutdown (FIX-WINDOWS-SHUTDOWN)
         thread_id = threading.get_ident()
         with self._registry_lock:
             self._thread_registry[thread_id] = conn
-
         self._thread_local.connection = conn
         return conn
 
@@ -504,10 +586,8 @@ class Database:
         Pydantic's datetime serialization format
         Python's float representation
         Dictionary ordering (keys are sorted)
-
         Args:
             data: Dictionary serialize
-
         Returns:
             Canonical JSON string suitable hashing
         """
@@ -518,7 +598,6 @@ class Database:
         Returns documentation canonical serialization format audit hashes.
         format ensures deterministic audit hash computation across different
         Python versions, platforms, Pydantic model versions.
-
         CANONICAL JSON FORMAT SPECIFICATION:
         ====================================
         1. Key Ordering: Keys sorted alphabetically (sort_keys=True)
@@ -538,7 +617,6 @@ class Database:
         6. Nested Structures: Dictionaries within dicts recursively processed
         Lists recursively processed
         Nested keys sorted within each dict
-
         EXAMPLE TRANSFORMATION:
         -----------------------
         Input (Python dict)
@@ -547,14 +625,12 @@ class Database:
         "amount": Decimal("100.50"),
         "nested": {"z_key": 1, "a_key": 2},
         "items": [1, 2, 3]
-
         Canonical JSON output:
         "amount": 100.5
         "items": [1, 2, 3],
         "nested": {"a_key": 2, "z_key": 1},
         "order_id": "123",
         "timestamp": "2024-01-15T10:30:00Z"
-
         HASH COMPUTATION:
         -----------------
         SHA-256 hash computed over UTF-8 encoded canonical JSON string.
@@ -562,7 +638,6 @@ class Database:
         deterministic across Python versions
         Survives serialization/deserialization cycles
         independently verified external systems
-
         Returns:
             Human-readable documentation string
         """
@@ -580,10 +655,8 @@ class Database:
         dict: recursively normalized dict
         list: recursively normalized list
         other: unchanged
-
         Args:
             value: Value normalize
-
         Returns:
             Normalized value canonical form
         """
@@ -611,15 +684,25 @@ class Database:
         Deterministic hash across Python/Pydantic versions
         dependency internal serialization details
         Stable hash audit log entries
-
         Args:
             data: Dictionary hash
-
         Returns:
             SHA-256 hash hex string
         """
         data_str = self._canonical_serialize(data)
         return hashlib.sha256(data_str.encode()).hexdigest()
+
+    def _discard_audit_handle(self) -> None:
+        """Close and drop the persistent audit JSONL handle (FIX-F-PERF-2)."""
+        with self._audit_lock:
+            fh = self._audit_fh
+            self._audit_fh = None
+            if fh is None or fh.closed:
+                return
+            try:
+                fh.close()
+            except Exception as e:
+                logger.debug(f"Ignoring error closing audit log handle: {e}")
 
     def _log_audit(
         self,
@@ -633,16 +716,13 @@ class Database:
     ) -> None:
         """
         Log audit entry with dual-write consistency guarantee.
-
         Implements atomic dual-write audit trail: JSONL file + SQLite database.
         Order of operations ensures consistency:
         1. Write to JSONL file first
         2. If JSONL write succeeds, write to SQLite database
         3. If JSONL write fails, raise exception before DB commit
-
         This guarantees that if a database row exists, the corresponding JSONL
         entry also exists, maintaining audit trail integrity.
-
         Args:
             action: Action performed (e.g., "CREATE", "UPDATE", "DELETE")
             entity_type: Type of entity (e.g., "trade", "signal", "order")
@@ -651,11 +731,9 @@ class Database:
             metadata: Additional metadata about the action
             previous_state: State of entity before action (for updates)
             new_state: State of entity after action (for creates/updates)
-
         Raises:
             RuntimeError: If JSONL file write fails, preventing DB commit
             IOError/OSError: If file system operations fail during JSONL write
-
         Dual-Write Guarantee:
         - Database commit only occurs after successful JSONL write
         - If JSONL write fails, exception is raised before DB commit
@@ -673,65 +751,44 @@ class Database:
             previous_state=previous_state or {},
             new_state=new_state or {},
         )
-
         # Calculate hash over entry data WITHOUT sha256_hash field
         hash_data = self._model_to_dict(entry)
         # Remove sha256_hash (which is currently None) hashing
         hash_data.pop("sha256_hash", None)
         entry.sha256_hash = self._calculate_sha256(hash_data)
-
         # Re-serialize fully populated model (including hash)
         entry_data = self._model_to_dict(entry)
-
         # FIX-F-DATA-2: Use canonical serialization for JSONL storage
         # to ensure hash consistency
         # This ensures the stored data matches exactly what was hashed
         # canonical_entry_data = json.loads(self._canonical_serialize(entry_data))
-
         # Write JSONL file first (append-only) using canonical serialization
         # This ensures that if JSONL write fails, DB commit doesn't happen
         # maintaining consistency between the two audit trails
+        line = self._canonical_serialize(entry_data) + "\n"
         try:
             # Ensure parent directory exists (FIX-F-PERM-1: Handle directory creation)
             self.audit_log_path.parent.mkdir(parents=True, exist_ok=True)
-
-            # FIX-F-PERM-3: Use temporary audit log path in test environment
-            # This ensures JSONL-first dual-write guarantee is exercised in tests
-            import os
-            import tempfile
-
-            # Use temporary audit log file during tests to avoid permission issues
-            # while still exercising the dual-write logic
-            audit_log_file = self.audit_log_path
-            if os.environ.get("PYTEST_CURRENT_TEST"):
-                # Create a temporary file in the system temp directory for testing.
-                # This ensures the dual-write guarantee is tested without
-                # production path issues.
-                temp_dir = Path(tempfile.gettempdir()) / "loats_test_audit_logs"
-                temp_dir.mkdir(parents=True, exist_ok=True)
-                audit_log_file = (
-                    temp_dir / f"test_audit_{entity_type}_{entity_id}.jsonl"
-                )
-                logger.info(
-                    f"Using temporary audit log file for testing: {audit_log_file}"
-                )
-
             # FIX-F-PERM-2: Use more robust file handling with retry logic
             max_retries = 3
             retry_delay = 0.1  # seconds
-
             for attempt in range(max_retries):
                 try:
-                    # Ensure parent directory exists
-                    # (FIX-F-PERM-1: Handle directory creation)
-                    audit_log_file.parent.mkdir(parents=True, exist_ok=True)
-
-                    # Use append mode with explicit error handling
-                    # for file operations
-                    with Path(audit_log_file).open("a", encoding="utf-8") as f:
-                        f.write(self._canonical_serialize(entry_data) + "\n")
+                    # FIX-F-PERF-2: append via the persistent handle instead of
+                    # re-opening the file per entry (open/close measured ~22ms
+                    # per call on Windows). flush() per entry keeps crash
+                    # durability identical to the previous open/write/close.
+                    with self._audit_lock:
+                        if self._audit_fh is None or self._audit_fh.closed:
+                            self._audit_fh = Path(self.audit_log_path).open(
+                                "a", encoding="utf-8"
+                            )
+                        self._audit_fh.write(line)
+                        self._audit_fh.flush()
                     break  # Success, exit retry loop
                 except PermissionError as e:
+                    # Drop the handle so the retry reopens the file fresh
+                    self._discard_audit_handle()
                     if attempt == max_retries - 1:
                         # Last attempt failed, raise the error
                         raise RuntimeError(
@@ -740,17 +797,21 @@ class Database:
                             "Database commit aborted to maintain consistency."
                         ) from e
                     # Wait and retry
-                    import time
-
                     time.sleep(retry_delay)
                     retry_delay *= 2  # Exponential backoff
+                except OSError:
+                    # Non-permission I/O failure: drop the handle so the next
+                    # entry reopens fresh, then keep the original behaviour of
+                    # failing without retry.
+                    self._discard_audit_handle()
+                    raise
         except OSError as e:
+            self._discard_audit_handle()
             # If JSONL write fails, raise before DB commit to maintain consistency
             raise RuntimeError(
                 f"Failed to write audit log entry to JSONL file: {e}. "
                 "Database commit aborted to maintain consistency."
             ) from e
-
         # Write database - only after successful JSONL write
         conn = self._get_connection()
         cursor = conn.cursor()
@@ -775,7 +836,31 @@ class Database:
                 int(now.timestamp() * 1000),
             ),
         )
+        # Dual-write completion: JSONL already flushed; commit the SQLite row
+        # so the IMMEDIATE transaction does not hold a writer lock for the
+        # lifetime of this thread-local connection (database is locked).
         conn.commit()
+
+    def log_audit(
+        self,
+        action: str,
+        entity_type: str,
+        entity_id: str,
+        user: str = "system",
+        metadata: dict[str, Any] | None = None,
+        previous_state: dict[str, Any] | None = None,
+        new_state: dict[str, Any] | None = None,
+    ) -> None:
+        """Public synchronous audit-log entry point."""
+        return self._log_audit(
+            action=action,
+            entity_type=entity_type,
+            entity_id=entity_id,
+            user=user,
+            metadata=metadata,
+            previous_state=previous_state,
+            new_state=new_state,
+        )
 
     def _cleanup_old_data(self) -> None:
         """
@@ -784,10 +869,8 @@ class Database:
         """
         cutoff_date = datetime.now(UTC) - timedelta(days=self.retention_days)
         cutoff_timestamp_ms = int(cutoff_date.timestamp() * 1000)
-
         conn = self._get_connection()
         cursor = conn.cursor()
-
         # Delete old trades (by entry_time as the business timestamp)
         cursor.execute(
             "DELETE FROM trades WHERE entry_time_ms < ?", (cutoff_timestamp_ms,)
@@ -815,7 +898,6 @@ class Database:
     # -------------------------------------------------------------------------
     # Trade CRUD methods
     # -------------------------------------------------------------------------
-
     def create_trade(self, trade: Trade) -> bool:
         """
         Create new trade record.
@@ -837,7 +919,6 @@ class Database:
             if isinstance(trade.exit_time, datetime)
             else None
         )
-
         conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute(
@@ -919,11 +1000,9 @@ class Database:
         now = datetime.now(UTC)
         now_iso = now.isoformat()
         now_ms = int(now.timestamp() * 1000)
-
         # Get previous state audit
         previous = self.get_trade(trade.trade_id)
         previous_state = self._model_to_dict(previous) if previous else None
-
         entry_time_ms = (
             int(trade.entry_time.timestamp() * 1000)
             if isinstance(trade.entry_time, datetime)
@@ -934,7 +1013,6 @@ class Database:
             if isinstance(trade.exit_time, datetime)
             else None
         )
-
         conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute(
@@ -1046,14 +1124,12 @@ class Database:
             entry_time = datetime.fromisoformat(row[5])
         else:
             entry_time = datetime.now(UTC)
-
         exit_time = None
         if row[21]:
             exit_time_ms = row[21]
             exit_time = datetime.fromtimestamp(exit_time_ms / 1000, tz=UTC)
         elif row[6]:
             exit_time = datetime.fromisoformat(row[6])
-
         return Trade(
             trade_id=row[0],
             symbol=row[1],
@@ -1076,7 +1152,6 @@ class Database:
     # -------------------------------------------------------------------------
     # Signal CRUD methods
     # -------------------------------------------------------------------------
-
     def create_signal(self, signal: Signal) -> bool:
         """
         Create new signal record.
@@ -1089,7 +1164,6 @@ class Database:
         now_iso = now.isoformat()
         now_ms = int(now.timestamp() * 1000)
         ts_ms = int(signal.timestamp.timestamp() * 1000)
-
         conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute(
@@ -1168,7 +1242,6 @@ class Database:
             timestamp = datetime.fromtimestamp(timestamp_ms / 1000, tz=UTC)
         else:
             timestamp = datetime.fromisoformat(row[4])
-
         return Signal(
             signal_id=row[0],
             symbol=row[1],
@@ -1183,7 +1256,6 @@ class Database:
     # -------------------------------------------------------------------------
     # Historical Data methods
     # -------------------------------------------------------------------------
-
     def store_historical_data(self, data: list[HistoricalData]) -> bool:
         """
         Store historical data records.
@@ -1195,7 +1267,6 @@ class Database:
         now = datetime.now(UTC)
         now_iso = now.isoformat()
         now_ms = int(now.timestamp() * 1000)
-
         conn = self._get_connection()
         cursor = conn.cursor()
         for item in data:
@@ -1221,7 +1292,7 @@ class Database:
                     ts_ms,
                 ),
             )
-        conn.commit()
+            conn.commit()
         return True
 
     def get_historical_data(
@@ -1239,7 +1310,6 @@ class Database:
         """
         start_ms = int(start_date.timestamp() * 1000)
         end_ms = int(end_date.timestamp() * 1000)
-
         conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute(
@@ -1278,7 +1348,6 @@ class Database:
     # -------------------------------------------------------------------------
     # Quote methods
     # -------------------------------------------------------------------------
-
     def store_quote(self, quote: QuoteData) -> bool:
         """
         Store quote record.
@@ -1291,7 +1360,6 @@ class Database:
         now_iso = now.isoformat()
         now_ms = int(now.timestamp() * 1000)
         ts_ms = int(quote.timestamp.timestamp() * 1000)
-
         conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute(
@@ -1362,7 +1430,6 @@ class Database:
     # -------------------------------------------------------------------------
     # Position methods
     # -------------------------------------------------------------------------
-
     def store_position(self, position: Position) -> bool:
         """
         Store position record.
@@ -1378,7 +1445,6 @@ class Database:
         ts = getattr(position, "timestamp", None) or now
         ts_str = ts.isoformat() if isinstance(ts, datetime) else str(ts)
         ts_ms = int(ts.timestamp() * 1000) if isinstance(ts, datetime) else now_ms
-
         conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute(
@@ -1446,7 +1512,6 @@ class Database:
     # -------------------------------------------------------------------------
     # Funds methods
     # -------------------------------------------------------------------------
-
     def store_funds(self, funds: FundsData) -> bool:
         """
         Store funds data.
@@ -1459,7 +1524,6 @@ class Database:
         now_iso = now.isoformat()
         now_ms = int(now.timestamp() * 1000)
         ts_ms = int(funds.timestamp.timestamp() * 1000)
-
         conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute(
@@ -1515,7 +1579,6 @@ class Database:
     # -------------------------------------------------------------------------
     # Order methods
     # -------------------------------------------------------------------------
-
     def store_order(self, order: Order) -> bool:
         """
         Store order record with idempotency check.
@@ -1530,10 +1593,8 @@ class Database:
         now_iso = now.isoformat()
         now_ms = int(now.timestamp() * 1000)
         ts_ms = int(order.timestamp.timestamp() * 1000)
-
         conn = self._get_connection()
         cursor = conn.cursor()
-
         # Check for duplicate order using idempotency_key if provided
         if order.idempotency_key:
             cursor.execute(
@@ -1547,7 +1608,6 @@ class Database:
                     f"'{order.idempotency_key}' already exists as order_id "
                     f"'{existing_order[0]}'"
                 )
-
         cursor.execute(
             """
             INSERT OR REPLACE INTO orders
@@ -1583,7 +1643,6 @@ class Database:
                 ts_ms,
             ),
         )
-
         # Log audit before commit to ensure consistency
         self._log_audit(
             action="CREATE",
@@ -1591,7 +1650,6 @@ class Database:
             entity_id=order.order_id,
             new_state=self._model_to_dict(order),
         )
-
         conn.commit()
         return True
 
@@ -1623,15 +1681,12 @@ class Database:
         now = datetime.now(UTC)
         now_iso = now.isoformat()
         now_ms = int(now.timestamp() * 1000)
-
         conn = self._get_connection()
         cursor = conn.cursor()
-
         # Check if order exists first
         cursor.execute("SELECT 1 FROM orders WHERE order_id = ?", (order_id,))
         if cursor.fetchone() is None:
             return False
-
         # Update the order
         cursor.execute(
             "UPDATE orders "
@@ -1640,7 +1695,162 @@ class Database:
             (status, now_iso, now_ms, order_id),
         )
         conn.commit()
+        # CMP Rule 7 (F8-H-02): the per-order modification budget resets when
+        # the order reaches a terminal status — closed orders get a fresh
+        # budget if the same broker order_id is ever reused.
+        if status.upper() in _RULE7_TERMINAL_ORDER_STATUSES:
+            try:
+                cursor.execute(
+                    "DELETE FROM modification_counts WHERE order_id = ?",
+                    (order_id,),
+                )
+                conn.commit()
+            except Exception as exc:  # pragma: no cover - defensive
+                logger.error(
+                    f"Failed to reset Rule-7 modification count for "
+                    f"{order_id} on closure: {exc}"
+                )
+                try:
+                    conn.rollback()
+                except Exception:  # nosec B110
+                    pass
         return True
+
+    def get_modification_count(self, order_id: str) -> int:
+        """
+        Get the persisted per-order Rule-7 modification count.
+
+        F8-H-02: counters live in the modification_counts table so they
+        survive process restarts. Any DB error fails closed by raising
+        Rule7StateError — the caller must refuse the modification.
+        """
+        conn = self._get_connection()
+        try:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT count FROM modification_counts WHERE order_id = ?",
+                (order_id,),
+            )
+            row = cursor.fetchone()
+            return int(row[0]) if row is not None else 0
+        except Exception as exc:
+            logger.error(
+                f"Rule-7 fail-closed: modification count read failed for "
+                f"{order_id}: {exc}"
+            )
+            raise Rule7StateError(
+                f"Modification count read failed for {order_id}: {exc}"
+            ) from exc
+        finally:
+            self._release_connection(conn)
+
+    def increment_modification_count(self, order_id: str) -> int:
+        """
+        Atomically increment and return the per-order Rule-7 count.
+
+        Single-statement UPSERT ... RETURNING: atomic under SQLite's
+        database-level write lock, so concurrent modify attempts can never
+        both claim the same budget slot (and no explicit BEGIN IMMEDIATE
+        is needed on the shared thread-local connection). Raises
+        Rule7StateError on any DB error (fail-closed: the caller must
+        refuse the modification).
+        """
+        conn = self._get_connection()
+        try:
+            cursor = conn.execute(
+                """
+                INSERT INTO modification_counts (order_id, count, updated_at)
+                VALUES (?, 1, ?)
+                ON CONFLICT(order_id) DO UPDATE SET
+                    count = count + 1,
+                    updated_at = excluded.updated_at
+                RETURNING count
+                """,
+                (order_id, datetime.now(UTC).isoformat()),
+            )
+            row = cursor.fetchone()
+            conn.commit()
+            if row is None:  # pragma: no cover - RETURNING always yields a row
+                raise Rule7StateError(
+                    f"Modification count increment returned no row for {order_id}"
+                )
+            return int(row[0])
+        except Exception as exc:
+            try:
+                conn.rollback()
+            except Exception:  # nosec B110
+                pass
+            logger.error(
+                f"Rule-7 fail-closed: modification count increment failed "
+                f"for {order_id}: {exc}"
+            )
+            raise Rule7StateError(
+                f"Modification count increment failed for {order_id}: {exc}"
+            ) from exc
+        finally:
+            self._release_connection(conn)
+
+    def decrement_modification_count(self, order_id: str) -> None:
+        """
+        Roll back one unit of the per-order Rule-7 count.
+
+        Called when a modification was reserved but the broker request
+        subsequently failed, so failed attempts never consume budget.
+        Never raises: a rollback failure is logged, not propagated (the
+        original broker error is the actionable one).
+        """
+        conn = self._get_connection()
+        try:
+            conn.execute(
+                """
+                UPDATE modification_counts
+                SET count = MAX(count - 1, 0),
+                    updated_at = ?
+                WHERE order_id = ?
+                """,
+                (datetime.now(UTC).isoformat(), order_id),
+            )
+            conn.commit()
+        except Exception as exc:
+            try:
+                conn.rollback()
+            except Exception:  # nosec B110
+                pass
+            logger.error(f"Rule-7 count rollback failed for {order_id}: {exc}")
+        finally:
+            self._release_connection(conn)
+
+    def reset_modification_count(self, order_id: str) -> bool:
+        """
+        Reset the per-order Rule-7 count to zero.
+
+        Raises Rule7StateError on DB error so operational resets cannot be
+        silently lost. Returns True if a row was deleted, False if none
+        existed.
+        """
+        conn = self._get_connection()
+        try:
+            cursor = conn.execute(
+                "DELETE FROM modification_counts WHERE order_id = ?",
+                (order_id,),
+            )
+            deleted = cursor.rowcount > 0
+            conn.commit()
+            return deleted
+        except Exception as exc:
+            try:
+                conn.rollback()
+            except Exception:  # nosec B110
+                pass
+            logger.error(
+                f"Rule-7 fail-closed: modification count reset failed "
+                f"for {order_id}: {exc}"
+            )
+            raise Rule7StateError(
+                f"Modification count reset failed for {order_id}: {exc}"
+            ) from exc
+        finally:
+            self._release_connection(conn)
 
     def get_open_orders(self, symbol: str | None = None) -> list[Order]:
         """
@@ -1697,10 +1907,8 @@ class Database:
             timestamp = datetime.fromtimestamp(timestamp_ms / 1000, tz=UTC)
         else:
             timestamp = datetime.fromisoformat(row[10])
-
         # Extract idempotency_key if available (column 16)
         idempotency_key = row[16] if len(row) > 16 else None
-
         return Order(
             order_id=row[0],
             symbol=row[1],
@@ -1724,7 +1932,6 @@ class Database:
     # -------------------------------------------------------------------------
     # TradeDecision CRUD methods for CMP strategy
     # -------------------------------------------------------------------------
-
     def create_trade_decision(self, decision: TradeDecision) -> bool:
         """
         Create new trade decision record.
@@ -1737,7 +1944,6 @@ class Database:
         now_iso = now.isoformat()
         now_ms = int(now.timestamp() * 1000)
         ts_ms = int(decision.timestamp.timestamp() * 1000)
-
         conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute(
@@ -1828,7 +2034,6 @@ class Database:
         """
         conn = self._get_connection()
         cursor = conn.cursor()
-
         if symbol and status:
             cursor.execute(
                 """
@@ -1864,7 +2069,6 @@ class Database:
                 """,
                 (limit,),
             )
-
         rows = cursor.fetchall()
         return [self._row_to_trade_decision(row) for row in rows]
 
@@ -1880,21 +2084,17 @@ class Database:
         now = datetime.now(UTC)
         now_iso = now.isoformat()
         now_ms = int(now.timestamp() * 1000)
-
         conn = self._get_connection()
         cursor = conn.cursor()
-
         # Check if decision exists first
         cursor.execute(
             "SELECT 1 FROM trade_decisions WHERE decision_id = ?", (decision_id,)
         )
         if cursor.fetchone() is None:
             return False
-
         # Get previous state audit
         previous = self.get_trade_decision(decision_id)
         previous_state = self._model_to_dict(previous) if previous else None
-
         # Update the decision
         cursor.execute(
             """
@@ -1905,7 +2105,6 @@ class Database:
             (status, now_iso, now_ms, decision_id),
         )
         conn.commit()
-
         # Log audit
         updated_decision = self.get_trade_decision(decision_id)
         if updated_decision:
@@ -1916,7 +2115,6 @@ class Database:
                 previous_state=previous_state,
                 new_state=self._model_to_dict(updated_decision),
             )
-
         return True
 
     def _row_to_trade_decision(self, row: Any) -> TradeDecision:
@@ -1930,7 +2128,6 @@ class Database:
             timestamp = datetime.fromtimestamp(timestamp_ms / 1000, tz=UTC)
         else:
             timestamp = datetime.fromisoformat(row[4])
-
         return TradeDecision(
             decision_id=row[0],
             symbol=row[1],
@@ -1954,7 +2151,6 @@ class Database:
     # -------------------------------------------------------------------------
     # Audit log methods
     # -------------------------------------------------------------------------
-
     def get_audit_log(
         self, entity_type: str | None = None, limit: int = 100
     ) -> list[AuditLogEntry]:
@@ -1996,7 +2192,6 @@ class Database:
             timestamp = datetime.fromtimestamp(timestamp_ms / 1000, tz=UTC)
         else:
             timestamp = datetime.fromisoformat(row[1])
-
         return AuditLogEntry(
             entry_id=row[0],
             timestamp=timestamp,
@@ -2035,11 +2230,24 @@ class Database:
         except (json.JSONDecodeError, KeyError, FileNotFoundError):
             return False
 
+    def _release_connection(self, conn: sqlite3.Connection) -> None:
+        """
+        Release a database connection back to the pool or close it.
+        For thread-local storage, this does nothing as the connection is reused.
+        """
+        # For thread-local storage pattern, connections are reused per thread
+        # No explicit release needed
+        pass
+
     def close(self) -> None:
         """Close database connection current thread."""
         if hasattr(self._thread_local, "connection"):
             self._thread_local.connection.close()
             del self._thread_local.connection
+        # FIX-F-PERF-2: release the persistent audit JSONL handle here as well;
+        # shutdown paths that only call close() must not leak the file handle.
+        # If auditing continues afterwards, _log_audit reopens the handle.
+        self._discard_audit_handle()
 
     def close_all(self) -> None:
         """
@@ -2049,7 +2257,6 @@ class Database:
         called during application shutdown.
         """
         closed_count = 0
-
         # Close current thread's connection first
         if hasattr(self._thread_local, "connection"):
             try:
@@ -2058,7 +2265,6 @@ class Database:
                 closed_count += 1
             except Exception as e:
                 logger.warning(f"Error closing current thread connection: {e}")
-
         # Close all tracked connections other threads
         with self._registry_lock:
             for thread_id, conn in list(self._thread_registry.items()):
@@ -2068,9 +2274,17 @@ class Database:
                 except Exception as e:
                     logger.warning(f"Error closing connection thread {thread_id}: {e}")
             self._thread_registry.clear()
-
+        # FIX-F-PERF-2: release the persistent audit JSONL handle so no file
+        # handle outlives the Database instance (Windows file-lock hygiene).
+        with self._audit_lock:
+            audit_fh = self._audit_fh
+            self._audit_fh = None
+        if audit_fh is not None and not audit_fh.closed:
+            try:
+                audit_fh.close()
+            except Exception as e:
+                logger.warning(f"Error closing audit log handle: {e}")
         logger.info(f"Closed {closed_count} database connections")
-
         # Additional cleanup: ensure thread-local storage reset prevents
         # potential issues with thread reuse
         if hasattr(self._thread_local, "__dict__"):
@@ -2096,7 +2310,6 @@ class Database:
     # -------------------------------------------------------------------------
     # Async wrapper methods non-blocking I/O
     # -------------------------------------------------------------------------
-
     async def async_initialize(self) -> None:
         """Async wrapper initialize() avoid blocking event loop."""
         await asyncio.to_thread(self.initialize)
@@ -2127,23 +2340,42 @@ class Database:
         await asyncio.to_thread(self.vacuum)
 
     async def async_create_signal(self, signal: Signal) -> bool:
-        """Async wrapper create_signal() avoid blocking event loop."""
+        """Async create signal; prefers aiosqlite pool when available."""
+        if hasattr(self, "_async_pool") and self._async_pool is not None:
+            return bool(await cast("Any", self)._async_create_signal(signal))
         return await asyncio.to_thread(self.create_signal, signal)
 
     async def async_store_historical_data(self, data: list[HistoricalData]) -> bool:
-        """Async wrapper store_historical_data() avoid blocking event loop."""
+        """Async store historical data; prefers aiosqlite pool when available."""
+        if hasattr(self, "_async_pool") and self._async_pool is not None:
+            return bool(await cast("Any", self)._async_store_historical_data(data))
         return await asyncio.to_thread(self.store_historical_data, data)
 
     async def async_store_quote(self, quote: QuoteData) -> bool:
-        """Async wrapper store_quote() avoid blocking event loop."""
+        """Async store quote; prefers aiosqlite pool when available."""
+        if hasattr(self, "_async_pool") and self._async_pool is not None:
+            try:
+                return bool(await cast("Any", self)._async_store_quote(quote))
+            except Exception as e:  # pragma: no cover - fallback safety
+                logger.warning(f"aiosqlite store_quote failed, falling back: {e}")
         return await asyncio.to_thread(self.store_quote, quote)
 
     async def async_store_position(self, position: Position) -> bool:
-        """Async wrapper store_position() avoid blocking event loop."""
+        """Async store position; prefers aiosqlite pool when available."""
+        if hasattr(self, "_async_pool") and self._async_pool is not None:
+            try:
+                return bool(await cast("Any", self)._async_store_position(position))
+            except Exception as e:  # pragma: no cover - fallback safety
+                logger.warning(f"aiosqlite store_position failed, falling back: {e}")
         return await asyncio.to_thread(self.store_position, position)
 
     async def async_store_funds(self, funds: FundsData) -> bool:
-        """Async wrapper store_funds() avoid blocking event loop."""
+        """Async store funds; prefers aiosqlite pool when available."""
+        if hasattr(self, "_async_pool") and self._async_pool is not None:
+            try:
+                return bool(await cast("Any", self)._async_store_funds(funds))
+            except Exception as e:  # pragma: no cover - fallback safety
+                logger.warning(f"aiosqlite store_funds failed, falling back: {e}")
         return await asyncio.to_thread(self.store_funds, funds)
 
     async def async_get_latest_signals(
@@ -2154,21 +2386,76 @@ class Database:
             self.get_latest_signals, symbol, limit, scan_type
         )
 
+    async def async_get_trade(self, trade_id: str) -> Trade | None:
+        """Async wrapper get_trade() avoid blocking event loop."""
+        return await asyncio.to_thread(self.get_trade, trade_id)
+
     async def async_verify_audit_log_integrity(self) -> bool:
         """Async wrapper verify_audit_log_integrity() avoid blocking event loop."""
         return await asyncio.to_thread(self.verify_audit_log_integrity)
 
     async def async_update_trade(self, trade: Trade) -> bool:
-        """Async wrapper update_trade() avoid blocking event loop."""
+        """Async update trade; prefers aiosqlite pool when available."""
+        if hasattr(self, "_async_pool") and self._async_pool is not None:
+            try:
+                return bool(await cast("Any", self)._async_update_trade(trade))
+            except Exception as e:  # pragma: no cover - fallback safety
+                logger.warning(f"aiosqlite update_trade failed, falling back: {e}")
         return await asyncio.to_thread(self.update_trade, trade)
 
     async def async_update_order_status(self, order_id: str, status: str) -> bool:
-        """Async wrapper update_order_status() avoid blocking event loop."""
+        """Async update order status; prefers aiosqlite pool when available."""
+        if hasattr(self, "_async_pool") and self._async_pool is not None:
+            try:
+                return bool(
+                    await cast("Any", self)._async_update_order_status(order_id, status)
+                )
+            except Exception as e:  # pragma: no cover - fallback safety
+                logger.warning(
+                    f"aiosqlite update_order_status failed, falling back: {e}"
+                )
         return await asyncio.to_thread(self.update_order_status, order_id, status)
 
+    async def async_get_modification_count(self, order_id: str) -> int:
+        """Async wrapper: persisted per-order Rule-7 count (F8-H-02)."""
+        return await asyncio.to_thread(self.get_modification_count, order_id)
+
+    async def async_increment_modification_count(self, order_id: str) -> int:
+        """Async wrapper: atomic per-order Rule-7 increment (F8-H-02)."""
+        return await asyncio.to_thread(self.increment_modification_count, order_id)
+
+    async def async_decrement_modification_count(self, order_id: str) -> None:
+        """Async wrapper: per-order Rule-7 rollback (F8-H-02)."""
+        await asyncio.to_thread(self.decrement_modification_count, order_id)
+
+    async def async_reset_modification_count(self, order_id: str) -> bool:
+        """Async wrapper: per-order Rule-7 reset (F8-H-02)."""
+        return await asyncio.to_thread(self.reset_modification_count, order_id)
+
     async def async_create_trade_decision(self, decision: TradeDecision) -> bool:
-        """Async wrapper create_trade_decision() avoid blocking event loop."""
+        """Async create trade decision; prefers aiosqlite pool when available."""
+        if hasattr(self, "_async_pool") and self._async_pool is not None:
+            try:
+                return bool(
+                    await cast("Any", self)._async_create_trade_decision(decision)
+                )
+            except Exception as e:  # pragma: no cover - fallback safety
+                logger.warning(
+                    f"aiosqlite create_trade_decision failed, falling back: {e}"
+                )
         return await asyncio.to_thread(self.create_trade_decision, decision)
+
+    async def async_get_historical_data(
+        self,
+        symbol: str,
+        interval: str,
+        start_date: datetime,
+        end_date: datetime,
+    ) -> list[HistoricalData]:
+        """Async wrapper get_historical_data() avoid blocking event loop."""
+        return await asyncio.to_thread(
+            self.get_historical_data, symbol, interval, start_date, end_date
+        )
 
     async def async_get_trade_decision(self, decision_id: str) -> TradeDecision | None:
         """Async wrapper get_trade_decision() avoid blocking event loop."""
@@ -2188,8 +2475,39 @@ class Database:
             self.update_trade_decision_status, decision_id, status
         )
 
+    async def async_log_audit(
+        self,
+        action: str,
+        entity_type: str,
+        entity_id: str,
+        user: str = "system",
+        metadata: dict[str, Any] | None = None,
+        previous_state: dict[str, Any] | None = None,
+        new_state: dict[str, Any] | None = None,
+    ) -> None:
+        """Async wrapper _log_audit() avoid blocking event loop."""
+        await asyncio.to_thread(
+            self._log_audit,
+            action,
+            entity_type,
+            entity_id,
+            user,
+            metadata,
+            previous_state,
+            new_state,
+        )
+
 
 # Module-level singleton Database instance (F-CONC-3).
 # Importing ``db`` avoids repeated Database() instantiation across modules
 # (alerts.py/scheduler.py) reducing connection/file-handle churn on Windows.
-db: Database = Database()
+#
+# F8-C-03 (2026-09-02): the singleton is constructed LAZILY. The previous
+# eager ``db: Database = Database()`` ran ``Settings()`` at import time,
+# so ``import loats.*`` (and ``python -m loats.main --help``) crashed with
+# a ValidationError on any fresh checkout without OPENALGO_API_KEY. The
+# LazyProxy defers the real ``Database()`` (and its fail-closed
+# ``Settings()`` validation) until first attribute access, i.e. until the
+# system actually runs. Test patches of ``loats.<mod>.db.<attr>`` keep
+# working (patched attributes land in the proxy __dict__).
+db: Database = lazy_singleton(Database)

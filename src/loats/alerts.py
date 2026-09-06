@@ -17,8 +17,8 @@ from telegram.ext import (
     filters,
 )
 
-from .config import get_settings
 from .database import Database, db
+from .lazy_settings import LazySettings
 from .loats_logging import get_logger
 from .models import Order, Signal, SignalType, Trade
 from .openalgo import async_client
@@ -31,10 +31,14 @@ from .utils.resilience import (
     telegram_circuit_breaker_retry_async,
 )
 
+# Lazy settings binding (TODO-18 / HC-21).
+# Behavioral contract: importing this module builds NO Settings
+# instance -- first attribute access proxies through get_settings(),
+# so bare-env imports (no OPENALGO_API_KEY) stay clean.
+settings: Any = LazySettings()  # LazySettings.__getattr__ proxies to Settings()
 logger = get_logger(__name__)
 
 # Settings must be accessed after all imports to avoid circular imports
-settings = get_settings()
 
 
 class AlertSystem:
@@ -78,10 +82,10 @@ class AlertSystem:
         if self._explicit_db is not None:
             return self._explicit_db
         # Late import to support test-time patching. This allows
-        # `patch("src.loats.alerts.db")` to continue working when no
+        # `patch("loats.alerts.db")` to continue working when no
         # explicit database instance is injected. The import happens at
         # access time rather than module load time.
-        from src.loats.alerts import db as module_db
+        from loats.alerts import db as module_db
 
         return module_db
 
@@ -94,7 +98,12 @@ class AlertSystem:
             logger.warning("Telegram chat ID not configured.")
             raise ValueError("Telegram chat ID not configured")
 
-        self.bot = Bot(token=settings.telegram_bot_token.get_secret_value())
+        token = settings.telegram_bot_token
+        # SecretStr and plain string both expose a token value for the Bot.
+        token_value = (
+            token.get_secret_value() if hasattr(token, "get_secret_value") else token
+        )
+        self.bot = Bot(token=token_value)
         return self.bot
 
     async def initialize(self) -> None:
@@ -107,7 +116,14 @@ class AlertSystem:
                 logger.warning("Telegram chat not configured. Alerts not sent.")
                 return
 
-            self.bot = Bot(token=settings.telegram_bot_token.get_secret_value())
+            token = settings.telegram_bot_token
+            # SecretStr and plain string both expose a token value for the Bot.
+            token_value = (
+                token.get_secret_value()
+                if hasattr(token, "get_secret_value")
+                else token
+            )
+            self.bot = Bot(token=token_value)
             self.application = Application.builder().bot(self.bot).build()
 
             self.application.add_handler(CommandHandler("start", self._start))
@@ -161,6 +177,7 @@ class AlertSystem:
             logger.info("Telegram bot started")
         except Exception as e:
             logger.error(f"Failed start Telegram bot: {e}")
+            self._running = False
             raise
 
     async def shutdown(self) -> None:
@@ -646,6 +663,24 @@ class AlertSystem:
                 f"<b>Status:</b> {status}\n"
                 f"<b>Timestamp:</b> {datetime.now(UTC).strftime('%Y-%m-%d %H:%M:%S')}"
             )
+            # Per-source breaker states (CMP P5 / F8-L-01): surface open
+            # sources so operators see producer-level isolation live.
+            try:
+                from .utils.per_source_breakers import get_source_breaker_status
+
+                source_status = get_source_breaker_status()
+                open_sources = [
+                    name
+                    for name, st in source_status.items()
+                    if st.get("state") == "open"
+                ]
+                message += "\n\n<b>Source breakers:</b>"
+                if open_sources:
+                    message += "\n🔴 " + html.escape(", ".join(sorted(open_sources)))
+                else:
+                    message += "\n🟢 all closed"
+            except Exception as cb_error:
+                logger.debug(f"Source breaker status unavailable: {cb_error}")
             if update.message:
                 await update.message.reply_text(message, parse_mode="HTML")
         except Exception as e:

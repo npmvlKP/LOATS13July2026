@@ -1,5 +1,6 @@
 """Main entry point LOATS13July2026 trading system."""
 
+import argparse
 import asyncio
 import signal
 import sys
@@ -7,21 +8,29 @@ from collections.abc import Callable
 from typing import Any
 
 from .alerts import alerts
-from .config import get_settings
-from .database import Database
+
+# Module-level exports for testing (F-CONC-3)
+from .database import db
+from .lazy_settings import LazySettings
 from .loats_logging import logger
 from .metrics import metrics
 from .orchestrator import start_orchestrator, stop_orchestrator
 from .scheduler import scheduler
 from .utils.cache import close_cache, initialize_cache
 
-# Module-level exports for testing (F-CONC-3)
-settings = get_settings()
-db = Database(
-    db_path=settings.sqlite_db_path,
-    audit_log_path=settings.audit_log_path,
-    retention_days=settings.retention_days,
-)
+# Lazy settings binding (TODO-18 / HC-21).
+# Behavioral contract: importing this module builds NO Settings
+# instance -- first attribute access proxies through get_settings(),
+# so bare-env imports (no OPENALGO_API_KEY) stay clean.
+settings: Any = LazySettings()
+# F8-C-03 (2026-09-02): main.py previously built its OWN eager
+# ``Database(...)`` at import time (a second instance alongside the
+# database.py singleton -- a latent F-CONC-3 violation, and the direct
+# cause of ``python -m loats.main`` crashing on fresh checkouts without
+# OPENALGO_API_KEY, because reading ``settings.sqlite_db_path`` built
+# Settings() immediately). Bind the shared lazy singleton instead; the
+# real Database() is constructed on first attribute access at runtime.
+__all__ = ["TradingSystem", "db", "settings"]
 
 
 class TradingSystem:
@@ -86,10 +95,7 @@ class TradingSystem:
             signal.signal(signal.SIGTERM, signal_handler)
         else:
             for sig in (signal.SIGINT, signal.SIGTERM):
-                loop.add_signal_handler(
-                    sig,
-                    lambda s=sig: asyncio.create_task(self._handle_shutdown_signal(s)),
-                )
+                loop.add_signal_handler(sig, self._posix_signal_entry, sig)
 
         await self.shutdown_event.wait()
 
@@ -119,6 +125,18 @@ class TradingSystem:
         logger.info(f"Received shutdown signal: {sig.name}")
         await self.shutdown()
 
+    def _posix_signal_entry(self, sig: signal.Signals) -> None:
+        """POSIX loop callback: schedule async shutdown handling.
+
+        Passed directly to ``loop.add_signal_handler(sig, cb, sig)`` as a
+        bound method with the signal as its argument -- no lambda, whose
+        parameter type mypy 2.3.1 cannot infer under unix event-loop
+        stubs (``Cannot infer type of lambda``, Linux-only CI failure).
+        Scheduling on the loop (rather than awaiting inline) preserves the
+        original contract: the callback returns before shutdown awaits.
+        """
+        asyncio.create_task(self._handle_shutdown_signal(sig))
+
     async def shutdown(self) -> None:
         """Shutdown trading system gracefully."""
         if not self.running:
@@ -141,16 +159,34 @@ class TradingSystem:
             logger.error(f"Error during shutdown: {e}")
             raise
 
+    async def _run_scheduler_support_jobs(self) -> None:
+        """Run scheduler support jobs (no signal production).
+
+        F8-H-03: TA and sentiment signal scans have been retired from the
+        scheduler.  Signal generation is the sole responsibility of the
+        orchestrator's 100 ms trading cycle.
+        """
+        await scheduler.run_once("market_status_check")
+        await scheduler.run_once("data_cleanup")
+        await scheduler.run_once("backtest_sanity_check")
+
     async def run_once(self) -> None:
-        """Run all scans once testing."""
+        """Run all non-signal scheduler jobs once for testing.
+
+        F8-H-03: TA and sentiment signal scans have been retired from the
+        scheduler.  Signal generation is the sole responsibility of the
+        orchestrator's 100 ms trading cycle.  This test helper now only exercises
+        support jobs (market status, data cleanup, backtest sanity check) and
+        logs that the orchestrator owns signal production.
+        """
         try:
-            logger.info("Running all scans once")
-            await scheduler.run_ta_scan()
-            await scheduler.run_sentiment_scan()
-            await scheduler.run_signal_generation()
-            logger.info("All scans completed")
+            logger.info("Running scheduler support jobs once")
+            await self._run_scheduler_support_jobs()
+            logger.info(
+                "All support jobs completed; orchestrator owns signal generation"
+            )
         except Exception as e:
-            logger.error(f"Error running scans: {e}")
+            logger.error(f"Error running support jobs: {e}")
             raise
 
 
@@ -166,8 +202,8 @@ async def main() -> None:
         sys.exit(1)
 
 
-def cli_main() -> None:
-    """CLI entry point that properly handles async main function."""
+def _run_entry() -> None:
+    """Shared asyncio entry used by ``cli_main`` and ``__main__``."""
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
@@ -175,13 +211,24 @@ def cli_main() -> None:
     except Exception as e:
         logger.error(f"Unexpected error: {e}")
         sys.exit(1)
+
+
+def cli_main() -> None:
+    """CLI entry point that properly handles async main function."""
+    parser = argparse.ArgumentParser(
+        prog="loats",
+        description="LOATS13July2026 algorithmic options trading system (LITE).",
+        add_help=True,
+    )
+    # parse_known_args: ``--help`` prints and exits 0; any other flags are
+    # deliberately ignored (historical behavior -- TradingSystem takes no
+    # CLI options today), so non-flag consumers are unaffected.
+    parser.parse_known_args()
+    _run_entry()
 
 
 if __name__ == "__main__":
-    try:
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        logger.info("Trading system stopped user")
-    except Exception as e:
-        logger.error(f"Unexpected error: {e}")
-        sys.exit(1)
+    # Route through cli_main() so ``python -m loats.main --help`` (the
+    # CI fresh-clone boot test) prints help and exits 0 instead of
+    # attempting a full system boot (F8-C-03).
+    cli_main()

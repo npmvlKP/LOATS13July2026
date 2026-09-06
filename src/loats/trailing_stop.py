@@ -12,20 +12,24 @@ import datetime
 from enum import StrEnum
 from typing import Any
 
-from .config import get_settings
+from .lazy_settings import LazySettings
 from .loats_logging import get_logger
 from .models import (
     Order,
+    OrderStatus,
     OrderType,
+    OrderVariety,
+    ProductType,
     Trade,
     TransactionType,
-    OrderVariety,
-    OrderStatus,
-    ProductType,
 )
 
+# Lazy settings binding (TODO-18 / HC-21).
+# Behavioral contract: importing this module builds NO Settings
+# instance -- first attribute access proxies through get_settings(),
+# so bare-env imports (no OPENALGO_API_KEY) stay clean.
+settings: Any = LazySettings()  # LazySettings.__getattr__ proxies to Settings()
 logger = get_logger(__name__)
-settings = get_settings()
 
 
 class TrailingStopType(StrEnum):
@@ -81,7 +85,7 @@ class TrailingStopEngine:
             "stop_type": stop_type,
             "status": TrailingStopStatus.ACTIVE,
             "trigger_price": None,
-            "last_adjustment": datetime.datetime.now(datetime.UTC),
+            "last_adjustment": datetime.datetime.now(datetime.UTC).isoformat(),
             "adjustment_count": 0,
             "locked_profit": 0.0,
             "parameters": parameters,
@@ -152,69 +156,66 @@ class TrailingStopEngine:
         """
         Update trailing stop based on current price.
 
-        Returns updated config and boolean indicating if stop was triggered.
+        Implements monotonic ratchet logic for trailing stops.
+        Returns updated config and boolean indicating if trailing stop was modified.
         """
         if config["status"] != TrailingStopStatus.ACTIVE:
             return config, False
 
         stop_type = config["stop_type"]
         transaction_type = config.get("transaction_type", "BUY")
+        entry_price = config["entry_price"]
+        current_stop_price = config.get("trigger_price", entry_price)
 
         # Determine if we're in a long or short position
         is_long = transaction_type == TransactionType.BUY
 
         # Check if stop has been triggered
-        if is_long and current_price <= config["trigger_price"]:
+        if is_long and current_price <= current_stop_price:
             config["status"] = TrailingStopStatus.TRIGGERED
             config["triggered_price"] = current_price
             config["triggered_time"] = datetime.datetime.now(datetime.UTC)
-
             self._add_to_history(config, "triggered", current_price)
             return config, True
 
-        elif not is_long and current_price >= config["trigger_price"]:
+        elif not is_long and current_price >= current_stop_price:
             config["status"] = TrailingStopStatus.TRIGGERED
             config["triggered_price"] = current_price
             config["triggered_time"] = datetime.datetime.now(datetime.UTC)
-
             self._add_to_history(config, "triggered", current_price)
             return config, True
 
-        # Update trailing stop based on type
-        if stop_type == TrailingStopType.FIXED:
-            # Fixed trailing stop doesn't move
-            pass
-
-        elif stop_type == TrailingStopType.PERCENTAGE:
-            updated_config, adjusted = self._update_percentage_trailing(
-                config, current_price, is_long
-            )
-            if adjusted:
-                config = updated_config
-
-        elif stop_type == TrailingStopType.ATR:
-            updated_config, adjusted = self._update_atr_trailing(
-                config, current_price, is_long
-            )
-            if adjusted:
-                config = updated_config
-
-        elif stop_type == TrailingStopType.VOLATILITY:
-            updated_config, adjusted = self._update_volatility_trailing(
-                config, current_price, is_long
-            )
-            if adjusted:
-                config = updated_config
-
-        elif stop_type == TrailingStopType.RATCHET:
-            updated_config, adjusted = self._update_ratchet_trailing(
-                config, current_price, is_long
-            )
-            if adjusted:
-                config = updated_config
-
-        # Update current price
-        config["current_price"] = current_price
+        # Monotonic ratchet logic for trailing stops
+        if force_adjust or (
+            stop_type == TrailingStopType.RATCHET and current_price > entry_price
+        ):
+            # Calculate new trailing stop price
+            if is_long:
+                # For long positions, move stop up (higher) with price
+                new_stop_price = (
+                    current_price - (current_price - entry_price) * self.ratchet_step
+                )
+                if new_stop_price > current_stop_price:
+                    config["trigger_price"] = new_stop_price
+                    config["adjustment_count"] += 1
+                    config["last_adjustment"] = datetime.datetime.now(
+                        datetime.UTC
+                    ).isoformat()
+                    self._add_to_history(config, "adjusted", current_price)
+                    return config, True
+            else:
+                # For short positions, move stop down (lower) with price
+                new_stop_price = (
+                    current_price + (entry_price - current_price) * self.ratchet_step
+                )
+                if new_stop_price < current_stop_price:
+                    config["trigger_price"] = new_stop_price
+                    config["adjustment_count"] += 1
+                    config["last_adjustment"] = datetime.datetime.now(
+                        datetime.UTC
+                    ).isoformat()
+                    self._add_to_history(config, "adjusted", current_price)
+                    return config, True
 
         return config, False
 

@@ -6,20 +6,45 @@ Implements RSS news sentiment analysis using Vader Sentiment.
 import asyncio
 import hashlib
 import json
+import os
+import re
+import warnings
 from datetime import UTC, datetime
-from typing import cast
+from typing import Any, cast
 from urllib.parse import urlparse
+
+# F8-L-06 root cause: this knob MUST be read from the process environment
+# BEFORE the newspaper import below. newspaper4k's parsers module emits the
+# benign "nltk is not installed" UserWarning at *import* time when the
+# optional [nlp] extra is absent, so a filter installed after that import is
+# a verified no-op (regression-tested in tests/test_sentiment.py::
+# TestNltkWarningSuppression). The filter is scoped to that exact message;
+# no other warning is silenced. The knob works only via the process
+# environment: pydantic-settings loads .env into the Settings model, never
+# into os.environ, so a .env line cannot reach this guard. The durable fix
+# is installing the optional extra once:  pip install 'newspaper4k[nlp]'
+if os.environ.get("LOATS_SUPPRESS_NLTK_WARNING") == "1":
+    warnings.filterwarnings(
+        "ignore",
+        message=re.escape("nltk is not installed"),
+        category=UserWarning,
+    )
 
 import feedparser
 from newspaper import Article
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 
-from .config import get_settings
+from .lazy_settings import LazySettings
 from .loats_logging import get_logger
 from .models import NewsItem, SentimentAnalysisResult
 from .utils.cache import cache_manager
+from .utils.lazy_singleton import lazy_singleton
 
-settings = get_settings()
+# Lazy settings binding (TODO-18 / HC-21).
+# Behavioral contract: importing this module builds NO Settings
+# instance -- first attribute access proxies through get_settings(),
+# so bare-env imports (no OPENALGO_API_KEY) stay clean.
+settings: Any = LazySettings()  # LazySettings.__getattr__ proxies to Settings()
 
 logger = get_logger(__name__)
 
@@ -192,4 +217,7 @@ class SentimentAnalyzer:
         return " ".join(text.split())
 
 
-sentiment = SentimentAnalyzer()
+# F8-C-03 (2026-09-02): __init__ reads Settings() (sentiment_threshold);
+# defer construction so imports stay credential-free (see
+# utils/lazy_singleton.py). Test patches keep working via proxy __dict__.
+sentiment: SentimentAnalyzer = lazy_singleton(SentimentAnalyzer)

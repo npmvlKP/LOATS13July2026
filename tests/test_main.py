@@ -29,6 +29,10 @@ async def test_trading_system_initialization(trading_system):
             "loats.main.scheduler.initialize", new_callable=AsyncMock
         ) as mock_scheduler_init,
         patch("loats.main.metrics.start_server") as mock_metrics_start,
+        # F8-L-05: orchestrator.start() now runs the RSS startup gate (live
+        # HTTP drift pass); keep this unit test hermetic by stubbing the
+        # module-level start_orchestrator reference in loats.main.
+        patch("loats.main.start_orchestrator", new_callable=AsyncMock),
     ):
         await trading_system.initialize()
         mock_db_init.assert_called_once()
@@ -77,19 +81,29 @@ async def test_trading_system_start_shutdown(trading_system):
 
 @pytest.mark.asyncio
 async def test_trading_system_run_once(trading_system):
-    with (
-        patch("loats.main.scheduler.run_ta_scan", new_callable=AsyncMock) as mock_ta,
-        patch(
-            "loats.main.scheduler.run_sentiment_scan", new_callable=AsyncMock
-        ) as mock_sentiment,
-        patch(
-            "loats.main.scheduler.run_signal_generation", new_callable=AsyncMock
-        ) as mock_signal,
-    ):
+    """Test run_once executes scheduler support jobs.
+
+    F8-H-03: TA and sentiment signal scans have been retired from the
+    scheduler; the orchestrator is the sole signal engine. run_once now only
+    exercises support jobs (market status, data cleanup, backtest sanity check).
+    """
+    with patch.object(
+        trading_system, "_run_scheduler_support_jobs", new_callable=AsyncMock
+    ) as mock_support:
         await trading_system.run_once()
-        mock_ta.assert_called_once()
-        mock_sentiment.assert_called_once()
-        mock_signal.assert_called_once()
+        mock_support.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_run_once_exception(trading_system):
+    """Test run_once exception handling when a support job fails."""
+    with patch.object(
+        trading_system,
+        "_run_scheduler_support_jobs",
+        side_effect=Exception("Support job error"),
+    ):
+        with pytest.raises(Exception, match="Support job error"):
+            await trading_system.run_once()
 
 
 @pytest.mark.asyncio

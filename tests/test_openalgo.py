@@ -359,7 +359,13 @@ class TestSyncClientEndpoints:
 
     def test_modify_order_success(self) -> None:
         c = self._client()
-        with patch("loats.openalgo._get_alerts", return_value=_alerts_mock(False)):
+        with (
+            patch("loats.openalgo._get_alerts", return_value=_alerts_mock(False)),
+            # Rule-7 gate (F8-H-02) must not persist counters into the real
+            # data/loats.db during unit tests; boundary coverage lives in
+            # tests/test_rule7_modification_limit.py against a temp DB.
+            patch("loats.rules.rules_engine"),
+        ):
             c.modify_order("o1", quantity=20)
         payload = c.client.post.call_args.kwargs["json"]
         assert payload["order_id"] == "o1"
@@ -370,7 +376,7 @@ class TestSyncClientEndpoints:
         with patch("loats.openalgo._get_alerts", return_value=_alerts_mock(False)):
             c.cancel_order("o1")
         payload = c.client.post.call_args.kwargs["json"]
-        assert payload == {"order_id": "o1"}
+        assert payload == {"order_id": "o1", "apikey": "k"}
 
     def test_place_order_kill_switch_blocks(self) -> None:
         c = self._client()
@@ -647,7 +653,12 @@ class TestAsyncClientOrders:
     @pytest.mark.asyncio
     async def test_modify_order_success(self) -> None:
         c = self._client()
-        with patch("loats.openalgo._get_alerts", return_value=_alerts_mock(False)):
+        with (
+            patch("loats.openalgo._get_alerts", return_value=_alerts_mock(False)),
+            # Rule-7 gate (F8-H-02) mocked out here; boundary coverage lives
+            # in tests/test_rule7_modification_limit.py against a temp DB.
+            patch("loats.rules.rules_engine"),
+        ):
             await c.modify_order("o1", price=3.0, quantity=7)
         payload = c.client.post.call_args.kwargs["json"]
         assert payload["price"] == 3.0
@@ -659,7 +670,7 @@ class TestAsyncClientOrders:
         with patch("loats.openalgo._get_alerts", return_value=_alerts_mock(False)):
             await c.cancel_order("o1")
         payload = c.client.post.call_args.kwargs["json"]
-        assert payload == {"order_id": "o1"}
+        assert payload == {"order_id": "o1", "apikey": "k"}
 
     @pytest.mark.asyncio
     async def test_order_fail_fast_when_circuit_open(self) -> None:

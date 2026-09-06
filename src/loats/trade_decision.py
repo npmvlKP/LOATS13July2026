@@ -14,16 +14,24 @@ from enum import StrEnum
 from typing import Any
 
 from .config import get_settings
+from .database import db
+from .lazy_settings import LazySettings
 from .loats_logging import get_logger
 from .models import FundsData, Signal, SignalType, Trade, TradeDecision, TransactionType
+from .openalgo import AsyncOpenAlgoClient
 from .options import calculate_portfolio_var
 from .rules import rules_engine
 from .sizing import sizing_engine
-from .strength import strength_engine
+from .strength import exclude_unknown_source_signals, strength_engine
 from .trailing_stop import TrailingStopType, trailing_stop_engine
+from .utils.lazy_singleton import lazy_singleton
 
+# Lazy settings binding (TODO-18 / HC-21).
+# Behavioral contract: importing this module builds NO Settings
+# instance -- first attribute access proxies through get_settings(),
+# so bare-env imports (no OPENALGO_API_KEY) stay clean.
+settings: Any = LazySettings()  # LazySettings.__getattr__ proxies to Settings()
 logger = get_logger(__name__)
-settings = get_settings()
 
 
 class DecisionStatus(StrEnum):
@@ -40,11 +48,32 @@ class DecisionStatus(StrEnum):
 class TradeDecisionEngine:
     """CMP Trade Decision Engine with Analyzer routing."""
 
-    def __init__(self) -> None:
-        """Initialize TradeDecisionEngine."""
-        self.decision_queue = asyncio.Queue()
-        self.analyzer_routing_enabled = True
+    def __init__(self, maxsize: int | None = None) -> None:
+        """Initialize TradeDecisionEngine.
+
+        Args:
+            maxsize: Optional queue maxsize override (for testing).
+                     If None, uses settings.decision_queue_maxsize.
+                     Bounded queue prevents unbounded memory growth if
+                     enqueues outpace the lazy processor (TODO-27c).
+        """
+        cfg = get_settings()
+        queue_maxsize = maxsize if maxsize is not None else cfg.decision_queue_maxsize
+        self.decision_queue: asyncio.Queue[TradeDecision] = asyncio.Queue(
+            maxsize=queue_maxsize
+        )
+        self.analyzer_routing_enabled = cfg.analyzer_routing_enabled
         self.decision_timeout = datetime.timedelta(minutes=5)
+        self._processor_task: asyncio.Task[None] | None = None
+        # P5/F8-H-01 evidence counters: lifetime Analyzer-routing outcomes,
+        # incremented only when a routing call actually resolves. The P5
+        # supervisor reads these (via get_routing_stats) instead of
+        # fabricating activity numbers in the run log.
+        self.routing_counters: dict[str, int] = {
+            "success": 0,
+            "disabled": 0,
+            "error": 0,
+        }
 
     async def create_trade_decision(
         self,
@@ -69,22 +98,97 @@ class TradeDecisionEngine:
         symbol = signals[0].symbol if signals else settings.default_symbol
         timestamp = datetime.datetime.now(datetime.UTC)
 
-        # Step 1: Validate signals
-        validation_result = strength_engine.validate_signal_sources(signals)
+        # Step 0 (F8-M-01): exclude unknown-source signals per-signal.
+        # Mixed-provenance windows are normal on a shared signal table;
+        # excluding individually with a loud audit trail keeps a stray
+        # untagged emission from vetoing the cycle. The exclusion is
+        # applied to the whole workflow (validation, direction selection,
+        # strength, breakdown) so an unknown-source signal can never
+        # influence the decision.
+        valid_signals, excluded_unknown = exclude_unknown_source_signals(signals)
+        for src in excluded_unknown:
+            logger.warning(
+                f"F8-M-01: excluded signal with unknown source {src!r} from "
+                f"decision workflow for {symbol}"
+            )
+        if excluded_unknown and settings.environment != "test":
+            # F8-M-01: audited exclusion — dual-write (SQLite + JSONL,
+            # SHA-256-chained) row. Best-effort: an audit-store failure is
+            # logged but never cascades into the cycle. Skipped under the
+            # test environment so unit tests stay hermetic (no writes to
+            # data/loats.db from unpatched tests).
+            try:
+                await db.async_log_audit(
+                    action="EXCLUDE",
+                    entity_type="signal",
+                    entity_id=f"{symbol}:{timestamp.isoformat()}",
+                    user="trade_decision_engine",
+                    metadata={
+                        "reason": "unknown_source_excluded",
+                        "excluded_unknown_sources": excluded_unknown,
+                        "total_signals": len(signals),
+                        "valid_signals": len(valid_signals),
+                    },
+                )
+            except Exception as e:
+                logger.error(
+                    f"Failed to write signal-exclusion audit row for {symbol}: {e}"
+                )
+
+        # Step 1: Validate signals (F8-M-01: per-signal unknown-source
+        # exclusion happens inside the validator; the batch is rejected
+        # only when known-source signals fall below the CMP minimums).
+        validation_result = strength_engine.validate_signal_sources(valid_signals)
         if not validation_result[0]:
+            rejected_details = validation_result[1]
+            # F8-M-01: audited rejection — dual-write (SQLite + JSONL,
+            # SHA-256-chained) row with the per-offender diagnostics so
+            # operators can trace exactly which producer was excluded and
+            # why the batch was rejected. Best-effort: an audit-store
+            # failure is logged but never cascades into the cycle. Skipped
+            # under the test environment so unit tests stay hermetic (no
+            # writes to data/loats.db from unpatched tests).
+            if settings.environment != "test":
+                try:
+                    await db.async_log_audit(
+                        action="REJECT",
+                        entity_type="signal_batch",
+                        entity_id=f"{symbol}:{timestamp.isoformat()}",
+                        user="trade_decision_engine",
+                        metadata={
+                            "reason": rejected_details.get("reason"),
+                            "details": rejected_details,
+                            "excluded_unknown_sources": rejected_details.get(
+                                "excluded_unknown_sources", []
+                            ),
+                        },
+                    )
+                except Exception as e:
+                    logger.error(
+                        f"Failed to write signal-batch rejection audit row "
+                        f"for {symbol}: {e}"
+                    )
             return None, {
                 "status": "rejected",
                 "reason": "signal_validation_failed",
-                "details": validation_result[1],
+                "details": rejected_details,
                 "symbol": symbol,
                 "timestamp": timestamp,
             }
 
+        # F8-M-01: stamp the workflow-level exclusion into the validation
+        # details persisted with the decision. The validator saw the
+        # pre-filtered list (its own count is 0); the authoritative
+        # offender record is the one from Step 0.
+        validation_result[1]["excluded_unknown_sources"] = excluded_unknown
+
         # Step 2: Calculate composite strength
         composite_strength, strength_details = (
-            strength_engine.calculate_composite_strength(signals)
+            strength_engine.calculate_composite_strength(valid_signals)
         )
-        if composite_strength <= 0.5:  # Minimum strength threshold
+        if (
+            composite_strength <= settings.composite_strength_threshold
+        ):  # Minimum strength threshold
             return None, {
                 "status": "rejected",
                 "reason": "insufficient_strength",
@@ -95,7 +199,7 @@ class TradeDecisionEngine:
             }
 
         # Determine decision type from strongest signal
-        strongest_signal = max(signals, key=lambda s: s.strength)
+        strongest_signal = max(valid_signals, key=lambda s: s.strength)
         decision_type = strongest_signal.signal_type
 
         # Step 3: Apply gating rules
@@ -147,6 +251,7 @@ class TradeDecisionEngine:
                 symbol=symbol,
                 quantity=position_size,
                 entry_price=current_price,
+                entry_time=datetime.datetime.now(datetime.UTC),
                 transaction_type=(
                     TransactionType.BUY
                     if decision_type == SignalType.BUY
@@ -185,11 +290,14 @@ class TradeDecisionEngine:
                 "method": var_analysis.method,
             },
             gating_rules_result=gating_result,
-            source_breakdown=strength_engine.get_source_strength_breakdown(signals),
+            source_breakdown=strength_engine.get_source_strength_breakdown(
+                valid_signals
+            ),
             metadata={
                 "sizing_details": sizing_details,
                 "strength_details": strength_details,
                 "validation_result": validation_result[1],
+                "excluded_unknown_sources": excluded_unknown,
                 "session": str(rules_engine.session_state),
             },
             status="PENDING",
@@ -228,53 +336,146 @@ class TradeDecisionEngine:
 
     async def route_to_analyzer(self, trade_decision: TradeDecision) -> dict[str, Any]:
         """
-        Route TradeDecision to Analyzer.
+        Route TradeDecision to Analyzer with real HTTP call and audit persistence.
 
-        In production, this would send to actual Analyzer service.
-        For now, we simulate the routing and return success.
+        Workflow:
+        1. Check if analyzer routing is enabled
+        2. If disabled, return disabled status (but still persist to audit)
+        3. If enabled, submit payload via AsyncOpenAlgoClient.place_analyzer_request()
+        4. Persist decision + routing outcome to audit trail (SQLite + JSONL)
+        5. Return real response or propagate errors (no fabrication)
+
+        Args:
+            trade_decision: TradeDecision to route to Analyzer
+
+        Returns:
+            dict[str, Any]: Routing response from Analyzer or disabled status
+
+        Raises:
+            OpenAlgoError: If Analyzer request fails (propagated, not fabricated)
+            Exception: Other errors propagated without fabrication
+
+        Note:
+            - No asyncio.sleep simulation - real HTTP call
+            - Routing failure propagates (no fabricated success)
+            - Audit row exists per decision (dual-write: SQLite + JSONL)
+        """
+        payload = trade_decision.to_analyzer_payload()
+        response = await self._do_route_or_disable(trade_decision, payload)
+        return await self._persist_routing_outcome(trade_decision, response)
+
+    async def _do_route_or_disable(
+        self, trade_decision: TradeDecision, payload: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Return disabled status or make real Analyzer HTTP call.
+
+        Analyzer routing is intentionally gated by the environment flag
+        (default OFF, enable explicitly). When disabled we still return a
+        deterministic response so the paper-trail is complete, but we do not
+        fabricate a successful Analyzer response.
         """
         if not self.analyzer_routing_enabled:
-            return {
+            response = {
                 "status": "disabled",
                 "reason": "analyzer_routing_disabled",
                 "decision_id": trade_decision.decision_id,
+                "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
             }
-
-        try:
-            # Simulate Analyzer API call
-            payload = trade_decision.to_analyzer_payload()
-
-            # In production: await analyzer_client.send_decision(payload)
-            # For simulation, we'll just log and return success
-
             logger.info(
-                f"Routing TradeDecision to Analyzer: {trade_decision.decision_id}"
+                f"Analyzer routing disabled for decision {trade_decision.decision_id}"
             )
-            logger.debug(f"Analyzer payload: {payload}")
+            self.routing_counters["disabled"] += 1
+            return response
 
-            # Simulate processing delay
-            await asyncio.sleep(0.1)
-
+        # Routing enabled - make real HTTP call to Analyzer (no simulation).
+        logger.info(f"Routing TradeDecision to Analyzer: {trade_decision.decision_id}")
+        logger.debug(f"Analyzer payload: {payload}")
+        try:
+            async with AsyncOpenAlgoClient() as client:
+                analyzer_response = await client.place_analyzer_request(payload)
+            logger.info(
+                f"Successfully routed decision {trade_decision.decision_id} to Analyzer"
+            )
+            self.routing_counters["success"] += 1
             return {
                 "status": "success",
                 "decision_id": trade_decision.decision_id,
-                "analyzer_response": {
-                    "received": True,
-                    "decision_id": trade_decision.decision_id,
-                    "symbol": trade_decision.symbol,
-                    "status": "QUEUED_FOR_ANALYSIS",
-                    "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
-                },
+                "analyzer_response": analyzer_response,
+                "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
             }
-
         except Exception as e:
+            # Propagate errors, don't fabricate success.
             logger.error(f"Failed to route TradeDecision to Analyzer: {e}")
-            return {
+            response = {
                 "status": "error",
                 "decision_id": trade_decision.decision_id,
                 "error": str(e),
+                "error_type": type(e).__name__,
                 "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
             }
+            self.routing_counters["error"] += 1
+            await self._persist_routing_outcome(trade_decision, response)
+            raise
+
+    async def _persist_routing_outcome(
+        self, trade_decision: TradeDecision, response: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Persist decision + routing outcome to audit trail (SQLite + JSONL).
+
+        F8-H-01: every routed decision must leave (a) a ``trade_decisions``
+        row and (b) a ROUTE audit row whose metadata carries the routing
+        outcome (success / disabled / error). The previous implementation
+        probed for a nonexistent ``db.async_record_trade_decision`` attribute
+        (the registered extension is the private one-arg
+        ``_async_record_trade_decision``), so the preferred branch was dead
+        code and the routing outcome was never audited.
+
+        Idempotent: the orchestrator pre-persists the decision before
+        routing (orchestrator.py ``_execute_cmp_strategy``), so the row is
+        only created when missing.
+
+        Best-effort: if the DB write fails the routing response is still
+        returned so callers can decide whether to fail the orchestrator
+        cycle. Failures are logged loudly for monitoring.
+        """
+        try:
+            existing = await db.async_get_trade_decision(trade_decision.decision_id)
+            if existing is None:
+                await db.async_create_trade_decision(trade_decision)
+                logger.debug(
+                    f"Persisted decision {trade_decision.decision_id} to audit trail"
+                )
+        except Exception as e:
+            logger.error(
+                f"Failed to persist decision {trade_decision.decision_id} "
+                f"to audit trail: {e}"
+            )
+            # Don't fail the routing if audit persistence fails
+            # but log the error for monitoring
+
+        # ROUTE audit row: one per routed decision, carrying the outcome.
+        # async_log_audit is the canonical dual-write (SQLite + JSONL) with
+        # SHA-256 chaining; a failure here is logged but non-fatal so a
+        # transient audit-store error does not cascade into the cycle.
+        try:
+            await db.async_log_audit(
+                action="ROUTE",
+                entity_type="trade_decision",
+                entity_id=trade_decision.decision_id,
+                user="trade_decision_engine",
+                metadata={
+                    "symbol": trade_decision.symbol,
+                    "routing_enabled": self.analyzer_routing_enabled,
+                    "routing_outcome": dict(response),
+                },
+            )
+        except Exception as e:
+            logger.error(
+                f"Failed to write ROUTE audit row for decision "
+                f"{trade_decision.decision_id}: {e}"
+            )
+
+        return response
 
     async def process_decision_queue(self) -> None:
         """Process decisions from the queue and route to Analyzer."""
@@ -296,18 +497,49 @@ class TradeDecisionEngine:
 
                 self.decision_queue.task_done()
 
+            except asyncio.CancelledError:
+                raise
             except Exception as e:
                 logger.error(f"Error processing decision queue: {e}")
+                # Backoff to avoid tight spin on persistent errors, but never
+                # exceed the decision timeout so the queue does not stall.
                 await asyncio.sleep(1.0)
 
     async def enqueue_decision(self, trade_decision: TradeDecision) -> dict[str, Any]:
-        """Add TradeDecision to processing queue."""
+        """Add TradeDecision to processing queue with backpressure.
+
+        Uses bounded queue (asyncio.Queue(maxsize=N)) to prevent unbounded
+        memory growth when enqueues outpace the lazy processor
+        (TODO-27c). If the queue is full, the decision is rejected
+        immediately with queue_full status instead of blocking the
+        orchestrator cycle indefinitely.
+
+        Returns:
+            dict with status queued / rejected(queue_full) / error.
+        """
         try:
-            await self.decision_queue.put(trade_decision)
+            # Backpressure: non-blocking put; reject if full
+            self.decision_queue.put_nowait(trade_decision)
             return {
                 "status": "queued",
                 "decision_id": trade_decision.decision_id,
                 "queue_size": self.decision_queue.qsize(),
+                "queue_maxsize": self.decision_queue.maxsize,
+                "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
+            }
+        except asyncio.QueueFull:
+            logger.warning(
+                "Decision queue full — rejecting decision %s (size=%d, maxsize=%d)",
+                trade_decision.decision_id,
+                self.decision_queue.qsize(),
+                self.decision_queue.maxsize,
+            )
+            return {
+                "status": "rejected",
+                "reason": "queue_full",
+                "decision_id": trade_decision.decision_id,
+                "queue_size": self.decision_queue.qsize(),
+                "queue_maxsize": self.decision_queue.maxsize,
                 "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
             }
         except Exception as e:
@@ -319,19 +551,33 @@ class TradeDecisionEngine:
                 "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
             }
 
+    def get_queue_stats(self) -> dict[str, Any]:
+        """Return current queue depth and capacity for monitoring."""
+        return {
+            "queue_size": self.decision_queue.qsize(),
+            "queue_maxsize": self.decision_queue.maxsize,
+            "queue_full": self.decision_queue.full(),
+            "queue_empty": self.decision_queue.empty(),
+        }
+
+    def get_routing_stats(self) -> dict[str, Any]:
+        """Return lifetime Analyzer-routing outcome counters (P5/F8-H-01).
+
+        The P5 forward-test supervisor aggregates these into the run log so
+        graded activity reflects real routing outcomes (success / disabled
+        / error), never estimates.
+        """
+        return dict(self.routing_counters)
+
     async def start_decision_processor(self) -> None:
         """Start the decision processing task."""
-        if (
-            not hasattr(self, "_processor_task")
-            or self._processor_task is None
-            or self._processor_task.done()
-        ):
+        if self._processor_task is None or self._processor_task.done():
             self._processor_task = asyncio.create_task(self.process_decision_queue())
             logger.info("Started TradeDecision processor")
 
     async def stop_decision_processor(self) -> None:
         """Stop the decision processing task."""
-        if hasattr(self, "_processor_task") and self._processor_task:
+        if self._processor_task is not None:
             self._processor_task.cancel()
             try:
                 await self._processor_task
@@ -387,32 +633,57 @@ class TradeDecisionEngine:
         }
 
     async def get_decision_status(self, decision_id: str) -> dict[str, Any]:
-        """Get status of a TradeDecision."""
-        # In production, this would query the Analyzer or database
-        # For simulation, we return a mock status
+        """Get status of a TradeDecision from the persisted audit trail.
 
+        F8-H-01: reads the real ``trade_decisions`` row instead of returning
+        a fabricated "PROCESSED/ANALYZED" mock (the F7-H-01 fabrication
+        class). Unknown ids return ``NOT_FOUND`` — deterministic, auditable,
+        no invented state.
+        """
+        decision = await db.async_get_trade_decision(decision_id)
+        if decision is None:
+            return {
+                "decision_id": decision_id,
+                "status": "NOT_FOUND",
+                "source": "database",
+                "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
+            }
         return {
-            "decision_id": decision_id,
-            "status": "PROCESSED",
-            "analyzer_status": "ANALYZED",
+            "decision_id": decision.decision_id,
+            "status": decision.status,
+            "symbol": decision.symbol,
+            "decision_type": str(decision.decision_type),
+            "entry_price": decision.entry_price,
+            "quantity": decision.quantity,
+            "composite_strength": decision.composite_strength,
+            "source": "database",
             "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
-            "notes": ("Simulated response - production would query actual Analyzer"),
         }
 
     def increment_modification_counter(self) -> int:
-        """Increment rule 7 modification counter."""
+        """Increment the legacy Rule-7 counter (no enforcement role).
+
+        .. deprecated:: F8-H-02
+            Delegates to the rules engine's legacy global counter. CMP
+            Rule 7 is enforced per-order at the ``modify_order`` boundary
+            with a persisted SQLite counter — see
+            ``CMPRulesEngine.reserve_modification``.
+        """
         return rules_engine.increment_modification_counter()
 
-    def get_modification_count(self) -> int:
-        """Get current modification counter value."""
-        return rules_engine.get_modification_count()
+    def get_modification_count(self, order_id: str | None = None) -> int:
+        """Get the Rule-7 count (per-order when order_id given)."""
+        return rules_engine.get_modification_count(order_id)
 
     def reset_modification_counter(self) -> None:
-        """Reset rule 7 modification counter."""
+        """Reset the legacy Rule-7 counter (no enforcement role)."""
         rules_engine.reset_modification_counter()
 
 
 # Module-level singleton instance
-trade_decision_engine = TradeDecisionEngine()
+# F8-C-03 (2026-09-02): __init__ reads Settings() (decision_queue_maxsize,
+# analyzer_routing_enabled); defer construction so imports stay
+# credential-free. Test patches keep working via proxy __dict__.
+trade_decision_engine: TradeDecisionEngine = lazy_singleton(TradeDecisionEngine)
 
 __all__ = ["TradeDecisionEngine", "DecisionStatus", "trade_decision_engine"]

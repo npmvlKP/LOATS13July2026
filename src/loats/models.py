@@ -173,6 +173,7 @@ class Position(BaseModel):
     buy_quantity: int
     sell_quantity: int
     timestamp: datetime = Field(default_factory=datetime.now)
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class FundsData(BaseModel):

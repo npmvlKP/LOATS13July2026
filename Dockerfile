@@ -34,8 +34,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy dependency files first for better layer caching
+# (README.md is a build input: pyproject.toml references it via `readme`)
 COPY requirements-core.txt .
 COPY pyproject.toml .
+COPY README.md .
 
 # Install Python dependencies
 # LITE: No PyTorch, no heavy ML models, no QuantLib, no PostgreSQL
@@ -48,8 +50,10 @@ COPY src/ ./src/
 # Install the package in production mode (not editable)
 RUN pip install --no-cache-dir --no-deps .
 
-# Copy scripts (health checks, etc.)
-COPY quick_health_check.py verify_project_health.py ./
+# Copy the packaged health-check suite (the root-level quick_health_check.py /
+# verify_project_health.py were removed by the F8-M-05 repo cleanup wave; the
+# maintained checks live under scripts/ and ship with the repo)
+COPY scripts/fr7_health_check.py ./scripts/
 
 # Create non-root user for security
 RUN addgroup --system --gid 1001 loats && \
@@ -57,10 +61,11 @@ RUN addgroup --system --gid 1001 loats && \
     chown -R loats:loats /app
 USER loats
 
-# Health check using the project's quick health check script
+# Health check: HC-01 is a pure structural check (packaged tree intact,
+# src/__init__.py mypy-collision breaker absent) with no network or credentials
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python quick_health_check.py >/dev/null 2>&1; exit $?
+    CMD python scripts/fr7_health_check.py --only HC-01 >/dev/null 2>&1; exit $?
 
-# Default command runs quick health check on container start (for CI/CD)
+# Default command runs the structural health check on container start (for CI/CD)
 # For runtime, use: CMD ["python", "-m", "loats.main"]
-CMD ["python", "quick_health_check.py"]
+CMD ["python", "scripts/fr7_health_check.py", "--only", "HC-01"]

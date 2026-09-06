@@ -14,12 +14,26 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from .config import get_settings
+from .lazy_settings import LazySettings
 from .loats_logging import get_logger
 from .models import HistoricalData, Signal, SignalType, Trade
 
 logger = get_logger(__name__)
-settings = get_settings()
+
+# Lazy settings binding (TODO-18 / HC-21).
+# Behavioral contract: importing this module builds NO Settings
+# instance -- first attribute access proxies through get_settings(),
+# so bare-env imports (no OPENALGO_API_KEY) stay clean.
+settings: Any = LazySettings()  # LazySettings.__getattr__ proxies to Settings()
+
+
+class Rule7ModificationLimitError(RuntimeError):
+    """
+    CMP Rule 7 per-order modification ceiling exceeded (F8-H-02).
+
+    Raised at the ``modify_order`` boundary when ``order_id`` has already
+    consumed its ``max_modifications`` budget (persisted in SQLite).
+    """
 
 
 class RuleType(StrEnum):
@@ -48,6 +62,11 @@ class CMPRulesEngine:
         self.modification_counter = 0
         self.session_state = TradingSession.PRE_OPEN
         self.last_session_update = datetime.datetime.now(datetime.UTC)
+
+        # VIX state management
+        self._vix_level: float | None = None  # None = unknown/failed
+        self._vix_timestamp: datetime.datetime | None = None  # Last update time
+        self._vix_initialized = False  # Whether VIX has been set at least once
 
     def get_current_session(
         self, current_time: datetime.datetime | None = None
@@ -148,8 +167,9 @@ class CMPRulesEngine:
         # Calculate +DM, -DM, and TR
         df["+DM"] = df["high"].diff()
         df["-DM"] = -df["low"].diff()
-        df["+DM"][df["+DM"] < 0] = 0
-        df["-DM"][df["-DM"] < 0] = 0
+        # Clip negatives without chained assignment (pandas Copy-on-Write safe)
+        df["+DM"] = df["+DM"].clip(lower=0)
+        df["-DM"] = df["-DM"].clip(lower=0)
 
         df["TR"] = pd.concat(
             [
@@ -175,15 +195,118 @@ class CMPRulesEngine:
 
         return float(adx) if not pd.isna(adx) else 25.0
 
-    def get_vix_level(self) -> float:
+    def set_vix_level(self, vix: float | None) -> None:
         """
-        Get current VIX level (simulated for now).
+        Set VIX level with timestamp tracking.
 
-        In production, this would fetch from market data.
-        For testing, we'll use a reasonable default.
+        Args:
+            vix: VIX level (float) or None (if feed unavailable)
+
+        This method should be called by the orchestrator market-data task
+        every cycle when the feed is live. Setting None indicates feed failure.
         """
-        # TODO: Implement actual VIX data fetching
-        return 18.5  # Default neutral value
+        self._vix_level = vix
+        self._vix_timestamp = datetime.datetime.now(datetime.UTC)
+        if vix is not None:
+            self._vix_initialized = True
+            logger.debug(f"VIX level updated: {vix:.2f}")
+        else:
+            logger.warning("VIX feed unavailable - set_vix_level called with None")
+
+    def get_vix_level(self) -> float | None:
+        """
+        Get current VIX level.
+
+        Returns:
+            VIX level as float, or None if unknown/stale/unavailable
+
+        Checks for stale data based on configured threshold.
+        """
+        if self._vix_level is None:
+            return None
+
+        # Check if data is stale
+        if self._vix_timestamp is None:
+            logger.warning("VIX timestamp missing - treating as unknown")
+            return None
+
+        current_time = datetime.datetime.now(datetime.UTC)
+        age_seconds = (current_time - self._vix_timestamp).total_seconds()
+
+        if age_seconds > settings.vix_stale_threshold_seconds:
+            logger.warning(
+                f"VIX data stale (age: {age_seconds:.1f}s > "
+                f"threshold: {settings.vix_stale_threshold_seconds}s) "
+                f"- treating as unknown"
+            )
+            return None
+
+        return self._vix_level
+
+    def check_vix_gate(self, direction: str) -> bool:
+        """
+        Check VIX gate with symmetric fail-safe.
+
+        Args:
+            direction: "BUY" or "SELL"
+
+        Returns:
+            True if gate passes, False if blocked
+
+        Gating rules:
+        - VIX > 15 required for SELL
+        - VIX < 15 required for BUY
+        - Unknown/stale VIX blocks BOTH directions (symmetric fail-safe)
+        - No fake numbers - explicit None handling
+        """
+        vix = self.get_vix_level()
+
+        if vix is None:
+            fail_mode = settings.vix_fail_mode
+
+            if fail_mode == "block_all":
+                logger.warning(
+                    "VIX unknown/no-feed/stale-feed - gate blocked "
+                    "(symmetric fail-safe) "
+                    f"direction={direction}, fail_mode={fail_mode}"
+                )
+                return False  # Both BUY and SELL blocked
+            elif fail_mode == "block_buy":
+                # Only block BUY, allow SELL through
+                if direction == "BUY":
+                    logger.warning(
+                        "VIX unknown/no-feed/stale-feed - BUY gate blocked "
+                        f"fail_mode={fail_mode}"
+                    )
+                    return False
+                else:
+                    # SELL passes even without VIX
+                    logger.debug(
+                        "VIX unknown/no-feed/stale-feed - SELL allowed "
+                        f"fail_mode={fail_mode}"
+                    )
+                    return True
+
+        # VIX available - apply directional gating. Early returns above
+        # cover all vix-is-None branches per CMP fail-safe; mypy cannot
+        # narrow through the literal-list compare so re-bind local.
+        # Use a narrow local variable to keep mypy happy without an assert
+        # that would be removed under optimised bytecode (bandit B101).
+        if vix is None:
+            logger.error("Unexpected vix=None after None branches; blocking")
+            return False
+        if direction == "SELL":
+            # CMP Rule 10: SELL requires VIX above the configured threshold.
+            passes: bool = vix > settings.vix_gate_threshold
+            logger.debug(f"VIX gate SELL: VIX={vix:.2f}, passes={passes}")
+            return passes
+        if direction == "BUY":
+            # CMP Rule 10: BUY requires VIX below the configured threshold.
+            passes = vix < settings.vix_gate_threshold
+            logger.debug(f"VIX gate BUY: VIX={vix:.2f}, passes={passes}")
+            return passes
+        logger.error(f"Invalid direction for VIX gate: {direction}")
+        return False
 
     def apply_gating_rules(
         self,
@@ -209,27 +332,26 @@ class CMPRulesEngine:
         # Calculate indicators
         iv_rank = self.calculate_iv_rank(historical_data)
         adx = self.calculate_adx(historical_data)
-        vix = self.get_vix_level()
 
         # Apply gating rules based on signal type
         if signal.signal_type == SignalType.SELL:
             # SELL rules: IV-rank > 40 / ADX < 25 / VIX > 15
             iv_pass = iv_rank > 40
             adx_pass = adx < 25
-            vix_pass = vix > 15
+            vix_pass = self.check_vix_gate("SELL")
 
             if iv_pass and adx_pass and vix_pass:
                 return True, {
                     "iv_rank": iv_rank,
                     "adx": adx,
-                    "vix": vix,
+                    "vix": self.get_vix_level(),
                     "reason": "gating_passed",
                 }
             else:
                 return False, {
                     "iv_rank": iv_rank,
                     "adx": adx,
-                    "vix": vix,
+                    "vix": self.get_vix_level(),
                     "reason": "gating_failed",
                     "iv_pass": iv_pass,
                     "adx_pass": adx_pass,
@@ -237,23 +359,23 @@ class CMPRulesEngine:
                 }
 
         elif signal.signal_type == SignalType.BUY:
-            # BUY rules: IV-rank < 60 / ADX > 25 / VIX < 15
-            iv_pass = iv_rank < 60
+            # BUY rules: IV-rank < 30 / ADX > 25 / VIX < 15
+            iv_pass = iv_rank < 30
             adx_pass = adx > 25
-            vix_pass = vix < 15
+            vix_pass = self.check_vix_gate("BUY")
 
             if iv_pass and adx_pass and vix_pass:
                 return True, {
                     "iv_rank": iv_rank,
                     "adx": adx,
-                    "vix": vix,
+                    "vix": self.get_vix_level(),
                     "reason": "gating_passed",
                 }
             else:
                 return False, {
                     "iv_rank": iv_rank,
                     "adx": adx,
-                    "vix": vix,
+                    "vix": self.get_vix_level(),
                     "reason": "gating_failed",
                     "iv_pass": iv_pass,
                     "adx_pass": adx_pass,
@@ -265,7 +387,7 @@ class CMPRulesEngine:
             return True, {
                 "iv_rank": iv_rank,
                 "adx": adx,
-                "vix": vix,
+                "vix": self.get_vix_level(),
                 "reason": "neutral_signal",
             }
 
@@ -319,7 +441,7 @@ class CMPRulesEngine:
             return True, {"reason": "insufficient_trade_history"}
 
         # Group trades by source
-        source_trades = {}
+        source_trades: dict[str, list[Trade]] = {}
         for trade in recent_trades:
             source = trade.metadata.get("source", "unknown")
             if source not in source_trades:
@@ -360,20 +482,97 @@ class CMPRulesEngine:
         return True, {"reason": "circuit_breakers_ok"}
 
     def increment_modification_counter(self) -> int:
-        """Increment rule 7 modification counter."""
+        """
+        Increment the legacy process-global Rule-7 counter.
+
+        .. deprecated:: F8-H-02
+            Retained solely for backward compatibility with external
+            callers/tests. CMP Rule 7 is enforced per-order with a
+            persisted SQLite counter at the ``modify_order`` boundary —
+            see :meth:`check_modification_limit` /
+            :meth:`record_modification_result`. This global int has no
+            enforcement role.
+        """
         self.modification_counter += 1
         return self.modification_counter
 
     def reset_modification_counter(self) -> None:
-        """Reset rule 7 modification counter."""
+        """Reset the legacy process-global Rule-7 counter (see F8-H-02 note)."""
         self.modification_counter = 0
 
-    def get_modification_count(self) -> int:
-        """Get current modification counter value."""
-        return self.modification_counter
+    def get_modification_count(self, order_id: str | None = None) -> int:
+        """
+        Get the current Rule-7 modification count.
+
+        F8-H-02: with ``order_id``, reads the persisted per-order counter
+        from SQLite (survives restarts, keyed by order). Without one,
+        returns the legacy process-global counter (no enforcement role).
+        """
+        if order_id is None:
+            return self.modification_counter
+        from .database import db
+
+        return db.get_modification_count(order_id)
+
+    def check_modification_limit(self, order_id: str, limit: int | None = None) -> bool:
+        """
+        Check whether ``order_id`` still has Rule-7 modification budget.
+
+        Reads the persisted per-order counter. Raises Rule7StateError when
+        the counter state cannot be read (DB failure) — callers must treat
+        that as "refuse the modification" (fail-closed).
+        """
+        if limit is None:
+            limit = int(settings.max_modifications)
+        current = self.get_modification_count(order_id)
+        return current < limit
+
+    def reserve_modification(self, order_id: str, limit: int | None = None) -> int:
+        """
+        Atomically reserve one Rule-7 modification slot for ``order_id``.
+
+        F8-H-02 reserve/release protocol (race-safe AND failure-safe):
+        the persisted counter is incremented BEFORE the broker call inside
+        a BEGIN IMMEDIATE transaction, so two concurrent modify attempts
+        can never both claim the same slot. If the increment exceeds
+        ``limit`` the reservation is rolled back and
+        Rule7ModificationLimitError is raised — the caller must refuse the
+        modification. Rule7StateError is raised when the counter state
+        cannot be read/written (fail-closed).
+        """
+        from .database import db
+
+        if limit is None:
+            limit = int(settings.max_modifications)
+        new_count = db.increment_modification_count(order_id)
+        if new_count > limit:
+            db.decrement_modification_count(order_id)
+            raise Rule7ModificationLimitError(
+                f"CMP Rule 7: modification limit ({limit}) exceeded for "
+                f"order {order_id} (count would be {new_count})"
+            )
+        return new_count
+
+    def release_modification(self, order_id: str) -> None:
+        """
+        Release a reserved Rule-7 slot for ``order_id`` (best-effort).
+
+        Called when a modification was reserved but the broker request
+        subsequently failed, so failed attempts never consume budget.
+        Never raises: the original broker error is the actionable one.
+        """
+        from .database import db
+
+        db.decrement_modification_count(order_id)
 
 
 # Module-level singleton instance
 rules_engine = CMPRulesEngine()
 
-__all__ = ["CMPRulesEngine", "RuleType", "TradingSession", "rules_engine"]
+__all__ = [
+    "CMPRulesEngine",
+    "Rule7ModificationLimitError",
+    "RuleType",
+    "TradingSession",
+    "rules_engine",
+]

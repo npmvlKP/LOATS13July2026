@@ -12,12 +12,16 @@ from typing import Any
 
 import numpy as np
 
-from .config import get_settings
+from .lazy_settings import LazySettings
 from .loats_logging import get_logger
 from .models import Signal, SignalType
 
+# Lazy settings binding (TODO-18 / HC-21).
+# Behavioral contract: importing this module builds NO Settings
+# instance -- first attribute access proxies through get_settings(),
+# so bare-env imports (no OPENALGO_API_KEY) stay clean.
+settings: Any = LazySettings()  # LazySettings.__getattr__ proxies to Settings()
 logger = get_logger(__name__)
-settings = get_settings()
 
 
 class StrengthSource(StrEnum):
@@ -32,6 +36,76 @@ class StrengthSource(StrEnum):
     OPTIONS_FLOW = "options_flow"
 
 
+# Deliberate alias map: external producer tags → canonical enum value.
+# Unknown strings NOT in this map are excluded per-signal with a loud
+# per-offender warning (F8-M-01) and cause a loud rejection only when no
+# known-source signal survives.
+SOURCE_ALIASES: dict[str, str] = {
+    # Add explicit aliases here, e.g.: "tech_analysis": "ta",
+}
+
+
+def resolve_source(raw: str) -> StrengthSource:
+    """Resolve a raw source string to a StrengthSource enum member.
+
+    Resolution order:
+      1. Direct enum lookup (``StrengthSource(raw)``)
+      2. Alias map lookup (``SOURCE_ALIASES``)
+      3. Rejection with ``ValueError`` listing the offender
+
+    Raises:
+        ValueError: if *raw* is not a known source or alias.
+    """
+    try:
+        return StrengthSource(raw)
+    except ValueError:
+        pass
+
+    canonical = SOURCE_ALIASES.get(raw)
+    if canonical is not None:
+        return StrengthSource(canonical)
+
+    valid = [s.value for s in StrengthSource]
+    valid += list(SOURCE_ALIASES.keys())
+    raise ValueError(
+        f"unknown_source: {raw!r} is not a valid signal source. "
+        f"Valid values: {sorted(valid)}"
+    )
+
+
+def exclude_unknown_source_signals(
+    signals: list[Signal],
+) -> tuple[list[Signal], list[str]]:
+    """Split a mixed-provenance batch into known-source and unknown-source
+    signals (F8-M-01).
+
+    Mixed-provenance windows are the normal state of a shared signal table
+    (any untagged producer emission lands next to orchestrator signals).
+    Excluding unknown-source signals individually keeps a data-hygiene
+    lapse from vetoing every decision in the cycle; a batch-fatal rejection
+    would convert the lapse into a chain outage on the producer's clock.
+
+    Returns:
+        Tuple of (known_source_signals, unknown_source_strings). Signals
+        whose ``metadata["source"]`` (or its absence) does not resolve via
+        :func:`resolve_source` are excluded; the distinct offender strings
+        are returned for per-offender diagnostics/auditing.
+
+    """
+    known: list[Signal] = []
+    unknown_sources: list[str] = []
+    for signal in signals:
+        source = signal.metadata.get("source", "unknown")
+        try:
+            resolve_source(source)
+        except ValueError:
+            if source not in unknown_sources:
+                unknown_sources.append(source)
+        else:
+            known.append(signal)
+    return known, unknown_sources
+
+
 class StrengthEngine:
     """CMP Strategy Strength Engine with composite calculation."""
 
@@ -42,9 +116,10 @@ class StrengthEngine:
             StrengthSource.SENTIMENT: 0.3,
             StrengthSource.PRICE_ACTION: 0.2,
             StrengthSource.VOLATILITY: 0.1,
-            StrengthSource.FUNDAMENTAL: 0.1,
-            StrengthSource.MACHINE_LEARNING: 0.3,
-            StrengthSource.OPTIONS_FLOW: 0.2,
+            # NOTE: FUNDAMENTAL, MACHINE_LEARNING, OPTIONS_FLOW removed (TODO-23)
+            # These sources are enumerated in StrengthSource enum but have no
+            # production signal producers. When producers are added, restore
+            # appropriate weights. See: 23Aug2026-Investigator FR.md F7-L-03
         }
 
         self.min_sources = 3
@@ -99,6 +174,25 @@ class StrengthEngine:
                 "available": len(signals),
             }
 
+        # F8-M-01: exclude unknown-source signals per-signal (mirrors
+        # validate_signal_sources) so a stray untagged emission cannot
+        # crash resolve_source() below — the exclusion must hold
+        # end-to-end, not only at the validation gate.
+        signals, excluded_unknown = exclude_unknown_source_signals(signals)
+        if excluded_unknown:
+            for src in excluded_unknown:
+                logger.warning(
+                    f"F8-M-01: composite strength excluded signal with "
+                    f"unknown source {src!r}"
+                )
+        if len(signals) < self.min_sources:
+            return 0.0, {
+                "reason": "insufficient_sources",
+                "required": self.min_sources,
+                "available": len(signals),
+                "excluded_unknown_sources": excluded_unknown,
+            }
+
         # Group signals by source
         source_signals: dict[str, list[Signal]] = {}
         for signal in signals:
@@ -125,10 +219,7 @@ class StrengthEngine:
             # Use the strongest signal from each source
             strongest_signal = max(signal_list, key=lambda s: s.strength)
 
-            try:
-                source_enum = StrengthSource(source)
-            except ValueError:
-                source_enum = StrengthSource.TECHNICAL_ANALYSIS  # Default
+            source_enum = resolve_source(source)
 
             source_strength = self.calculate_source_strength(
                 strongest_signal, source_enum
@@ -148,6 +239,7 @@ class StrengthEngine:
             "sources": len(source_signals),
             "source_contributions": source_contributions,
             "opposition_check": opposition_result,
+            "excluded_unknown_sources": excluded_unknown,
             "total_strength": total_strength,
             "total_weight": total_weight,
         }
@@ -248,34 +340,74 @@ class StrengthEngine:
         Higher diversity means signals come from different types of sources,
         reducing correlation risk.
         """
-        source_types = set()
+        source_types: set[StrengthSource] = set()
 
         for source in source_signals.keys():
             try:
-                source_enum = StrengthSource(source)
-                source_types.add(source_enum)
+                source_enum = resolve_source(source)
             except ValueError:
-                source_types.add(StrengthSource.TECHNICAL_ANALYSIS)
+                # F8-M-01: unknown sources carry no diversity weight; they
+                # are excluded (and warned about) upstream of this call.
+                continue
+            source_types.add(source_enum)
 
-        # Diversity score based on number of unique source types
-        diversity_score = min(len(source_types) / len(StrengthSource), 1.0)
+        # Diversity score: unique sources relative to the total canonical
+        # source space. 3 distinct sources out of 7 -> 3/7 = 0.429,
+        # 4 distinct sources -> 4/7 = 0.571. The gate threshold is 0.5,
+        # so exactly 3 distinct sources is rejected and 4+ passes.
+        # This is the intended CMP diversity gate (HC-15).
+        total_sources = len(StrengthSource)
+        if total_sources == 0:
+            return 0.0
+        diversity_score = min(len(source_types) / total_sources, 1.0)
         return float(diversity_score)
 
     def validate_signal_sources(
         self, signals: list[Signal]
     ) -> tuple[bool, dict[str, Any]]:
         """
-        Validate that signals meet CMP requirements.
+        Validate that signals meet CMP requirements (F8-M-01 semantics).
 
         Requirements:
-        - ≥3 unique sources
+        - ≥3 unique known sources
         - Source diversity
         - No duplicate sources
+
+        Unknown-source signals are excluded individually with a loud
+        warning (one per offender string, tagged F8-M-01) instead of
+        rejecting the whole batch; the batch is rejected loudly only when
+        no known-source signal survives (``unknown_source``) or the
+        survivors fall below ``min_sources``
+        (``insufficient_unique_sources``).
         """
-        source_set = set()
-        for signal in signals:
-            source = signal.metadata.get("source", "unknown")
-            source_set.add(source)
+        valid_signals, unknown_sources = exclude_unknown_source_signals(signals)
+
+        # Per-signal exclusion with loud per-offender diagnostics (F8-M-01).
+        # The offenders stay visible in the returned details either way.
+        if unknown_sources:
+            for src in unknown_sources:
+                logger.warning(
+                    f"F8-M-01: excluded signal with unknown source {src!r}; "
+                    f"valid values: {[s.value for s in StrengthSource]}"
+                )
+
+        # Empty input is a min_sources failure, not an unknown-source one.
+        # A non-empty batch whose every signal is unknown is rejected
+        # loudly with the complete offender list (F8-M-01 test case 3).
+        if signals and not valid_signals:
+            return False, {
+                "reason": "unknown_source",
+                "offenders": unknown_sources,
+                "message": (
+                    f"No known-source signal in batch; unknown source "
+                    f"string(s): {unknown_sources}. "
+                    f"Valid values: {[s.value for s in StrengthSource]}"
+                ),
+            }
+
+        source_set: set[str] = {
+            signal.metadata.get("source", "unknown") for signal in valid_signals
+        }
 
         if len(source_set) < self.min_sources:
             return False, {
@@ -283,17 +415,19 @@ class StrengthEngine:
                 "required": self.min_sources,
                 "available": len(source_set),
                 "sources": list(source_set),
+                "excluded_unknown_sources": unknown_sources,
             }
 
         # Check source diversity
         diversity_score = self.calculate_strength_diversity(
-            dict.fromkeys(source_set, signals)
+            dict.fromkeys(source_set, valid_signals)
         )
         if diversity_score < 0.5:  # Minimum diversity threshold
             return False, {
                 "reason": "insufficient_source_diversity",
                 "diversity_score": diversity_score,
                 "min_required": 0.5,
+                "excluded_unknown_sources": unknown_sources,
             }
 
         return True, {
@@ -301,6 +435,7 @@ class StrengthEngine:
             "unique_sources": len(source_set),
             "diversity_score": diversity_score,
             "sources": list(source_set),
+            "excluded_unknown_sources": unknown_sources,
         }
 
     def get_source_strength_breakdown(self, signals: list[Signal]) -> dict[str, Any]:
@@ -327,9 +462,15 @@ class StrengthEngine:
             strongest_signal = max(signal_list, key=lambda s: s.strength)
 
             try:
-                source_enum = StrengthSource(source)
+                source_enum = resolve_source(source)
             except ValueError:
-                source_enum = StrengthSource.TECHNICAL_ANALYSIS
+                # F8-M-01: unknown sources contribute nothing to the
+                # weighted breakdown; they are excluded (and warned about)
+                # upstream of this call.
+                logger.warning(
+                    f"F8-M-01: source breakdown excluded unknown source {source!r}"
+                )
+                continue
 
             source_strength = self.calculate_source_strength(
                 strongest_signal, source_enum
@@ -362,4 +503,11 @@ class StrengthEngine:
 # Module-level singleton instance
 strength_engine = StrengthEngine()
 
-__all__ = ["StrengthEngine", "StrengthSource", "strength_engine"]
+__all__ = [
+    "StrengthEngine",
+    "StrengthSource",
+    "SOURCE_ALIASES",
+    "exclude_unknown_source_signals",
+    "resolve_source",
+    "strength_engine",
+]

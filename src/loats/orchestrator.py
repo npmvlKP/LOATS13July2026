@@ -10,24 +10,100 @@ from typing import Any
 from urllib.parse import urlparse
 
 import httpx
+import numpy as np
 
 from .alerts import alerts
 from .config import get_settings
 from .database import db
 from .loats_logging import get_logger
-from .metrics import record_cycle_time
+from .metrics import (
+    record_cmp_chain_rejection,
+    record_cycle_time,
+    set_circuit_breaker_status,
+)
 from .models import HistoricalData, OptionContract, QuoteData, Signal
 from .openalgo import KillSwitchError, async_client
-from .rules import rules_engine
+from .rules import Rule7ModificationLimitError, rules_engine
 from .sentiment import sentiment
+from .strength import StrengthSource
 from .strike_selection import select_strikes
 from .ta import technical_analysis
 from .trade_decision import trade_decision_engine
-from .utils.circuit_breaker import OPENALGO_CIRCUIT_BREAKER
+from .utils.cache import cache_manager
+from .utils.circuit_breaker import (
+    OPENALGO_CIRCUIT_BREAKER,
+    CircuitBreakerOpenError,
+)
+from .utils.per_source_breakers import (
+    get_source_breaker,
+    get_source_breaker_status,
+    reset_source_breakers,
+)
 from .utils.resilience import openalgo_circuit_breaker_retry_async
 
 logger = get_logger(__name__)
 settings = None
+
+
+async def _fetch_cached_vix() -> float | None:
+    """
+    Fetch India VIX via cached OpenAlgo quote.
+
+    Returns:
+        VIX level as float, or None if unavailable
+
+    Uses TTL cache to minimize API calls while keeping data fresh.
+    """
+    try:
+        global settings
+        if settings is None:
+            settings = get_settings()
+
+        vix_symbol = settings.vix_symbol
+        cache_key = f"vix_quote:{vix_symbol}"
+
+        # Check cache first
+        cached_vix = await cache_manager.get(cache_key)
+        if cached_vix is not None:
+            try:
+                vix_value = float(cached_vix)
+                logger.debug(f"VIX from cache: {vix_value:.2f}")
+                return vix_value
+            except (ValueError, TypeError) as e:
+                logger.warning(f"Invalid cached VIX value: {e}")
+                # Fall through to fetch fresh
+
+        # Fetch from OpenAlgo
+        quotes = await async_client.get_quotes(symbols=[vix_symbol])
+        if not quotes or "data" not in quotes:
+            logger.warning(f"No VIX data available for {vix_symbol}")
+            return None
+
+        vix_data = quotes["data"].get(vix_symbol, {})
+        vix_value = vix_data.get("last_price")
+
+        if vix_value is None:
+            logger.warning(f"VIX last_price missing for {vix_symbol}")
+            return None
+
+        try:
+            vix_float = float(vix_value)
+
+            # Cache the value
+            await cache_manager.set(
+                cache_key, str(vix_float), ttl=settings.vix_cache_ttl_seconds
+            )
+
+            logger.debug(f"VIX fetched and cached: {vix_float:.2f}")
+            return vix_float
+
+        except (ValueError, TypeError) as e:
+            logger.error(f"Invalid VIX value from OpenAlgo: {vix_value}, error: {e}")
+            return None
+
+    except Exception as e:
+        logger.error(f"VIX fetch failed: {e}")
+        return None
 
 
 async def validate_rss_feed(url: str, timeout: int = 5) -> bool:
@@ -84,6 +160,46 @@ async def validate_rss_feed(url: str, timeout: int = 5) -> bool:
         return False
 
 
+async def _settle_cancelled_producers(producers: tuple[asyncio.Task[Any], ...]) -> None:
+    """Cancel every not-yet-done producer and await their terminal states.
+
+    F8-M-02 upgraded per Remaining-Risk review: cancellation is not merely
+    requested but *settled* — every producer's ``finally`` block (timing,
+    logging, DB-write cleanup) completes inside the boundary, before the
+    next cycle tick, so a slow-cleanup producer can never stretch into a
+    subsequent window. Cancelling a done or already-cancelled task is a
+    no-op, so this is safe on every path. Holding the task references in
+    ``producers`` also keeps them strongly referenced for the lifetime of
+    the cycle, so no producer can be garbage-collected mid-flight (the
+    GC-hazard class documented in F6-H-05.3).
+
+    ``asyncio.wait`` re-raises nothing: producer exceptions were already
+    observed by the enclosing gather (first error) or are intrinsically
+    CancelledError here; the return value is ignored. The settle is bounded
+    by a 50 ms grace (half the cycle budget): if a producer's cleanup itself
+    hangs, the cycle logs a CRITICAL diagnostic and stays live rather than
+    compounding one hung fetch into a hung engine.
+    """
+    pending = tuple(t for t in producers if not t.done())
+    for task in pending:
+        task.cancel()
+    if pending:
+        _, still_pending = await asyncio.wait(pending, timeout=0.05)
+        if still_pending:
+            logger.critical(
+                "Producer cleanup exceeded 50ms grace after cancellation - "
+                "abandoning %d slow producer(s) to keep the cycle live: %s",
+                len(still_pending),
+                [t.get_name() for t in still_pending],
+            )
+    # Retrieve producer exceptions so concurrently-failed siblings never
+    # surface as "exception was never retrieved" GC noise: the first error
+    # was re-raised by the enclosing gather, the rest are observed here.
+    for task in producers:
+        if task.done() and not task.cancelled():
+            task.exception()
+
+
 class TradingOrchestrator:
     """High-performance trading orchestrator with <100ms cycle guarantee."""
 
@@ -98,6 +214,99 @@ class TradingOrchestrator:
         self._shutdown_event = asyncio.Event()
         self._cycle_task: asyncio.Task[None] | None = None
         self._last_alert_time = 0.0
+        # CMP chain rejection tracking
+        self._last_insufficient_signals_warning_time = 0.0
+        self._insufficient_signals_count = 0
+        self._last_session_state = ""
+        self._insufficient_signals_warning_interval = 60.0  # Log every 60 seconds
+        # F8-L-05: detached live-drift task (see _validate_rss_startup_gate)
+        self._rss_drift_task: asyncio.Task[None] | None = None
+
+    @staticmethod
+    async def _guarded_source_call(
+        source: StrengthSource,
+        func: Any,
+        /,
+        *args: Any,
+        **kwargs: Any,
+    ) -> Any:
+        """Await ``func`` behind ``source``'s dedicated circuit breaker.
+
+        CMP P5 / F8-L-01: each signal producer's external fetch is isolated
+        by its own breaker — one source's failures open only that source's
+        breaker; every other producer keeps calling through its own.
+        """
+        breaker = get_source_breaker(source)
+        return await breaker.call_async(func, *args, **kwargs)
+
+    async def _guarded_source_get(
+        self,
+        source: StrengthSource,
+        fetch: Any,
+        *args: Any,
+        degraded: Any = None,
+        **kwargs: Any,
+    ) -> Any:
+        """Fetch behind ``source``'s breaker with graceful degradation.
+
+        Composition order is the F8-L-01 root-cause fix: the per-source
+        breaker wraps the fetch FIRST, and degradation to ``degraded``
+        happens only for that source's own rejections (breaker open).
+        Failures raised by the fetch itself propagate to the breaker, so
+        the source breaker actually counts them — the previous shape
+        (``except Exception: return None`` INSIDE the breaker-wrapped
+        method) made every failure look like a successful ``None`` result
+        and no breaker, global or per-source, ever tripped on producer
+        fetch failures.
+        """
+        try:
+            return await self._guarded_source_call(source, fetch, *args, **kwargs)
+        except CircuitBreakerOpenError as e:
+            logger.warning(f"{source.value} source breaker open, degraded fetch: {e}")
+            # Mirror the open state onto the :8001 metrics surface so
+            # operator dashboards (RUNBOOK "Circuit Breaker Status") see
+            # per-source isolation, not just the global breakers.
+            set_circuit_breaker_status(f"source:{source.value}", True)
+            return degraded
+
+    async def _source_guarded_history(
+        self, source: StrengthSource, symbol: str, interval: str
+    ) -> dict[str, Any] | None:
+        """History fetch behind ``source``'s breaker + global protection.
+
+        ``_safe_get_history`` is the innermost fetch seam (existing tests
+        patch it); the global breaker+retry and the per-source breaker wrap
+        AROUND it, so degradation happens outside both breakers and both
+        count real failures.
+        """
+        result: dict[str, Any] | None = await self._guarded_source_get(
+            source,
+            openalgo_circuit_breaker_retry_async(self._safe_get_history),
+            symbol,
+            interval,
+        )
+        return result
+
+    async def _source_guarded_quotes(
+        self, source: StrengthSource, symbols: list[str]
+    ) -> dict[str, Any] | None:
+        """Quotes fetch behind ``source``'s breaker + global protection."""
+        result: dict[str, Any] | None = await self._guarded_source_get(
+            source,
+            openalgo_circuit_breaker_retry_async(self._safe_get_quotes),
+            symbols,
+        )
+        return result
+
+    @staticmethod
+    def get_source_breaker_status() -> dict[str, Any]:
+        """Per-source circuit breaker status (CMP P5 / F8-L-01 monitoring)."""
+        return get_source_breaker_status()
+
+    @staticmethod
+    def reset_source_breakers() -> None:
+        """Reset every per-source breaker (operational recovery path)."""
+        reset_source_breakers()
 
     async def initialize(self) -> None:
         """Initialize the orchestrator."""
@@ -117,9 +326,65 @@ class TradingOrchestrator:
 
         if not self.running:
             await self.initialize()
+        await self._validate_rss_startup_gate()
         logger.info("Starting TradingOrchestrator cycle")
         self._cycle_task = asyncio.create_task(self._run_cycle_loop())
         self._cycle_task.add_done_callback(self._handle_cycle_task_completion)
+
+    async def _validate_rss_startup_gate(self) -> None:
+        """F8-L-05: recorded-fallback RSS feed validation at startup.
+
+        The offline manifest validation is authoritative and runs inline:
+        it is deterministic, needs no network, and a structural failure must
+        be loud BEFORE trading starts. The live drift pass is advisory only,
+        so it runs as a DETACHED task -- awaiting it inline would let a dead
+        network stall trading startup for the full per-feed HTTP timeout
+        (3 feeds x ~20s worst case). Failures inside the detached task
+        degrade to WARNING; they can never block or crash startup.
+        """
+        try:
+            from .rss_validation import run_startup_gate
+
+            ok = await run_startup_gate(live=False)
+        except Exception as exc:
+            logger.error("RSS startup gate error: %s", exc)
+            # H3 (adversarial review): a gate error is operationally visible
+            # -- alert, but never block startup on the alert path itself.
+            try:
+                await alerts.send_system_alert(
+                    f"RSS startup gate error: {exc}", "error"
+                )
+            except Exception:
+                logger.warning("RSS gate alert delivery failed")
+            return
+        if not ok:
+            logger.error(
+                "RSS startup gate FAILED: recorded manifest invalid -- sentiment "
+                "source list unvalidated; fix tests/fixtures/rss/recorded-sources.json"
+            )
+            # H3: surface the failure through the alert channel (Telegram /
+            # system alerts) so it is not just a log line at startup.
+            try:
+                await alerts.send_system_alert(
+                    "RSS startup gate FAILED: recorded manifest invalid -- "
+                    "sentiment source list unvalidated",
+                    "error",
+                )
+            except Exception:
+                logger.warning("RSS gate alert delivery failed")
+            return
+        self._rss_drift_task = asyncio.create_task(self._rss_live_drift_pass())
+
+    async def _rss_live_drift_pass(self) -> None:
+        """Advisory live re-validation of the recorded sources (detached)."""
+        try:
+            from .rss_validation import run_startup_gate
+
+            await run_startup_gate(live=True)
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            logger.warning("RSS live drift pass error (advisory only): %s", exc)
 
     async def _run_cycle_loop(self) -> None:
         """Main trading cycle loop with <100ms target."""
@@ -156,6 +421,7 @@ class TradingOrchestrator:
     async def _execute_trading_cycle(self) -> None:
         """Execute a complete trading cycle with parallel execution."""
         cycle_start = datetime.datetime.now(datetime.UTC)
+        producers: tuple[asyncio.Task[Any], ...] = ()
 
         try:
             # Lazy load settings to avoid import-time failures
@@ -167,23 +433,41 @@ class TradingOrchestrator:
             # with timeout
             ta_task = asyncio.create_task(self._execute_ta_analysis())
             sentiment_task = asyncio.create_task(self._execute_sentiment_analysis())
+            volatility_task = asyncio.create_task(self._execute_volatility_analysis())
+            price_action_task = asyncio.create_task(
+                self._execute_price_action_analysis()
+            )
             market_data_task = asyncio.create_task(self._execute_market_data_update())
+            producers = (
+                ta_task,
+                sentiment_task,
+                volatility_task,
+                price_action_task,
+                market_data_task,
+            )
 
             try:
                 await asyncio.wait_for(
-                    asyncio.gather(ta_task, sentiment_task, market_data_task),
+                    asyncio.gather(*producers),
                     timeout=0.08,
                 )
             except TimeoutError:
                 logger.warning(
                     "Trading cycle tasks timed out - continuing with partial results"
                 )
-                for task in [ta_task, sentiment_task, market_data_task]:
-                    if not task.done():
-                        task.cancel()
+                # Cancel every producer still running and settle their
+                # cleanup before continuing, so "timed out" implies
+                # "producers stopped" (F8-M-02). The earlier comment exempted
+                # volatility/price-action in the name of F8-C-01 diversity,
+                # but that exemption was dead code: wait_for cancels the
+                # gather on timeout and gather cancellation propagates to all
+                # children, so no signal ever outlived the window anyway.
+                # Diversity is a Step-1 gate property of the stored-signal
+                # set (producers persist signals before the window closes),
+                # not a producer-lifetime property.
+                await _settle_cancelled_producers(producers)
 
             # Execute sequential operations
-            await self._execute_signal_generation()
             await self._execute_risk_management()
 
             # Execute CMP strategy (only if trading is allowed in current session)
@@ -196,6 +480,13 @@ class TradingOrchestrator:
 
         except Exception as e:
             logger.error(f"Error in trading cycle execution: {e}")
+            # If a producer raised into the gather, gather does NOT cancel
+            # its surviving children - without this, a hung volatility (or
+            # any) fetch would keep running across cycles and its late
+            # signal could land in a later window (F8-M-02). Settled here so
+            # cleanup finishes inside the boundary; cancelling already-done
+            # or already-cancelled tasks is a no-op.
+            await _settle_cancelled_producers(producers)
             raise
 
         finally:
@@ -221,8 +512,12 @@ class TradingOrchestrator:
             symbol = settings.default_symbol
             timeframe = settings.default_timeframe
 
-            # Get historical data with circuit breaker protection
-            history_data = await self._safe_get_history(symbol, timeframe)
+            # Get historical data with per-source + global breaker protection
+            history_data = await self._source_guarded_history(
+                StrengthSource.TECHNICAL_ANALYSIS,
+                symbol,
+                timeframe,
+            )
             if not history_data:
                 return
 
@@ -247,7 +542,10 @@ class TradingOrchestrator:
             indicators = technical_analysis.calculate_indicators(historical_data_objs)
 
             # Generate TA signal
-            quotes = await self._safe_get_quotes([symbol])
+            quotes = await self._source_guarded_quotes(
+                StrengthSource.TECHNICAL_ANALYSIS,
+                [symbol],
+            )
             if quotes:
                 quote_data = quotes.get("data", {}).get(symbol, {})
                 current_price = quote_data.get("last_price", 0)
@@ -266,9 +564,18 @@ class TradingOrchestrator:
                         timestamp=datetime.datetime.now(datetime.UTC),
                         indicators={ind.name: ind.value for ind in indicators},
                         confidence=strength,
-                        metadata={"scan_type": "ta", "source": "orchestrator"},
+                        metadata={
+                            "scan_type": "ta",
+                            "source": StrengthSource.TECHNICAL_ANALYSIS.value,
+                        },
                     )
                     await db.async_create_signal(signal)
+
+        except CircuitBreakerOpenError as e:
+            # This source's breaker is open — skip the producer for this
+            # cycle without failing the gather (which would cancel sibling
+            # producers). Other sources keep their own breakers.
+            logger.warning(f"TA analysis skipped: source breaker open: {e}")
 
         except Exception as e:
             logger.error(f"TA analysis failed: {e}")
@@ -292,16 +599,22 @@ class TradingOrchestrator:
                 settings = get_settings()
 
             symbol = settings.default_symbol
-            rss_feeds = [
-                "https://economictimes.indiatimes.com/markets/rssfeeds/1977021501.cms",
-                "https://www.moneycontrol.com/rss/latestnews.xml",
-                "https://www.bloombergquint.com/markets-feed",
-            ]
+            # RSS feeds are now configurable via settings.rss_feeds
+            # BloombergQuint feed (https://www.bloombergquint.com/markets-feed)
+            # was removed as defunct (TODO-27d). Replaced with Livemint markets
+            # feed after validation (ET + Moneycontrol remain). Validate at runtime
+            # to tolerate transient failures and keep sentiment pipeline resilient.
+            rss_feeds = get_settings().rss_feeds
 
             # Validate RSS feeds and filter out invalid ones
             valid_feeds = []
             for feed_url in rss_feeds:
-                if await validate_rss_feed(feed_url):
+                if await self._guarded_source_get(
+                    StrengthSource.SENTIMENT,
+                    validate_rss_feed,
+                    feed_url,
+                    degraded=False,
+                ):
                     valid_feeds.append(feed_url)
                 else:
                     logger.warning(f"Skipping invalid RSS feed: {feed_url}")
@@ -311,7 +624,16 @@ class TradingOrchestrator:
                 return
 
             # Call the async sentiment analysis function directly with validated feeds
-            result = await sentiment.analyze_symbol_sentiment(symbol, valid_feeds)
+            result = await self._guarded_source_get(
+                StrengthSource.SENTIMENT,
+                sentiment.analyze_symbol_sentiment,
+                symbol,
+                valid_feeds,
+                degraded=None,
+            )
+            if result is None:
+                # Source breaker open — skip signal generation this cycle.
+                return
 
             # Generate sentiment signal
             if result.sentiment_score > 0:
@@ -333,11 +655,15 @@ class TradingOrchestrator:
                     confidence=abs(result.sentiment_score),
                     metadata={
                         "scan_type": "sentiment",
-                        "source": "orchestrator",
+                        "source": StrengthSource.SENTIMENT.value,
                         "news_count": result.news_count,
                     },
                 )
                 await db.async_create_signal(signal)
+
+        except CircuitBreakerOpenError as e:
+            # Source breaker open — skip gracefully (see TA handler).
+            logger.warning(f"Sentiment analysis skipped: source breaker open: {e}")
 
         except Exception as e:
             logger.error(f"Sentiment analysis failed: {e}")
@@ -351,6 +677,373 @@ class TradingOrchestrator:
                 logger.warning(
                     f"Sentiment analysis exceeded budget: {duration * 1000:.2f}ms"
                 )
+
+    async def _execute_volatility_analysis(self) -> None:
+        """Execute volatility analysis — 4th signal producer for diversity gate.
+
+        Uses existing TA machinery (ATR, VWAP) and adds Hurst exponent
+        regime detection. Runs inside the 80ms parallel window.
+        """
+        start_time = datetime.datetime.now(datetime.UTC)
+
+        try:
+            global settings
+            if settings is None:
+                settings = get_settings()
+
+            symbol = settings.default_symbol
+            timeframe = settings.default_timeframe
+
+            historical_data_raw = await self._source_guarded_history(
+                StrengthSource.VOLATILITY,
+                symbol,
+                timeframe,
+            )
+
+            if not historical_data_raw or not historical_data_raw.get("data"):
+                logger.warning("No historical data for volatility analysis")
+                return
+
+            historical_data_objs = [
+                HistoricalData(
+                    symbol=symbol,
+                    timestamp=datetime.datetime.fromisoformat(item["timestamp"]),
+                    open=item["open"],
+                    high=item["high"],
+                    low=item["low"],
+                    close=item["close"],
+                    volume=item["volume"],
+                    interval=timeframe,
+                )
+                for item in historical_data_raw["data"]
+            ]
+
+            if len(historical_data_objs) < 50:
+                logger.warning(
+                    f"Insufficient bars for volatility: {len(historical_data_objs)}"
+                )
+                return
+
+            import pandas as pd
+
+            from .models import SignalType
+            from .ta import calculate_atr, calculate_vwap
+
+            df = pd.DataFrame(
+                {
+                    "timestamp": [h.timestamp for h in historical_data_objs],
+                    "open": [h.open for h in historical_data_objs],
+                    "high": [h.high for h in historical_data_objs],
+                    "low": [h.low for h in historical_data_objs],
+                    "close": [h.close for h in historical_data_objs],
+                    "volume": [h.volume for h in historical_data_objs],
+                }
+            )
+
+            atr_series = calculate_atr(df, period=14)
+            current_atr = atr_series.iloc[-1] if not pd.isna(atr_series.iloc[-1]) else 0
+
+            current_price = df["close"].iloc[-1]
+            atr_pct = (current_atr / current_price * 100) if current_price > 0 else 0
+
+            vwap_series = calculate_vwap(df)
+            current_vwap = (
+                vwap_series.iloc[-1]
+                if not pd.isna(vwap_series.iloc[-1])
+                else current_price
+            )
+
+            hurst_exponent = self._calculate_hurst_exponent(
+                np.asarray(df["close"].values)
+            )
+            regime = (
+                "trending"
+                if hurst_exponent is not None and hurst_exponent > 0.5
+                else "mean_reverting"
+                if hurst_exponent is not None
+                else "unknown"
+            )
+
+            vol_score = min(atr_pct / 2.0, 1.0)
+
+            signal_type = "NEUTRAL"
+            signal_strength = 0.5
+
+            if regime == "trending" and vol_score > 0.6:
+                signal_type = "BUY" if current_price > current_vwap else "SELL"
+                signal_strength = 0.7 + vol_score * 0.2
+            elif regime == "mean_reverting" and vol_score > 0.5:
+                signal_type = "SELL" if current_price > current_vwap else "BUY"
+                signal_strength = 0.65 + vol_score * 0.15
+            elif vol_score < 0.3:
+                signal_type = "NEUTRAL"
+                signal_strength = 0.4
+
+            signal = Signal(
+                symbol=symbol,
+                signal_type=SignalType(signal_type),
+                strength=signal_strength,
+                timestamp=datetime.datetime.now(datetime.UTC),
+                indicators={
+                    "atr": float(current_atr),
+                    "atr_pct": float(atr_pct),
+                    "vwap": float(current_vwap),
+                    "hurst_exponent": (
+                        float(hurst_exponent) if hurst_exponent is not None else 0.5
+                    ),
+                },
+                confidence=signal_strength,
+                metadata={
+                    "scan_type": "volatility",
+                    "source": StrengthSource.VOLATILITY.value,
+                    "regime": regime,
+                    "atr_pct": float(atr_pct),
+                    "hurst": (
+                        float(hurst_exponent) if hurst_exponent is not None else 0.5
+                    ),
+                },
+            )
+            await db.async_create_signal(signal)
+
+        except CircuitBreakerOpenError as e:
+            # Source breaker open — skip gracefully (see TA handler).
+            logger.warning(f"Volatility analysis skipped: source breaker open: {e}")
+        except Exception as e:
+            logger.error(f"Volatility analysis failed: {e}")
+            raise
+        finally:
+            duration = (
+                datetime.datetime.now(datetime.UTC) - start_time
+            ).total_seconds()
+            if duration > 0.03:
+                logger.warning(
+                    f"Volatility analysis exceeded budget: {duration * 1000:.2f}ms"
+                )
+
+    async def _execute_price_action_analysis(self) -> None:
+        """Execute price-action analysis — 4th diversity-critical producer.
+
+        Microstructure signal derived exclusively from data the orchestrator
+        already fetches (OHLCV bars + last quote). Uses existing ``ta.py``
+        primitives (Supertrend position, VWAP position, consecutive-candle
+        momentum, candle-body ratio). Emits signals tagged with
+        ``StrengthSource.PRICE_ACTION`` and persists them via
+        ``db.async_create_signal`` (F8-C-01 / Option A).
+
+        Signal model (microstructure conviction):
+        - direction: agreement of Supertrend position and VWAP position of
+          the last close (both above -> BUY bias, both below -> SELL bias)
+        - conviction: scaled by consecutive same-direction candles and the
+          5-bar candle-body ratio (bodies dominating ranges = clean tape)
+        - NEUTRAL (0.5) when the two references disagree or conviction is
+          too weak to express a directional view
+        """
+        start_time = datetime.datetime.now(datetime.UTC)
+
+        try:
+            global settings
+            if settings is None:
+                settings = get_settings()
+
+            symbol = settings.default_symbol
+            timeframe = settings.default_timeframe
+
+            historical_data_raw = await self._source_guarded_history(
+                StrengthSource.PRICE_ACTION,
+                symbol,
+                timeframe,
+            )
+            if not historical_data_raw or not historical_data_raw.get("data"):
+                logger.debug("No historical data for price-action analysis")
+                return
+
+            historical_data_objs = [
+                HistoricalData(
+                    symbol=symbol,
+                    timestamp=datetime.datetime.fromisoformat(item["timestamp"]),
+                    open=item["open"],
+                    high=item["high"],
+                    low=item["low"],
+                    close=item["close"],
+                    volume=item["volume"],
+                    interval=timeframe,
+                )
+                for item in historical_data_raw["data"]
+            ]
+
+            if len(historical_data_objs) < 20:
+                logger.debug(
+                    f"Insufficient bars for price-action: {len(historical_data_objs)}"
+                )
+                return
+
+            import pandas as pd
+
+            from .models import SignalType
+            from .ta import calculate_supertrend, calculate_vwap
+
+            df = pd.DataFrame(
+                {
+                    "open": [h.open for h in historical_data_objs],
+                    "high": [h.high for h in historical_data_objs],
+                    "low": [h.low for h in historical_data_objs],
+                    "close": [h.close for h in historical_data_objs],
+                    "volume": [h.volume for h in historical_data_objs],
+                }
+            )
+
+            current_price = float(df["close"].iloc[-1])
+
+            supertrend_series, _direction = calculate_supertrend(df)
+            current_supertrend = supertrend_series.iloc[-1]
+            if pd.isna(current_supertrend):
+                logger.debug("Supertrend not ready for price-action analysis")
+                return
+
+            vwap_series = calculate_vwap(df)
+            current_vwap = vwap_series.iloc[-1]
+            if pd.isna(current_vwap):
+                logger.debug("VWAP not ready for price-action analysis")
+                return
+
+            above_trend = current_price > float(current_supertrend)
+            above_vwap = current_price > float(current_vwap)
+
+            if above_trend and above_vwap:
+                bias: int = 1
+            elif not above_trend and not above_vwap:
+                bias = -1
+            else:
+                # References disagree — express no directional view.
+                bias = 0
+
+            # Consecutive same-direction candles ending at the most recent
+            # bar. The streak direction is defined by the newest candle; a
+            # newest bar against the bias means the tape disagrees with the
+            # references and conviction must not be counted.
+            newest_open = float(df["open"].iloc[-1])
+            newest_close = float(df["close"].iloc[-1])
+            newest_dir = (
+                1
+                if newest_close > newest_open
+                else (-1 if newest_close < newest_open else 0)
+            )
+            consecutive = 0
+            if newest_dir != 0:
+                consecutive = 1
+                for o, c in zip(
+                    df["open"].iloc[-5:-1].tolist()[::-1],
+                    df["close"].iloc[-5:-1].tolist()[::-1],
+                    strict=True,
+                ):
+                    d = 1 if c > o else (-1 if c < o else 0)
+                    if d != newest_dir:
+                        break
+                    consecutive += 1
+
+            window = df.iloc[-5:]
+            total_range = float((window["high"] - window["low"]).sum())
+            total_body = float((window["close"] - window["open"]).abs().sum())
+            body_ratio = total_body / total_range if total_range > 0 else 0.0
+
+            signal_type = "NEUTRAL"
+            signal_strength = 0.5
+            if bias != 0 and consecutive >= 2 and body_ratio >= 0.4:
+                # Clean tape + aligned references -> directional conviction.
+                conviction = min(0.1 * consecutive + 0.25 * body_ratio, 0.3)
+                signal_strength = 0.55 + conviction
+                signal_type = "BUY" if bias > 0 else "SELL"
+
+            signal = Signal(
+                symbol=symbol,
+                signal_type=SignalType(signal_type),
+                strength=signal_strength,
+                timestamp=datetime.datetime.now(datetime.UTC),
+                indicators={
+                    "supertrend": float(current_supertrend),
+                    "vwap": float(current_vwap),
+                    "consecutive_candles": float(consecutive),
+                    "body_ratio": float(body_ratio),
+                },
+                confidence=signal_strength,
+                metadata={
+                    "scan_type": "price_action",
+                    "source": StrengthSource.PRICE_ACTION.value,
+                    "supertrend": float(current_supertrend),
+                    "vwap": float(current_vwap),
+                    "consecutive_candles": consecutive,
+                    "body_ratio": float(body_ratio),
+                },
+            )
+            await db.async_create_signal(signal)
+
+        except CircuitBreakerOpenError as e:
+            # Source breaker open — skip gracefully (see TA handler).
+            logger.warning(f"Price-action analysis skipped: source breaker open: {e}")
+        except Exception as e:
+            logger.error(f"Price-action analysis failed: {e}")
+            raise
+        finally:
+            duration = (
+                datetime.datetime.now(datetime.UTC) - start_time
+            ).total_seconds()
+            if duration > 0.03:
+                logger.warning(
+                    f"Price-action analysis exceeded budget: {duration * 1000:.2f}ms"
+                )
+
+    def _calculate_hurst_exponent(
+        self,
+        close_prices: np.ndarray,
+    ) -> float | None:
+        """Hurst exponent via R/S analysis.
+
+        H < 0.5 = mean-reverting, H > 0.5 = trending.
+        """
+        try:
+            from scipy import stats as sp_stats
+
+            if len(close_prices) < 50:
+                return None
+
+            returns = np.diff(np.log(close_prices))
+            if len(returns) < 30:
+                return None
+
+            window_sizes = [10, 20, 30, 40]
+            rs_values: list[tuple[int, float]] = []
+
+            for w in window_sizes:
+                if w >= len(returns):
+                    continue
+                n_sub = len(returns) // w
+                if n_sub < 1:
+                    continue
+                rs_sub: list[float] = []
+                for i in range(n_sub):
+                    subset = returns[i * w : (i + 1) * w]
+                    if len(subset) < 2:
+                        continue
+                    mean_s = np.mean(subset)
+                    devs = np.cumsum(subset - mean_s)
+                    r = np.max(devs) - np.min(devs)
+                    s = np.std(subset, ddof=1)
+                    if s > 0:
+                        rs_sub.append(float(r / s))
+                if rs_sub:
+                    rs_values.append((w, float(np.mean(rs_sub))))
+
+            if len(rs_values) < 2:
+                return None
+
+            log_n = np.log([x[0] for x in rs_values])
+            log_rs = np.log([x[1] for x in rs_values])
+            slope, _, _, _, _ = sp_stats.linregress(log_n, log_rs)
+            return float(slope)
+
+        except Exception as e:
+            logger.warning(f"Failed to calculate Hurst exponent: {e}")
+            return None
 
     async def _execute_market_data_update(self) -> None:
         """Update market data with performance monitoring."""
@@ -395,6 +1088,10 @@ class TradingOrchestrator:
                 funds_model = self._create_funds_model(funds_data["data"])
                 await db.async_store_funds(funds_model)
 
+            # Fetch and update VIX level (within 80ms window)
+            vix_level = await _fetch_cached_vix()
+            rules_engine.set_vix_level(vix_level)
+
         except Exception as e:
             logger.error(f"Market data update failed: {e}")
             raise
@@ -406,94 +1103,6 @@ class TradingOrchestrator:
             if duration > 0.02:  # 20ms budget for market data update
                 logger.warning(
                     f"Market data update exceeded budget: {duration * 1000:.2f}ms"
-                )
-
-    async def _execute_signal_generation(self) -> None:
-        """Generate combined signals with performance monitoring."""
-        start_time = datetime.datetime.now(datetime.UTC)
-
-        try:
-            # Lazy load settings to avoid import-time failures
-            global settings
-            if settings is None:
-                settings = get_settings()
-
-            symbol = settings.default_symbol
-
-            # Get latest signals
-            ta_signals = await db.async_get_latest_signals(
-                symbol, limit=1, scan_type="ta"
-            )
-            sentiment_signals = await db.async_get_latest_signals(
-                symbol, limit=1, scan_type="sentiment"
-            )
-
-            # Get current price
-            quotes = await self._safe_get_quotes([symbol])
-            if not quotes:
-                return
-
-            quote_data = quotes.get("data", {}).get(symbol, {})
-            current_price = quote_data.get("last_price", 0)
-
-            # Calculate combined strength
-            ta_strength = ta_signals[0].strength if ta_signals else 0
-            sentiment_strength = (
-                sentiment_signals[0].strength if sentiment_signals else 0
-            )
-            combined_strength = (ta_strength + sentiment_strength) / 2
-
-            # Determine signal type
-            if combined_strength > 0.6:
-                signal_type = "BUY"
-            elif combined_strength < 0.4:
-                signal_type = "SELL"
-            else:
-                signal_type = "NEUTRAL"
-
-            # Create combined signal
-            indicators: dict[str, float] = {}
-            if ta_signals:
-                indicators.update(ta_signals[0].indicators)
-            if sentiment_signals:
-                indicators.update(
-                    {
-                        "sentiment_score": sentiment_signals[0].indicators.get(
-                            "sentiment_score", 0.0
-                        )
-                    }
-                )
-
-            from .models import SignalType
-
-            signal = Signal(
-                symbol=symbol,
-                signal_type=SignalType(signal_type),
-                strength=combined_strength,
-                timestamp=datetime.datetime.now(datetime.UTC),
-                indicators=indicators,
-                confidence=combined_strength,
-                metadata={
-                    "scan_type": "combined",
-                    "source": "orchestrator",
-                    "ta_strength": ta_strength,
-                    "sentiment_strength": sentiment_strength,
-                    "current_price": current_price,
-                },
-            )
-            await db.async_create_signal(signal)
-
-        except Exception as e:
-            logger.error(f"Signal generation failed: {e}")
-            raise
-
-        finally:
-            duration = (
-                datetime.datetime.now(datetime.UTC) - start_time
-            ).total_seconds()
-            if duration > 0.01:  # 10ms budget for signal generation
-                logger.warning(
-                    f"Signal generation exceeded budget: {duration * 1000:.2f}ms"
                 )
 
     async def _execute_risk_management(self) -> None:
@@ -574,10 +1183,34 @@ class TradingOrchestrator:
             recent_signals = [s for s in all_signals if s.timestamp >= cutoff_time]
 
             if len(recent_signals) < 3:
-                logger.debug(
-                    f"Insufficient signals for CMP strategy: "
-                    f"{len(recent_signals)} signals"
-                )
+                # Track CMP chain rejection
+                record_cmp_chain_rejection("insufficient_signals")
+
+                # Increment counter
+                self._insufficient_signals_count += 1
+
+                # Check for session state change
+                current_session_state = rules_engine.session_state.value
+                session_changed = self._last_session_state != current_session_state
+                if session_changed:
+                    self._last_session_state = current_session_state
+                    # Reset counter on session state change
+                    self._insufficient_signals_count = 1
+
+                # Periodic warning log to prevent noise (every 60 seconds)
+                current_time = datetime.datetime.now(datetime.UTC).timestamp()
+                if (
+                    current_time - self._last_insufficient_signals_warning_time
+                    >= self._insufficient_signals_warning_interval
+                    or session_changed
+                ):
+                    logger.warning(
+                        f"Insufficient signals for CMP strategy: "
+                        f"{len(recent_signals)} signals "
+                        f"(rejected {self._insufficient_signals_count} "
+                        f"times since last session change)"
+                    )
+                    self._last_insufficient_signals_warning_time = current_time
                 return
 
             # Get historical data for gating rules
@@ -620,6 +1253,13 @@ class TradingOrchestrator:
             # Get current positions
             current_positions = await asyncio.to_thread(db.get_position, symbol=symbol)
 
+            # Add trailing stop update to risk step
+            if settings.enable_trailing_stops:
+                try:
+                    await update_trailing_stops()
+                except Exception as e:
+                    logger.error(f"Error in trailing stop update: {e}")
+
             # Convert Position to list of Trades for TradeDecisionEngine
             current_trades = []
             if current_positions:
@@ -641,7 +1281,7 @@ class TradingOrchestrator:
                     product_type=current_positions.product_type,
                     status="OPEN",
                     entry_time=datetime.datetime.now(datetime.UTC),
-                    metadata={"source": "position_conversion"}
+                    metadata={"source": "position_conversion"},
                 )
                 current_trades.append(trade)
 
@@ -663,6 +1303,10 @@ class TradingOrchestrator:
                 )
                 return
 
+            # Persist the decision first so the audit trail is complete even if
+            # analyzer routing is disabled or fails.
+            await db.async_create_trade_decision(decision)
+
             # Route TradeDecision to Analyzer
             routing_result = await trade_decision_engine.route_to_analyzer(decision)
 
@@ -672,9 +1316,6 @@ class TradingOrchestrator:
                     f"{decision.decision_id}"
                 )
                 logger.debug(f"TradeDecision details: {decision.to_analyzer_payload()}")
-
-                # Store the decision in database
-                await db.async_create_trade_decision(decision)
             else:
                 logger.warning(f"Failed to route CMP TradeDecision: {routing_result}")
 
@@ -788,6 +1429,15 @@ class TradingOrchestrator:
             except asyncio.CancelledError:
                 pass
 
+        # F8-L-05: cancel the detached advisory live-drift task if present
+        if self._rss_drift_task is not None and not self._rss_drift_task.done():
+            self._rss_drift_task.cancel()
+            try:
+                await self._rss_drift_task
+            except asyncio.CancelledError:
+                pass
+            self._rss_drift_task = None
+
         logger.info("TradingOrchestrator shutdown complete")
 
     async def _check_kill_switch(self) -> None:
@@ -796,25 +1446,58 @@ class TradingOrchestrator:
             logger.error("Kill switch active - trading operations blocked")
             raise KillSwitchError()
 
-    @openalgo_circuit_breaker_retry_async
     async def _safe_get_history(
         self, symbol: str, interval: str
     ) -> dict[str, Any] | None:
-        """Get history with circuit breaker protection."""
+        """Get history with circuit breaker protection.
+
+        The innermost fetch seam for producer call sites
+        (``_source_guarded_history`` layers the per-source breaker and a
+        fresh global breaker+retry around this method, so both count real
+        failures); direct non-producer callers get the global breaker here
+        with degradation to ``None`` OUTSIDE the breaker.
+        """
         try:
-            return await async_client.get_history(symbol=symbol, interval=interval)
+            return await openalgo_circuit_breaker_retry_async(self._fetch_history_bare)(
+                symbol, interval
+            )
+        except CircuitBreakerOpenError:
+            # Global breaker open — degrade without disturbing source stats.
+            logger.error("Failed to get history: global circuit breaker open")
+            return None
         except Exception:
             logger.error("Failed to get history after retries")
             return None
 
-    @openalgo_circuit_breaker_retry_async
+    async def _fetch_history_bare(self, symbol: str, interval: str) -> dict[str, Any]:
+        """Bare history fetch — no breaker, no swallow; raises to caller."""
+        return await async_client.get_history(symbol=symbol, interval=interval)
+
     async def _safe_get_quotes(self, symbols: list[str]) -> dict[str, Any] | None:
-        """Get quotes with circuit breaker protection."""
+        """Get quotes with circuit breaker protection.
+
+        The innermost fetch seam for producer call sites
+        (``_source_guarded_quotes`` layers the per-source breaker and a
+        fresh global breaker+retry around this method, so both count real
+        failures); direct non-producer callers get the global breaker here
+        with degradation to ``None`` OUTSIDE the breaker — mirroring
+        ``_safe_get_history``.
+        """
         try:
-            return await async_client.get_quotes(symbols)
+            return await openalgo_circuit_breaker_retry_async(self._fetch_quotes_bare)(
+                symbols
+            )
+        except CircuitBreakerOpenError:
+            # Global breaker open — degrade without disturbing source stats.
+            logger.error("Failed to get quotes: global circuit breaker open")
+            return None
         except Exception:
             logger.error("Failed to get quotes after retries")
             return None
+
+    async def _fetch_quotes_bare(self, symbols: list[str]) -> dict[str, Any]:
+        """Bare quotes fetch — no breaker, no swallow; raises to caller."""
+        return await async_client.get_quotes(symbols)
 
     @openalgo_circuit_breaker_retry_async
     async def _safe_get_position_book(self) -> dict[str, Any] | None:
@@ -902,3 +1585,150 @@ async def stop_orchestrator() -> None:
 async def get_cycle_stats() -> dict[str, Any]:
     """Get orchestrator cycle statistics."""
     return orchestrator.get_cycle_stats()
+
+
+async def update_trailing_stops() -> None:
+    """
+    Update trailing stops for all open positions.
+
+    This function implements the runtime driver for trailing stop updates
+    as required by TODO-14 (F7-H-04 / CMP Rule 12).
+
+    Enforces Rule-7: ≤25 modifications per cycle (secondary guard). The
+    primary CMP Rule-7 control (F8-H-02) is per-order and persisted —
+    enforced inside ``AsyncOpenAlgoClient.modify_order``.
+    Runs as part of the orchestrator risk step with <1ms budget.
+    """
+    try:
+        from .trailing_stop import trailing_stop_engine
+
+        # Get all open positions from OpenAlgo position book
+        position_book_data = await async_client.get_position_book()
+
+        if not position_book_data or "data" not in position_book_data:
+            return
+
+        positions_data = position_book_data.get("data", [])
+
+        if not positions_data:
+            return
+
+        # Enforce Rule-7: ≤25 modifications per cycle (pulled from settings).
+        cfg = get_settings()
+        max_modifications = cfg.max_modifications
+        modifications_this_cycle = 0
+
+        # Process each position with trailing stop configuration
+        for position_data in positions_data:
+            try:
+                symbol = position_data.get("symbol", "")
+                if not symbol:
+                    continue
+
+                # Get position from database to check for trailing config
+                db_position = await asyncio.to_thread(db.get_position, symbol)
+
+                if not db_position:
+                    continue
+
+                # Trailing config and order id are persisted in metadata so
+                # we don't need to extend the Position model with dynamic state.
+                trailing_config = db_position.metadata.get("trailing_config")
+                order_id = db_position.metadata.get("order_id", "")
+                if not trailing_config or not order_id:
+                    continue
+
+                # Get current price for the symbol
+                quotes = await async_client.get_quotes(symbols=[symbol])
+                if not quotes or "data" not in quotes:
+                    logger.warning(f"No quote data available for {symbol}")
+                    continue
+
+                quote_data = quotes.get("data", {}).get(symbol, {})
+                current_price = quote_data.get("last_price", 0)
+
+                if current_price <= 0:
+                    logger.warning(f"Invalid price {current_price} for {symbol}")
+                    continue
+
+                # Update trailing stop using the engine
+                old_config = trailing_config.copy()
+                updated_config, was_modified = (
+                    trailing_stop_engine.update_trailing_stop(
+                        trailing_config,
+                        current_price,
+                    )
+                )
+
+                # Only persist if configuration was modified
+                if was_modified:
+                    # Enforce Rule-7: ≤25 modifications per cycle
+                    if modifications_this_cycle >= max_modifications:
+                        logger.warning(
+                            f"Rule-7 limit reached ({max_modifications} "
+                            f"modifications). Skipping further updates."
+                        )
+                        break
+
+                    # Modify order via OpenAlgo. CMP Rule 7 (F8-H-02) is
+                    # enforced at this boundary (per-order, persisted): the
+                    # 26th modification raises Rule7ModificationLimitError.
+                    try:
+                        await async_client.modify_order(
+                            order_id=order_id,
+                            trigger_price=updated_config.get("trigger_price"),
+                            order_type="SL-M",
+                        )
+                    except Rule7ModificationLimitError as r7:
+                        # Budget exhausted for THIS order: stop ratcheting
+                        # it (fail-closed per F8-H-02) and audit the refusal.
+                        logger.warning(
+                            f"Rule-7 per-order budget exhausted for {order_id}: {r7}"
+                        )
+                        await db.async_log_audit(
+                            action="ratchet_refused_rule7",
+                            entity_type="order",
+                            entity_id=order_id,
+                            metadata={
+                                "reason": "rule7_modification_limit",
+                                "current_price": current_price,
+                            },
+                        )
+                        continue
+
+                    # Record ratchet event for audit via generic async_log_audit
+                    await db.async_log_audit(
+                        action="ratchet_update",
+                        entity_type="order",
+                        entity_id=order_id,
+                        metadata={
+                            "old_sl": old_config.get("trigger_price", 0),
+                            "new_sl": updated_config.get("trigger_price", 0),
+                            "current_price": current_price,
+                        },
+                    )
+
+                    # Update position in database with new trailing config
+                    db_position.metadata["trailing_config"] = updated_config
+                    await asyncio.to_thread(db.store_position, db_position)
+
+                    # Per-order Rule-7 counter is incremented inside
+                    # modify_order (F8-H-02); only the per-cycle secondary
+                    # guard is tracked here.
+                    modifications_this_cycle += 1
+
+                    logger.debug(
+                        f"Updated trailing stop for {symbol}: "
+                        f"old_level={old_config.get('trigger_price', 'N/A')} -> "
+                        f"new_level={updated_config.get('trigger_price', 'N/A')}"
+                    )
+
+            except Exception as e:
+                logger.error(
+                    f"Error updating trailing stop for "
+                    f"{position_data.get('symbol', 'unknown')}: {e}"
+                )
+                continue
+
+    except Exception as e:
+        logger.error(f"Trailing stop update failed: {e}")
