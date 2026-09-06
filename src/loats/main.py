@@ -95,10 +95,7 @@ class TradingSystem:
             signal.signal(signal.SIGTERM, signal_handler)
         else:
             for sig in (signal.SIGINT, signal.SIGTERM):
-                loop.add_signal_handler(
-                    sig,
-                    lambda s=sig: asyncio.create_task(self._handle_shutdown_signal(s)),
-                )
+                loop.add_signal_handler(sig, self._posix_signal_entry, sig)
 
         await self.shutdown_event.wait()
 
@@ -127,6 +124,18 @@ class TradingSystem:
         """Handle shutdown signal."""
         logger.info(f"Received shutdown signal: {sig.name}")
         await self.shutdown()
+
+    def _posix_signal_entry(self, sig: signal.Signals) -> None:
+        """POSIX loop callback: schedule async shutdown handling.
+
+        Passed directly to ``loop.add_signal_handler(sig, cb, sig)`` as a
+        bound method with the signal as its argument -- no lambda, whose
+        parameter type mypy 2.3.1 cannot infer under unix event-loop
+        stubs (``Cannot infer type of lambda``, Linux-only CI failure).
+        Scheduling on the loop (rather than awaiting inline) preserves the
+        original contract: the callback returns before shutdown awaits.
+        """
+        asyncio.create_task(self._handle_shutdown_signal(sig))
 
     async def shutdown(self) -> None:
         """Shutdown trading system gracefully."""
