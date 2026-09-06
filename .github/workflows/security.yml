@@ -74,14 +74,19 @@ jobs:
           cache: 'pip'
 
       - name: Install pip-audit
-        run: pip install pip-audit
+        # Pinned to the version the local gates verify against (pyproject
+        # dev extra); unpinned installs pulled a CLI-breaking release.
+        run: pip install pip-audit==2.10.1
 
       - name: Run pip-audit
-        # pip-audit 2.10.1 dropped --output-file; -o/--output is the stable
-        # long-form across 2.x (verified against 2.10.1).
+        # pip-audit 2.10.1: --output is the stable long-form. The second
+        # view uses --format=markdown: `requirements` was NEVER a valid
+        # --format value (valid: columns/json/cyclonedx-json/cyclonedx-xml/
+        # markdown, introspected from pip_audit._cli.OutputFormatChoice)
+        # and only failed on the runner (dispatch run 34051682117).
         run: |
           pip-audit --format=json --output pip-audit-full.json
-          pip-audit --format=requirements --output requirements-vulnerable.txt
+          pip-audit --format=markdown --output pip-audit-vulnerable.md
 
       - name: Upload pip-audit report
         uses: actions/upload-artifact@v4
@@ -89,7 +94,7 @@ jobs:
           name: pip-audit-full-report
           path: |
             pip-audit-full.json
-            requirements-vulnerable.txt
+            pip-audit-vulnerable.md
           retention-days: 30
 
       - name: Fail on critical vulnerabilities
@@ -128,6 +133,9 @@ jobs:
           cache-dependency-path: pyproject.toml
 
       - name: Install Bandit
+        # Pinned: bandit 1.9.4 is the version the local gates run; safety
+        # 3.x is capped because v3 removed the v2 CLI flags the report
+        # artifact contract expects (same drift class as pip-audit).
         run: pip install "bandit==1.9.4" "safety>=3,<4"
 
       - name: Run Bandit
@@ -185,12 +193,18 @@ jobs:
           python-version: '3.12'
 
       - name: Install CycloneDX
-        run: pip install cyclonedx-bom
+        # Pinned: cyclonedx-bom 7.x removed the `mod` command; the job
+        # below uses the documented `requirements -` pip-freeze form
+        # verified against 7.3.1.
+        run: pip install "cyclonedx-bom==7.3.1"
 
       - name: Generate SBOM
+        # cyclonedx-py 7.x: `mod` is gone (dispatch run 34051682117);
+        # `requirements -` consumes a pip freeze listing. Local evidence:
+        # JSON and XML outputs both verified against the repo venv freeze.
         run: |
-          cyclonedx-py mod -o sbom.json
-          cyclonedx-py mod -o sbom.xml --format xml
+          python -m pip freeze --all | cyclonedx-py requirements - -o sbom.json
+          python -m pip freeze --all | cyclonedx-py requirements - -o sbom.xml --of XML
 
       - name: Upload SBOM
         uses: actions/upload-artifact@v4

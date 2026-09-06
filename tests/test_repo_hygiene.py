@@ -712,9 +712,9 @@ class TestWorkflowFlagCurrency:
             ("--format=json", "--output", "pip-audit-full.json"),
         ),
         (
-            "security.yml pip-audit requirements step",
+            "security.yml pip-audit markdown step",
             "pip_audit",
-            ("--format=requirements", "--output", "requirements-vulnerable.txt"),
+            ("--format=markdown", "--output", "pip-audit-vulnerable.md"),
         ),
     )
 
@@ -741,6 +741,35 @@ class TestWorkflowFlagCurrency:
                 f"security.yml uses removed flag --output-file: {ln}"
             )
             assert "--output" in ln, f"security.yml pip-audit missing --output: {ln}"
+
+    def test_security_yml_pip_audit_format_values_are_real(self) -> None:
+        """``--format`` VALUES must exist, not just the flag name.
+
+        Root cause being guarded: the flag-name check above passed
+        ``--format=requirements`` because argparse short help renders
+        value-taking options as ``[-f FORMAT]`` with no inline choices,
+        so a format value that never existed in any pip-audit release
+        sailed through every local gate and failed only on the runner
+        (dispatch run 34051682117, 2026-09-06). Introspect the installed
+        pinned tool's OutputFormatChoice enum — the same self-maintaining
+        philosophy as the name check: the enum IS the tool's vocabulary —
+        and require every ``--format=<value>`` in security.yml to be real.
+        """
+        from pip_audit._cli import OutputFormatChoice
+
+        valid = {e.value for e in OutputFormatChoice}
+        used = re.findall(
+            r"--format=([a-z-]+)",
+            self.SECURITY_YML.read_text(encoding="utf-8"),
+        )
+        assert used, "expected --format= values in security.yml pip-audit steps"
+        unknown = sorted(set(used) - valid)
+        assert not unknown, (
+            f"security.yml pip-audit uses --format value(s) {unknown} that "
+            f"the installed pip-audit does not offer (valid: {sorted(valid)}); "
+            f"the workflow step would fail on the runner. Upgrade the pin "
+            f"or fix the step."
+        )
 
     def test_ci_yml_mypy_step_omits_removed_output_format_flag(self) -> None:
         lines = self._workflow_run_lines(CI_YML)
