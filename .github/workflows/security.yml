@@ -110,16 +110,19 @@ jobs:
           cache-dependency-path: pyproject.toml
 
       - name: Install Bandit
-        run: pip install bandit safety
+        run: pip install "bandit==1.9.4" "safety>=3,<4"
 
       - name: Run Bandit
         run: |
           bandit -r src/ -c pyproject.toml -f json -o bandit-full-report.json
           bandit -r src/ -c pyproject.toml -f screen
 
+      # safety>=3 dropped the v2 flags (`--json`, `--output-file`); `scan` needs
+      # platform auth this workflow does not have. `check --save-json` keeps the
+      # artifact contract with the auth-free path (verified: safety 3.8.1).
       - name: Run Safety check
         run: |
-          safety check --json --output-file safety-report.json
+          safety check --save-json safety-report.json
 
       - name: Upload security reports
         uses: actions/upload-artifact@v4
