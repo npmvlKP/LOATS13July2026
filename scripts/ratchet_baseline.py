@@ -45,9 +45,10 @@ History (most recent last):
        (tests/test_commit_message_check.py — regression net for the
        cp1252 rejection crash and the F8-L-06-R2 format rule — and
        docs/adr/0011-security-report-artifacts.md; see ADR-0011). The
-       same wave removed 2 accidental git-add -A sweep-ins
+       same wave untracked 2 accidental git-add -A sweep-ins
        (reports/security/bandit.json, reports/security/
-       safety-report.json — undated scan output; net delta 0).
+       safety-report.json — undated scan output; they were staged but
+       never committed, so no committed file was removed).
 """
 
 from __future__ import annotations
