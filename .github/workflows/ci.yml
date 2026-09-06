@@ -310,12 +310,14 @@ jobs:
         with:
           fetch-depth: 0
       - name: Run Gitleaks
+        # gitleaks-action@v2 hard-requires GITHUB_TOKEN for PR scanning (without
+        # it the job fails with "GITHUB_TOKEN is now required to scan pull
+        # requests"); its with: inputs (config/fail-on/exit-code/verbose) are
+        # not valid inputs for this action and are ignored with a warning.
+        # .gitleaks.toml is picked up from the repo root automatically.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         uses: gitleaks/gitleaks-action@v2
-        with:
-          config: .gitleaks.toml
-          fail-on: secrets
-          exit-code: 1
-          verbose: true
 
   docker:
     name: Docker Build
