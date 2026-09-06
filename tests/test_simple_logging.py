@@ -3,25 +3,35 @@ Simple test for logging functionality without conftest dependencies.
 """
 
 import logging
-import os
-import sys
 from pathlib import Path
-from unittest.mock import patch
 
-# Add the src directory to the path
-sys.path.insert(0, str(Path(__file__).parent.parent))
+import pytest
 
 
-def test_logging_test_mode():
+@pytest.fixture(autouse=True)
+def _hermetic_cwd(tmp_path, monkeypatch):
+    """Run from a fresh temp cwd: production mode must create logs/ itself.
+
+    The dev host has a pre-existing logs/ directory, which hides the
+    contract this pins (2026-09-06 workflow_dispatch run 34021260111:
+    'Unable to configure handler file' on a fresh runner).
+    """
+    monkeypatch.chdir(tmp_path)
+
+
+def test_logging_test_mode(monkeypatch):
     """Test that logging is configured correctly in test mode."""
-    # Set test environment
-    os.environ["ENVIRONMENT"] = "test"
+    # Set test environment (monkeypatch restores it afterwards)
+    monkeypatch.setenv("ENVIRONMENT", "test")
 
     # Import after setting environment
     from loats.loats_logging import configure_logging
 
     # Configure logging in test mode
     configure_logging(test_mode=True)
+
+    # Check that no logs directory was created
+    assert not Path("logs").exists()
 
     # Check that no file handlers are configured
     root_logger = logging.getLogger()
@@ -42,50 +52,45 @@ def test_logging_test_mode():
 
     assert len(console_handlers) > 0, "Console handler should be configured"
 
-    print("✓ Test mode logging test passed")
 
-
-def test_logging_production_mode():
+def test_logging_production_mode(monkeypatch):
     """Test that logging is configured correctly in production mode."""
-    # Remove test environment if set
-    if "ENVIRONMENT" in os.environ:
-        del os.environ["ENVIRONMENT"]
+    # Remove test environment if set (monkeypatch restores it afterwards)
+    monkeypatch.delenv("ENVIRONMENT", raising=False)
 
     # Import after setting environment
     from loats.loats_logging import configure_logging
 
-    # Mock the Path.mkdir to avoid creating actual directories
-    with patch("pathlib.Path.mkdir") as mock_mkdir:
-        # Configure logging in production mode
-        configure_logging(test_mode=False)
+    # Configure logging in production mode. The real directory creation is
+    # the behavior under test: mocking Path.mkdir away (the old pattern)
+    # starves the RotatingFileHandler and dictConfig fails with
+    # "Unable to configure handler 'file'" on a fresh environment.
+    configure_logging(test_mode=False)
 
-        # Check that mkdir was called to create logs directory
-        mock_mkdir.assert_called_once()
+    # Check that the logs directory was created for real
+    assert Path("logs").is_dir()
 
-        # Check that both console and file handlers are configured
-        root_logger = logging.getLogger()
-        file_handlers = [
-            handler
-            for handler in root_logger.handlers
-            if isinstance(handler, logging.FileHandler)
-        ]
-        console_handlers = [
-            handler
-            for handler in root_logger.handlers
-            if isinstance(handler, logging.StreamHandler)
-        ]
+    # Check that both console and file handlers are configured
+    root_logger = logging.getLogger()
+    file_handlers = [
+        handler
+        for handler in root_logger.handlers
+        if isinstance(handler, logging.FileHandler)
+    ]
+    console_handlers = [
+        handler
+        for handler in root_logger.handlers
+        if isinstance(handler, logging.StreamHandler)
+    ]
 
-        assert len(file_handlers) > 0, (
-            "File handler should be configured in production mode"
-        )
-        assert len(console_handlers) > 0, (
-            "Console handler should be configured in production mode"
-        )
+    assert len(file_handlers) > 0, (
+        "File handler should be configured in production mode"
+    )
+    assert len(console_handlers) > 0, (
+        "Console handler should be configured in production mode"
+    )
 
-    print("✓ Production mode logging test passed")
-
-
-if __name__ == "__main__":
-    test_logging_test_mode()
-    test_logging_production_mode()
-    print("All logging tests passed!")
+    # Release the file handles on the temp directory.
+    for handler in file_handlers:
+        handler.close()
+        root_logger.removeHandler(handler)
