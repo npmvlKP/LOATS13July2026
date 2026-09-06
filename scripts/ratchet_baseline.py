@@ -41,8 +41,15 @@ History (most recent last):
   380  CI/security workflow flag-drift repair wave (2026-09-06):
        +1 docs/adr/0010-nltk-dev-toolchain-triage.md (PYSEC-2026-3740
        triage decision record; see ADR-0010).
+  382  Commit-gate observability wave (2026-09-06): +2
+       (tests/test_commit_message_check.py — regression net for the
+       cp1252 rejection crash and the F8-L-06-R2 format rule — and
+       docs/adr/0011-security-report-artifacts.md; see ADR-0011). The
+       same wave removed 2 accidental git-add -A sweep-ins
+       (reports/security/bandit.json, reports/security/
+       safety-report.json — undated scan output; net delta 0).
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 380
+TRACKED_FILE_CEILING = 382
