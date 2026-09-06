@@ -233,7 +233,10 @@ jobs:
           python -m pip install --upgrade pip
           pip install ".[dev]"
       - name: Run MyPy
-        run: mypy src/ --strict --config-file pyproject.toml --output-format=github
+        # mypy 2.3.1 (the pinned version) has no --output-format flag; -O/--output
+        # accepts only json. Plain default output keeps the job runnable and the
+        # non-zero exit contract intact (verified against mypy==2.3.1).
+        run: mypy src/ --strict --config-file pyproject.toml
 
   pytest-coverage:
     name: pytest-coverage
@@ -282,7 +285,10 @@ jobs:
       - name: Install pip-audit
         run: pip install "pip-audit==2.10.1"
       - name: Run pip-audit
-        run: pip-audit --format=json --output-file pip-audit-report.json
+        # pip-audit 2.10.1 has no --output-file flag; -o/--output is the
+        # long-form that exists in every 2.x (verified against 2.10.1).
+        run: |
+          pip-audit --format=json --output pip-audit-report.json
       - name: Upload pip-audit report
         if: always()
         uses: actions/upload-artifact@v4

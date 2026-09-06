@@ -67,9 +67,11 @@ jobs:
         run: pip install pip-audit
 
       - name: Run pip-audit
+        # pip-audit 2.10.1 dropped --output-file; -o/--output is the stable
+        # long-form across 2.x (verified against 2.10.1).
         run: |
-          pip-audit --format=json --output-file pip-audit-full.json
-          pip-audit --format=requirements --output-file requirements-vulnerable.txt
+          pip-audit --format=json --output pip-audit-full.json
+          pip-audit --format=requirements --output requirements-vulnerable.txt
 
       - name: Upload pip-audit report
         uses: actions/upload-artifact@v4
