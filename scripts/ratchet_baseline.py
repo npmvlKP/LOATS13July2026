@@ -38,8 +38,11 @@ History (most recent last):
        scripts/ orphans are separately ratcheted by
        scripts/check_scripts_wiring.py (CI repo-hygiene, pre-commit,
        HC-30).
+  380  CI/security workflow flag-drift repair wave (2026-09-06):
+       +1 docs/adr/0010-nltk-dev-toolchain-triage.md (PYSEC-2026-3740
+       triage decision record; see ADR-0010).
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 379
+TRACKED_FILE_CEILING = 380

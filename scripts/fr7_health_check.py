@@ -1035,6 +1035,17 @@ def check_gates(rep: Report, fast: bool) -> dict:
                 "-m",
                 "pip_audit",
                 "--format=json",
+                # PYSEC-2026-3740 (nltk<3.11 path-traversal model loaders):
+                # nltk is not a runtime dependency -- no src/loats module
+                # imports it; it enters the environment only as a transitive
+                # dependency of safety (the audit tool itself, all 3.x
+                # releases pin nltk>=3.9). No fixed nltk release exists
+                # upstream. Triaged as accepted dev-toolchain risk per
+                # docs/adr/0010-nltk-dev-toolchain-triage.md. REMOVE this
+                # ignore as soon as safety ships a release without nltk or
+                # nltk 3.11 lands.
+                "--ignore-vuln",
+                "PYSEC-2026-3740",
                 "-o",
                 "reports/health/pip_audit.json",
             ],
