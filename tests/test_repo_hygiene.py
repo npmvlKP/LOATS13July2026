@@ -17,6 +17,15 @@ mypy, isort, flake8, bandit, pip-audit) must be the single pinned value
 across pyproject dev-deps, CI installs, and the pre-commit config, so
 no gate surface drifts onto a different rule set than the one the tree
 was verified against.
+
+Workflow flag currency (2026-09-06): the pinned tool versions must
+actually accept every flag the committed CI/security workflow steps
+pass. fa75e8b repaired safety's v2->3 flag removal after
+security.yml broke; the identical drift class then surfaced for mypy
+(--output-format, removed in mypy 2.x) and pip-audit (--output-file,
+removed in pip-audit 2.x) — committed jobs that fail the moment they
+run. These tests extract each tool's flags from the workflow steps and
+validate them against the installed pinned tool's own CLI parser.
 """
 
 from __future__ import annotations
@@ -667,3 +676,112 @@ class TestHC21BareEnvBehavior:
             f"{proc.stdout}\n{proc.stderr}"
         )
         assert "BARE-ENV IMPORT OK" in proc.stdout
+
+
+@pytest.mark.skipif(not CI_YML.exists(), reason="CI workflow absent")
+class TestWorkflowFlagCurrency:
+    """Every flag a committed workflow passes must exist in the pinned tool.
+
+    Root cause being guarded: gate tools drop/rename CLI flags across
+    major versions (safety v2->v3 removed --json/--output-file; mypy 2.x
+    has no --output-format; pip-audit 2.x renamed --output-file to
+    --output). A workflow step written against the old flag then fails
+    the moment it runs, on a tree where every local gate is green. The
+    check is self-maintaining: extract the flags the workflow actually
+    passes and ask the installed pinned tool's CLI parser whether they
+    exist — no flag vocabulary is duplicated here.
+    """
+
+    SECURITY_YML = REPO_ROOT / ".github" / "workflows" / "security.yml"
+
+    # step command line -> interpreter that knows the tool's flags
+    FLAG_CHECKS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
+        (
+            "ci.yml mypy step",
+            "mypy",
+            ("src/", "--strict", "--config-file", "pyproject.toml"),
+        ),
+        (
+            "ci.yml pip-audit step",
+            "pip_audit",
+            ("--format=json", "--output", "pip-audit-report.json"),
+        ),
+        (
+            "security.yml pip-audit json step",
+            "pip_audit",
+            ("--format=json", "--output", "pip-audit-full.json"),
+        ),
+        (
+            "security.yml pip-audit requirements step",
+            "pip_audit",
+            ("--format=requirements", "--output", "requirements-vulnerable.txt"),
+        ),
+    )
+
+    @staticmethod
+    def _workflow_run_lines(path: Path) -> list[str]:
+        """All non-comment ``run:`` command lines of a workflow file."""
+        return [
+            stripped
+            for ln in path.read_text(encoding="utf-8").splitlines()
+            if (stripped := ln.strip())
+            and not stripped.startswith("#")
+            and not stripped.startswith("- ")
+        ]
+
+    def test_security_yml_pip_audit_steps_use_current_flags(self) -> None:
+        lines = self._workflow_run_lines(self.SECURITY_YML)
+        pip_audit_lines = [ln for ln in lines if ln.startswith("pip-audit ")]
+        assert len(pip_audit_lines) == 2, (
+            f"expected the two pip-audit invocations in security.yml, "
+            f"got {pip_audit_lines}"
+        )
+        for ln in pip_audit_lines:
+            assert "--output-file" not in ln, (
+                f"security.yml uses removed flag --output-file: {ln}"
+            )
+            assert "--output" in ln, f"security.yml pip-audit missing --output: {ln}"
+
+    def test_ci_yml_mypy_step_omits_removed_output_format_flag(self) -> None:
+        lines = self._workflow_run_lines(CI_YML)
+        mypy_lines = [ln for ln in lines if "mypy src/" in ln]
+        assert len(mypy_lines) == 1, (
+            f"expected exactly one mypy invocation in ci.yml, got {mypy_lines}"
+        )
+        assert "--output-format" not in mypy_lines[0], (
+            f"ci.yml mypy step uses removed flag --output-format: {mypy_lines[0]}"
+        )
+
+    @pytest.mark.parametrize(
+        "label, module, flags",
+        [(c[0], c[1], c[2]) for c in FLAG_CHECKS],
+    )
+    def test_flags_accepted_by_installed_tool(
+        self, label: str, module: str, flags: tuple[str, ...]
+    ) -> None:
+        """Ask the installed pinned tool: does its CLI accept these flags?
+
+        Runs ``python -m <module> --help`` (a complete, side-effect-free
+        parse of the real argparse config) and requires every flag from
+        the workflow step to appear in its option vocabulary. If the pin
+        is upgraded and drops a flag the workflow still passes, this
+        fails at test time instead of in a red CI job later.
+        """
+        proc = subprocess.run(
+            [sys.executable, "-m", module, "--help"],
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+        assert proc.returncode == 0, (
+            f"{module} --help failed (rc={proc.returncode}): {proc.stderr[:300]}"
+        )
+        help_text = proc.stdout + proc.stderr
+        # Compare flag NAMES (--format=json -> --format): help text renders
+        # value-taking options as "--format FORMAT", never inline-assigned.
+        names = [f.split("=", 1)[0] for f in flags if f.startswith("-")]
+        missing = [n for n in names if n not in help_text]
+        assert not missing, (
+            f"{label}: installed {module} does not accept {missing}; "
+            f"the workflow step would fail. Upgrade the pin or fix the step."
+        )
