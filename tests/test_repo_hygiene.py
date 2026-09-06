@@ -171,7 +171,7 @@ class TestForbiddenPatterns:
             "scripts/check_repo_hygiene.py",
             "docs/x.md",
             "reports/health/health-final-20260901.json",
-            "reports/p1_analyze_latency_20260828_084822.json",
+            "reports/p1_analyze_latency_20260904_040609.json",
             ".github/workflows/ci.yml",
         ):
             assert guard._violations([path]) == [], f"unexpected flag on {path}"

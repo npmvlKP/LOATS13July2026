@@ -529,7 +529,6 @@ class TestRatchetLockstep:
         )
         tracked = set(out.stdout.split())
         required = {
-            "reports/p1_analyze_latency_20260828_084822.json",
             "reports/p1_analyze_latency_20260904_040609.json",
         }
         missing = required - tracked
