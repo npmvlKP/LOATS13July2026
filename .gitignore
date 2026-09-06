@@ -145,6 +145,14 @@ reports/*.json
 !reports/p1_analyze_latency_20260828_084822.json
 !reports/p1_analyze_latency_20260904_040609.json
 
+# Security-scan run artifacts under reports/security/ (2026-09-06): bandit
+# and safety JSON emitted per invocation are re-derivable and embed
+# machine-absolute paths; the evidence of record is the dated snapshot
+# scheme (bandit-20260901.json, pip-audit-20260901.json). CI's
+# security.yml writes its own root-level copies (below).
+reports/security/bandit.json
+reports/security/safety-report.json
+
 # Junk files
 $null
 [100%]
@@ -152,6 +160,9 @@ $null
 pytest_final*.log
 bandit-report.json
 pip-audit-core-report.json
+pip-audit-report.json
+safety-report.json
+bandit-full-report.json
 results.json
 coverage_floor_map.json
 opencode.json
