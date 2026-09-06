@@ -34,6 +34,13 @@ from .loats_logging import get_logger
 logger = get_logger(__name__)
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+# parents[2] assumes the source-checkout layout (<root>/src/loats/): it is
+# correct for editable installs, which resolve this module to the checkout.
+# CI pins that contract by installing EDITABLE in both gating jobs
+# (pip install -e ".[dev]"); under a non-editable install this anchor would
+# resolve into site-packages, where tests/fixtures does not exist (proven by
+# the 2026-09-06 workflow_dispatch run: 26 CI-only failures, all fixed by
+# the editable-install parity repair, none by changing this anchor).
 MANIFEST_PATH = REPO_ROOT / "tests" / "fixtures" / "rss" / "recorded-sources.json"
 
 # Signatures accepted as "looks like a syndicated feed" (case-insensitive).

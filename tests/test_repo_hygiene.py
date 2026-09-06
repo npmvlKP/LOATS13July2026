@@ -752,6 +752,36 @@ class TestWorkflowFlagCurrency:
             f"ci.yml mypy step uses removed flag --output-format: {mypy_lines[0]}"
         )
 
+    def test_ci_yml_gating_jobs_install_editable(self) -> None:
+        """Both CI gating jobs must install the package EDITABLE.
+
+        Root cause being guarded (2026-09-06 workflow_dispatch run): a
+        non-editable ``pip install ".[dev]"`` made ``--cov=src`` measure
+        site-packages never executed (coverage 0, fail-under=80 tripped)
+        and broke ``src/loats/rss_validation.py``'s ``parents[2]`` repo
+        anchor (recorded-sources manifest "missing" -- 26 CI-only test
+        failures). Local editable venvs hid all of it. Editable installs
+        are not optional parity polish; they are the load-bearing
+        contract for coverage measurement and repo-relative fixtures.
+        """
+        text = CI_YML.read_text(encoding="utf-8")
+        job_blocks = re.findall(
+            r"^  (mypy|pytest-coverage):\n(?:^    .*\n)*?^      - name: Install dependencies\n"
+            r"(?:^        [^\n]*\n)*?^          pip install ([^\n]+)\n",
+            text,
+            re.MULTILINE,
+        )
+        installs = dict(job_blocks)
+        assert set(installs) == {"mypy", "pytest-coverage"}, (
+            f"expected Install dependencies steps in mypy and pytest-coverage "
+            f"jobs, found {sorted(installs)}"
+        )
+        for job, line in installs.items():
+            assert line.strip().startswith('-e "'), (
+                f"ci.yml {job} job must install editable (pip install -e), "
+                f"got: pip install {line.strip()}"
+            )
+
     @pytest.mark.parametrize(
         "label, module, flags",
         [(c[0], c[1], c[2]) for c in FLAG_CHECKS],

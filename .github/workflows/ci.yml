@@ -229,9 +229,13 @@ jobs:
           python-version: '3.12'
           cache: 'pip'
       - name: Install dependencies
+        # Editable install is REQUIRED for the gates below: --cov=src must
+        # measure the checkout's source files (a non-editable install made
+        # coverage report 0% on GitHub runners), and repo-relative fixtures
+        # (tests/fixtures/rss) must resolve from the installed package.
         run: |
           python -m pip install --upgrade pip
-          pip install ".[dev]"
+          pip install -e ".[dev]"
       - name: Run MyPy
         # mypy 2.3.1 (the pinned version) has no --output-format flag; -O/--output
         # accepts only json. Plain default output keeps the job runnable and the
@@ -248,9 +252,10 @@ jobs:
           python-version: '3.12'
           cache: 'pip'
       - name: Install dependencies
+        # Editable install: same parity contract as the mypy job above.
         run: |
           python -m pip install --upgrade pip
-          pip install ".[dev]"
+          pip install -e ".[dev]"
       - name: Run pytest with coverage
         run: |
           pytest tests/ \
