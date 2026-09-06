@@ -57,11 +57,15 @@ exists-probing. The hostile classes:
 * reserved device names, optionally dot-extensioned -- ``NUL``,
   ``NUL.txt`` (``> NUL`` redirection mishaps).
 
-Patterns are lowercase and matched against ``os.path.normcase``-folded
-verbatim names. On POSIX the fold is identity, so reserved-name
-matching is exact-case there; the class-wide scan still runs on POSIX
-(a ``G......`` created on Windows and committed to git materializes
-verbatim in a Linux clone -- CI on ubuntu must catch it too).
+Patterns are matched against ``os.path.normcase``-folded AND
+``str.casefold``-folded verbatim names. On POSIX ``normcase`` is the
+identity, so ``casefold`` carries the case-insensitivity: a
+Windows-hostile name committed from a POSIX mishap must fail the
+ubuntu CI job regardless of its letter case. On Windows the fold is
+equivalent to normcase alone (ASCII device names). The class-wide
+scan still runs on POSIX (a ``G......`` created on Windows and
+committed to git materializes verbatim in a Linux clone -- CI on
+ubuntu must catch it too).
 
 Failure semantics
 -----------------
@@ -113,8 +117,9 @@ ROOT_JUNK_NAMES: tuple[str, ...] = (
 # F8-M-04: class-wide Win32-hostile final-component patterns,
 # evaluated against os.scandir VERBATIM names (never Path-parsed --
 # parsing/exists-probing is exactly what hides trailing-dot entries).
-# Patterns are lowercase; callers match against os.path.normcase-folded
-# names (fold is identity on POSIX, so matching there is exact-case).
+# Patterns are matched against os.path.normcase + str.casefold folded
+# verbatim names (normcase is the identity on POSIX, so casefold carries
+# case-insensitivity there -- see "Case handling" above).
 # Hostile classes:
 # * trailing dot(s)/space(s): Win32 strips them before stat/open, so
 #   the entry is invisible to exists-probing and undeletable via
@@ -165,7 +170,7 @@ def is_hostile_root_name(name: str) -> bool:
     list: catches FUTURE shell-redirection mishaps, not just past
     artifacts.
     """
-    folded = os.path.normcase(name)
+    folded = os.path.normcase(name).casefold()
     if _HOSTILE_TAIL_RE.search(folded):
         return True  # trailing dot(s)/space(s): Win32 dot-strip class
     if ":" in folded:
