@@ -146,8 +146,16 @@ def check_archived_scripts(verbose: bool = False) -> dict:
         for script in still_tracked:
             print(f"  - {script}")
     elif not archive_exists:
-        print(f"⚠️  WARNING: Archive directory not created at {archive_dir}")
-        result["passed"] = False
+        # Fresh-checkout invariant: git cannot track an empty directory, so
+        # a clean clone has no reports/archived-audit/ until a local wave
+        # archives scripts into it. Nothing is still tracked (branch above),
+        # so the archive's absence on this host is informational, not a
+        # cleanup failure -- failing closed here made every GitHub-hosted
+        # run exit 1 with zero actual violations (2026-09-06 dispatch run).
+        print(
+            f"⚠️  WARNING: Archive directory not present at {archive_dir} "
+            "(fresh checkout -- nothing archived on this host)"
+        )
     else:
         print(
             f"✅ PASSED: All stale scripts archived ({archived_count} scripts in archive)"

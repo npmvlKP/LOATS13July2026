@@ -17,6 +17,7 @@ Exit code: 0 = all stages pass, 1 = any stage fails
 """
 
 import json
+import os
 import sys
 from pathlib import Path
 from typing import Any
@@ -70,11 +71,25 @@ def stage_1_venv_health() -> tuple[int, int]:
     project_root = Path(__file__).parent.parent
 
     venv_path = project_root / "loatsNEW"
+    loatsnew_present = venv_path.exists()
+    in_loatsnew = "loatsNEW" in sys.executable
+    in_any_venv = sys.prefix != getattr(sys, "base_prefix", sys.prefix)
+    on_ci = os.environ.get("GITHUB_ACTIONS") == "true" or os.environ.get("CI") == "true"
+
+    # Environment-independence (2026-09-06 CI parity wave): the dedicated
+    # loatsNEW venv exists on the dev workstation only. A GitHub-hosted
+    # runner has no loatsNEW and no venv at all -- an ephemeral hosted
+    # runtime is sanctioned there (CI installs and gates everything the
+    # stages below verify). The check fails closed everywhere else: a
+    # non-CI host must either have the venv or run from some venv.
     checks.append(
         (
-            venv_path.exists(),
-            "loatsNEW venv exists",
-            str(venv_path) if venv_path.exists() else "NOT FOUND",
+            loatsnew_present or in_any_venv or on_ci,
+            "Project venv available (loatsNEW) or ephemeral CI runtime",
+            (
+                f"loatsNEW exists: {loatsnew_present}; "
+                f"in venv: {in_any_venv}; on CI: {on_ci}"
+            ),
         )
     )
 
@@ -98,8 +113,17 @@ def stage_1_venv_health() -> tuple[int, int]:
         )
     )
 
-    in_venv = "loatsNEW" in sys.executable
-    checks.append((in_venv, "Running from loatsNEW venv", sys.executable))
+    # Original discipline preserved where it applies: when the dedicated
+    # venv exists on this host, the verifier must run from it. When it
+    # does not exist (CI, or a host without the venv), running from it is
+    # impossible by definition and the check is vacuously satisfied.
+    checks.append(
+        (
+            in_loatsnew or not loatsnew_present,
+            "Running from loatsNEW venv (required where the venv exists)",
+            sys.executable,
+        )
+    )
 
     return run_stage(checks)
 
@@ -116,12 +140,15 @@ def stage_2_dependencies() -> tuple[int, int]:
         ("numpy", "numpy"),
         ("scipy", "scipy"),
         ("pandas", "pandas"),
-        ("ta", "ta"),
+        # ("ta", ...) and ("vollib", ...) removed: both dependencies were
+        # deliberately dropped (ADR-0003 drop-ta, ADR-0004 vollib-handrolled
+        # migration) and are imported nowhere in src/. Import-checking them
+        # here failed every GitHub-hosted run, where the extras install
+        # correctly does not provide them.
         ("vaderSentiment", "vaderSentiment"),
         ("feedparser", "feedparser"),
         ("structlog", "structlog"),
         ("apscheduler", "APScheduler"),
-        ("vollib", "vollib"),
         ("cachetools", "cachetools"),
         ("cryptography", "cryptography"),
         ("lxml", "lxml"),

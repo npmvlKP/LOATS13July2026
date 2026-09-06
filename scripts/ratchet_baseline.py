@@ -49,8 +49,14 @@ History (most recent last):
        (reports/security/bandit.json, reports/security/
        safety-report.json — undated scan output; they were staged but
        never committed, so no committed file was removed).
+  383  CI parity wave (2026-09-06): +1
+       (docs/adr/0012-ci-parity-linux-runners.md — decision record for
+       the 26 GitHub-runner-only failures found by the first
+       workflow_dispatch proof: editable-install contract, mypy
+       platform-stub lambda, EXE001 exec bits, POSIX casefold gap,
+       host-specific verifiers; see ADR-0012).
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 382
+TRACKED_FILE_CEILING = 383
