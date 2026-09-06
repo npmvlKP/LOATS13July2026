@@ -139,10 +139,11 @@ reports/health/only-probes.json
 reports/*.json
 
 # Canonical P1 evidence of record (negations must sit AFTER reports/*.json —
-# git honours the last matching rule). 084822 is the pre-sweep baseline;
-# 20260904_040609 is the F8-L-03 discharge artifact (100/100 live TCS
-# round trips, live-endpoint scope) so HC-29 passes from a fresh clone.
-!reports/p1_analyze_latency_20260828_084822.json
+# git honours the last matching rule). 20260904_040609 is the F8-L-03
+# discharge artifact (100/100 live TCS round trips, live-endpoint scope) so
+# HC-29 passes from a fresh clone. (The 20260828_084822 pre-sweep baseline
+# was dropped on the 06Sep merge to keep the merged tree at the 383 ceiling;
+# the 04Sep run supersedes it.)
 !reports/p1_analyze_latency_20260904_040609.json
 
 # Security-scan run artifacts under reports/security/ (2026-09-06): bandit

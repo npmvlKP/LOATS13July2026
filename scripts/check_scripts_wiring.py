@@ -56,7 +56,6 @@ _LIVE_SEARCH_PATHS = (
     "docs",
     # Evidence-of-record artifacts pinned in .gitignore and verified by
     # verify_f8c02_external.py; their provenance field names the generator.
-    "reports/p1_analyze_latency_20260828_084822.json",
     "reports/p1_analyze_latency_20260904_040609.json",
 )
 _ARCHIVE_HINTS = ("docs/audit-history/", "reports/ai-generated/")

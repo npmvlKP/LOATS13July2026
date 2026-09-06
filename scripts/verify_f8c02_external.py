@@ -154,11 +154,7 @@ def main() -> int:
     # in .gitignore so HC-29 passes from a fresh clone)
     p1 = [p for p in tracked if p.startswith("reports/p1_analyze_latency_")]
     record(
-        p1
-        == [
-            "reports/p1_analyze_latency_20260828_084822.json",
-            "reports/p1_analyze_latency_20260904_040609.json",
-        ],
+        p1 == ["reports/p1_analyze_latency_20260904_040609.json"],
         "8. only canonical P1 evidence tracked",
         f"tracked={p1}",
     )
