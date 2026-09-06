@@ -5,10 +5,9 @@ Minimal test for logging functionality without importing loats package.
 import logging
 import logging.config
 from pathlib import Path
-from unittest.mock import patch
 
 
-def test_logging_configuration():
+def test_logging_configuration(tmp_path, monkeypatch):
     """Test logging configuration with test_mode parameter."""
 
     # Test 1: Test mode (no file logging)
@@ -63,62 +62,62 @@ def test_logging_configuration():
         # Apply logging configuration
         logging.config.dictConfig(logging_config)
 
-    # Test test mode
-    with patch("pathlib.Path.mkdir") as mock_mkdir:
-        configure_logging_test_mode(test_mode=True)
+    # Test test mode in a hermetic cwd: no logs directory may be created
+    # (fresh-checkout contract), and only the console handler is configured.
+    monkeypatch.chdir(tmp_path)
+    configure_logging_test_mode(test_mode=True)
 
-        # Check that mkdir was not called
-        mock_mkdir.assert_not_called()
+    # Check that no logs directory was created
+    assert not Path("logs").exists()
 
-        # Check that only console handler is configured
-        root_logger = logging.getLogger()
-        file_handlers = [
-            handler
-            for handler in root_logger.handlers
-            if isinstance(handler, logging.FileHandler)
-        ]
-        console_handlers = [
-            handler
-            for handler in root_logger.handlers
-            if isinstance(handler, logging.StreamHandler)
-        ]
+    # Check that only console handler is configured
+    root_logger = logging.getLogger()
+    file_handlers = [
+        handler
+        for handler in root_logger.handlers
+        if isinstance(handler, logging.FileHandler)
+    ]
+    console_handlers = [
+        handler
+        for handler in root_logger.handlers
+        if isinstance(handler, logging.StreamHandler)
+    ]
 
-        assert len(file_handlers) == 0, (
-            "No file handlers should be configured in test mode"
-        )
-        assert len(console_handlers) > 0, (
-            "Console handler should be configured in test mode"
-        )
+    assert len(file_handlers) == 0, "No file handlers should be configured in test mode"
+    assert len(console_handlers) > 0, (
+        "Console handler should be configured in test mode"
+    )
 
-    # Test production mode
-    with patch("pathlib.Path.mkdir") as mock_mkdir:
-        configure_logging_test_mode(test_mode=False)
+    # Test production mode: the real directory creation is the behavior
+    # under test -- mocking Path.mkdir away starves the RotatingFileHandler
+    # and dictConfig fails with "Unable to configure handler 'file'" on a
+    # fresh environment (no pre-existing logs/ directory).
+    configure_logging_test_mode(test_mode=False)
 
-        # Check that mkdir was called
-        mock_mkdir.assert_called_once()
+    # Check that the logs directory was created for real
+    assert Path("logs").is_dir()
 
-        # Check that both console and file handlers are configured
-        root_logger = logging.getLogger()
-        file_handlers = [
-            handler
-            for handler in root_logger.handlers
-            if isinstance(handler, logging.FileHandler)
-        ]
-        console_handlers = [
-            handler
-            for handler in root_logger.handlers
-            if isinstance(handler, logging.StreamHandler)
-        ]
+    # Check that both console and file handlers are configured
+    root_logger = logging.getLogger()
+    file_handlers = [
+        handler
+        for handler in root_logger.handlers
+        if isinstance(handler, logging.FileHandler)
+    ]
+    console_handlers = [
+        handler
+        for handler in root_logger.handlers
+        if isinstance(handler, logging.StreamHandler)
+    ]
 
-        assert len(file_handlers) > 0, (
-            "File handler should be configured in production mode"
-        )
-        assert len(console_handlers) > 0, (
-            "Console handler should be configured in production mode"
-        )
+    assert len(file_handlers) > 0, (
+        "File handler should be configured in production mode"
+    )
+    assert len(console_handlers) > 0, (
+        "Console handler should be configured in production mode"
+    )
 
-    print("OK: All logging configuration tests passed")
-
-
-if __name__ == "__main__":
-    test_logging_configuration()
+    # Release the file handles on the temp directory.
+    for handler in file_handlers:
+        handler.close()
+        root_logger.removeHandler(handler)

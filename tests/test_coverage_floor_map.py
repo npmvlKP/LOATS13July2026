@@ -1,19 +1,36 @@
-"""F8-H-04: guard coverage floor map against silent narrowing."""
+"""F8-H-04: guard the coverage floor map against silent narrowing.
 
-import json
+The floor map's enforcement single source of truth is ``FR_FLOOR_MAP``
+in ``scripts/check_per_module_coverage.py``. ``coverage_floor_map.json``
+itself is a deliberately UNTRACKED artifact (a TODO-21 junk pattern,
+gitignored), so a fresh CI checkout has no such file -- an earlier
+version of this module read it from the repo root and failed on every
+GitHub-hosted run with ``FileNotFoundError``. The regression guard is
+therefore a double-entry check: the script's enforced map AND its
+fail-closed fallback must both equal the FR-specified map pinned here.
+Any narrowing (module removed, floor lowered) fails CI and forces an
+explicit architectural decision -- exactly the F8-H-04 gate-weakening
+pathology this guard exists to prevent.
+"""
+
+from __future__ import annotations
+
+import importlib.util
 from pathlib import Path
 
 import pytest
 
+_SCRIPT = (
+    Path(__file__).resolve().parents[1] / "scripts" / "check_per_module_coverage.py"
+)
 
-def _floor_map() -> dict[str, float]:
-    """Load the coverage floor map as a flat module-floor dict."""
-    path = Path(__file__).resolve().parents[1] / "coverage_floor_map.json"
-    with path.open(encoding="utf-8") as f:
-        data = json.load(f)
-    return dict(data["floor_mapped_modules"])
+_spec = importlib.util.spec_from_file_location("_check_per_module_coverage", _SCRIPT)
+assert _spec is not None and _spec.loader is not None  # repo layout invariant
+_check_module = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_check_module)
 
-
+# FR-specified floor map. This frozen copy is the independent second entry:
+# scripts/check_per_module_coverage.py must not weaken or extend it.
 EXPECTED_FLOOR_MAP: dict[str, float] = {
     "orchestrator.py": 80.0,
     "trailing_stop.py": 80.0,
@@ -28,26 +45,27 @@ EXPECTED_FLOOR_MAP: dict[str, float] = {
 }
 
 
-def test_coverage_floor_map_has_exact_fr_specified_modules():
-    """coverage_floor_map.json must equal the FR-specified module set.
+def test_enforced_floor_map_matches_fr_exactly():
+    """The enforced map must equal the FR-specified set AND floors.
 
-    This is a regression guard against the F8-H-04 gate-weakening pathology:
-    modules with low coverage were removed from the floor map instead of being
-    tested to their floors. Any narrowing must fail CI and force an explicit
-    architectural decision.
+    A missing module, an extra module, or a lowered floor all break dict
+    equality and fail this guard.
     """
-    actual = _floor_map()
-    assert set(actual.keys()) == set(EXPECTED_FLOOR_MAP.keys()), (
-        "coverage_floor_map.json module set differs from the FR-specified set; "
-        f"expected {sorted(EXPECTED_FLOOR_MAP.keys())}, got {sorted(actual.keys())}"
-    )
+    assert _check_module.FR_FLOOR_MAP == EXPECTED_FLOOR_MAP
 
 
-@pytest.mark.parametrize("module,floor", list(EXPECTED_FLOOR_MAP.items()))
-def test_coverage_floor_map_floor_matches_fr(module: str, floor: float) -> None:
-    """Each module's floor must match the FR-specified value."""
-    actual = _floor_map()
-    assert actual[module] == floor, (
-        f"Floor for {module} was changed from {floor} to {actual[module]}. "
-        "Changing a floor requires an explicit FR review."
-    )
+def test_fallback_floor_map_matches_fr_exactly(tmp_path):
+    """The script's fail-closed fallback must match the FR map.
+
+    When the untracked ``coverage_floor_map.json`` is absent (every fresh
+    CI checkout), ``load_floor_map`` must fall back to the canonical FR
+    map -- never to a narrowed gate.
+    """
+    fallback = _check_module.load_floor_map(tmp_path / "does-not-exist.json")
+    assert fallback["floor_mapped_modules"] == EXPECTED_FLOOR_MAP
+
+
+@pytest.mark.parametrize("module,floor", sorted(EXPECTED_FLOOR_MAP.items()))
+def test_floor_values_match_fr(module: str, floor: float) -> None:
+    """Per-module diagnosability: each floor must equal its FR value."""
+    assert _check_module.FR_FLOOR_MAP[module] == pytest.approx(floor)
