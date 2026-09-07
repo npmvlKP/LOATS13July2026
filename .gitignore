@@ -122,6 +122,10 @@ reports/performance/*.json
 # P5 forward-test run logs (runtime evidence, graded by verify_p5_forward_test)
 reports/p5_forward_test_*.json
 
+# Archived stub-era run logs + stray runtime files (2026-09-07 P3 hygiene
+# sweep; kept for forensics, not evidence of record)
+reports/archived-stubs-*/
+
 # Health check intermediate run artifacts (keep health-final-*.json only)
 reports/health/health-fast-*.json
 reports/health/health-full-*.json
