@@ -12,7 +12,16 @@ class TestConfig:
     def test_settings_initialization(self) -> None:
         """Test Settings initialization default values."""
         # Ensure ENVIRONMENT is set to 'development' for this test
-        patch_dict = {"ENVIRONMENT": "development", "OPENALGO_API_KEY": "test_key"}
+        # F8-H-01 test isolation: conftest hard-pins SQLITE_DB_PATH /
+        # AUDIT_LOG_PATH to a private temp dir for the whole suite (the
+        # ``db`` singleton binds them at import), so this test pins them
+        # back to the documented defaults to assert the default mapping.
+        patch_dict = {
+            "ENVIRONMENT": "development",
+            "OPENALGO_API_KEY": "test_key",
+            "SQLITE_DB_PATH": "data/loats.db",
+            "AUDIT_LOG_PATH": "data/audit.log",
+        }
         with patch.dict(os.environ, patch_dict, clear=False):
             test_settings = Settings()
             assert test_settings.environment == "development"
