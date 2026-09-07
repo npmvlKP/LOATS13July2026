@@ -91,8 +91,13 @@ History (most recent last):
        normalized to ASCII across src/, test-pinned alert emoji
        enumerated in the gate's ALLOWED_NON_ASCII, gate wired into the
        CI repo-hygiene job and pre-commit; see ADR-0014).
+  391  F8-H-04 closure wave (2026-09-07): +1
+       (docs/audit-history/07Sep2026-F8-H-04-closure.md — outcome
+       evidence for the restored FR floor map at HEAD af37d33: fresh
+       1553-test run, aggregate 87.33%, all ten floor-mapped modules
+       green; closure record for register item 5).
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 390
+TRACKED_FILE_CEILING = 391
