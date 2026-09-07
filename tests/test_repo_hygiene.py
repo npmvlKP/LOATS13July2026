@@ -936,3 +936,150 @@ class TestWorkflowFlagCurrency:
             f"{label}: installed {module} does not accept {missing}; "
             f"the workflow step would fail. Upgrade the pin or fix the step."
         )
+
+
+VERIFIER = REPO_ROOT / "scripts" / "verify_f8m02_m07_external.py"
+VERIFIER_SNAPSHOT_ANCHOR = "await _settle_cancelled_producers(producers)"
+
+
+class TestF8M02M07ExternalVerifier:
+    """F8-M-02..07 closure net: the external verifier must stay honest.
+
+    GREEN direction: exits 0 against the live tree from a clean process.
+    RED direction: on a snapshot whose orchestrator dropped the producer
+    settle call (the F8-M-02 fix), the verifier must FAIL — proving it
+    asserts outcomes, not the presence of remediation idioms.
+    """
+
+    def test_verifier_passes_on_live_tree(self) -> None:
+        proc = subprocess.run(
+            [sys.executable, str(VERIFIER)],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+        assert proc.returncode == 0, proc.stdout[-2000:] + proc.stderr[-2000:]
+        assert "VERIFIED: " in proc.stdout
+        assert "[FAIL]" not in proc.stdout
+
+    def test_verifier_fails_on_settle_removed_snapshot(self, tmp_path) -> None:
+        orch = REPO_ROOT / "src" / "loats" / "orchestrator.py"
+        text = orch.read_text(encoding="utf-8")
+        assert VERIFIER_SNAPSHOT_ANCHOR in text, (
+            "mutation anchor missing from orchestrator.py"
+        )
+        mutated = text.replace(
+            VERIFIER_SNAPSHOT_ANCHOR, "pass  # verifier RED snapshot"
+        )
+        assert mutated != text
+
+        snapshot = tmp_path / "snap"
+        (snapshot / "scripts").mkdir(parents=True)
+        for script in (REPO_ROOT / "scripts").glob("*.py"):
+            shutil.copy2(script, snapshot / "scripts" / script.name)
+        shutil.copytree(
+            REPO_ROOT / "src" / "loats",
+            snapshot / "src" / "loats",
+            ignore=shutil.ignore_patterns("__pycache__"),
+        )
+        # Apply the mutation INSIDE the snapshot (never the live tree):
+        # the F8-M-02 fix must be absent for the verifier to fire.
+        snap_orch = snapshot / "src" / "loats" / "orchestrator.py"
+        snap_orch.write_text(mutated, encoding="utf-8")
+        (snapshot / "tests").mkdir()
+        shutil.copy2(Path(__file__), snapshot / "tests" / Path(__file__).name)
+        shutil.copy2(REPO_ROOT / ".env.example", snapshot / ".env.example")
+        subprocess.run(
+            ["git", "init", "-q"], cwd=snapshot, capture_output=True, timeout=60
+        )
+        subprocess.run(
+            ["git", "add", "-A"], cwd=snapshot, capture_output=True, timeout=300
+        )
+
+        proc = subprocess.run(
+            [sys.executable, str(snapshot / "scripts" / VERIFIER.name)],
+            cwd=snapshot,
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+        assert proc.returncode != 0, (
+            "verifier PASSED on a settle-removed snapshot — it does not "
+            "verify the F8-M-02 outcome"
+        )
+        assert "m02c_settle_wired_on_both_boundaries" in proc.stdout
+        assert "[FAIL] m02c_settle_wired_on_both_boundaries" in proc.stdout
+
+
+class TestFlake8HookGateAgreement:
+    """The pre-commit flake8 hook must agree with the lint scope of record.
+
+    Defect class: the hook passes explicit filenames, and flake8 does not
+    apply its own `exclude` to those — so the hook false-failed on the
+    tree's own files (scripts/ verifiers' late sys.path-seeded imports =
+    E402; frozen regex literals in tests/ = E501) even though ruff, the
+    formatter/linter of record, deliberately grants those codes per-file
+    (pyproject per-file-ignores). The same gate ran `flake8 src/` clean at
+    every commit: the false positive class never surfaced in CI, only as
+    a broken pre-commit hook. Root cause fixed by mirroring ruff's grants
+    into .flake8 per-file-ignores; this net pins the agreement in both
+    directions so a future grant divergence (either side) fails here.
+    """
+
+    def test_explicit_path_mode_agrees_with_ruff(self) -> None:
+        # The exact false-positive class: HEAD's own tests/scripts files,
+        # in the hook's explicit-filename mode.
+        proc = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "flake8",
+                "--config",
+                str(REPO_ROOT / ".flake8"),
+                str(REPO_ROOT / "scripts" / "verify_f8m01_external.py"),
+                str(REPO_ROOT / "scripts" / "verify_f8m02_m07_external.py"),
+                str(REPO_ROOT / "tests" / "test_repo_hygiene.py"),
+            ],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+        assert proc.returncode == 0, (
+            f"flake8 hook-mode false positive on the repo's own files: "
+            f"{proc.stdout[:800]}"
+        )
+
+    def test_src_scope_stays_strict(self) -> None:
+        proc = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "flake8",
+                "--config",
+                str(REPO_ROOT / ".flake8"),
+                "src/",
+            ],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+        assert proc.returncode == 0, (
+            f"src/ no longer flake8-strict: {proc.stdout[:800]}"
+        )
+
+    def test_grant_sets_match_ruff(self) -> None:
+        cfg = (REPO_ROOT / ".flake8").read_text(encoding="utf-8")
+        m = re.search(
+            r"per-file-ignores\s*=\s*\n\s*tests/\*:([A-Z0-9,]+)\s*\n\s*scripts/\*:([A-Z0-9,]+)",
+            cfg,
+        )
+        assert m, ".flake8 per-file-ignores block missing or reshaped"
+        assert {c.strip() for c in m.group(1).split(",")} == {"E501"}, (
+            "tests/ grant diverged from ruff (ruff tests/* carries E501)"
+        )
+        assert {c.strip() for c in m.group(2).split(",")} == {"E402", "E501"}, (
+            "scripts/ grant diverged from ruff (ruff scripts/* carries E402, E501)"
+        )
