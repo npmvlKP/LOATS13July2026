@@ -87,7 +87,7 @@ class TradeDecisionEngine:
         Create TradeDecision from signals using full CMP workflow.
 
         Workflow:
-        1. Validate signals (≥3 sources)
+        1. Validate signals (>=3 sources)
         2. Calculate composite strength with opposition gate
         3. Apply gating rules (IV-rank/ADX/VIX)
         4. Calculate position size (2% fixed-fraction)
@@ -112,7 +112,7 @@ class TradeDecisionEngine:
                 f"decision workflow for {symbol}"
             )
         if excluded_unknown and settings.environment != "test":
-            # F8-M-01: audited exclusion — dual-write (SQLite + JSONL,
+            # F8-M-01: audited exclusion -- dual-write (SQLite + JSONL,
             # SHA-256-chained) row. Best-effort: an audit-store failure is
             # logged but never cascades into the cycle. Skipped under the
             # test environment so unit tests stay hermetic (no writes to
@@ -141,7 +141,7 @@ class TradeDecisionEngine:
         validation_result = strength_engine.validate_signal_sources(valid_signals)
         if not validation_result[0]:
             rejected_details = validation_result[1]
-            # F8-M-01: audited rejection — dual-write (SQLite + JSONL,
+            # F8-M-01: audited rejection -- dual-write (SQLite + JSONL,
             # SHA-256-chained) row with the per-offender diagnostics so
             # operators can trace exactly which producer was excluded and
             # why the batch was rejected. Best-effort: an audit-store
@@ -529,7 +529,7 @@ class TradeDecisionEngine:
             }
         except asyncio.QueueFull:
             logger.warning(
-                "Decision queue full — rejecting decision %s (size=%d, maxsize=%d)",
+                "Decision queue full -- rejecting decision %s (size=%d, maxsize=%d)",
                 trade_decision.decision_id,
                 self.decision_queue.qsize(),
                 self.decision_queue.maxsize,
@@ -637,7 +637,7 @@ class TradeDecisionEngine:
 
         F8-H-01: reads the real ``trade_decisions`` row instead of returning
         a fabricated "PROCESSED/ANALYZED" mock (the F7-H-01 fabrication
-        class). Unknown ids return ``NOT_FOUND`` — deterministic, auditable,
+        class). Unknown ids return ``NOT_FOUND`` -- deterministic, auditable,
         no invented state.
         """
         decision = await db.async_get_trade_decision(decision_id)
@@ -666,7 +666,7 @@ class TradeDecisionEngine:
         .. deprecated:: F8-H-02
             Delegates to the rules engine's legacy global counter. CMP
             Rule 7 is enforced per-order at the ``modify_order`` boundary
-            with a persisted SQLite counter — see
+            with a persisted SQLite counter -- see
             ``CMPRulesEngine.reserve_modification``.
         """
         return rules_engine.increment_modification_counter()

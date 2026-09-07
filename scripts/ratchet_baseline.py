@@ -85,8 +85,27 @@ History (most recent last):
        of test-contaminated trade decisions into
        trade_decisions_quarantined, audit trail untouched; and its
        regression net tests/test_quarantine_test_data.py).
+  390  ASCII gate contract wave (2026-09-07): +1
+       (docs/adr/0014-src-ascii-gate-contract.md — the born-red,
+       never-wired src ascii gate made enforceable: prose characters
+       normalized to ASCII across src/, test-pinned alert emoji
+       enumerated in the gate's ALLOWED_NON_ASCII, gate wired into the
+       CI repo-hygiene job and pre-commit; see ADR-0014).
+  391  F8-H-04 closure wave (2026-09-07): +1
+       (docs/audit-history/07Sep2026-F8-H-04-closure.md — outcome
+       evidence for the restored FR floor map at HEAD af37d33: fresh
+       1553-test run, aggregate 87.33%, all ten floor-mapped modules
+       green; closure record for register item 5).
+  393  Carried-set reconciliation wave (2026-09-07): +2
+       (docs/audit-history/07Sep2026-carried-set-reconciliation.md —
+       register item 8 re-derived against the tree: seven of eight
+       carried items CLOSED/DISCHARGED with pinned evidence,
+       as_of_date registered as the sole open item; and
+       scripts/verify_carried_set_external.py — the clean-process
+       outcome verifier for those dispositions, wired live by
+       tests/test_repo_hygiene.py::TestCarriedSetExternalVerifier).
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 389
+TRACKED_FILE_CEILING = 393

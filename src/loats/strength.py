@@ -2,7 +2,7 @@
 CMP Strategy Strength Engine for LOATS13July2026.
 
 Implements composite strength calculation with:
-- ≥3-source requirement
+- >=3-source requirement
 - Opposition gate logic
 - Source weighting and normalization
 """
@@ -36,7 +36,7 @@ class StrengthSource(StrEnum):
     OPTIONS_FLOW = "options_flow"
 
 
-# Deliberate alias map: external producer tags → canonical enum value.
+# Deliberate alias map: external producer tags -> canonical enum value.
 # Unknown strings NOT in this map are excluded per-signal with a loud
 # per-offender warning (F8-M-01) and cause a loud rejection only when no
 # known-source signal survives.
@@ -163,7 +163,7 @@ class StrengthEngine:
         Calculate composite strength from multiple signals.
 
         Requirements:
-        - ≥3 sources for valid composite strength
+        - >=3 sources for valid composite strength
         - Opposition gate: no strong opposing signals
         - Source diversity check
         """
@@ -176,7 +176,7 @@ class StrengthEngine:
 
         # F8-M-01: exclude unknown-source signals per-signal (mirrors
         # validate_signal_sources) so a stray untagged emission cannot
-        # crash resolve_source() below — the exclusion must hold
+        # crash resolve_source() below -- the exclusion must hold
         # end-to-end, not only at the validation gate.
         signals, excluded_unknown = exclude_unknown_source_signals(signals)
         if excluded_unknown:
@@ -369,7 +369,7 @@ class StrengthEngine:
         Validate that signals meet CMP requirements (F8-M-01 semantics).
 
         Requirements:
-        - ≥3 unique known sources
+        - >=3 unique known sources
         - Source diversity
         - No duplicate sources
 

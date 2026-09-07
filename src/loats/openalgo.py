@@ -357,7 +357,7 @@ class OpenAlgoClient:
 
     def get_quotes(self, symbols: list[str]) -> dict[str, Any]:
         # Deployment contract (verified live, F8-L-03): POST /quotes accepts a
-        # SINGLE {apikey, exchange, symbol} body — batch quotes belong to
+        # SINGLE {apikey, exchange, symbol} body -- batch quotes belong to
         # /multiquotes. Fan out sequentially and reshape into the canonical
         # {"data": {symbol: {...}}} form every caller parses.
         data: dict[str, Any] = {}
@@ -524,7 +524,7 @@ class OpenAlgoClient:
 
         CMP Rule 7 (F8-H-02): a persisted, per-order modification budget
         (settings.max_modifications, default 25) is enforced HERE, at the
-        API boundary, so every caller is gated — not just the trailing
+        API boundary, so every caller is gated -- not just the trailing
         driver. The slot is reserved before the broker call and released
         if the broker request fails, so failed attempts never consume
         budget. Counter state is read from SQLite (survives restarts); a
@@ -682,7 +682,7 @@ class AsyncOpenAlgoClient:
 
     async def get_quotes(self, symbols: list[str]) -> dict[str, Any]:
         # Deployment contract (verified live, F8-L-03): POST /quotes accepts a
-        # SINGLE {apikey, exchange, symbol} body — batch quotes belong to
+        # SINGLE {apikey, exchange, symbol} body -- batch quotes belong to
         # /multiquotes. Fan out per symbol and reshape into the canonical
         # {"data": {symbol: {...}}} form every caller parses. The synthesized
         # result is cached under the pre-existing digest key (60s TTL).
@@ -1006,7 +1006,7 @@ class AsyncOpenAlgoClient:
 
         # CMP Rule 7 (F8-H-02): reserve budget before touching the broker.
         # Raises Rule7ModificationLimitError (refuse) or Rule7StateError
-        # (fail closed) — identical semantics to the sync client.
+        # (fail closed) -- identical semantics to the sync client.
         from .rules import rules_engine
 
         rules_engine.reserve_modification(order_id)

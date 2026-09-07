@@ -71,7 +71,7 @@ _RULE7_TERMINAL_ORDER_STATUSES: frozenset[str] = frozenset(
 
 
 class Rule7StateError(RuntimeError):
-    """Rule-7 persisted counter state unavailable (DB failure) — fail closed."""
+    """Rule-7 persisted counter state unavailable (DB failure) -- fail closed."""
 
 
 class Database:
@@ -643,7 +643,7 @@ class Database:
         """
         return (
             "Canonical JSON format: sorted keys, ISO-8601 UTC datetimes, "
-            "Decimal→float, trailing zeros, recursive nested structures"
+            "Decimal->float, trailing zeros, recursive nested structures"
         )
 
     def _canonical_normalize(self, value: Any) -> Any:
@@ -1696,7 +1696,7 @@ class Database:
         )
         conn.commit()
         # CMP Rule 7 (F8-H-02): the per-order modification budget resets when
-        # the order reaches a terminal status — closed orders get a fresh
+        # the order reaches a terminal status -- closed orders get a fresh
         # budget if the same broker order_id is ever reused.
         if status.upper() in _RULE7_TERMINAL_ORDER_STATUSES:
             try:
@@ -1722,7 +1722,7 @@ class Database:
 
         F8-H-02: counters live in the modification_counts table so they
         survive process restarts. Any DB error fails closed by raising
-        Rule7StateError — the caller must refuse the modification.
+        Rule7StateError -- the caller must refuse the modification.
         """
         conn = self._get_connection()
         try:

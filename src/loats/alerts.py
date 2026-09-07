@@ -145,7 +145,8 @@ class AlertSystem:
 
     async def start(self) -> None:
         """Start Telegram bot non-blocking mode.
-        Uses v20+ lifecycle: `initialize()` → ``start()`` → ``updater.start_polling()``.
+        Uses v20+ lifecycle: `initialize()` -> ``start()`` ->
+        ``updater.start_polling()``.
         Starts polling background, allowing other async tasks (like scheduler)
         run concurrently. FIX-F-CONC-2: Original implementation blocking
         ``start_polling()``. Now uses ``start_polling()`` separate task avoid
@@ -182,7 +183,7 @@ class AlertSystem:
 
     async def shutdown(self) -> None:
         """Shutdown Telegram bot gracefully.
-        Uses v20+ shutdown lifecycle: `updater.stop()` → ``application.stop()``.
+        Uses v20+ shutdown lifecycle: `updater.stop()` -> ``application.stop()``.
         FIX-F-CONC-2: Properly cancel polling task avoid resource leaks.
         """
         if not self.application:
