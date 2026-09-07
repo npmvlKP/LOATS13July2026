@@ -115,6 +115,7 @@ async def _run_cycle(
 
     ms = MagicMock()
     ms.default_symbol = "NIFTY"
+    ms.producer_window_seconds = 0.05  # F8-H-01: explicit fast window
     error: BaseException | None = None
     with patch.object(o, "_execute_risk_management", new_callable=AsyncMock):
         with (

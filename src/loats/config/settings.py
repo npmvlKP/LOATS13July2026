@@ -76,6 +76,22 @@ class Settings(BaseSettings):
             "(default False to prevent default-on fabrication)"
         ),
     )
+    # F8-H-01: producer-window budget for the trading cycle. The legacy
+    # hard-coded 80 ms window always expired mid-fetch under live feed
+    # latencies (TA/sentiment take ~1.3 s), so every producer was
+    # cancelled before it could persist a signal — the CMP gate starved
+    # ("insufficient signals"), no TradeDecision ever formed, and the P5
+    # forward test could measure cycles but never a routing. Producers
+    # are still cancelled when the window expires (they never outlive
+    # the cycle, F8-M-02); the window is simply large enough for real
+    # latencies while the cycle loop keeps running at 1 Hz.
+    producer_window_seconds: float = Field(
+        8.0,
+        description=(
+            "Trading-cycle producer window in seconds; producers are "
+            "cancelled when it expires (never outlive the cycle)"
+        ),
+    )
     # CMP Rule 12 trailing-stop driver (default False = risk-off; enable
     # explicitly for the CMP strategy to update trailing stops each cycle).
     enable_trailing_stops: bool = Field(

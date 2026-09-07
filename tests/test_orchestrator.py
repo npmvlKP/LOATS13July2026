@@ -102,13 +102,16 @@ class TestCMPStrategyExecution:
 
     @pytest.mark.asyncio
     async def test_trading_not_allowed_skips(self, orch):
-        with patch("loats.orchestrator.rules_engine") as mock_rules:
-            mock_rules.is_trading_allowed.return_value = False
-            with patch.object(
-                orch, "_execute_cmp_strategy", new_callable=AsyncMock
-            ) as mock_cmp:
-                await orch._execute_trading_cycle()
-                mock_cmp.assert_not_called()
+        ms = MagicMock()
+        ms.producer_window_seconds = 0.05  # F8-H-01: cycle runs the real window
+        with patch("loats.orchestrator.settings", ms):
+            with patch("loats.orchestrator.rules_engine") as mock_rules:
+                mock_rules.is_trading_allowed.return_value = False
+                with patch.object(
+                    orch, "_execute_cmp_strategy", new_callable=AsyncMock
+                ) as mock_cmp:
+                    await orch._execute_trading_cycle()
+                    mock_cmp.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_no_historical_data_returns(self, orch, temp_db):
@@ -468,6 +471,7 @@ class TestExecuteTradingCycle:
         ms = MagicMock()
         ms.default_symbol = "NIFTY"
         ms.trading_enabled = True
+        ms.producer_window_seconds = 0.05  # F8-H-01: real (fast) producer window
         with patch("loats.orchestrator.settings", ms):
             with patch.object(o, "_execute_market_data_update", new_callable=AsyncMock):
                 with patch.object(o, "_execute_ta_analysis", new_callable=AsyncMock):

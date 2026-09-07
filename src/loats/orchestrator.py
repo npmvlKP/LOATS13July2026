@@ -449,7 +449,13 @@ class TradingOrchestrator:
             try:
                 await asyncio.wait_for(
                     asyncio.gather(*producers),
-                    timeout=0.08,
+                    # F8-H-01: the legacy hard-coded 80 ms window always
+                    # expired before a real feed fetch (~1.3 s) could
+                    # persist its signal, starving the CMP gate. The window
+                    # is now settings-driven; the F8-M-02 invariant
+                    # (producers never outlive the cycle — settle on both
+                    # boundaries) is unchanged.
+                    timeout=settings.producer_window_seconds,
                 )
             except TimeoutError:
                 logger.warning(

@@ -119,6 +119,7 @@ class TestExecuteSentimentAnalysis:
         o = TradingOrchestrator()
         ms = MagicMock()
         ms.default_symbol = "NIFTY"
+        ms.producer_window_seconds = 0.05  # F8-H-01: explicit fast window
         ms.sentiment_threshold = 0.3
         with patch("loats.orchestrator.settings", ms):
             with patch(
@@ -133,6 +134,7 @@ class TestExecuteSentimentAnalysis:
         o = TradingOrchestrator()
         ms = MagicMock()
         ms.default_symbol = "NIFTY"
+        ms.producer_window_seconds = 0.05  # F8-H-01: explicit fast window
         ms.sentiment_threshold = 0.3
         mock_result = MagicMock()
         mock_result.sentiment_score = 0.7
@@ -155,6 +157,7 @@ class TestExecuteSentimentAnalysis:
         o = TradingOrchestrator()
         ms = MagicMock()
         ms.default_symbol = "NIFTY"
+        ms.producer_window_seconds = 0.05  # F8-H-01: explicit fast window
         ms.sentiment_threshold = 0.9
         mock_result = MagicMock()
         mock_result.sentiment_score = 0.5
@@ -179,6 +182,7 @@ class TestExecuteTAAnalysis:
         o = TradingOrchestrator()
         ms = MagicMock()
         ms.default_symbol = "NIFTY"
+        ms.producer_window_seconds = 0.05  # F8-H-01: explicit fast window
         ms.default_timeframe = "5minute"
         with patch("loats.orchestrator.settings", ms):
             with patch.object(
@@ -191,6 +195,7 @@ class TestExecuteTAAnalysis:
         o = TradingOrchestrator()
         ms = MagicMock()
         ms.default_symbol = "NIFTY"
+        ms.producer_window_seconds = 0.05  # F8-H-01: explicit fast window
         ms.default_timeframe = "5minute"
         ts = dt.datetime(2025, 1, 1, 10, 0, tzinfo=dt.UTC)
         raw = {
@@ -226,6 +231,7 @@ class TestExecuteTAAnalysis:
         o = TradingOrchestrator()
         ms = MagicMock()
         ms.default_symbol = "NIFTY"
+        ms.producer_window_seconds = 0.05  # F8-H-01: explicit fast window
         ms.default_timeframe = "5minute"
         ts = dt.datetime(2025, 1, 1, 10, 0, tzinfo=dt.UTC)
         raw = {
@@ -269,6 +275,7 @@ class TestRiskManagementAdditional:
         o = TradingOrchestrator()
         ms = MagicMock()
         ms.default_symbol = "NIFTY"
+        ms.producer_window_seconds = 0.05  # F8-H-01: explicit fast window
         ms.max_position_size = 50
         mock_pos = MagicMock()
         mock_pos.quantity = 100
@@ -291,6 +298,7 @@ class TestRiskManagementAdditional:
         o = TradingOrchestrator()
         ms = MagicMock()
         ms.default_symbol = "NIFTY"
+        ms.producer_window_seconds = 0.05  # F8-H-01: explicit fast window
         ms.max_margin_utilization = 0.8
         mock_funds = MagicMock()
         mock_funds.available_margin = 100000.0
@@ -314,6 +322,7 @@ class TestRiskManagementAdditional:
         o = TradingOrchestrator()
         ms = MagicMock()
         ms.default_symbol = "NIFTY"
+        ms.producer_window_seconds = 0.05  # F8-H-01: explicit fast window
         ms.max_margin_utilization = 0.8
         mock_funds = MagicMock()
         mock_funds.available_margin = 0.0
@@ -336,6 +345,7 @@ class TestTradingCycleException:
         o = TradingOrchestrator()
         ms = MagicMock()
         ms.default_symbol = "NIFTY"
+        ms.producer_window_seconds = 0.05  # F8-H-01: explicit fast window
         ms.trading_enabled = True
         with patch("loats.orchestrator.settings", ms):
             with patch.object(
@@ -371,6 +381,7 @@ class TestTradingCycleException:
         o = TradingOrchestrator()
         ms = MagicMock()
         ms.default_symbol = "NIFTY"
+        ms.producer_window_seconds = 0.05  # F8-H-01: explicit fast window
         with patch("loats.orchestrator.settings", ms):
             with patch.object(o, "_execute_market_data_update", new_callable=AsyncMock):
                 with patch.object(o, "_execute_ta_analysis", new_callable=AsyncMock):
@@ -509,6 +520,7 @@ class TestMarketDataUpdateWithPositions:
         o = TradingOrchestrator()
         ms = MagicMock()
         ms.default_symbol = "NIFTY"
+        ms.producer_window_seconds = 0.05  # F8-H-01: explicit fast window
         mdb = MagicMock()
         mdb.async_store_quote = AsyncMock()
         mdb.async_store_position = AsyncMock()
@@ -741,6 +753,7 @@ class TestSentimentSellSignal:
         o = TradingOrchestrator()
         ms = MagicMock()
         ms.default_symbol = "NIFTY"
+        ms.producer_window_seconds = 0.05  # F8-H-01: explicit fast window
         ms.sentiment_threshold = 0.3
         mock_result = MagicMock()
         mock_result.sentiment_score = -0.7
@@ -840,6 +853,7 @@ class TestProducerWindowLifecycle:
         patches["_execute_volatility_analysis"] = AsyncMock(side_effect=hang_forever)
         ms = MagicMock()
         ms.default_symbol = "NIFTY"
+        ms.producer_window_seconds = 0.05  # F8-H-01: explicit fast window
 
         recorded, task_spy = self._spy_producer_tasks()
         with contextlib.ExitStack() as stack:
@@ -882,6 +896,7 @@ class TestProducerWindowLifecycle:
         patches["_execute_volatility_analysis"] = AsyncMock(side_effect=hang_forever)
         ms = MagicMock()
         ms.default_symbol = "NIFTY"
+        ms.producer_window_seconds = 0.05  # F8-H-01: explicit fast window
 
         recorded, task_spy = self._spy_producer_tasks()
         with contextlib.ExitStack() as stack:
@@ -908,6 +923,7 @@ class TestProducerWindowLifecycle:
         patches = self._patch_all_producers()
         ms = MagicMock()
         ms.default_symbol = "NIFTY"
+        ms.producer_window_seconds = 0.05  # F8-H-01: explicit fast window
 
         with contextlib.ExitStack() as stack:
             for name, mock in patches.items():
