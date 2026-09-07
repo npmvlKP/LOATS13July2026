@@ -55,8 +55,28 @@ History (most recent last):
        workflow_dispatch proof: editable-install contract, mypy
        platform-stub lambda, EXE001 exec bits, POSIX casefold gap,
        host-specific verifiers; see ADR-0012).
+  382  DevOps workflow-integrity wave (2026-09-07): -1
+       (reports/f8-h-03-verification.json — a zero-reference,
+       machine-local verifier run artifact with embedded working-tree
+       state and absolute paths — relocated to
+       docs/audit-history/f8-h-03-verification-20260902.json per the
+       ADR-0011 artifact discipline. The rename keeps the count at 382,
+       so the ceiling now equals the tree: any net addition requires a
+       deliberate re-pin.
+  384  F8-M-02..07 closure wave (2026-09-07): +2
+       (scripts/verify_f8m02_m07_external.py — the clean-process
+       outcome verifier for risk-matrix rows F8-M-02..F8-M-07 — and
+       docs/audit-history/07Sep2026-F8-M-02-M-07-closure.md, its
+       closure record; see the record's External verifier section).
+       Wired live by tests/test_repo_hygiene.py::
+       TestF8M02M07ExternalVerifier.
+  386  Shebang exec-bit normalizer wave (2026-09-07): +2
+       (scripts/ensure_shebang_exec_bit.py — the ADR-0013 self-healing
+       pre-commit normalizer for the Windows 100644 shebang class —
+       and its decision record
+       docs/adr/0013-shebang-exec-bit-normalizer.md).
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 383
+TRACKED_FILE_CEILING = 386

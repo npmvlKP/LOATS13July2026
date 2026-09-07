@@ -12,6 +12,17 @@ env:
   PYTHONDONTWRITEBYTECODE: 1
   PYTHONUNBUFFERED: 1
 
+# Job topology (2026-09-07): all jobs run in PARALLEL — there is no
+# aggregate "final status" job. Merge blocking is enforced exclusively by
+# branch protection on main (required_status_checks, strict); the
+# required-context list is documented in CONTRIBUTING.md and must list
+# every job that gates a merge.
+#
+# Action majors are pinned to Node-24-native releases: GitHub removes the
+# Node 20 runtime from hosted runners on 2026-09-16, after which Node-20
+# actions fail regardless of ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION.
+# Verified Node 24 majors: checkout@v5+ (latest v7), setup-python@v6+
+# (latest v7), upload-artifact@v6+ (latest v7), gitleaks-action@v3.
 jobs:
   # ================================================================
   # 5a REQUIRED CHECKS — green now, enforced from wave start
@@ -21,8 +32,8 @@ jobs:
     name: deps-sync
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
           cache: 'pip'
@@ -37,8 +48,8 @@ jobs:
     name: repo-hygiene
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
       - name: Reject tracked venvs / junk / env files (F8-C-02)
@@ -50,8 +61,8 @@ jobs:
     name: rss-feeds (F8-L-05 recorded fallback)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
           cache: 'pip'
@@ -72,8 +83,8 @@ jobs:
     name: ruff-lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
           cache: 'pip'
@@ -88,8 +99,8 @@ jobs:
     name: ruff-repo-scope (repository root)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
           cache: 'pip'
@@ -104,8 +115,8 @@ jobs:
     name: ruff-format
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
           cache: 'pip'
@@ -120,8 +131,8 @@ jobs:
     name: isort
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
           cache: 'pip'
@@ -136,8 +147,8 @@ jobs:
     name: flake8
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
           cache: 'pip'
@@ -152,8 +163,8 @@ jobs:
     name: bandit
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
           cache: 'pip'
@@ -162,10 +173,13 @@ jobs:
           python -m pip install --upgrade pip
           pip install "bandit==1.9.4"
       - name: Run Bandit
-        run: bandit -r src/ -f json -o bandit-report.json
+        # -c pyproject.toml mirrors the pre-commit bandit hook and the
+        # security.yml job (the config carries the B101 skip); bandit exits
+        # 0 on scan success, findings live in the JSON payload.
+        run: bandit -r src/ -c pyproject.toml -f json -o bandit-report.json
       - name: Upload bandit report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: bandit-report
           path: bandit-report.json
@@ -178,7 +192,7 @@ jobs:
     name: commit-lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: Validate commit messages
@@ -223,8 +237,8 @@ jobs:
     name: mypy
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
           cache: 'pip'
@@ -246,8 +260,8 @@ jobs:
     name: pytest-coverage
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
           cache: 'pip'
@@ -270,7 +284,7 @@ jobs:
         run: python scripts/check_per_module_coverage.py
       - name: Upload coverage
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-report
           path: |
@@ -282,21 +296,32 @@ jobs:
     name: pip-audit
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
           cache: 'pip'
+      - name: Install project (production closure)
+        # The audit must run against THIS project's dependency closure.
+        # A bare `pip install pip-audit` environment audits only pip-audit's
+        # own deps — a vacuous gate (contributing: zero vulnerabilities
+        # against production dependencies is the standard).
+        run: |
+          python -m pip install --upgrade pip
+          pip install .
       - name: Install pip-audit
         run: pip install "pip-audit==2.10.1"
       - name: Run pip-audit
-        # pip-audit 2.10.1 has no --output-file flag; -o/--output is the
-        # long-form that exists in every 2.x (verified against 2.10.1).
+        # Environment mode: audits the installed production closure of the
+        # project (above). Per ADR-0010, PYSEC-2026-3740 (nltk, dev-toolchain
+        # only via `safety`) is waived HERE and in HC-11; the waiver is
+        # meaningless anywhere safety is absent, and any future RUNTIME
+        # advisory still fails this job.
         run: |
-          pip-audit --format=json --output pip-audit-report.json
+          pip-audit --format=json --output pip-audit-report.json --ignore-vuln PYSEC-2026-3740
       - name: Upload pip-audit report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: pip-audit-report
           path: pip-audit-report.json
@@ -306,7 +331,7 @@ jobs:
     name: gitleaks
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: Run Gitleaks
@@ -324,7 +349,7 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Build Test
         run: |
           docker build -t loats13july2026:test .

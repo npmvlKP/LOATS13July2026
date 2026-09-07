@@ -30,20 +30,26 @@ jobs:
   secrets-scan:
     name: Secret Scanning
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch' && (github.event.inputs.scan_type == 'full' || github.event.inputs.scan_type == 'secrets' || github.event.inputs.scan_type == '')
+    # Scheduled runs execute the full-history secret scan (the reason the
+    # weekly cron exists); manual runs honor the scan_type selector.
+    if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.scan_type == 'full' || github.event.inputs.scan_type == 'secrets' || github.event.inputs.scan_type == ''))
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
       - name: Run Gitleaks
-        uses: gitleaks/gitleaks-action@v2
+        # gitleaks-action@v3 is the Node-24 runtime release; @v2 stops
+        # working when GitHub removes Node 20 from hosted runners
+        # (2026-09-16). v3 changes no inputs or behavior. GITLEAKS_CONFIG
+        # is the documented variable for a non-default config path;
+        # ENABLE_COMMENTS/ENABLE_PROPOSAL are not v3 variables.
+        uses: gitleaks/gitleaks-action@v3
         env:
-          GITLEAKS_CONFIG_PATH: .gitleaks.toml
-          GITLEAKS_ENABLE_COMMENTS: true
-          GITLEAKS_ENABLE_PROPOSAL: true
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_CONFIG: .gitleaks.toml
 
   # ============================================================
   # Dependency Vulnerability Scanning
@@ -51,46 +57,63 @@ jobs:
   dependency-scan:
     name: Dependency Vulnerabilities
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch' && (github.event.inputs.scan_type == 'full' || github.event.inputs.scan_type == 'dependencies' || github.event.inputs.scan_type == '')
+    if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.scan_type == 'full' || github.event.inputs.scan_type == 'dependencies' || github.event.inputs.scan_type == ''))
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: '3.12'
           cache: 'pip'
 
-      - name: Install pip-audit
-        run: pip install pip-audit
-
-      - name: Run pip-audit
-        # pip-audit 2.10.1 dropped --output-file; -o/--output is the stable
-        # long-form across 2.x (verified against 2.10.1).
+      - name: Install project (production closure)
+        # pip-audit needs a project environment to audit; a bare
+        # `pip install pip-audit` environment contains only the auditor.
         run: |
-          pip-audit --format=json --output pip-audit-full.json
-          pip-audit --format=requirements --output requirements-vulnerable.txt
+          python -m pip install --upgrade pip
+          pip install .
+
+      - name: Install pip-audit
+        run: pip install "pip-audit==2.10.1"
+
+      - name: Run pip-audit (environment mode — audits the project closure)
+        # Per ADR-0010: the nltk advisory (PYSEC-2026-3740) fires only in
+        # environments containing `safety`; CI never installs safety, so the
+        # waiver is a no-op here kept solely to keep HC-11 and this job on
+        # one contract. Any future runtime advisory still fails the scan.
+        run: |
+          pip-audit --format=json --output pip-audit-full.json --ignore-vuln PYSEC-2026-3740
 
       - name: Upload pip-audit report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: pip-audit-full-report
-          path: |
-            pip-audit-full.json
-            requirements-vulnerable.txt
+          path: pip-audit-full.json
           retention-days: 30
 
       - name: Fail on critical vulnerabilities
-        if: github.event.inputs.scan_type == 'full'
+        if: github.event.inputs.scan_type == 'full' || github.event_name == 'schedule'
         run: |
-          if grep -q "CRITICAL" pip-audit-full.json 2>/dev/null; then
-            echo "❌ Critical vulnerabilities found!"
-            cat pip-audit-full.json
-            exit 1
-          fi
-          echo "✅ No critical vulnerabilities found"
+          # pip-audit JSON is {"dependencies": [...]}; it carries no severity
+          # field, so gate on the PRESENCE of advisories, not on a grep for
+          # "CRITICAL" (which can never match this format).
+          CRIT=$(python - <<'PY'
+          import json, sys
+          try:
+              data = json.load(open("pip-audit-full.json", encoding="utf-8"))
+          except (OSError, ValueError):
+              sys.exit("pip-audit-full.json missing or unparseable")
+          hits = [f"{d['name']} {d['version']}" for d in data.get("dependencies", []) for v in d.get("vulns", [])]
+          if hits:
+              print("\n".join(hits))
+              sys.exit(1)
+          print("0 vulnerable distributions")
+          PY
+          )
+          echo "$CRIT"
 
   # ============================================================
   # Code Security Analysis with Bandit
@@ -98,36 +121,54 @@ jobs:
   code-security:
     name: Code Security Analysis
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch' && (github.event.inputs.scan_type == 'full' || github.event.inputs.scan_type == 'code' || github.event.inputs.scan_type == '')
+    if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.scan_type == 'full' || github.event.inputs.scan_type == 'code' || github.event.inputs.scan_type == ''))
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: '3.12'
           cache: 'pip'
           cache-dependency-path: pyproject.toml
 
       - name: Install Bandit
-        run: pip install "bandit==1.9.4" "safety>=3,<4"
+        run: pip install "bandit==1.9.4" "safety==3.8.1"
 
       - name: Run Bandit
+        # Bandit always exits 0 on scan success — findings live in the JSON
+        # payload, not the exit code. Gate on the payload's metrics block
+        # ({"metrics": {"_totals": {"SEVERITY.HIGH": N}}}); a severity grep
+        # can never match this format and silently never fails.
         run: |
           bandit -r src/ -c pyproject.toml -f json -o bandit-full-report.json
           bandit -r src/ -c pyproject.toml -f screen
+          HIGH=$(python - <<'PY'
+          import json, sys
+          data = json.load(open("bandit-full-report.json", encoding="utf-8"))
+          high = data.get("metrics", {}).get("_totals", {}).get("SEVERITY.HIGH", 0)
+          if high:
+              print(f"{high} high-severity bandit finding(s) - failing")
+              sys.exit(1)
+          print("0 high-severity bandit findings")
+          PY
+          )
+          echo "$HIGH"
 
       # safety>=3 dropped the v2 flags (`--json`, `--output-file`); `scan` needs
       # platform auth this workflow does not have. `check --save-json` keeps the
       # artifact contract with the auth-free path (verified: safety 3.8.1).
+      # 2026-09-07: `safety>=3,<4` resolved to a future 3.x that removed the
+      # `check` command — pin to the verified version (same class of drift the
+      # workflow-flag-currency tests guard against).
       - name: Run Safety check
         run: |
           safety check --save-json safety-report.json
 
       - name: Upload security reports
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: code-security-reports
           path: |
@@ -135,43 +176,38 @@ jobs:
             safety-report.json
           retention-days: 30
 
-      - name: Check for high severity issues
-        if: github.event.inputs.scan_type == 'full'
-        run: |
-          HIGH_COUNT=$(grep -o '"high": [0-9]*' bandit-full-report.json | grep -o '[0-9]*' || echo "0")
-          if [ "$HIGH_COUNT" -gt 0 ]; then
-            echo "❌ $HIGH_COUNT high severity issues found!"
-            exit 1
-          fi
-          echo "✅ No high severity issues found"
-
   # ============================================================
   # SBOM Generation (Software Bill of Materials)
   # ============================================================
   sbom:
     name: SBOM Generation
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch' && (github.event.inputs.scan_type == 'full' || github.event.inputs.scan_type == 'dependencies' || github.event.inputs.scan_type == '')
+    if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.scan_type == 'full' || github.event.inputs.scan_type == 'dependencies' || github.event.inputs.scan_type == ''))
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: '3.12'
 
       - name: Install CycloneDX
-        run: pip install cyclonedx-bom
+        run: pip install "cyclonedx-bom==7.3.1"
 
       - name: Generate SBOM
+        # cyclonedx-bom 7.x: `mod` is not a subcommand. `requirements` reads a
+        # pip requirements file (positional, `-` for stdin; default
+        # requirements.txt); `pip freeze --all` feeds the FULL environment
+        # (prod + dev tools) and `--of` selects the output format (validated
+        # against cyclonedx-bom 7.3.1).
         run: |
-          cyclonedx-py mod -o sbom.json
-          cyclonedx-py mod -o sbom.xml --format xml
+          pip freeze --all | cyclonedx-py requirements - -o sbom.json
+          pip freeze --all | cyclonedx-py requirements - --of XML -o sbom.xml
 
       - name: Upload SBOM
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: sbom
           path: |
@@ -180,7 +216,7 @@ jobs:
           retention-days: 90
 
       - name: Upload SBOM to GitHub
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: sbom-github
           path: sbom.json
@@ -193,7 +229,7 @@ jobs:
     name: Security Scan Summary
     runs-on: ubuntu-latest
     needs: [secrets-scan, dependency-scan, code-security, sbom]
-    if: always() && github.event_name == 'workflow_dispatch'
+    if: always() && (github.event_name == 'workflow_dispatch' || github.event_name == 'schedule')
 
     steps:
       - name: Generate Summary
@@ -207,7 +243,7 @@ jobs:
           echo "| Code Security | ${{ needs.code-security.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| SBOM Generation | ${{ needs.sbom.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          
+
           if [[ "${{ needs.secrets-scan.result }}" == "success" ]] && \
              [[ "${{ needs.dependency-scan.result }}" == "success" ]] && \
              [[ "${{ needs.code-security.result }}" == "success" ]]; then

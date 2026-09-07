@@ -18,6 +18,19 @@ repos:
         args: [--fix, --exit-non-zero-on-fix]
       - id: ruff-format
 
+  # ADR-0013: Windows cannot record exec bits, so a shebang'd script
+  # staged from Windows lands at 100644 and fails the Linux CI EXE001
+  # gate. This hook flips staged shebang'd *.py to 100755 in the index
+  # (self-healing; CI EXE001 stays the hard verifier of record).
+  - repo: local
+    hooks:
+      - id: shebang-exec-bit
+        name: shebang exec-bit normalizer (ADR-0013)
+        entry: python scripts/ensure_shebang_exec_bit.py
+        language: system
+        types: [python]
+        pass_filenames: true
+
   # mypy: Behavioral + version lockstep with CI. A language:system local
   # hook runs the venv's pinned mypy (== pyproject pin) with the same
   # config and directory target as the CI mypy job, avoiding both the

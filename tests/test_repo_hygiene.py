@@ -164,6 +164,58 @@ class TestForbiddenPatterns:
         ):
             assert guard._violations([path]), f"expected {path} to be flagged"
 
+    def test_report_run_artifacts_matched(self, guard):
+        """F8-M-05/ADR-0011: verifier run artifacts never live in reports/.
+
+        Root cause being guarded: the hygiene guard had no reports/
+        rule, so machine-local verifier output (git status, absolute
+        paths) was trackable at the reports/ top level even though the
+        documented curation rule names only health-final-*.json for
+        reports/health/. Curated subdirectory evidence (reports/security/
+        dated snapshots, reports/p1_analyze_latency_*) stays legitimate.
+        """
+        for path in (
+            "reports/f8-h-03-verification.json",
+            "reports/some_verifier_output.json",
+            "reports/production-verification-unlisted.json",
+        ):
+            assert guard._violations([path]), f"expected {path} to be flagged"
+
+    def test_cited_root_level_evidence_allowlisted(self, guard):
+        """Root-level reports/*.json with tracked consumers stay legitimate.
+
+        The allowlist entries each name their consumer; the wiring guard
+        fails when a citation goes dead (F8-L-06-R2), so a stale entry
+        cannot silently persist.
+        """
+        for path in (
+            "reports/p1_analyze_latency_20260904_040609.json",
+            "reports/production-verification.json",
+            "reports/todo27_eval.json",
+            "reports/todo27_external.json",
+            "reports/verify_f8h01_external.json",
+        ):
+            assert guard._violations([path]) == [], f"unexpected flag on {path}"
+
+    def test_curated_subdir_evidence_clean(self, guard):
+        """Nested evidence of record must NOT be flagged (single-segment rule)."""
+        for path in (
+            "reports/health/health-final-20260901.json",
+            "reports/security/bandit-20260901.json",
+            "reports/p1_analyze_latency_20260904_040609.json",
+        ):
+            assert guard._violations([path]) == [], f"unexpected flag on {path}"
+
+    def test_nested_health_paths_out_of_guard_scope(self, guard):
+        """Nested reports/health/* is TestCompactRepoDocs' contract, not the guard's.
+
+        The guard's artifact rule is deliberately single-segment (top-level
+        reports/*.json only); asserting nested paths here would demand
+        fnmatch-crossing semantics that false-positive the curated
+        evidence subdirectories.
+        """
+        assert guard._violations(["reports/health/health-full-20260906.json"]) == []
+
     def test_legitimate_paths_clean(self, guard):
         for path in (
             "src/loats/main.py",
@@ -729,12 +781,81 @@ class TestWorkflowFlagCurrency:
             and not stripped.startswith("- ")
         ]
 
+    @staticmethod
+    def _pip_audit_help() -> str:
+        """The pinned pip-audit's own CLI help text (format choices included)."""
+        proc = subprocess.run(
+            [sys.executable, "-m", "pip_audit", "--help"],
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+        assert proc.returncode == 0, (
+            f"pip_audit --help failed (rc={proc.returncode}): {proc.stderr[:300]}"
+        )
+        return proc.stdout + proc.stderr
+
+    def test_security_yml_pip_audit_format_choices_are_valid(self) -> None:
+        """--format=<choice> values must exist in the tool's own choice list.
+
+        Root cause being guarded: flag NAMES can be valid while the VALUE
+        is not — `--format=requirements` passed test_flags_accepted_by_
+        installed_tool for weeks, yet pip-audit's format choices are
+        columns/json/cyclonedx-json/cyclonedx-xml/markdown (no
+        `requirements`), so the step would fail the moment it ran.
+        """
+        help_text = self._pip_audit_help()
+        lines = self._workflow_run_lines(self.SECURITY_YML)
+        pip_audit_lines = [ln for ln in lines if ln.startswith("pip-audit ")]
+        for ln in pip_audit_lines:
+            for token in ln.split():
+                if token.startswith("--format="):
+                    value = token.split("=", 1)[1]
+                    assert f"{{{value}" in help_text or f"{value}," in help_text, (
+                        f"security.yml passes --format={value}, which the "
+                        f"installed pip-audit does not offer as a choice: {ln}"
+                    )
+
+    def test_security_yml_has_no_deprecated_gitleaks_v2(self) -> None:
+        """gitleaks-action@v2 dies with the Node 20 runner removal.
+
+        GitHub removes Node 20 from hosted runners on 2026-09-16; @v2 is
+        Node 20 and has no opt-out after that date. @v3 is the Node-24
+        release with unchanged inputs/behavior.
+        """
+        text = self.SECURITY_YML.read_text(encoding="utf-8")
+        assert "gitleaks-action@v2" not in text, (
+            "security.yml pins gitleaks-action@v2 (Node 20) — removed from"
+            " GitHub-hosted runners on 2026-09-16; use @v3"
+        )
+
+    def test_workflows_use_node24_native_action_majors(self) -> None:
+        """Every pinned action major must run on Node 24.
+
+        Node 20 is removed from GitHub-hosted runners on 2026-09-16, so
+        Node-20 actions (checkout@v4, setup-python@v5, upload-artifact@v4)
+        fail regardless of ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION.
+        """
+        for yml in (CI_YML, self.SECURITY_YML):
+            text = yml.read_text(encoding="utf-8")
+            for action in (
+                "actions/checkout@v4",
+                "actions/setup-python@v5",
+                "actions/upload-artifact@v4",
+            ):
+                assert action not in text, (
+                    f"{yml.name} pins {action} (Node 20 runtime), which"
+                    " GitHub removes from hosted runners on 2026-09-16"
+                )
+
     def test_security_yml_pip_audit_steps_use_current_flags(self) -> None:
         lines = self._workflow_run_lines(self.SECURITY_YML)
         pip_audit_lines = [ln for ln in lines if ln.startswith("pip-audit ")]
-        assert len(pip_audit_lines) == 2, (
-            f"expected the two pip-audit invocations in security.yml, "
-            f"got {pip_audit_lines}"
+        assert len(pip_audit_lines) == 1, (
+            f"expected exactly one pip-audit invocation in security.yml "
+            f"(environment mode over the installed project closure; the "
+            f"--format=requirements step was removed with the 2026-09-07 "
+            f"integrity wave), got {pip_audit_lines}"
         )
         for ln in pip_audit_lines:
             assert "--output-file" not in ln, (
@@ -815,3 +936,237 @@ class TestWorkflowFlagCurrency:
             f"{label}: installed {module} does not accept {missing}; "
             f"the workflow step would fail. Upgrade the pin or fix the step."
         )
+
+
+VERIFIER = REPO_ROOT / "scripts" / "verify_f8m02_m07_external.py"
+VERIFIER_SNAPSHOT_ANCHOR = "await _settle_cancelled_producers(producers)"
+
+
+class TestF8M02M07ExternalVerifier:
+    """F8-M-02..07 closure net: the external verifier must stay honest.
+
+    GREEN direction: exits 0 against the live tree from a clean process.
+    RED direction: on a snapshot whose orchestrator dropped the producer
+    settle call (the F8-M-02 fix), the verifier must FAIL — proving it
+    asserts outcomes, not the presence of remediation idioms.
+    """
+
+    def test_verifier_passes_on_live_tree(self) -> None:
+        proc = subprocess.run(
+            [sys.executable, str(VERIFIER)],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+        assert proc.returncode == 0, proc.stdout[-2000:] + proc.stderr[-2000:]
+        assert "VERIFIED: " in proc.stdout
+        assert "[FAIL]" not in proc.stdout
+
+    def test_verifier_fails_on_settle_removed_snapshot(self, tmp_path) -> None:
+        orch = REPO_ROOT / "src" / "loats" / "orchestrator.py"
+        text = orch.read_text(encoding="utf-8")
+        assert VERIFIER_SNAPSHOT_ANCHOR in text, (
+            "mutation anchor missing from orchestrator.py"
+        )
+        mutated = text.replace(
+            VERIFIER_SNAPSHOT_ANCHOR, "pass  # verifier RED snapshot"
+        )
+        assert mutated != text
+
+        snapshot = tmp_path / "snap"
+        (snapshot / "scripts").mkdir(parents=True)
+        for script in (REPO_ROOT / "scripts").glob("*.py"):
+            shutil.copy2(script, snapshot / "scripts" / script.name)
+        shutil.copytree(
+            REPO_ROOT / "src" / "loats",
+            snapshot / "src" / "loats",
+            ignore=shutil.ignore_patterns("__pycache__"),
+        )
+        # Apply the mutation INSIDE the snapshot (never the live tree):
+        # the F8-M-02 fix must be absent for the verifier to fire.
+        snap_orch = snapshot / "src" / "loats" / "orchestrator.py"
+        snap_orch.write_text(mutated, encoding="utf-8")
+        (snapshot / "tests").mkdir()
+        shutil.copy2(Path(__file__), snapshot / "tests" / Path(__file__).name)
+        shutil.copy2(REPO_ROOT / ".env.example", snapshot / ".env.example")
+        subprocess.run(
+            ["git", "init", "-q"], cwd=snapshot, capture_output=True, timeout=60
+        )
+        subprocess.run(
+            ["git", "add", "-A"], cwd=snapshot, capture_output=True, timeout=300
+        )
+
+        proc = subprocess.run(
+            [sys.executable, str(snapshot / "scripts" / VERIFIER.name)],
+            cwd=snapshot,
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+        assert proc.returncode != 0, (
+            "verifier PASSED on a settle-removed snapshot — it does not "
+            "verify the F8-M-02 outcome"
+        )
+        assert "m02c_settle_wired_on_both_boundaries" in proc.stdout
+        assert "[FAIL] m02c_settle_wired_on_both_boundaries" in proc.stdout
+
+
+class TestFlake8HookGateAgreement:
+    """The pre-commit flake8 hook must agree with the lint scope of record.
+
+    Defect class: the hook passes explicit filenames, and flake8 does not
+    apply its own `exclude` to those — so the hook false-failed on the
+    tree's own files (scripts/ verifiers' late sys.path-seeded imports =
+    E402; frozen regex literals in tests/ = E501) even though ruff, the
+    formatter/linter of record, deliberately grants those codes per-file
+    (pyproject per-file-ignores). The same gate ran `flake8 src/` clean at
+    every commit: the false positive class never surfaced in CI, only as
+    a broken pre-commit hook. Root cause fixed by mirroring ruff's grants
+    into .flake8 per-file-ignores; this net pins the agreement in both
+    directions so a future grant divergence (either side) fails here.
+    """
+
+    def test_explicit_path_mode_agrees_with_ruff(self) -> None:
+        # The exact false-positive class: HEAD's own tests/scripts files,
+        # in the hook's explicit-filename mode.
+        proc = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "flake8",
+                "--config",
+                str(REPO_ROOT / ".flake8"),
+                str(REPO_ROOT / "scripts" / "verify_f8m01_external.py"),
+                str(REPO_ROOT / "scripts" / "verify_f8m02_m07_external.py"),
+                str(REPO_ROOT / "tests" / "test_repo_hygiene.py"),
+            ],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+        assert proc.returncode == 0, (
+            f"flake8 hook-mode false positive on the repo's own files: "
+            f"{proc.stdout[:800]}"
+        )
+
+    def test_src_scope_stays_strict(self) -> None:
+        proc = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "flake8",
+                "--config",
+                str(REPO_ROOT / ".flake8"),
+                "src/",
+            ],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+        assert proc.returncode == 0, (
+            f"src/ no longer flake8-strict: {proc.stdout[:800]}"
+        )
+
+    def test_grant_sets_match_ruff(self) -> None:
+        cfg = (REPO_ROOT / ".flake8").read_text(encoding="utf-8")
+        m = re.search(
+            r"per-file-ignores\s*=\s*\n\s*tests/\*:([A-Z0-9,]+)\s*\n\s*scripts/\*:([A-Z0-9,]+)",
+            cfg,
+        )
+        assert m, ".flake8 per-file-ignores block missing or reshaped"
+        assert {c.strip() for c in m.group(1).split(",")} == {"E501"}, (
+            "tests/ grant diverged from ruff (ruff tests/* carries E501)"
+        )
+        assert {c.strip() for c in m.group(2).split(",")} == {"E402", "E501"}, (
+            "scripts/ grant diverged from ruff (ruff scripts/* carries E402, E501)"
+        )
+
+
+class TestShebangExecBit:
+    """Every tracked shebang'd script must sit at index mode 100755.
+
+    Defect class (ADR-0013): Windows cannot record exec bits, so a
+    shebang'd script committed from Windows lands at 100644; Windows
+    ruff suppresses EXE001, so the defect surfaces only as a Linux CI
+    ruff failure — realized by verify_f8m02_m07_external.py before
+    db5957b. The shebang-exec-bit pre-commit hook
+    (scripts/ensure_shebang_exec_bit.py) self-heals staged files;
+    these tests pin the live-tree invariant and prove the normalizer's
+    semantics end-to-end in a throwaway git repository.
+    """
+
+    @staticmethod
+    def _load_normalizer():
+        spec = importlib.util.spec_from_file_location(
+            "ensure_shebang_exec_bit",
+            str(REPO_ROOT / "scripts" / "ensure_shebang_exec_bit.py"),
+        )
+        assert spec is not None and spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    def test_live_tree_shebang_scripts_are_executable(self) -> None:
+        mod = self._load_normalizer()
+        offenders = sorted(
+            p for p, m in mod.tracked_py_modes().items() if mod.needs_fix(m, p)
+        )
+        assert offenders == [], (
+            "shebang'd scripts at mode 100644 (Linux CI EXE001 will fail; "
+            f"run scripts/ensure_shebang_exec_bit.py): {offenders}"
+        )
+
+    def test_normalizer_flips_only_shebang_100644_files(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        mod = self._load_normalizer()
+        repo = tmp_path / "repo"
+        repo.mkdir()
+
+        def git(*args: str) -> None:
+            subprocess.run(["git", *args], cwd=repo, check=True, capture_output=True)
+
+        git("init", "-q")
+        git("config", "user.email", "guard@example.com")
+        git("config", "user.name", "guard")
+        (repo / "shebang.py").write_bytes(b"#!/usr/bin/env python3\nprint(1)\n")
+        (repo / "plain.py").write_bytes(b"print(1)\n")
+        git("add", "shebang.py", "plain.py")
+        monkeypatch.setattr(mod, "REPO_ROOT", repo)
+
+        assert mod.main(["shebang.py", "plain.py"]) == 0
+        out = capsys.readouterr().out
+        assert "enabled executable bit: shebang.py" in out
+        assert "plain.py" not in out
+        modes = mod.tracked_py_modes(["shebang.py", "plain.py"])
+        assert modes["shebang.py"] == "100755"
+        assert modes["plain.py"] == "100644"
+
+        # Idempotent when clean.
+        assert mod.main(["shebang.py", "plain.py"]) == 0
+        assert (
+            "OK every tracked shebang'd script already carries mode 100755"
+            in capsys.readouterr().out
+        )
+
+    def test_unit_semantics(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        mod = self._load_normalizer()
+        monkeypatch.setattr(mod, "REPO_ROOT", tmp_path)
+        shebang = tmp_path / "s.py"
+        shebang.write_bytes(b"#!/bin/sh\n")
+        plain = tmp_path / "p.py"
+        plain.write_bytes(b"print(1)\n")
+        assert mod.has_shebang(shebang) is True
+        assert mod.has_shebang(plain) is False
+        assert mod.parse_mode("100644 abcdef 0\tshebang.py") == "100644"
+        assert mod.needs_fix("100644", "s.py") is True
+        assert mod.needs_fix("100755", "s.py") is False
+        assert mod.needs_fix("100644", "p.py") is False

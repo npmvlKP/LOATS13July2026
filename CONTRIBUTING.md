@@ -89,14 +89,25 @@ All commits must pass the following quality gates:
 - ✅ Pytest (testing)
 - ✅ Bandit (security scanning)
 - ✅ Pre-commit hooks (client-side; must be verified locally)
-- ✅ GitHub branch protection rules (verified enforced as of 2026-09-04: pushes to `main` are rejected with GH006 — pull requests and required status checks are mandatory; direct pushes and force-pushes are blocked)
+- ✅ GitHub branch protection rules — verified via API on 2026-09-07
+  (`GET /repos/npmvlKP/LOATS13July2026/branches/main/protection`):
+  `required_status_checks.strict=true` with 10 required contexts
+  (`deps-sync`, `ruff-lint`, `ruff-format`, `isort`, `flake8`, `bandit`,
+  `commit-lint`, `mypy`, `pytest-coverage`, `pip-audit`),
+  `required_pull_request_reviews.required_approving_review_count=1`,
+  `enforce_admins=true`, `allow_force_pushes=false`,
+  `allow_deletions=false`. Direct pushes are rejected (GH006); PRs and
+  required status checks are mandatory. The repo-hygiene, rss-feeds,
+  ruff-repo-scope, gitleaks and docker jobs run on every push/PR but are
+  intentionally NOT in the required-context list — they remain advisory
+  signals on main; add a context there only when a job must gate merges.
 
 ### Manual GitHub Gates (TODO-5 / TODO-6)
 
 The following safeguards are **not** enforceable by this codebase or by an agent; they require a maintainer with repository admin access to verify in the GitHub web UI:
 
-1. **Branch protection for `main`**: Enable "Require a pull request before merging" with at least one reviewer approval.
-2. **Status checks**: Enable "Require status checks to pass before merging" and select the CI jobs that run Ruff, MyPy, Pytest, Bandit, and pip-audit.
+1. **Branch protection for `main`**: Enable "Require a pull request before merging" with at least one reviewer approval. *(VERIFIED via API 2026-09-07: enabled, 1 approval, admin-enforced — see Quality Gates above. TODO-5b closure evidence is the API response recorded there; no UI check outstanding.)*
+2. **Status checks**: Enable "Require status checks to pass before merging" and select the CI jobs that run Ruff, MyPy, Pytest, Bandit, and pip-audit. *(VERIFIED via API 2026-09-07: 10 required contexts, strict — see Quality Gates above.)*
 3. **Pre-commit hooks as client-side guards**: The `.pre-commit-config.yaml` hooks run locally; they are not a server-side substitute for branch protection. Verify each contributor has run `pre-commit install`.
 4. **Review dismissal / admin enforcement**: Optionally enable "Dismiss stale pull request approvals when new commits are pushed" and "Include administrators". *(Empirically confirmed enforced as of 2026-09-04: a direct force-push to `main` was rejected with GH006 "Protected branch update failed" — PR-only, 10 required status checks, force-pushes forbidden. The probe commits that prompted TODO-5/TODO-6 landed before protection was enabled.)*
 

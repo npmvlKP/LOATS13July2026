@@ -20,6 +20,7 @@ from __future__ import annotations
 import argparse
 import fnmatch
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -33,6 +34,12 @@ import win32_root_junk  # noqa: F401  (lockstep pin via guard.win32_root_junk)
 from ratchet_baseline import TRACKED_FILE_CEILING
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+
+# F8-M-05 / ADR-0011: root-level reports/*.json are verifier run artifacts
+# (machine-local state, absolute paths) — the curated evidence of record
+# lives in dated snapshots under reports/<subdir>/. Single-segment match:
+# fnmatch globs would cross "/" and false-positive the curated subdirs.
+_TOP_LEVEL_REPORT_ARTIFACT = re.compile(r"reports/[^/]+\.json")
 
 # Patterns matched against tracked paths (fnmatch, forward slashes).
 # A match means "must NOT be tracked".
@@ -79,12 +86,30 @@ FORBIDDEN_PATTERNS: tuple[str, ...] = (
 # scripts/ orphans are separately ratcheted by
 # scripts/check_scripts_wiring.py (CI repo-hygiene, pre-commit, HC-30).
 
-# Tracked paths that would match FORBIDDEN_PATTERNS but are deliberate.
+# Tracked paths that would match FORBIDDEN_PATTERNS / the root-level
+# reports/*.json artifact rule but are deliberate evidence of record with
+# tracked consumers. Adding an entry requires naming its consumer in the
+# comment (the wiring guard fails when a citation goes dead — F8-L-06-R2).
 ALLOWLIST: frozenset[str] = frozenset(
     {
         # Example template, intentionally tracked (referenced by
         # scripts/check_env_settings_sync.py / HC-23).
         ".env.example",
+        # Canonical P1 discharge evidence of record (100/100 live TCS round
+        # trips). Pinned in .gitignore by negation; consumed by
+        # verify_todo25_* and required by HC-29 from a fresh clone.
+        "reports/p1_analyze_latency_20260904_040609.json",
+        # FR7 production-status verification record; cited by
+        # docs/audit-history/FR7_PRODUCTION_STATUS.md.
+        "reports/production-verification.json",
+        # TODO-27 decision inputs, consumed by the tracked verifiers
+        # scripts/verify_todo27_eval.py and scripts/verify_todo27_external.py.
+        "reports/todo27_eval.json",
+        "reports/todo27_external.json",
+        # F8-H-01 external verification record; consumed by
+        # scripts/verify_f8h01_external.py and cited by
+        # docs/ADR-006-analyzer-routing-p5.md and the F8-L-06 closure note.
+        "reports/verify_f8h01_external.json",
     }
 )
 
@@ -115,6 +140,17 @@ def _violations(paths: list[str]) -> list[tuple[str, str]]:
     hits: list[tuple[str, str]] = []
     for path in paths:
         if path in ALLOWLIST:
+            continue
+        # F8-M-05 / ADR-0011: run artifacts live at the TOP level of
+        # reports/ only (single-segment rule). fnmatch globs cross "/", so
+        # "reports/*.json" would also condemn the deliberate evidence of
+        # record in curated subdirectories (reports/security/,
+        # reports/health/, reports/ai-generated/, reports/performance/ and
+        # reports/p1_analyze_latency_*.json); those are governed by
+        # TestCompactRepoDocs instead. A single-segment regex pins the
+        # top-level rule without that false-positive class.
+        if _TOP_LEVEL_REPORT_ARTIFACT.fullmatch(path):
+            hits.append((path, "reports/*.json (root-level run artifact)"))
             continue
         for pattern in FORBIDDEN_PATTERNS:
             # Anchored match for root-level names, glob match otherwise.

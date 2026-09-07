@@ -162,6 +162,9 @@ pytest_final*.log
 bandit-report.json
 pip-audit-core-report.json
 pip-audit-report.json
+# pip-audit full-tree scan output (128-dep JSON, re-derivable per run;
+# evidence of record is reports/security/pip-audit-*.json)
+pip-audit-full.json
 safety-report.json
 bandit-full-report.json
 results.json
