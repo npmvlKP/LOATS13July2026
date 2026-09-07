@@ -1078,6 +1078,17 @@ class TestFlake8HookGateAgreement:
         assert {c.strip() for c in m.group(2).split(",")} == {"E402", "E501"}, (
             "scripts/ grant diverged from ruff (ruff scripts/* carries E402, E501)"
         )
+        # F8-H-01 (2026-09-07): the conftest-specific grant mirrors ruff's
+        # "tests/conftest.py" = ["E402"] (env-first isolation layout) plus
+        # F811/F841 for the dummy-variable reset fixture ruff's
+        # dummy-variable-rgx already ignores.
+        mc = re.search(r"tests/conftest\.py:([A-Z0-9,]+)", cfg)
+        assert mc, ".flake8 conftest per-file grant missing"
+        assert {c.strip() for c in mc.group(1).split(",")} == {
+            "E402",
+            "F811",
+            "F841",
+        }, "conftest grant diverged from the ruff-mirror contract"
 
 
 class TestShebangExecBit:

@@ -16,6 +16,15 @@ max-line-length = 88
 per-file-ignores =
     tests/*:E501
     scripts/*:E402,E501
+    # F8-H-01 (2026-09-07): conftest pins the test-data env vars BEFORE
+    # importing loats on purpose — the ``db`` singleton binds Settings at
+    # import, so the env-first layout IS the production-isolation
+    # mechanism (mirrors ruff's "tests/conftest.py" = ["E402"] grant).
+    # F811/F841: the autouse rate-limiter reset fixture re-assigns the
+    # module singletons to None; ruff ignores leading-underscore dummies
+    # via dummy-variable-rgx, so flake8 must agree (mirrors the
+    # linter-of-record's effective behavior).
+    tests/conftest.py:E402,F811,F841
 # Frozen audit evidence archived verbatim (mirrors pyproject.toml per-file-ignores,
 # which carry the same rationale): these directories are historical verification
 # artifacts and must not be mutated to satisfy lint. Excluded from repository-root

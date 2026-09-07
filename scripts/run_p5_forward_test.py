@@ -31,6 +31,7 @@ import asyncio
 import datetime
 import importlib.util
 import json
+import os
 import sys
 from pathlib import Path
 from typing import Any
@@ -38,7 +39,12 @@ from typing import Any
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "src"))
 
-RUN_LOG_DIR = REPO_ROOT / "reports"
+# F8-H-01 (2026-09-07): run logs must be writable OUTSIDE the repo tree so
+# test/CI invocations of this supervisor never drop smoke stubs into the
+# production evidence directory (≈200 stub logs accumulated there from
+# suite runs). The default stays the real reports/ for operator runs;
+# tests set P5_RUN_LOG_DIR to a private temp dir.
+RUN_LOG_DIR = Path(os.environ.get("P5_RUN_LOG_DIR") or (REPO_ROOT / "reports"))
 RUN_LOG_GLOB = "p5_forward_test_*.json"
 MIN_SPAN_DAYS = 14
 # Live-activity sampling cadence for supervised runs: fold real system

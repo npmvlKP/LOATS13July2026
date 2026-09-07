@@ -140,3 +140,73 @@ evidence; dry-run smoke logs now grade INCOMPLETE/FAIL on span and (for
 upgraded writers) would fail the activity requirement rather than
 masquerading as live evidence.
 
+## Amendment 2 (2026-09-07, forward-test integrity: the run measured a sterile loop)
+
+Five days into the supervised live run (resumed through 7 restarts,
+29,836 cycles, zero unhandled exceptions) a full forensic pass proved the
+run **could never satisfy P5 regardless of span**, and that the activity
+it did measure was partly spurious:
+
+### Findings
+
+1. **Producer-window starvation (P1, fixed).** The trading cycle spawned
+   TA/sentiment/volatility/price-action/market-data producers inside a
+   hard-coded **80 ms** window (``timeout=0.08``), then cancelled them
+   (F8-M-02: producers never outlive the cycle). Live feed latencies are
+   ~1.3 s per analysis — every producer was cancelled before it could
+   persist a signal. Consequence chain: ``async_get_latest_signals`` →
+   empty → "insufficient signals" every cycle → no TradeDecision is ever
+   created → ``route_to_analyzer`` never runs → routing counters stay at
+   zero for the life of the run. The supervised engine's own log
+   confirmed it: zero ``Routing TradeDecision`` lines in 5 days. **The
+   window is now settings-driven (``producer_window_seconds``, default
+   8 s; ``PRODUCER_WINDOW_SECONDS`` in ``.env.example``).** The F8-M-02
+   invariant is unchanged (both settle boundaries preserved — external
+   verifier re-verified 19/19).
+
+2. **Validator could grade a decisionless run PASS at 14 d (P1, fixed).**
+   PASS required only span + cycles + zero exceptions. A run that never
+   routed a single decision would have cleared the phase gate on
+   cycle-count alone. **PASS now additionally requires measured
+   decisional activity**: with ``counters`` present, all-zero
+   success/disabled/error is a hard FAIL ("cycles alone do not satisfy
+   P5"). Legacy logs without ``counters`` grade unchanged.
+
+3. **Test-data contamination (P1, fixed).** Suite runs leaked into
+   production data via the unpatched module-level ``db`` singleton:
+   **186 production audit rows carry the test fixture's analyzer
+   response** (``analyzer_id: "abc-123"``), and DB decision-burst
+   timestamps match pytest run times, not the supervised cycle. The
+   conftest now pins ``SQLITE_DB_PATH``/``AUDIT_LOG_PATH`` (hard
+   override) to a private temp dir before any loats import, so the
+   singleton is physically unable to bind production files under test.
+
+4. **Run-log stub pollution (P3, fixed).** ``test_dry_run_creates_run_log``
+   ran the real runner against the real ``reports/`` — ≈200 smoke stubs
+   accumulated in the evidence directory. ``P5_RUN_LOG_DIR`` now
+   redirects runner writes; the test uses it (temp dir per run).
+
+5. **Counters were honest (root-caused, no fix needed).** The supervised
+   engine never received a decision to route, so its zero counters were
+   truthful — the falsity was in what the run would have proved. The
+   wiring (proxy → instance → counters → ``get_routing_stats()``) was
+   verified end-to-end by controlled probe (0 → 1 on a routed decision).
+
+### Consequences
+
+- The ongoing supervised run is **structurally INCOMPLETE**: it can never
+  grade PASS (decisional criterion fails on its zero counters), and its
+  cycles measured a starved loop. **It must be restarted** after this
+  amendment ships: ``run_p5_forward_test.py`` resumes only ongoing logs,
+  so the operator ends the current log (stop the supervisor task) and
+  starts a fresh run (``--ack-live-endpoint``) once decisions are
+  actually flowing. The 14-day clock restarts with the new run.
+- ``verify_p5_forward_test.py`` exit codes unchanged; ``run --status``
+  unchanged; the two F8-M-02 settle call-sites are byte-identical
+  (external verifier 19/19 re-verified on the amended tree).
+- Regression tests: ``tests/test_f8h01_fixes.py`` (13 cases) locks all
+  four fixes.
+- The decisional criterion is calibrated to **any** resolved routing
+  outcome (success, disabled, or error all count): a healthy supervised
+  run with routing enabled produces successes; the criterion exists to
+  catch the zero-decisional class, not to grade outcome quality.

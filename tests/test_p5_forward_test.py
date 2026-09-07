@@ -415,19 +415,25 @@ class TestP5RunnerSmoke:
     """Runner dry-run must exit 0 and produce a gradeable run log."""
 
     def test_dry_run_creates_run_log(self, tmp_path: Path) -> None:
+        # F8-H-01 (2026-09-07): the smoke run must NOT drop its stub into
+        # the production evidence directory. P5_RUN_LOG_DIR redirects the
+        # runner's run-log writes to this test's private temp dir; the
+        # ≈200 stub logs that accumulated in reports/ came from this test
+        # globbing the real tree.
         result = subprocess.run(
             [sys.executable, str(RUNNER), "--dry-run"],
             capture_output=True,
             text=True,
             cwd=REPO_ROOT,
             timeout=180,
+            env={**os.environ, "P5_RUN_LOG_DIR": str(tmp_path)},
         )
         assert result.returncode == 0, result.stderr
         logs = sorted(
-            (REPO_ROOT / "reports").glob("p5_forward_test_*.json"),
+            tmp_path.glob("p5_forward_test_*.json"),
             key=lambda p: p.stat().st_mtime,
         )
-        assert logs, "dry-run must leave a run log under reports/"
+        assert logs, "dry-run must leave a run log under P5_RUN_LOG_DIR"
         data = json.loads(logs[-1].read_text(encoding="utf-8"))
         assert data["routing"]["enabled_at_start"] is True
         assert data["unhandled_exceptions"] == 0

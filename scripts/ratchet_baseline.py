@@ -75,8 +75,18 @@ History (most recent last):
        pre-commit normalizer for the Windows 100644 shebang class —
        and its decision record
        docs/adr/0013-shebang-exec-bit-normalizer.md).
+  387  F8-H-01 forward-test integrity (2026-09-07): +1
+       (tests/test_f8h01_fixes.py — regression net for the producer
+       window, the validator's decisional-activity criterion, the
+       P5_RUN_LOG_DIR runner isolation, and the conftest test-data
+       isolation; ADR-006 Amendment 2).
+  389  F8-H-01 P2 follow-up (2026-09-07): +2
+       (scripts/quarantine_test_data.py — fingerprint-only quarantine
+       of test-contaminated trade decisions into
+       trade_decisions_quarantined, audit trail untouched; and its
+       regression net tests/test_quarantine_test_data.py).
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 386
+TRACKED_FILE_CEILING = 389

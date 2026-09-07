@@ -111,6 +111,11 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
+# tests/conftest.py pins test env vars (incl. the F8-H-01 test-data
+# isolation override) BEFORE importing loats modules on purpose: the ``db``
+# singleton binds Settings at import time, so the env-first layout is the
+# isolation mechanism. The late imports are intentional (E402).
+"tests/conftest.py" = ["E402"]
 "tests/*" = ["S101", "DTZ001", "DTZ005", "BLE001", "SLF001", "PLC0415", "T201", "ANN001", "ANN201", "ANN202", "PT001", "PT011", "PT012", "ARG001", "PTH123", "PLR0915", "E501", "B017"]
 "scripts/*" = ["INP001", "T201", "E402", "E501", "RUF001", "UP035", "DTZ005", "PGH003", "F841"]
 "scripts/identify_low_coverage.py" = ["E501"]

@@ -28,6 +28,18 @@ os.environ.setdefault("TELEGRAM_CHAT_ID", "123456789")
 # sides of their contract stay observable.
 os.environ.setdefault("LOATS_SUPPRESS_NLTK_WARNING", "1")
 
+# F8-H-01 test isolation (2026-09-07, hard fail-closed): the ``db`` singleton
+# inside the loats process under test binds ``Settings.sqlite_db_path`` /
+# ``audit_log_path``. Tests that patch collaborators but not that singleton
+# wrote 186 production audit rows (test-fixture analyzer responses in
+# data/audit.log) and production trade_decisions. The suite therefore pins
+# BOTH paths to a private temp directory with a HARD override (not
+# setdefault): a stray real path in the environment must lose in tests.
+# Prod data lives only where the supervisor/process env points it.
+_TEST_DATA_DIR = Path(tempfile.mkdtemp(prefix="loats-test-data-"))
+os.environ["SQLITE_DB_PATH"] = str(_TEST_DATA_DIR / "test_loats.db")
+os.environ["AUDIT_LOG_PATH"] = str(_TEST_DATA_DIR / "test_audit.log")
+
 from loats.database import Database
 from loats.models import (
     HistoricalData,
