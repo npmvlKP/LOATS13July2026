@@ -55,8 +55,16 @@ History (most recent last):
        workflow_dispatch proof: editable-install contract, mypy
        platform-stub lambda, EXE001 exec bits, POSIX casefold gap,
        host-specific verifiers; see ADR-0012).
+  382  DevOps workflow-integrity wave (2026-09-07): -1
+       (reports/f8-h-03-verification.json — a zero-reference,
+       machine-local verifier run artifact with embedded working-tree
+       state and absolute paths — relocated to
+       docs/audit-history/f8-h-03-verification-20260902.json per the
+       ADR-0011 artifact discipline. The rename keeps the count at 382,
+       so the ceiling now equals the tree: any net addition requires a
+       deliberate re-pin.
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 383
+TRACKED_FILE_CEILING = 382
