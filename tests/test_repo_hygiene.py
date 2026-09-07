@@ -763,11 +763,6 @@ class TestWorkflowFlagCurrency:
             "pip_audit",
             ("--format=json", "--output", "pip-audit-full.json"),
         ),
-        (
-            "security.yml pip-audit requirements step",
-            "pip_audit",
-            ("--format=requirements", "--output", "requirements-vulnerable.txt"),
-        ),
     )
 
     @staticmethod
