@@ -164,6 +164,58 @@ class TestForbiddenPatterns:
         ):
             assert guard._violations([path]), f"expected {path} to be flagged"
 
+    def test_report_run_artifacts_matched(self, guard):
+        """F8-M-05/ADR-0011: verifier run artifacts never live in reports/.
+
+        Root cause being guarded: the hygiene guard had no reports/
+        rule, so machine-local verifier output (git status, absolute
+        paths) was trackable at the reports/ top level even though the
+        documented curation rule names only health-final-*.json for
+        reports/health/. Curated subdirectory evidence (reports/security/
+        dated snapshots, reports/p1_analyze_latency_*) stays legitimate.
+        """
+        for path in (
+            "reports/f8-h-03-verification.json",
+            "reports/some_verifier_output.json",
+            "reports/production-verification-unlisted.json",
+        ):
+            assert guard._violations([path]), f"expected {path} to be flagged"
+
+    def test_cited_root_level_evidence_allowlisted(self, guard):
+        """Root-level reports/*.json with tracked consumers stay legitimate.
+
+        The allowlist entries each name their consumer; the wiring guard
+        fails when a citation goes dead (F8-L-06-R2), so a stale entry
+        cannot silently persist.
+        """
+        for path in (
+            "reports/p1_analyze_latency_20260904_040609.json",
+            "reports/production-verification.json",
+            "reports/todo27_eval.json",
+            "reports/todo27_external.json",
+            "reports/verify_f8h01_external.json",
+        ):
+            assert guard._violations([path]) == [], f"unexpected flag on {path}"
+
+    def test_curated_subdir_evidence_clean(self, guard):
+        """Nested evidence of record must NOT be flagged (single-segment rule)."""
+        for path in (
+            "reports/health/health-final-20260901.json",
+            "reports/security/bandit-20260901.json",
+            "reports/p1_analyze_latency_20260904_040609.json",
+        ):
+            assert guard._violations([path]) == [], f"unexpected flag on {path}"
+
+    def test_nested_health_paths_out_of_guard_scope(self, guard):
+        """Nested reports/health/* is TestCompactRepoDocs' contract, not the guard's.
+
+        The guard's artifact rule is deliberately single-segment (top-level
+        reports/*.json only); asserting nested paths here would demand
+        fnmatch-crossing semantics that false-positive the curated
+        evidence subdirectories.
+        """
+        assert guard._violations(["reports/health/health-full-20260906.json"]) == []
+
     def test_legitimate_paths_clean(self, guard):
         for path in (
             "src/loats/main.py",
@@ -729,12 +781,81 @@ class TestWorkflowFlagCurrency:
             and not stripped.startswith("- ")
         ]
 
+    @staticmethod
+    def _pip_audit_help() -> str:
+        """The pinned pip-audit's own CLI help text (format choices included)."""
+        proc = subprocess.run(
+            [sys.executable, "-m", "pip_audit", "--help"],
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+        assert proc.returncode == 0, (
+            f"pip_audit --help failed (rc={proc.returncode}): {proc.stderr[:300]}"
+        )
+        return proc.stdout + proc.stderr
+
+    def test_security_yml_pip_audit_format_choices_are_valid(self) -> None:
+        """--format=<choice> values must exist in the tool's own choice list.
+
+        Root cause being guarded: flag NAMES can be valid while the VALUE
+        is not — `--format=requirements` passed test_flags_accepted_by_
+        installed_tool for weeks, yet pip-audit's format choices are
+        columns/json/cyclonedx-json/cyclonedx-xml/markdown (no
+        `requirements`), so the step would fail the moment it ran.
+        """
+        help_text = self._pip_audit_help()
+        lines = self._workflow_run_lines(self.SECURITY_YML)
+        pip_audit_lines = [ln for ln in lines if ln.startswith("pip-audit ")]
+        for ln in pip_audit_lines:
+            for token in ln.split():
+                if token.startswith("--format="):
+                    value = token.split("=", 1)[1]
+                    assert f"{{{value}" in help_text or f"{value}," in help_text, (
+                        f"security.yml passes --format={value}, which the "
+                        f"installed pip-audit does not offer as a choice: {ln}"
+                    )
+
+    def test_security_yml_has_no_deprecated_gitleaks_v2(self) -> None:
+        """gitleaks-action@v2 dies with the Node 20 runner removal.
+
+        GitHub removes Node 20 from hosted runners on 2026-09-16; @v2 is
+        Node 20 and has no opt-out after that date. @v3 is the Node-24
+        release with unchanged inputs/behavior.
+        """
+        text = self.SECURITY_YML.read_text(encoding="utf-8")
+        assert "gitleaks-action@v2" not in text, (
+            "security.yml pins gitleaks-action@v2 (Node 20) — removed from"
+            " GitHub-hosted runners on 2026-09-16; use @v3"
+        )
+
+    def test_workflows_use_node24_native_action_majors(self) -> None:
+        """Every pinned action major must run on Node 24.
+
+        Node 20 is removed from GitHub-hosted runners on 2026-09-16, so
+        Node-20 actions (checkout@v4, setup-python@v5, upload-artifact@v4)
+        fail regardless of ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION.
+        """
+        for yml in (CI_YML, self.SECURITY_YML):
+            text = yml.read_text(encoding="utf-8")
+            for action in (
+                "actions/checkout@v4",
+                "actions/setup-python@v5",
+                "actions/upload-artifact@v4",
+            ):
+                assert action not in text, (
+                    f"{yml.name} pins {action} (Node 20 runtime), which"
+                    " GitHub removes from hosted runners on 2026-09-16"
+                )
+
     def test_security_yml_pip_audit_steps_use_current_flags(self) -> None:
         lines = self._workflow_run_lines(self.SECURITY_YML)
         pip_audit_lines = [ln for ln in lines if ln.startswith("pip-audit ")]
-        assert len(pip_audit_lines) == 2, (
-            f"expected the two pip-audit invocations in security.yml, "
-            f"got {pip_audit_lines}"
+        assert len(pip_audit_lines) == 1, (
+            f"expected exactly one pip-audit invocation in security.yml "
+            f"(environment mode over the installed project closure; the "
+            f"--format=requirements step was removed with the 2026-09-07 "
+            f"integrity wave), got {pip_audit_lines}"
         )
         for ln in pip_audit_lines:
             assert "--output-file" not in ln, (
