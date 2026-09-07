@@ -82,9 +82,24 @@ class TradeDecisionEngine:
         current_price: float,
         funds: FundsData,
         current_positions: list[Trade],
+        as_of_date: datetime.date | None = None,
     ) -> tuple[TradeDecision | None, dict[str, Any]]:
         """
         Create TradeDecision from signals using full CMP workflow.
+
+        Args:
+            signals: Candidate signals for the decision batch.
+            historical_data: Historical bars for the gating rules.
+            current_price: Latest traded price for the symbol.
+            funds: Available funds snapshot.
+            current_positions: Currently open positions.
+            as_of_date: F8-L-02 (CMP Rule 8) caller-supplied input
+                snapshot date. Stamped onto the created TradeDecision
+                and echoed in every workflow result so backtests can pin
+                a record to the data it was computed from. Never derived
+                from the wall clock inside this module (the zero
+                wall-clock-date invariant holds across src/loats); None
+                keeps records unpinned.
 
         Workflow:
         1. Validate signals (>=3 sources)
@@ -97,6 +112,9 @@ class TradeDecisionEngine:
         """
         symbol = signals[0].symbol if signals else settings.default_symbol
         timestamp = datetime.datetime.now(datetime.UTC)
+        # F8-L-02: single normalized as-of value shared by the decision
+        # model and every diagnostic/result payload below.
+        as_of_iso = as_of_date.isoformat() if as_of_date is not None else None
 
         # Step 0 (F8-M-01): exclude unknown-source signals per-signal.
         # Mixed-provenance windows are normal on a shared signal table;
@@ -174,6 +192,7 @@ class TradeDecisionEngine:
                 "details": rejected_details,
                 "symbol": symbol,
                 "timestamp": timestamp,
+                "as_of_date": as_of_iso,
             }
 
         # F8-M-01: stamp the workflow-level exclusion into the validation
@@ -196,6 +215,7 @@ class TradeDecisionEngine:
                 "strength_details": strength_details,
                 "symbol": symbol,
                 "timestamp": timestamp,
+                "as_of_date": as_of_iso,
             }
 
         # Determine decision type from strongest signal
@@ -214,6 +234,7 @@ class TradeDecisionEngine:
                 "gating_result": gating_result,
                 "symbol": symbol,
                 "timestamp": timestamp,
+                "as_of_date": as_of_iso,
             }
 
         # Step 4: Check position limits (CMP Rule 11)
@@ -227,6 +248,7 @@ class TradeDecisionEngine:
                 "position_result": position_result,
                 "symbol": symbol,
                 "timestamp": timestamp,
+                "as_of_date": as_of_iso,
             }
 
         # Step 5: Calculate position size (2% fixed-fraction)
@@ -242,6 +264,7 @@ class TradeDecisionEngine:
                 "sizing_details": sizing_details,
                 "symbol": symbol,
                 "timestamp": timestamp,
+                "as_of_date": as_of_iso,
             }
 
         # Step 6: Set up trailing stop
@@ -275,6 +298,7 @@ class TradeDecisionEngine:
             decision_type=decision_type,
             composite_strength=composite_strength,
             timestamp=timestamp,
+            as_of_date=as_of_date,
             entry_price=current_price,
             quantity=position_size,
             stop_loss=stop_loss,
@@ -310,6 +334,7 @@ class TradeDecisionEngine:
             "composite_strength": composite_strength,
             "position_size": position_size,
             "timestamp": timestamp,
+            "as_of_date": as_of_iso,
         }
 
     def _calculate_stop_loss(
@@ -466,6 +491,13 @@ class TradeDecisionEngine:
                 metadata={
                     "symbol": trade_decision.symbol,
                     "routing_enabled": self.analyzer_routing_enabled,
+                    # F8-L-02: the routing record is traceable to the
+                    # snapshot date the decision was computed from.
+                    "as_of_date": (
+                        trade_decision.as_of_date.isoformat()
+                        if trade_decision.as_of_date is not None
+                        else None
+                    ),
                     "routing_outcome": dict(response),
                 },
             )
