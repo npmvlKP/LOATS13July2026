@@ -488,7 +488,7 @@ class CMPRulesEngine:
         .. deprecated:: F8-H-02
             Retained solely for backward compatibility with external
             callers/tests. CMP Rule 7 is enforced per-order with a
-            persisted SQLite counter at the ``modify_order`` boundary —
+            persisted SQLite counter at the ``modify_order`` boundary --
             see :meth:`check_modification_limit` /
             :meth:`record_modification_result`. This global int has no
             enforcement role.
@@ -519,7 +519,7 @@ class CMPRulesEngine:
         Check whether ``order_id`` still has Rule-7 modification budget.
 
         Reads the persisted per-order counter. Raises Rule7StateError when
-        the counter state cannot be read (DB failure) — callers must treat
+        the counter state cannot be read (DB failure) -- callers must treat
         that as "refuse the modification" (fail-closed).
         """
         if limit is None:
@@ -536,7 +536,7 @@ class CMPRulesEngine:
         a BEGIN IMMEDIATE transaction, so two concurrent modify attempts
         can never both claim the same slot. If the increment exceeds
         ``limit`` the reservation is rolled back and
-        Rule7ModificationLimitError is raised — the caller must refuse the
+        Rule7ModificationLimitError is raised -- the caller must refuse the
         modification. Rule7StateError is raised when the counter state
         cannot be read/written (fail-closed).
         """

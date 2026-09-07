@@ -2,7 +2,7 @@
 
 ``LazySettings`` defers constructing the cached ``Settings`` instance
 until first attribute access. Importing this module does NOT trigger
-``Settings()`` — so a fresh checkout with no API keys can still
+``Settings()`` -- so a fresh checkout with no API keys can still
 ``import loats.*`` without raising.
 
 Rationale

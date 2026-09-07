@@ -164,7 +164,7 @@ async def _settle_cancelled_producers(producers: tuple[asyncio.Task[Any], ...]) 
     """Cancel every not-yet-done producer and await their terminal states.
 
     F8-M-02 upgraded per Remaining-Risk review: cancellation is not merely
-    requested but *settled* — every producer's ``finally`` block (timing,
+    requested but *settled* -- every producer's ``finally`` block (timing,
     logging, DB-write cleanup) completes inside the boundary, before the
     next cycle tick, so a slow-cleanup producer can never stretch into a
     subsequent window. Cancelling a done or already-cancelled task is a
@@ -233,7 +233,7 @@ class TradingOrchestrator:
         """Await ``func`` behind ``source``'s dedicated circuit breaker.
 
         CMP P5 / F8-L-01: each signal producer's external fetch is isolated
-        by its own breaker — one source's failures open only that source's
+        by its own breaker -- one source's failures open only that source's
         breaker; every other producer keeps calling through its own.
         """
         breaker = get_source_breaker(source)
@@ -253,7 +253,7 @@ class TradingOrchestrator:
         breaker wraps the fetch FIRST, and degradation to ``degraded``
         happens only for that source's own rejections (breaker open).
         Failures raised by the fetch itself propagate to the breaker, so
-        the source breaker actually counts them — the previous shape
+        the source breaker actually counts them -- the previous shape
         (``except Exception: return None`` INSIDE the breaker-wrapped
         method) made every failure look like a successful ``None`` result
         and no breaker, global or per-source, ever tripped on producer
@@ -453,7 +453,7 @@ class TradingOrchestrator:
                     # expired before a real feed fetch (~1.3 s) could
                     # persist its signal, starving the CMP gate. The window
                     # is now settings-driven; the F8-M-02 invariant
-                    # (producers never outlive the cycle — settle on both
+                    # (producers never outlive the cycle -- settle on both
                     # boundaries) is unchanged.
                     timeout=settings.producer_window_seconds,
                 )
@@ -578,7 +578,7 @@ class TradingOrchestrator:
                     await db.async_create_signal(signal)
 
         except CircuitBreakerOpenError as e:
-            # This source's breaker is open — skip the producer for this
+            # This source's breaker is open -- skip the producer for this
             # cycle without failing the gather (which would cancel sibling
             # producers). Other sources keep their own breakers.
             logger.warning(f"TA analysis skipped: source breaker open: {e}")
@@ -638,7 +638,7 @@ class TradingOrchestrator:
                 degraded=None,
             )
             if result is None:
-                # Source breaker open — skip signal generation this cycle.
+                # Source breaker open -- skip signal generation this cycle.
                 return
 
             # Generate sentiment signal
@@ -668,7 +668,7 @@ class TradingOrchestrator:
                 await db.async_create_signal(signal)
 
         except CircuitBreakerOpenError as e:
-            # Source breaker open — skip gracefully (see TA handler).
+            # Source breaker open -- skip gracefully (see TA handler).
             logger.warning(f"Sentiment analysis skipped: source breaker open: {e}")
 
         except Exception as e:
@@ -685,7 +685,7 @@ class TradingOrchestrator:
                 )
 
     async def _execute_volatility_analysis(self) -> None:
-        """Execute volatility analysis — 4th signal producer for diversity gate.
+        """Execute volatility analysis -- 4th signal producer for diversity gate.
 
         Uses existing TA machinery (ATR, VWAP) and adds Hurst exponent
         regime detection. Runs inside the 80ms parallel window.
@@ -812,7 +812,7 @@ class TradingOrchestrator:
             await db.async_create_signal(signal)
 
         except CircuitBreakerOpenError as e:
-            # Source breaker open — skip gracefully (see TA handler).
+            # Source breaker open -- skip gracefully (see TA handler).
             logger.warning(f"Volatility analysis skipped: source breaker open: {e}")
         except Exception as e:
             logger.error(f"Volatility analysis failed: {e}")
@@ -827,7 +827,7 @@ class TradingOrchestrator:
                 )
 
     async def _execute_price_action_analysis(self) -> None:
-        """Execute price-action analysis — 4th diversity-critical producer.
+        """Execute price-action analysis -- 4th diversity-critical producer.
 
         Microstructure signal derived exclusively from data the orchestrator
         already fetches (OHLCV bars + last quote). Uses existing ``ta.py``
@@ -920,7 +920,7 @@ class TradingOrchestrator:
             elif not above_trend and not above_vwap:
                 bias = -1
             else:
-                # References disagree — express no directional view.
+                # References disagree -- express no directional view.
                 bias = 0
 
             # Consecutive same-direction candles ending at the most recent
@@ -984,7 +984,7 @@ class TradingOrchestrator:
             await db.async_create_signal(signal)
 
         except CircuitBreakerOpenError as e:
-            # Source breaker open — skip gracefully (see TA handler).
+            # Source breaker open -- skip gracefully (see TA handler).
             logger.warning(f"Price-action analysis skipped: source breaker open: {e}")
         except Exception as e:
             logger.error(f"Price-action analysis failed: {e}")
@@ -1179,7 +1179,7 @@ class TradingOrchestrator:
 
             symbol = settings.default_symbol
 
-            # Get all available signals for CMP strategy (≥3 sources required)
+            # Get all available signals for CMP strategy (>=3 sources required)
             all_signals = await db.async_get_latest_signals(symbol, limit=10)
 
             # Filter out only recent signals (last 5 minutes)
@@ -1468,7 +1468,7 @@ class TradingOrchestrator:
                 symbol, interval
             )
         except CircuitBreakerOpenError:
-            # Global breaker open — degrade without disturbing source stats.
+            # Global breaker open -- degrade without disturbing source stats.
             logger.error("Failed to get history: global circuit breaker open")
             return None
         except Exception:
@@ -1476,7 +1476,7 @@ class TradingOrchestrator:
             return None
 
     async def _fetch_history_bare(self, symbol: str, interval: str) -> dict[str, Any]:
-        """Bare history fetch — no breaker, no swallow; raises to caller."""
+        """Bare history fetch -- no breaker, no swallow; raises to caller."""
         return await async_client.get_history(symbol=symbol, interval=interval)
 
     async def _safe_get_quotes(self, symbols: list[str]) -> dict[str, Any] | None:
@@ -1486,7 +1486,7 @@ class TradingOrchestrator:
         (``_source_guarded_quotes`` layers the per-source breaker and a
         fresh global breaker+retry around this method, so both count real
         failures); direct non-producer callers get the global breaker here
-        with degradation to ``None`` OUTSIDE the breaker — mirroring
+        with degradation to ``None`` OUTSIDE the breaker -- mirroring
         ``_safe_get_history``.
         """
         try:
@@ -1494,7 +1494,7 @@ class TradingOrchestrator:
                 symbols
             )
         except CircuitBreakerOpenError:
-            # Global breaker open — degrade without disturbing source stats.
+            # Global breaker open -- degrade without disturbing source stats.
             logger.error("Failed to get quotes: global circuit breaker open")
             return None
         except Exception:
@@ -1502,7 +1502,7 @@ class TradingOrchestrator:
             return None
 
     async def _fetch_quotes_bare(self, symbols: list[str]) -> dict[str, Any]:
-        """Bare quotes fetch — no breaker, no swallow; raises to caller."""
+        """Bare quotes fetch -- no breaker, no swallow; raises to caller."""
         return await async_client.get_quotes(symbols)
 
     @openalgo_circuit_breaker_retry_async
@@ -1600,8 +1600,8 @@ async def update_trailing_stops() -> None:
     This function implements the runtime driver for trailing stop updates
     as required by TODO-14 (F7-H-04 / CMP Rule 12).
 
-    Enforces Rule-7: ≤25 modifications per cycle (secondary guard). The
-    primary CMP Rule-7 control (F8-H-02) is per-order and persisted —
+    Enforces Rule-7: <=25 modifications per cycle (secondary guard). The
+    primary CMP Rule-7 control (F8-H-02) is per-order and persisted --
     enforced inside ``AsyncOpenAlgoClient.modify_order``.
     Runs as part of the orchestrator risk step with <1ms budget.
     """
@@ -1619,7 +1619,7 @@ async def update_trailing_stops() -> None:
         if not positions_data:
             return
 
-        # Enforce Rule-7: ≤25 modifications per cycle (pulled from settings).
+        # Enforce Rule-7: <=25 modifications per cycle (pulled from settings).
         cfg = get_settings()
         max_modifications = cfg.max_modifications
         modifications_this_cycle = 0
@@ -1668,7 +1668,7 @@ async def update_trailing_stops() -> None:
 
                 # Only persist if configuration was modified
                 if was_modified:
-                    # Enforce Rule-7: ≤25 modifications per cycle
+                    # Enforce Rule-7: <=25 modifications per cycle
                     if modifications_this_cycle >= max_modifications:
                         logger.warning(
                             f"Rule-7 limit reached ({max_modifications} "

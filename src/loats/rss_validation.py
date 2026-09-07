@@ -1,4 +1,4 @@
-"""F8-L-05 — RSS feed validation with recorded fallback (startup + CI gate).
+"""F8-L-05 -- RSS feed validation with recorded fallback (startup + CI gate).
 
 Closes the carried finding "bloombergquint RSS feed still unvalidated"
 (carried since FR1 as F6-L-06, re-carried as F8-L-05). TODO-27d removed the

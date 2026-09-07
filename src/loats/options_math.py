@@ -56,7 +56,7 @@ def d1(S: float, K: float, t: float, r: float, sigma: float) -> float:
     """
     if t <= 0 or sigma <= 0:
         # Guard against division by zero; callers validate t before invoking.
-        # Return 0.0 as a safe sentinel — price formulas handle expiry via
+        # Return 0.0 as a safe sentinel -- price formulas handle expiry via
         # intrinsic fallback in OptionsEngine.
         return 0.0
     sigma_sq = sigma * sigma
@@ -115,7 +115,7 @@ def black_scholes(
 
 
 # ---------------------------------------------------------------------------
-# Greeks — analytical, with vollib-compatible scaling
+# Greeks -- analytical, with vollib-compatible scaling
 # ---------------------------------------------------------------------------
 
 
@@ -192,7 +192,7 @@ def rho(flag: str, S: float, K: float, t: float, r: float, sigma: float) -> floa
 
 
 # ---------------------------------------------------------------------------
-# Implied volatility — Brent + Newton fallback
+# Implied volatility -- Brent + Newton fallback
 # ---------------------------------------------------------------------------
 
 
@@ -225,7 +225,7 @@ def implied_volatility(
                     check bounds before calling; we raise to let them fallback).
     """
 
-    # Arbitrage bounds check — let caller decide fallback if needed
+    # Arbitrage bounds check -- let caller decide fallback if needed
     # Keep minimal: if price is impossible, let solver fail gracefully.
     def _objective(sigma: float) -> float:
         try:
@@ -243,7 +243,7 @@ def implied_volatility(
     except Exception:  # nosec B110
         pass
 
-    # Newton fallback — needs vega as derivative
+    # Newton fallback -- needs vega as derivative
     try:
 
         def _vega_fn(sigma: float) -> float:
@@ -252,7 +252,7 @@ def implied_volatility(
 
         # scipy newton expects fprime = derivative; our _vega is correct
         # but we must pass raw vega, not scaled. Adjust by /0.01 already.
-        # For stability, try with scaled vega and let Newton handle it —
+        # For stability, try with scaled vega and let Newton handle it --
         # our _objective uses price diff, so derivative should be raw vega.
         # Bridge: raw = scaled / 0.01
         def _objective_raw(sigma: float) -> float:

@@ -3,7 +3,7 @@
 CMP P5 names per-source circuit breakers in addition to the global
 service-level breakers (``OPENALGO_CIRCUIT_BREAKER`` /
 ``TELEGRAM_CIRCUIT_BREAKER``). Finding F8-L-01 (FR8, carried since FR7):
-only global breakers existed — a single misbehaving producer's failures
+only global breakers existed -- a single misbehaving producer's failures
 were invisible to source-level isolation.
 
 The registry maps every :class:`StrengthSource` member to a dedicated
@@ -27,7 +27,7 @@ from ..strength import StrengthSource
 from .circuit_breaker import CircuitBreaker, CircuitBreakerConfig
 
 # Lazy settings binding (TODO-18 / HC-21 contract): importing this module
-# builds NO Settings instance — first attribute access proxies through
+# builds NO Settings instance -- first attribute access proxies through
 # get_settings(), so bare-env imports (no OPENALGO_API_KEY) stay clean.
 settings: Any = LazySettings()
 
@@ -96,12 +96,12 @@ class PerSourceBreakerRegistry:
 
     CMP P5 / F8-L-01 scope: only sources with a real producer (an
     emission site in ``orchestrator.py``) get a breaker. Dormant enum
-    members (``FUNDAMENTAL`` / ``MACHINE_LEARNING`` / ``OPTIONS_FLOW`` —
+    members (``FUNDAMENTAL`` / ``MACHINE_LEARNING`` / ``OPTIONS_FLOW`` --
     zero-weight placeholders per the F7-L-03 disposition, no production
     emitter) are deliberately NOT tracked: a breaker that can never be
     exercised is fleet-status noise, and its state would silently read
     "closed" while measuring nothing. When a producer for a dormant
-    source lands, add its member here — ``get`` fail-closes until then.
+    source lands, add its member here -- ``get`` fail-closes until then.
 
     Thread-safe: breakers are created eagerly under a lock at
     construction; ``get`` on an existing member never mutates state.

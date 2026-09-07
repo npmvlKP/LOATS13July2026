@@ -79,7 +79,7 @@ class Settings(BaseSettings):
     # F8-H-01: producer-window budget for the trading cycle. The legacy
     # hard-coded 80 ms window always expired mid-fetch under live feed
     # latencies (TA/sentiment take ~1.3 s), so every producer was
-    # cancelled before it could persist a signal — the CMP gate starved
+    # cancelled before it could persist a signal -- the CMP gate starved
     # ("insufficient signals"), no TradeDecision ever formed, and the P5
     # forward test could measure cycles but never a routing. Producers
     # are still cancelled when the window expires (they never outlive

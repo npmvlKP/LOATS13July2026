@@ -377,7 +377,7 @@ def get_order_rate_limiter(
 
     * No ``max_ops`` -> return the process-wide default singleton
       (from settings.max_ops).
-    * ``max_ops`` supplied → return a stable instance cached per
+    * ``max_ops`` supplied -> return a stable instance cached per
       ``(max_ops, window_size)`` pair.
     """
     if max_ops is None:
@@ -443,7 +443,7 @@ def get_sync_order_rate_limiter(
 
     * No ``max_ops`` -> return the process-wide default singleton
       (from settings.max_ops).
-    * ``max_ops`` supplied → return a stable instance cached per
+    * ``max_ops`` supplied -> return a stable instance cached per
       ``(max_ops, window_size)`` pair.
     """
     if max_ops is None:

@@ -11,8 +11,8 @@ Several module-level singletons (``db``, ``async_client``,
 ``sentiment``, ``trade_decision_engine``, ``sizing_engine``) run
 ``get_settings()`` inside ``__init__``. Settings is deliberately
 fail-closed (``openalgo_api_key`` has no default), which is correct at
-runtime but crashes ``import loats.*`` — and therefore
-``python -m loats.main --help`` — on any fresh checkout without
+runtime but crashes ``import loats.*`` -- and therefore
+``python -m loats.main --help`` -- on any fresh checkout without
 credentials. The CI fresh-clone boot test requires imports to be
 credential-free while runtime stays fail-closed; deferring
 construction reconciles both.
@@ -38,7 +38,7 @@ from typing import Any, cast
 class LazyProxy[T]:
     """Deferred-construction proxy around a zero-argument factory.
 
-    Note: deliberately NOT ``__slots__``-annotated — the instance
+    Note: deliberately NOT ``__slots__``-annotated -- the instance
     ``__dict__`` is what lets ``unittest.mock.patch`` setattr patched
     attributes onto the proxy (found by test_patched_attribute_shadows_proxy).
     """
@@ -46,7 +46,7 @@ class LazyProxy[T]:
     def __init__(self, factory: Callable[[], T]) -> None:
         self._factory = factory
         # When the factory is a plain class (all current call sites),
-        # isinstance() can answer before construction — matching the
+        # isinstance() can answer before construction -- matching the
         # stdlib Mock __class__ protocol.
         self._target_type: type[Any] | None = (
             factory if isinstance(factory, type) else None
