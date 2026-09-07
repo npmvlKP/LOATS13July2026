@@ -5,8 +5,17 @@ ignore =
     E303,
     E203,
     E226,
-    W503,
+    W503
 max-line-length = 88
+# Mirror ruff's per-file-ignores (pyproject.toml) so the pre-commit flake8
+# hook agrees with the formatter-of-record on tests/ and scripts/. The hook
+# passes explicit filenames, and flake8 does not apply `exclude` to those —
+# without the mirrored grants the hook false-fails on the tree's own files
+# (scripts/ verifiers' late sys.path-seeded imports = E402; frozen regex
+# literals in tests/ = E501). src/ stays fully strict.
+per-file-ignores =
+    tests/*:E501
+    scripts/*:E402,E501
 # Frozen audit evidence archived verbatim (mirrors pyproject.toml per-file-ignores,
 # which carry the same rationale): these directories are historical verification
 # artifacts and must not be mutated to satisfy lint. Excluded from repository-root
