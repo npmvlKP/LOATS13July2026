@@ -383,14 +383,18 @@ class TestCompactRepoDocs:
 
 
 class TestSrcAsciiGate:
-    """F8-M-06: scripts/check_src_ascii.py must propagate its verdict.
+    """ASCII gate contract (ADR-0014): reachable green, enforced red.
 
-    The historical defect: __main__ called check_ascii_files() and
-    discarded the bool, so the process exited 0 even when violations
-    were found. The scan may legitimately report violations (the src
-    tree currently contains non-ASCII emoji in alert message payloads
-    and typographic punctuation in docstrings), so only the exit-code
-    propagation is gated here, both directions, via live-tree runs.
+    The gate's original contract demanded byte-pure ASCII across all of
+    src/ while alerts.py deliberately embeds emoji in notification
+    payloads pinned by tests/test_alerts.py -- a gate whose green state
+    was unreachable, which is why it sat unwired in CI and pre-commit
+    since birth (the decorative-gate erosion class). ADR-0014 normalized
+    prose characters to ASCII, enumerated the test-pinned payload glyphs
+    in ALLOWED_NON_ASCII, and wired the gate into the CI repo-hygiene
+    job and pre-commit. These tests pin the new contract in both
+    directions: the live tree passes, any non-allowlisted non-ASCII
+    character -- anywhere in src/, including inside alerts.py -- fails.
     """
 
     SCRIPT = REPO_ROOT / "scripts" / "check_src_ascii.py"
@@ -404,23 +408,16 @@ class TestSrcAsciiGate:
             timeout=120,
         )
 
-    def test_exit_code_matches_reported_state(self):
+    def test_live_tree_passes(self):
         proc = self._run()
-        found = "non-ASCII" in proc.stdout and "Found" in proc.stdout
-        clean = "only ASCII" in proc.stdout
-        assert found != clean, f"unparsable gate output: {proc.stdout!r}"
-        if clean:
-            assert proc.returncode == 0, proc.stdout
-        else:
-            assert proc.returncode == 1, (
-                f"violations reported but exit code {proc.returncode} "
-                f"(discarded-result regression): {proc.stdout[:300]}"
-            )
+        assert proc.returncode == 0, proc.stdout
+        assert "satisfy the ASCII contract" in proc.stdout
+        assert proc.stderr == "", proc.stderr
 
-    def test_ascii_source_addition_flips_exit_code(self):
+    def test_non_ascii_source_addition_fails(self):
         probe = REPO_ROOT / "src" / "loats" / "_tmp_ascii_gate_probe.py"
         try:
-            probe.write_text("# non-ascii mutation ✓\n", encoding="utf-8")
+            probe.write_text("# non-ascii mutation \u2717\n", encoding="utf-8")
             proc = self._run()
         finally:
             probe.unlink(missing_ok=True)
@@ -428,14 +425,25 @@ class TestSrcAsciiGate:
             f"non-ASCII source file must fail the gate, got rc={proc.returncode}"
         )
         assert "_tmp_ascii_gate_probe" in proc.stdout
+        assert "U+2717" in proc.stdout
 
-    def test_gate_runs_without_stderr(self):
-        # Ordering-independent follow-up to the flip test: after the
-        # probe file is removed the gate must run cleanly (no tracebacks
-        # on stderr) and propagate its verdict either way.
-        proc = self._run()
-        assert proc.returncode in (0, 1)
-        assert proc.stderr == "", proc.stderr
+    def test_allowlist_is_enumeration_not_exemption(self):
+        # The alerts.py ALLOWED_NON_ASCII entry covers the exact test-pinned
+        # payload glyphs; any other non-ASCII character in that file must
+        # still fail. U+2717 (ballot X) is pinned by no test, so it is a
+        # violation even inside the allowlisted file.
+        alerts = REPO_ROOT / "src" / "loats" / "alerts.py"
+        original = alerts.read_bytes()
+        try:
+            alerts.write_bytes(original + b"\n# _tmp allowlist probe \xe2\x9c\x97\n")
+            proc = self._run()
+        finally:
+            alerts.write_bytes(original)
+        assert proc.returncode == 1, (
+            "a non-allowlisted character inside alerts.py must fail the gate: "
+            + proc.stdout[:300]
+        )
+        assert "alerts.py" in proc.stdout
 
 
 def _load_helper():

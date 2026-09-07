@@ -85,8 +85,14 @@ History (most recent last):
        of test-contaminated trade decisions into
        trade_decisions_quarantined, audit trail untouched; and its
        regression net tests/test_quarantine_test_data.py).
+  390  ASCII gate contract wave (2026-09-07): +1
+       (docs/adr/0014-src-ascii-gate-contract.md — the born-red,
+       never-wired src ascii gate made enforceable: prose characters
+       normalized to ASCII across src/, test-pinned alert emoji
+       enumerated in the gate's ALLOWED_NON_ASCII, gate wired into the
+       CI repo-hygiene job and pre-commit; see ADR-0014).
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 389
+TRACKED_FILE_CEILING = 390

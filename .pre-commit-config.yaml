@@ -120,3 +120,10 @@ repos:
         language: system
         pass_filenames: false
         files: ^(\.env\.example|src/loats/config/settings\.py)$
+
+      - id: src-ascii
+        name: src ascii conformance (test-pinned payloads allowlisted)
+        entry: python scripts/check_src_ascii.py
+        language: system
+        pass_filenames: false
+        files: ^src/.*\.py$
