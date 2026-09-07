@@ -1015,6 +1015,95 @@ class TestF8M02M07ExternalVerifier:
         assert "[FAIL] m02c_settle_wired_on_both_boundaries" in proc.stdout
 
 
+CARRIED_VERIFIER = REPO_ROOT / "scripts" / "verify_carried_set_external.py"
+CARRIED_RECORD_ANCHOR = "`as_of_date` convention (F8-L-02, CMP Rule 8) | **OPEN**"
+
+
+class TestCarriedSetExternalVerifier:
+    """Carried-set reconciliation net: the external verifier must stay honest.
+
+    GREEN direction: exits 0 against the live tree from a clean process,
+    re-deriving every disposition in
+    docs/audit-history/07Sep2026-carried-set-reconciliation.md.
+    RED direction: on a snapshot whose reconciliation record flips the
+    open item (as_of_date) to CLOSED without evidence, the verifier must
+    FAIL -- proving it verifies the recorded disposition against reality
+    rather than trusting the prose.
+    """
+
+    def test_verifier_passes_on_live_tree(self) -> None:
+        proc = subprocess.run(
+            [sys.executable, str(CARRIED_VERIFIER)],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+        assert proc.returncode == 0, proc.stdout[-2000:] + proc.stderr[-2000:]
+        assert "All carried-set dispositions VERIFIED." in proc.stdout
+        assert "[FAIL]" not in proc.stdout
+
+    def test_verifier_fails_on_open_item_flipped_snapshot(self, tmp_path) -> None:
+        rec = (
+            REPO_ROOT
+            / "docs"
+            / "audit-history"
+            / "07Sep2026-carried-set-reconciliation.md"
+        )
+        text = rec.read_text(encoding="utf-8")
+        assert CARRIED_RECORD_ANCHOR in text, "open-item anchor missing from the record"
+        mutated = text.replace(
+            CARRIED_RECORD_ANCHOR,
+            "`as_of_date` convention (F8-L-02, CMP Rule 8) | **CLOSED**",
+        )
+        assert mutated != text
+
+        snapshot = tmp_path / "snap"
+        (snapshot / "scripts").mkdir(parents=True)
+        for script in (REPO_ROOT / "scripts").glob("*.py"):
+            shutil.copy2(script, snapshot / "scripts" / script.name)
+        shutil.copytree(
+            REPO_ROOT / "src" / "loats",
+            snapshot / "src" / "loats",
+            ignore=shutil.ignore_patterns("__pycache__"),
+        )
+        (snapshot / "docs" / "audit-history").mkdir(parents=True)
+        (snapshot / "docs" / "audit-history" / rec.name).write_text(
+            mutated, encoding="utf-8"
+        )
+        shutil.copy2(REPO_ROOT / ".env.example", snapshot / ".env.example")
+        shutil.copytree(
+            REPO_ROOT / "reports",
+            snapshot / "reports",
+            ignore=shutil.ignore_patterns("__pycache__"),
+        )
+        shutil.copytree(
+            REPO_ROOT / "tests" / "fixtures",
+            snapshot / "tests" / "fixtures",
+            ignore=shutil.ignore_patterns("__pycache__"),
+        )
+        subprocess.run(
+            ["git", "init", "-q"], cwd=snapshot, capture_output=True, timeout=60
+        )
+        subprocess.run(
+            ["git", "add", "-A"], cwd=snapshot, capture_output=True, timeout=300
+        )
+
+        proc = subprocess.run(
+            [sys.executable, str(snapshot / "scripts" / CARRIED_VERIFIER.name)],
+            cwd=snapshot,
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+        assert proc.returncode != 0, (
+            "verifier PASSED on a record whose open item was flipped to "
+            "CLOSED -- it does not verify the recorded disposition"
+        )
+        assert "record registers as_of_date as the open item" in proc.stdout
+        assert "[FAIL] record registers as_of_date as the open item" in proc.stdout
+
+
 class TestFlake8HookGateAgreement:
     """The pre-commit flake8 hook must agree with the lint scope of record.
 
