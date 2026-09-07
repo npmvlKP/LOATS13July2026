@@ -20,9 +20,11 @@ live tree:
     trips, 100% gate compliance.
 (f) probe debris (F8-L-04) DISCHARGED -- probe commit objects absent
     from the clone; record documents the server-side protection proof.
-(g) as_of_date (F8-L-02) OPEN -- zero occurrences in src/ (the
-    registered next feature), and the zero-date.today() invariant
-    still holds.
+(g) as_of_date (F8-L-02) CLOSED -- the caller-supplied snapshot date is
+    implemented across the decision/audit record chain (model field,
+    engine + orchestrator parameters, persisted column), the
+    acceptance anchors are checked directly, and the zero-date.today()
+    invariant still holds.
 
 Usage:
     python scripts/verify_carried_set_external.py
@@ -373,7 +375,7 @@ def check_probe_debris() -> list[Check]:
     return results
 
 
-def check_as_of_date_open() -> list[Check]:
+def check_as_of_date_closed() -> list[Check]:
     results: list[Check] = []
     src_hits: list[Path] = []
     today_hits: list[Path] = []
@@ -387,9 +389,11 @@ def check_as_of_date_open() -> list[Check]:
             today_hits.append(py)
     results.append(
         (
-            "as_of_date remains OPEN (zero occurrences in src/loats)",
-            not src_hits,
-            "clean" if not src_hits else ", ".join(str(p.name) for p in src_hits),
+            "as_of_date implemented across src/loats",
+            bool(src_hits),
+            ", ".join(sorted(p.name for p in src_hits))
+            if src_hits
+            else "no occurrences -- field missing",
         )
     )
     results.append(
@@ -400,10 +404,51 @@ def check_as_of_date_open() -> list[Check]:
         )
     )
 
-    rec = _read(RECORD)
-    open_ok = "as_of_date" in rec and "**OPEN**" in rec
+    # F8-L-02 acceptance anchors: the propagation chain must be present
+    # end to end (model field -> engine parameter -> orchestrator
+    # parameter -> persisted column). All four live under src/loats so
+    # this suite stays runnable against a scripts/+src snapshot.
+    models_t = _read(SRC / "loats" / "models.py")
+    td_t = _read(SRC / "loats" / "trade_decision.py")
+    orch_t = _read(SRC / "loats" / "orchestrator.py")
+    db_t = _read(SRC / "loats" / "database.py")
     results.append(
-        ("record registers as_of_date as the open item", open_ok, "record scanned")
+        (
+            "TradeDecision model carries the as_of_date field",
+            "as_of_date: date | None" in models_t,
+            "src/loats/models.py",
+        )
+    )
+    results.append(
+        (
+            "TradeDecisionEngine accepts the caller-supplied as-of date",
+            "as_of_date: datetime.date | None = None" in td_t,
+            "src/loats/trade_decision.py",
+        )
+    )
+    results.append(
+        (
+            "orchestrator CMP step accepts the caller-supplied as-of date",
+            "as_of_date: datetime.date | None = None" in orch_t,
+            "src/loats/orchestrator.py",
+        )
+    )
+    results.append(
+        (
+            "trade_decisions schema persists as_of_date",
+            "as_of_date TEXT" in db_t,
+            "src/loats/database.py",
+        )
+    )
+
+    rec = _read(RECORD)
+    closed_ok = "as_of_date" in rec and "CLOSED 2026-09-07" in rec
+    results.append(
+        (
+            "record registers as_of_date as CLOSED with F8-L-02 evidence",
+            closed_ok,
+            "record scanned",
+        )
     )
     return results
 
@@ -424,7 +469,7 @@ def main() -> int:
         ("broker idempotency (CLOSED at client)", check_broker_idempotency()),
         ("live P1 re-measurement (DISCHARGED)", check_live_p1()),
         ("probe debris (DISCHARGED)", check_probe_debris()),
-        ("as_of_date (OPEN - registered)", check_as_of_date_open()),
+        ("as_of_date (CLOSED - implemented)", check_as_of_date_closed()),
     ]
 
     all_checks: list[dict[str, Any]] = []
