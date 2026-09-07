@@ -166,9 +166,11 @@ pytest tests/ --cov=src --cov-branch --cov-fail-under=80
   runnable: `scripts/run_p5_forward_test.py --ack-live-endpoint` enables
   routing only for the supervised 2-week run (log to
   `reports/p5_forward_test_*.json`); `scripts/verify_p5_forward_test.py`
-  grades it (≥14-day span, zero unhandled exceptions, routing enabled).
-  Every routed decision leaves a SHA-256-chained `ROUTE` audit row
-  carrying the routing outcome (success / disabled / error).
+  grades it (≥14-day span, zero unhandled exceptions, routing enabled,
+  **and measured decisional activity — zero routing counters is a hard
+  FAIL per ADR-006 Amendment 2**). Every routed decision leaves a
+  SHA-256-chained `ROUTE` audit row carrying the routing outcome
+  (success / disabled / error).
 
 ## License
 

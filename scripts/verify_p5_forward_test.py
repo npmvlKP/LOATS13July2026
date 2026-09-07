@@ -87,20 +87,39 @@ def grade_run_log(run_log: dict[str, Any]) -> Grade:
     # nothing about decisioning, so it does not clear the gate).
     has_activity_fields = "cycles_completed" in run_log and "counters" in run_log
     total_activity = 0
+    counters_decisional: int | None = None
     activity_recorded: bool | None = None
     if has_activity_fields:
         try:
             total_activity = int(run_log.get("cycles_completed", 0) or 0) + sum(
                 int(v) for v in (run_log.get("counters") or {}).values()
             )
+            counters_decisional = sum(
+                int(v) for v in (run_log.get("counters") or {}).values()
+            )
         except (TypeError, ValueError):
             total_activity = 0
+            counters_decisional = 0
         activity_recorded = total_activity > 0
         if not activity_recorded:
             reasons.append(
                 "no measured activity recorded "
                 "(cycles_completed and routing counters all zero — "
                 "run measures nothing)"
+            )
+        elif counters_decisional == 0:
+            # F8-H-01 hard criterion (2026-09-07): cycles alone prove the
+            # loop spun, not that the P5 mandate (route ALL TradeDecisions
+            # to Analyzer) was exercised. A multi-day run in which the
+            # engine never routed a single decision — success, disabled,
+            # or error — measures nothing about decisioning and must not
+            # grade PASS on cycle counts alone. Legacy logs without a
+            # ``counters`` field keep grading unchanged (criterion is
+            # None there).
+            reasons.append(
+                "no decisional activity recorded "
+                "(routing counters all zero — no TradeDecision was ever "
+                "routed to the Analyzer; cycles alone do not satisfy P5)"
             )
 
     data_freshness: str | None = None
@@ -131,6 +150,13 @@ def grade_run_log(run_log: dict[str, Any]) -> Grade:
         exceptions > 0
         or not routing.get("enabled_at_start")
         or activity_recorded is False
+        # F8-H-01 (2026-09-07): zero decisional routing outcomes fail an
+        # ENDED run (a finished 14-day span with no routed decision
+        # measured nothing). An ONGOING zero-decision run stays
+        # INCOMPLETE — e.g. a run started outside market hours has
+        # genuinely produced nothing yet. Legacy logs without
+        # ``counters`` keep None here and grade unchanged.
+        or (counters_decisional == 0 and ended is not None)
     )
     if hard_violation:
         return Grade("FAIL", reasons, activity_recorded, data_freshness)
