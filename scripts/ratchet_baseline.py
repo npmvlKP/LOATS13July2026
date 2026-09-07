@@ -70,8 +70,13 @@ History (most recent last):
        closure record; see the record's External verifier section).
        Wired live by tests/test_repo_hygiene.py::
        TestF8M02M07ExternalVerifier.
+  386  Shebang exec-bit normalizer wave (2026-09-07): +2
+       (scripts/ensure_shebang_exec_bit.py — the ADR-0013 self-healing
+       pre-commit normalizer for the Windows 100644 shebang class —
+       and its decision record
+       docs/adr/0013-shebang-exec-bit-normalizer.md).
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 384
+TRACKED_FILE_CEILING = 386

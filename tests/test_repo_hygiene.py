@@ -1083,3 +1083,90 @@ class TestFlake8HookGateAgreement:
         assert {c.strip() for c in m.group(2).split(",")} == {"E402", "E501"}, (
             "scripts/ grant diverged from ruff (ruff scripts/* carries E402, E501)"
         )
+
+
+class TestShebangExecBit:
+    """Every tracked shebang'd script must sit at index mode 100755.
+
+    Defect class (ADR-0013): Windows cannot record exec bits, so a
+    shebang'd script committed from Windows lands at 100644; Windows
+    ruff suppresses EXE001, so the defect surfaces only as a Linux CI
+    ruff failure — realized by verify_f8m02_m07_external.py before
+    db5957b. The shebang-exec-bit pre-commit hook
+    (scripts/ensure_shebang_exec_bit.py) self-heals staged files;
+    these tests pin the live-tree invariant and prove the normalizer's
+    semantics end-to-end in a throwaway git repository.
+    """
+
+    @staticmethod
+    def _load_normalizer():
+        spec = importlib.util.spec_from_file_location(
+            "ensure_shebang_exec_bit",
+            str(REPO_ROOT / "scripts" / "ensure_shebang_exec_bit.py"),
+        )
+        assert spec is not None and spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    def test_live_tree_shebang_scripts_are_executable(self) -> None:
+        mod = self._load_normalizer()
+        offenders = sorted(
+            p for p, m in mod.tracked_py_modes().items() if mod.needs_fix(m, p)
+        )
+        assert offenders == [], (
+            "shebang'd scripts at mode 100644 (Linux CI EXE001 will fail; "
+            f"run scripts/ensure_shebang_exec_bit.py): {offenders}"
+        )
+
+    def test_normalizer_flips_only_shebang_100644_files(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        mod = self._load_normalizer()
+        repo = tmp_path / "repo"
+        repo.mkdir()
+
+        def git(*args: str) -> None:
+            subprocess.run(["git", *args], cwd=repo, check=True, capture_output=True)
+
+        git("init", "-q")
+        git("config", "user.email", "guard@example.com")
+        git("config", "user.name", "guard")
+        (repo / "shebang.py").write_bytes(b"#!/usr/bin/env python3\nprint(1)\n")
+        (repo / "plain.py").write_bytes(b"print(1)\n")
+        git("add", "shebang.py", "plain.py")
+        monkeypatch.setattr(mod, "REPO_ROOT", repo)
+
+        assert mod.main(["shebang.py", "plain.py"]) == 0
+        out = capsys.readouterr().out
+        assert "enabled executable bit: shebang.py" in out
+        assert "plain.py" not in out
+        modes = mod.tracked_py_modes(["shebang.py", "plain.py"])
+        assert modes["shebang.py"] == "100755"
+        assert modes["plain.py"] == "100644"
+
+        # Idempotent when clean.
+        assert mod.main(["shebang.py", "plain.py"]) == 0
+        assert (
+            "OK every tracked shebang'd script already carries mode 100755"
+            in capsys.readouterr().out
+        )
+
+    def test_unit_semantics(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        mod = self._load_normalizer()
+        monkeypatch.setattr(mod, "REPO_ROOT", tmp_path)
+        shebang = tmp_path / "s.py"
+        shebang.write_bytes(b"#!/bin/sh\n")
+        plain = tmp_path / "p.py"
+        plain.write_bytes(b"print(1)\n")
+        assert mod.has_shebang(shebang) is True
+        assert mod.has_shebang(plain) is False
+        assert mod.parse_mode("100644 abcdef 0\tshebang.py") == "100644"
+        assert mod.needs_fix("100644", "s.py") is True
+        assert mod.needs_fix("100755", "s.py") is False
+        assert mod.needs_fix("100644", "p.py") is False
