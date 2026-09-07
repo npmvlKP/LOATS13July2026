@@ -63,8 +63,15 @@ History (most recent last):
        ADR-0011 artifact discipline. The rename keeps the count at 382,
        so the ceiling now equals the tree: any net addition requires a
        deliberate re-pin.
+  384  F8-M-02..07 closure wave (2026-09-07): +2
+       (scripts/verify_f8m02_m07_external.py — the clean-process
+       outcome verifier for risk-matrix rows F8-M-02..F8-M-07 — and
+       docs/audit-history/07Sep2026-F8-M-02-M-07-closure.md, its
+       closure record; see the record's External verifier section).
+       Wired live by tests/test_repo_hygiene.py::
+       TestF8M02M07ExternalVerifier.
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 382
+TRACKED_FILE_CEILING = 384
