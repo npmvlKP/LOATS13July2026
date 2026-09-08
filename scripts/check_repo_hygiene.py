@@ -107,10 +107,6 @@ ALLOWLIST: frozenset[str] = frozenset(
         # scripts/verify_todo27_eval.py and scripts/verify_todo27_external.py.
         "reports/todo27_eval.json",
         "reports/todo27_external.json",
-        # F8-H-01 external verification record; consumed by
-        # scripts/verify_f8h01_external.py and cited by
-        # docs/ADR-006-analyzer-routing-p5.md and the F8-L-06 closure note.
-        "reports/verify_f8h01_external.json",
     }
 )
 

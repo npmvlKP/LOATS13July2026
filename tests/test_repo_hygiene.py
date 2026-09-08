@@ -194,7 +194,6 @@ class TestForbiddenPatterns:
             "reports/production-verification.json",
             "reports/todo27_eval.json",
             "reports/todo27_external.json",
-            "reports/verify_f8h01_external.json",
         ):
             assert guard._violations([path]) == [], f"unexpected flag on {path}"
 

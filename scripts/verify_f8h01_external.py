@@ -314,7 +314,13 @@ async def main_async() -> int:
         for name, ok, note in _CHECKS:
             if not ok:
                 print(f"  FAILED: {name} {note}")
-    out = REPO_ROOT / "reports" / "verify_f8h01_external.json"
+    out = (
+        REPO_ROOT
+        / "reports"
+        / "health"
+        / "p5-verify-stubs"
+        / "verify_f8h01_external.json"
+    )
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(
         json.dumps(
