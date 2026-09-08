@@ -9,6 +9,7 @@ HTTP 400s (or silently-wrong parses) on every P5 cycle since 05Sep.
 from __future__ import annotations
 
 import re
+from datetime import datetime
 from typing import Any
 
 import pytest
@@ -16,6 +17,7 @@ import pytest
 import loats.openalgo as oa
 from loats.openalgo import AsyncOpenAlgoClient, OpenAlgoClient
 from loats.orchestrator import TradingOrchestrator
+from loats.utils.cache import cache_manager
 
 
 def _capturing_sync_client(
@@ -159,7 +161,7 @@ class TestOptionChainPayload:
             if endpoint == "expiry":
                 assert kwargs["json"]["instrumenttype"] == "options"
                 assert kwargs["json"]["symbol"] == "NIFTY"
-                return {"status": "success", "data": ["08-SEP-26", "15-SEP-26"]}
+                return {"status": "success", "data": ["01-JAN-49", "08-JAN-49"]}
             calls.append((method, endpoint, kwargs.get("json") or {}))
             return {"status": "success", "data": []}
 
@@ -171,7 +173,7 @@ class TestOptionChainPayload:
         payload = calls[0][2]
         assert payload["underlying"] == "NIFTY"
         # Front LISTED expiry, normalized to the compact wire format.
-        assert payload["expiry_date"] == "08SEP26"
+        assert payload["expiry_date"] == "01JAN49"
         assert payload["exchange"] == "NFO"
         assert "symbol" not in payload and "expiry" not in payload
 
@@ -198,12 +200,12 @@ class TestOptionChainPayload:
         assert re.match(r"^\d{2}[A-Z]{3}\d{2}$", oa._option_chain_expiry_date())
 
     def test_choose_listed_expiry_picks_front_listing_and_compacts(self) -> None:
-        picked = oa._choose_listed_expiry(["15-SEP-26", "08-SEP-26", "22-SEP-26"])
-        assert picked == "08SEP26"
+        picked = oa._choose_listed_expiry(["08-JAN-49", "01-JAN-49", "15-JAN-49"])
+        assert picked == "01JAN49"
 
     def test_choose_listed_expiry_skips_expired_entries(self) -> None:
-        picked = oa._choose_listed_expiry(["01-JAN-26", "15-SEP-26"])
-        assert picked == "15SEP26"
+        picked = oa._choose_listed_expiry(["01-JAN-26", "01-JAN-49"])
+        assert picked == "01JAN49"
 
     def test_choose_listed_expiry_falls_back_without_listing(
         self, monkeypatch: pytest.MonkeyPatch
@@ -295,7 +297,7 @@ class TestAsyncQuoteRouting:
         ) -> dict[str, Any]:
             calls.append((endpoint, kwargs.get("json") or {}))
             if endpoint == "expiry":
-                return {"status": "success", "data": ["08-SEP-26", "15-SEP-26"]}
+                return {"status": "success", "data": ["01-JAN-49", "08-JAN-49"]}
             if endpoint == "optionchain":
                 return {
                     "status": "success",
@@ -318,7 +320,7 @@ class TestAsyncQuoteRouting:
         assert calls[2][0] == "optionchain"
         assert calls[2][1]["underlying"] == "NIFTY"
         assert calls[2][1]["exchange"] == "NFO"
-        assert calls[2][1]["expiry_date"] == "08SEP26"
+        assert calls[2][1]["expiry_date"] == "01JAN49"
 
 
 class TestAdversarialRoundFindings:
@@ -401,11 +403,11 @@ class TestExpiryResolutionMemoization:
 
         def request(payload: dict[str, Any]) -> dict[str, Any]:
             calls.append(payload["symbol"])
-            return {"status": "success", "data": ["08-SEP-26", "15-SEP-26"]}
+            return {"status": "success", "data": ["01-JAN-49", "08-JAN-49"]}
 
         first = oa._resolve_expiry_date("NIFTY", "NFO", request)
         second = oa._resolve_expiry_date("NIFTY", "NFO", request)
-        assert first == second == "08SEP26"
+        assert first == second == "01JAN49"
         assert len(calls) == 1  # second call served from the memo
 
     def test_failed_lookup_is_not_cached(self) -> None:
@@ -429,14 +431,64 @@ class TestExpiryResolutionMemoization:
             method: str, endpoint: str, **kwargs: Any
         ) -> dict[str, Any]:
             assert endpoint == "expiry"
-            return {"status": "success", "data": ["08-SEP-26", "15-SEP-26"]}
+            return {"status": "success", "data": ["01-JAN-49", "08-JAN-49"]}
 
         monkey_patch = pytest.MonkeyPatch()
         try:
             monkey_patch.setattr(client, "_request", fake_request)
             first = await client._resolve_expiry_date_async("NIFTY", "NFO")
             second = await client._resolve_expiry_date_async("NIFTY", "NFO")
-            assert first == second == "08SEP26"
-            assert oa._EXPIRY_CACHE[("NIFTY", "NFO")][1] == "08SEP26"
+            assert first == second == "01JAN49"
+            assert oa._EXPIRY_CACHE[("NIFTY", "NFO")][1] == "01JAN49"
         finally:
             monkey_patch.undo()
+
+
+class TestHistoryTimestampNormalization:
+    """History rows carry epoch timestamps; consumers parse ISO strings."""
+
+    def test_epoch_timestamps_converted_to_iso(self) -> None:
+        result = oa._normalize_history_rows(
+            {
+                "status": "success",
+                "data": [
+                    {"close": 23838.4, "timestamp": 1788752700},
+                    {"close": 23850.0, "timestamp": 1788752760},
+                ],
+            }
+        )
+        first = result["data"][0]["timestamp"]
+        assert isinstance(first, str)
+        parsed = datetime.fromisoformat(first)
+        assert parsed.year == 2026 and parsed.tzinfo is not None
+
+    def test_iso_rows_pass_through_untouched(self) -> None:
+        original = {"timestamp": "2026-09-08T10:00:00+00:00"}
+        result = oa._normalize_history_rows({"data": [dict(original)]})
+        assert result["data"][0]["timestamp"] == original["timestamp"]
+
+    def test_non_list_and_missing_timestamp_pass_through(self) -> None:
+        payload = {"status": "error", "message": "x"}
+        assert oa._normalize_history_rows(payload) is payload
+        row_only = {"data": [{"close": 1.0}]}
+        assert oa._normalize_history_rows(row_only)["data"] == row_only["data"]
+
+    @pytest.mark.asyncio
+    async def test_async_history_normalizes_before_cache(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The value stored in the cache must already be ISO-parsable."""
+        client = AsyncOpenAlgoClient(api_key="k", base_url="http://t")
+
+        async def fake_request(
+            method: str, endpoint: str, **kwargs: Any
+        ) -> dict[str, Any]:
+            assert endpoint == "history"
+            return {"status": "success", "data": [{"close": 1.0, "timestamp": 0}]}
+
+        monkeypatch.setattr(client, "_request", fake_request)
+        await cache_manager.initialize()
+        result = await client.get_history("NIFTY", "1min")
+        ts = result["data"][0]["timestamp"]
+        assert isinstance(ts, str)
+        datetime.fromisoformat(ts)

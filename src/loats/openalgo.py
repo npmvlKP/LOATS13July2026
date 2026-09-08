@@ -397,6 +397,35 @@ def _normalize_option_chain(result: dict[str, Any]) -> dict[str, Any]:
     return {**result, "data": rows}
 
 
+def _normalize_history_rows(result: dict[str, Any]) -> dict[str, Any]:
+    """Normalize history rows into the shape every consumer parses.
+
+    The live deployment returns ``timestamp`` as INTEGER EPOCH SECONDS
+    (verified 08Sep2026: row = {open, high, low, close, volume, oi,
+    timestamp: 1788752700}), while the orchestrator's history consumers
+    parse ``datetime.fromisoformat(item["timestamp"])`` -- an int crashes
+    all three chart producers ("fromisoformat: argument must be str").
+    Epoch values are converted to timezone-aware UTC ISO-8601 strings;
+    string timestamps pass through untouched (a ISO-speaking deployment
+    must not be double-normalized). Rows lacking a timestamp, or a
+    non-list ``data`` payload, pass through unchanged.
+    """
+    rows = result.get("data")
+    if not isinstance(rows, list):
+        return result
+    normalized = False
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        ts = row.get("timestamp")
+        if isinstance(ts, (int, float)) and not isinstance(ts, bool):
+            row["timestamp"] = datetime.fromtimestamp(ts, tz=UTC).isoformat()
+            normalized = True
+    if not normalized:
+        return result
+    return {**result, "data": rows}
+
+
 def _history_payload(
     symbol: str, interval: str, from_date: str | None, to_date: str | None
 ) -> dict[str, Any]:
@@ -664,7 +693,8 @@ class OpenAlgoClient:
         to_date: str | None = None,
     ) -> dict[str, Any]:
         payload = _history_payload(symbol, interval, from_date, to_date)
-        return self._request("POST", "history", json=payload)
+        result = self._request("POST", "history", json=payload)
+        return _normalize_history_rows(result)
 
     def get_option_chain(
         self, symbol: str, expiry: str | None = None
@@ -1066,6 +1096,7 @@ class AsyncOpenAlgoClient:
         # Cache miss - fetch from API
         payload = _history_payload(symbol, interval, from_date, to_date)
         result = await self._request("POST", "history", json=payload)
+        result = _normalize_history_rows(result)
 
         # Cache the result for 5 minutes (300 seconds)
         try:
