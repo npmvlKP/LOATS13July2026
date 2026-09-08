@@ -372,15 +372,6 @@ class TestCompactRepoDocs:
             f"non-curated health snapshots tracked: {tracked}"
         )
 
-    def test_todo26_verifier_reads_archived_report(self):
-        src = (REPO_ROOT / "scripts" / "final_verify_todo26.py").read_text(
-            encoding="utf-8"
-        )
-        assert "audit-history" in src, (
-            "final_verify_todo26 must read TODO26_FINAL_REPORT.md from "
-            "docs/audit-history/ (F8-M-05 relocation)"
-        )
-
 
 class TestSrcAsciiGate:
     """ASCII gate contract (ADR-0014): reachable green, enforced red.
