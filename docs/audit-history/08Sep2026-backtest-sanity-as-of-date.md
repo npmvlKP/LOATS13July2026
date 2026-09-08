@@ -71,9 +71,10 @@ coverage and satisfies the zero-duplicate-logic rule.
   mypy `src/ --strict` + bandit `-r src/ -c pyproject.toml` +
   pip-audit (ADR-0010 waiver `PYSEC-2026-3740`) + gitleaks - all green.
 - Scripts-wiring guard green on the live tree after the probe deletion.
-- PR delivery through protected main follows this record; post-merge
-  pipeline run id to be attached per the merge-evidence pattern
-  (PR #7 / PR #9 precedent).
+- PR delivery through protected main followed this record; the
+  post-merge `main` pipeline run **34188827522** completed
+  successfully (2026-09-08) - attached as merge evidence per the
+  PR #7 / PR #9 pattern.
 
 ## Risk register delta
 
