@@ -7,7 +7,7 @@ on historical data stored in the database and logs results to audit trail.
 CMP Requirement: P4 exit gate - "backtest sanity on /history data"
 """
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
@@ -50,6 +50,11 @@ class BacktestSanityResult(BaseModel):
 
     symbol: str = Field(description="Symbol tested")
     timestamp: datetime = Field(description="When the check was performed")
+    # F8-L-02: input snapshot date the analysis window is anchored to;
+    # None means the live wall-clock window (weekly scheduler run).
+    as_of_date: date | None = Field(
+        default=None, description="Input snapshot date (window anchor)"
+    )
     total_windows: int = Field(description="Total walk-forward windows")
     total_bars: int = Field(description="Total bars analyzed")
     total_pnl: Decimal = Field(description="Aggregate PnL across all windows")
@@ -193,6 +198,7 @@ async def run_backtest_sanity_check(
     days_back: int = 30,
     window_size: int = 20,
     step_size: int = 10,
+    as_of_date: date | None = None,
 ) -> BacktestSanityResult:
     """
     Run backtest sanity check on historical data.
@@ -205,6 +211,11 @@ async def run_backtest_sanity_check(
         days_back: Number of days to look back in history
         window_size: Walk-forward window size in bars
         step_size: Step size between windows
+        as_of_date: F8-L-02 (CMP Rule 8) input snapshot date. When supplied,
+            the history window ends at that day's end-of-day (UTC) instead of
+            wall-clock now, so replaying the same snapshot date always yields
+            the same walk-forward window; it is also stamped onto the result.
+            None keeps the live wall-clock window (scheduler default).
 
     Returns:
         BacktestSanityResult with complete analysis
@@ -220,11 +231,29 @@ async def run_backtest_sanity_check(
             "days_back": days_back,
             "window_size": window_size,
             "step_size": step_size,
+            "as_of_date": (as_of_date.isoformat() if as_of_date is not None else None),
         },
     )
 
-    # Fetch historical data from database
-    cutoff_time = datetime.now(UTC) - timedelta(days=days_back)
+    # Fetch historical data from database.
+    # F8-L-02: anchor the window. An explicit as_of_date pins the window end
+    # to that day's end-of-day (UTC) so the snapshot day's bars are fully
+    # included and replays are deterministic; None keeps the live wall-clock
+    # window (weekly scheduler path).
+    if as_of_date is not None:
+        window_end = datetime(
+            as_of_date.year,
+            as_of_date.month,
+            as_of_date.day,
+            23,
+            59,
+            59,
+            999999,
+            tzinfo=UTC,
+        )
+    else:
+        window_end = datetime.now(UTC)
+    cutoff_time = window_end - timedelta(days=days_back)
 
     # Use the sync database interface in an async-safe way
     try:
@@ -235,7 +264,7 @@ async def run_backtest_sanity_check(
                 symbol=test_symbol,
                 interval="5min",  # Default interval
                 start_date=cutoff_time,
-                end_date=datetime.now(UTC),
+                end_date=window_end,
             )
 
         history_data = await asyncio.to_thread(fetch_sync)
@@ -332,6 +361,7 @@ async def run_backtest_sanity_check(
     result = BacktestSanityResult(
         symbol=test_symbol,
         timestamp=datetime.now(UTC),
+        as_of_date=as_of_date,
         total_windows=total_windows,
         total_bars=len(history_data),
         total_pnl=total_pnl,
@@ -348,6 +378,9 @@ async def run_backtest_sanity_check(
             "Backtest sanity check completed",
             extra={
                 "symbol": test_symbol,
+                "as_of_date": (
+                    as_of_date.isoformat() if as_of_date is not None else None
+                ),
                 "total_windows": total_windows,
                 "pass_rate": float(pass_rate),
                 "avg_pnl": float(avg_pnl),

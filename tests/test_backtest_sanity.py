@@ -1,6 +1,6 @@
 """Tests for walk-forward window slicing and no look-ahead."""
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 
 import pytest
@@ -244,3 +244,123 @@ class TestBacktestSanityCheckRun:
                 await run_backtest_sanity_check(
                     symbol="NIFTY", days_back=1, window_size=20, step_size=10
                 )
+
+
+class TestAsOfDatePinning:
+    """F8-L-02: as_of_date pins the walk-forward fetch window and result."""
+
+    @staticmethod
+    def _make_anchored(count: int) -> list:
+        base = datetime(2026, 8, 31, 9, 15, tzinfo=UTC)
+        return [
+            HistoricalData(
+                symbol="NIFTY",
+                timestamp=base + timedelta(minutes=5 * i),
+                open=100.0 + i,
+                high=101.0 + i,
+                low=99.0 + i,
+                close=100.5 + i,
+                volume=10_000,
+                interval="5min",
+            )
+            for i in range(count)
+        ]
+
+    @pytest.mark.asyncio
+    async def test_as_of_date_pins_fetch_window_to_eod(self):
+        """end_date equals the snapshot day's EOD; start = end - days_back."""
+        from unittest.mock import MagicMock, patch
+
+        from loats.backtest_sanity import run_backtest_sanity_check
+
+        mock_db = MagicMock()
+        mock_db.get_historical_data.return_value = self._make_anchored(50)
+
+        with (
+            patch("loats.backtest_sanity.db", mock_db),
+            patch("loats.backtest_sanity.settings.default_symbol", "NIFTY"),
+        ):
+            await run_backtest_sanity_check(
+                symbol="NIFTY",
+                days_back=1,
+                window_size=20,
+                step_size=10,
+                as_of_date=date(2026, 8, 31),
+            )
+
+        kwargs = mock_db.get_historical_data.call_args.kwargs
+        assert kwargs["end_date"] == datetime(
+            2026, 8, 31, 23, 59, 59, 999999, tzinfo=UTC
+        )
+        assert kwargs["start_date"] == kwargs["end_date"] - timedelta(days=1)
+
+    @pytest.mark.asyncio
+    async def test_default_window_remains_live_wall_clock(self):
+        """as_of_date=None keeps the live now()-anchored window (scheduler path)."""
+        from unittest.mock import MagicMock, patch
+
+        from loats.backtest_sanity import run_backtest_sanity_check
+
+        mock_db = MagicMock()
+        mock_db.get_historical_data.return_value = self._make_anchored(50)
+        t0 = datetime.now(UTC)
+
+        with (
+            patch("loats.backtest_sanity.db", mock_db),
+            patch("loats.backtest_sanity.settings.default_symbol", "NIFTY"),
+        ):
+            await run_backtest_sanity_check(
+                symbol="NIFTY", days_back=1, window_size=20, step_size=10
+            )
+
+        t1 = datetime.now(UTC)
+        kwargs = mock_db.get_historical_data.call_args.kwargs
+        assert t0 <= kwargs["end_date"] <= t1
+        assert kwargs["start_date"] == kwargs["end_date"] - timedelta(days=1)
+
+    @pytest.mark.asyncio
+    async def test_result_stamps_as_of_date(self):
+        """Pinned run stamps the snapshot date; live run stamps None."""
+        from unittest.mock import MagicMock, patch
+
+        from loats.backtest_sanity import run_backtest_sanity_check
+
+        mock_db = MagicMock()
+        mock_db.get_historical_data.return_value = self._make_anchored(50)
+
+        with (
+            patch("loats.backtest_sanity.db", mock_db),
+            patch("loats.backtest_sanity.settings.default_symbol", "NIFTY"),
+        ):
+            pinned = await run_backtest_sanity_check(
+                symbol="NIFTY", days_back=1, as_of_date=date(2026, 8, 31)
+            )
+            live = await run_backtest_sanity_check(symbol="NIFTY", days_back=1)
+
+        assert pinned.as_of_date == date(2026, 8, 31)
+        assert live.as_of_date is None
+
+    @pytest.mark.asyncio
+    async def test_same_as_of_date_replay_yields_identical_window(self):
+        """Replays with the same snapshot date reuse byte-identical query bounds."""
+        from unittest.mock import MagicMock, patch
+
+        from loats.backtest_sanity import run_backtest_sanity_check
+
+        mock_db = MagicMock()
+        mock_db.get_historical_data.return_value = self._make_anchored(50)
+
+        with (
+            patch("loats.backtest_sanity.db", mock_db),
+            patch("loats.backtest_sanity.settings.default_symbol", "NIFTY"),
+        ):
+            await run_backtest_sanity_check(
+                symbol="NIFTY", days_back=7, as_of_date=date(2026, 8, 31)
+            )
+            first = mock_db.get_historical_data.call_args.kwargs
+            await run_backtest_sanity_check(
+                symbol="NIFTY", days_back=7, as_of_date=date(2026, 8, 31)
+            )
+            second = mock_db.get_historical_data.call_args.kwargs
+
+        assert first == second
