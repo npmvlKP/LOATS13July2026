@@ -123,8 +123,19 @@ History (most recent last):
        supervisor, the recovery of the abandoned forward-test run, and
        the backtest-sanity interval source-of-truth fix; tree returns
        to 395 = ceiling).
+  396  P5 evidence-stream isolation wave (2026-09-08): +0
+       (scripts/verify_f8h01_external.py check_e now pins
+       P5_RUN_LOG_DIR so verification runs stop dropping dry-run stub
+       logs into the live reports/ stream; check_repo_hygiene.py gains
+       the disk-state guard _p5_dry_run_stubs; .gitignore absorbs
+       reports/health/p5-verify-stubs/. No tracked files added.)
+  397  F8-H-02 closure-record wave (2026-09-08): +1
+       (docs/audit-history/08Sep2026-f8h02-closure-and-p5-evidence-
+       hygiene.md - closure of the Rule-7 per-order finding plus the
+       P5 evidence-stream contamination fix and its disk-state guard;
+       ceiling 397 = final tree).
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 395
+TRACKED_FILE_CEILING = 396

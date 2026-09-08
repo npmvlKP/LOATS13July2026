@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import fnmatch
 import importlib.util
+import json
 import os
 import re
 import shutil
@@ -1007,6 +1008,7 @@ class TestF8M02M07ExternalVerifier:
 
 
 CARRIED_VERIFIER = REPO_ROOT / "scripts" / "verify_carried_set_external.py"
+F8H01_VERIFIER = REPO_ROOT / "scripts" / "verify_f8h01_external.py"
 CARRIED_RECORD_ANCHOR = (
     "`as_of_date` convention (F8-L-02, CMP Rule 8) | CLOSED 2026-09-07"
 )
@@ -1272,3 +1274,87 @@ class TestShebangExecBit:
         assert mod.needs_fix("100644", "s.py") is True
         assert mod.needs_fix("100755", "s.py") is False
         assert mod.needs_fix("100644", "p.py") is False
+
+
+class TestF8H01VerifierEvidenceStreamIsolation:
+    """The F8-H-01 verifier must not write into the production P5 evidence
+    stream.
+
+    Defect (2026-09-08): check_e shelled ``run_p5_forward_test.py
+    --dry-run`` without P5_RUN_LOG_DIR, so every verifier run dropped a
+    closed dry-run stub into reports/ -- machine-local debris in the live
+    run-log directory, invisible to git (reports/*.json ignored) and to
+    the tracked-set guard alike.
+    """
+
+    def test_runner_invocation_pins_p5_run_log_dir(self) -> None:
+        src = F8H01_VERIFIER.read_text(encoding="utf-8")
+        assert "P5_RUN_LOG_DIR" in src, (
+            "verify_f8h01_external.py must redirect the dry-run runner's "
+            "run-log writes out of the production evidence stream"
+        )
+
+    def test_verifier_run_leaves_no_stub_in_reports(self, tmp_path) -> None:
+        before = set((REPO_ROOT / "reports").glob("p5_forward_test_*.json"))
+        proc = subprocess.run(
+            [sys.executable, str(F8H01_VERIFIER)],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            timeout=600,
+        )
+        assert proc.returncode == 0, proc.stdout[-2000:] + proc.stderr[-2000:]
+        after = set((REPO_ROOT / "reports").glob("p5_forward_test_*.json"))
+        assert after == before, (
+            f"verifier run created debris in reports/: "
+            f"{sorted(p.name for p in after - before)}"
+        )
+        assert "[FAIL]" not in proc.stdout
+
+    def test_guard_flags_dry_run_stub_in_evidence_stream(
+        self, tmp_path, monkeypatch
+    ) -> None:
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location(
+            "check_repo_hygiene_probe", GUARD_PATH
+        )
+        assert spec is not None and spec.loader is not None
+        guard = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(guard)
+
+        reports = tmp_path / "reports"
+        reports.mkdir()
+        stub = reports / "p5_forward_test_20260908_101820.json"
+        stub.write_text(
+            json.dumps(
+                {
+                    "metadata": {
+                        "phase_gate": "P5",
+                        "finding": "F8-H-01",
+                        "reason": "F8-H-01 P5 forward test",
+                        "dry_run": True,
+                        "script": "scripts/run_p5_forward_test.py",
+                    },
+                    "started_at": "2026-09-08T10:18:20+00:00",
+                    "ended_at": "2026-09-08T10:18:20+00:00",
+                }
+            ),
+            encoding="utf-8",
+        )
+        with open(reports / "p5_forward_test_live.json", "w", encoding="utf-8") as fh:
+            json.dump(
+                {
+                    "metadata": {
+                        "phase_gate": "P5",
+                        "finding": "F8-H-01",
+                        "reason": "supervised run",
+                        "dry_run": False,
+                        "script": "scripts/run_p5_forward_test.py",
+                    },
+                },
+                fh,
+            )
+
+        monkeypatch.setattr(guard, "REPO_ROOT", tmp_path)
+        assert guard._p5_dry_run_stubs() == [stub.name]

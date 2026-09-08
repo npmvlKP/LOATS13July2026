@@ -129,6 +129,9 @@ reports/p5_forward_test_*.json.claim
 # Archived stub-era run logs + stray runtime files (2026-09-07 P3 hygiene
 # sweep; kept for forensics, not evidence of record)
 reports/archived-stubs-*/
+# F8-H-01 verifier dry-run stubs (2026-09-08 evidence-stream fix: check_e
+# redirects the dry-run runner here instead of the live reports/ stream)
+reports/health/p5-verify-stubs/
 
 # Health check intermediate run artifacts (keep health-final-*.json only)
 reports/health/health-fast-*.json

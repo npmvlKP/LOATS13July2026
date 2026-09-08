@@ -20,6 +20,7 @@ from __future__ import annotations
 import argparse
 import fnmatch
 import json
+import os
 import re
 import subprocess
 import sys
@@ -178,6 +179,40 @@ def _root_junk() -> list[str]:
     return root_junk_findings(REPO_ROOT)
 
 
+# F8-H-01 evidence-stream guard (2026-09-08): test/verification invocations
+# of scripts/run_p5_forward_test.py are required to redirect run-log writes
+# via P5_RUN_LOG_DIR (the isolation mechanism tests/ already pin); a dry-run
+# stub landing in the production evidence stream means a caller skipped it.
+# Matches only the dry-run stub grammar — live supervised logs (dry_run
+# false) are never flagged, so the gate can never block a real run.
+def _p5_dry_run_stubs() -> list[str]:
+    stubs: list[str] = []
+    reports = REPO_ROOT / "reports"
+    if not reports.is_dir():
+        return stubs
+    for entry in os.scandir(reports):
+        if not (entry.is_file() and entry.name.startswith("p5_forward_test_")):
+            continue
+        if not entry.name.endswith(".json"):
+            continue
+        try:
+            with open(entry.path, encoding="utf-8") as fh:
+                head = fh.read(2048)
+            if '"dry_run": true' not in head and "'dry_run': True" not in head:
+                continue
+            with open(entry.path, encoding="utf-8") as fh:
+                meta = json.load(fh).get("metadata", {})
+        except (OSError, ValueError):
+            continue
+        if (
+            meta.get("phase_gate") == "P5"
+            and meta.get("script") == "scripts/run_p5_forward_test.py"
+            and meta.get("dry_run") is True
+        ):
+            stubs.append(entry.name)
+    return stubs
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--json", default="", help="write summary JSON to this path")
@@ -191,6 +226,7 @@ def main() -> int:
 
     violations = _violations(tracked)
     junk = _root_junk()
+    p5_stubs = _p5_dry_run_stubs()
     ceiling_breach = len(tracked) > TRACKED_FILE_CEILING
 
     problems: list[str] = []
@@ -198,6 +234,11 @@ def main() -> int:
         problems.append(f"tracked path matches forbidden pattern '{pattern}': {path}")
     for name in junk:
         problems.append(f"root junk artifact present: {name}")
+    for name in p5_stubs:
+        problems.append(
+            f"dry-run stub in the production P5 evidence stream: reports/{name} "
+            "(delete it; the caller must set P5_RUN_LOG_DIR - see F8-H-01)"
+        )
     if ceiling_breach:
         problems.append(
             f"tracked file count {len(tracked)} exceeds ceiling {TRACKED_FILE_CEILING}"
@@ -208,6 +249,7 @@ def main() -> int:
         "ceiling": TRACKED_FILE_CEILING,
         "pattern_violations": len(violations),
         "root_junk": junk,
+        "p5_dry_run_stubs": p5_stubs,
         "problems": problems,
         "status": "PASS" if not problems else "FAIL",
     }
