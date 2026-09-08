@@ -115,6 +115,14 @@ History (most recent last):
        record for the register's last open item, with the wave's
        implementation surfaces, behaviour contract, and acceptance
        evidence. Carried set now eight of eight CLOSED/DISCHARGED).
+       [Subsequent stale-verifier removal wave (PR #10) took the tree
+       back to 394; the ceiling stayed 395.]
+  395  P5 resume-guard + sanity-interval wave (2026-09-08): +1
+       (docs/audit-history/08Sep2026-p5-resume-guard-interval-fix.md —
+       wave record for the single-writer resume guard on the P5
+       supervisor, the recovery of the abandoned forward-test run, and
+       the backtest-sanity interval source-of-truth fix; tree returns
+       to 395 = ceiling).
 """
 
 from __future__ import annotations
