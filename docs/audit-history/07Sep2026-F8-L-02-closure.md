@@ -70,8 +70,10 @@ test mocks the real producers (PR #6 Linux-CI lesson).
   `loatsNEW/Scripts`).
 - External verifier: all carried-set dispositions verified from a clean
   process against the working tree.
-- Full-suite quality-gate re-run and PR delivery follow this record;
-  merge evidence (post-merge pipeline run) to be attached to the PR.
+- Full-suite quality-gate re-run preceded PR delivery (#8, merged
+  `3997e31`); post-merge pipeline run 34180909682 completed
+  successfully on `main` (2026-09-08, 3m27s) - merge evidence,
+  mirroring the PR #7 pattern (run 34141119952).
 
 ## Ratchet
 
