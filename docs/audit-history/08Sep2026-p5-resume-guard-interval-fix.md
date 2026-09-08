@@ -113,3 +113,41 @@ production database.
   optional keys; legacy logs grade unchanged (validator untouched).
 - `run_backtest_sanity_check` gains an optional trailing parameter; all
   existing callers and call_args-based tests pass unmodified.
+
+## Adversarial review round (2026-09-08, same day)
+
+A fresh-subagent adversarial grade of this wave's diff returned
+REQUEST_CHANGES (6.5/10) with two blocking findings; both were verified
+real and fixed, RED-first:
+
+1. **Recycled-PID deadlock (high).** Exact-image liveness matches ANY live
+   same-image process (~19 share the base interpreter on this host), so a
+   dead supervisor's recycled PID would PERMANENTLY BLOCK takeover of an
+   in-span evidence run — reintroducing the evidence-loss mode this wave
+   fixes. Writer identity now binds the claim to the writer's process
+   creation time (GetProcessTimes / /proc stat field 22), recorded as
+   `supervisor_started_at`; a live same-image process with a different
+   creation time is a recycler = dead writer, takeover allowed. Logs
+   without the stamp (pre-identity) keep image matching.
+2. **Claim race not closed (medium).** The post-write re-read narrows the
+   window but two claimants can still interleave read/write and both
+   proceed; the previous comment overclaimed ("settles the race
+   deterministically") — my error, retracted. Mutual exclusion is now an
+   OS-level exclusive lock on a `<log>.claim` sidecar (msvcrt.locking /
+   fcntl.flock) held for the writer's lifetime: the kernel releases it on
+   process death, so a hard kill cannot orphan a claim, and two writers
+   cannot both proceed by construction.
+
+Non-blocking findings also fixed: resolver refusals are persisted to
+`resume_refusal` (both refusal paths now leave evidence); `_release_run_log`
+is identity-scoped (never clears a successor's claim); the misleading mypy
+comment was corrected (scripts/ is excluded from the repo mypy config);
+the stray `pytest-report.xml` worktree artifact was deleted; sidecar
+artifacts are gitignored. Test gaps closed: exit-2 claim-refusal branch,
+free-PID OpenProcess error path, recycled-PID takeover, external lock
+holder, lock death auto-release, resolver-refusal persistence
+(TestWriterIdentity, 9 tests; file total 61).
+
+Live regression verification after the fixes: the running supervisor's
+pre-identity claim still grades `alive` (fallback arm), a second `--resume`
+still refuses with rc=2 and persists the refusal.

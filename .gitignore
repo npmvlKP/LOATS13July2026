@@ -123,6 +123,8 @@ reports/performance/*.json
 
 # P5 forward-test run logs (runtime evidence, graded by verify_p5_forward_test)
 reports/p5_forward_test_*.json
+# Single-writer guard sidecar (kernel lock held by the live supervisor)
+reports/p5_forward_test_*.json.claim
 
 # Archived stub-era run logs + stray runtime files (2026-09-07 P3 hygiene
 # sweep; kept for forensics, not evidence of record)
