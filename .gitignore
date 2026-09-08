@@ -141,7 +141,11 @@ reports/health/health-*.json
 reports/health/bandit.json
 reports/health/coverage.json
 reports/health/fast-fixes.json
+# Both spellings: the health runner writes pip_audit.json (underscore); ad-hoc
+# manual pip-audit runs use the security-dir spelling pip-audit.json. The
+# hyphenated variant leaked into reports/health/ on 08Sep — ignore both.
 reports/health/pip_audit.json
+reports/health/pip-audit.json
 reports/health/run*.json
 reports/health/only-probes.json
 
