@@ -119,7 +119,6 @@ ignore = [
 "tests/*" = ["S101", "DTZ001", "DTZ005", "BLE001", "SLF001", "PLC0415", "T201", "ANN001", "ANN201", "ANN202", "PT001", "PT011", "PT012", "ARG001", "PTH123", "PLR0915", "E501", "B017"]
 "scripts/*" = ["INP001", "T201", "E402", "E501", "RUF001", "UP035", "DTZ005", "PGH003", "F841"]
 "scripts/identify_low_coverage.py" = ["E501"]
-"scripts/final_verify_todo26.py" = ["INP001", "T201", "E402", "E501", "RUF001", "UP035", "DTZ005", "F401", "F541", "W292"]
 "scripts/benchmark_performance.py" = ["E402"]
 "scripts/benchmark_supertrend.py" = ["E402"]
 "scripts/verify_todo27_eval.py" = ["PGH003", "F841"]
