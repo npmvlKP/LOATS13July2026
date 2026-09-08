@@ -1009,6 +1009,7 @@ class TestF8M02M07ExternalVerifier:
 
 CARRIED_VERIFIER = REPO_ROOT / "scripts" / "verify_carried_set_external.py"
 F8H01_VERIFIER = REPO_ROOT / "scripts" / "verify_f8h01_external.py"
+F8H02_VERIFIER = REPO_ROOT / "scripts" / "verify_f8h02_external.py"
 CARRIED_RECORD_ANCHOR = (
     "`as_of_date` convention (F8-L-02, CMP Rule 8) | CLOSED 2026-09-07"
 )
@@ -1358,3 +1359,59 @@ class TestF8H01VerifierEvidenceStreamIsolation:
 
         monkeypatch.setattr(guard, "REPO_ROOT", tmp_path)
         assert guard._p5_dry_run_stubs() == [stub.name]
+
+
+class TestF8H02ExternalVerifier:
+    """Suite net for the F8-H-02 external verifier (Rule-7 per-order budget).
+
+    GREEN direction: exits 0 against the live tree from a clean process,
+    behaviorally proving the per-order modification gate (persistence,
+    reserve-before-broker, boundary enforcement, fail-closed, release,
+    terminal reset).
+    RED direction: on a snapshot whose ``modify_order`` no longer reserves
+    budget, the verifier must FAIL -- proving it verifies behavior rather
+    than source idioms (the F8-C-01 lesson, docs/adr/0006).
+    """
+
+    def test_verifier_passes_on_live_tree(self) -> None:
+        proc = subprocess.run(
+            [sys.executable, str(F8H02_VERIFIER)],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+        assert proc.returncode == 0, proc.stdout[-2000:] + proc.stderr[-2000:]
+        assert "Rule-7 per-order gate verified live" in proc.stdout
+        assert "[FAIL]" not in proc.stdout
+
+    def test_verifier_fails_on_gate_stripped_snapshot(self, tmp_path) -> None:
+        snapshot = tmp_path / "snap"
+        (snapshot / "scripts").mkdir(parents=True)
+        for script in (REPO_ROOT / "scripts").glob("*.py"):
+            shutil.copy2(script, snapshot / "scripts" / script.name)
+        shutil.copytree(
+            REPO_ROOT / "src" / "loats",
+            snapshot / "src" / "loats",
+            ignore=shutil.ignore_patterns("__pycache__"),
+        )
+        target = snapshot / "src" / "loats" / "openalgo.py"
+        src = target.read_text(encoding="utf-8")
+        anchor = "rules_engine.reserve_modification(order_id)"
+        assert anchor in src, "gate anchor missing from openalgo.py"
+        target.write_text(
+            src.replace(anchor, "pass  # F8-H-02 gate stripped by mutation"),
+            encoding="utf-8",
+        )
+        proc = subprocess.run(
+            [sys.executable, str(snapshot / "scripts" / F8H02_VERIFIER.name)],
+            cwd=snapshot,
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+        assert proc.returncode != 0, (
+            "verifier PASSED on a snapshot whose modify_order boundary gate "
+            "was stripped -- it does not verify the behavior"
+        )
+        assert "[FAIL] 3. boundary gate fires at modify_order" in proc.stdout

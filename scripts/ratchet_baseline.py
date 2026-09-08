@@ -130,6 +130,13 @@ History (most recent last):
        the disk-state guard _p5_dry_run_stubs; .gitignore absorbs
        reports/health/p5-verify-stubs/. No tracked files added.)
   397  F8-H-02 closure-record wave (2026-09-08): +1
+       (scripts/verify_f8h02_external.py - outcome-scoped external
+       verifier for the Rule-7 per-order modification budget, GREEN/RED
+       netted in tests/test_repo_hygiene.py; plus
+       docs/audit-history/08Sep2026-f8h02-closure-and-p5-evidence-
+       hygiene.md registering F8-H-02 CLOSED with live evidence.
+       Ceiling 397 = this tree.)
+  397  F8-H-02 closure-record wave (2026-09-08): +1
        (docs/audit-history/08Sep2026-f8h02-closure-and-p5-evidence-
        hygiene.md - closure of the Rule-7 per-order finding plus the
        P5 evidence-stream contamination fix and its disk-state guard;
@@ -138,4 +145,4 @@ History (most recent last):
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 396
+TRACKED_FILE_CEILING = 397
