@@ -109,12 +109,15 @@ class PerSourceBreakerRegistry:
 
     #: Enum members with a live producer in orchestrator.py. Order is
     #: irrelevant; membership is what defines the breaker fleet scope.
+    #: OPTIONS_FLOW joined in the F8-C-01 wave 2 (5th producer: broker
+    #: option-chain flow via ``_execute_options_flow_analysis``).
     ACTIVE_SOURCES: frozenset[StrengthSource] = frozenset(
         {
             StrengthSource.TECHNICAL_ANALYSIS,
             StrengthSource.SENTIMENT,
             StrengthSource.VOLATILITY,
             StrengthSource.PRICE_ACTION,
+            StrengthSource.OPTIONS_FLOW,
         }
     )
 

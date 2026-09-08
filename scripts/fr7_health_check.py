@@ -635,6 +635,7 @@ def probe_strength_gate(rep: Report) -> None:
             "SENTIMENT",
             "VOLATILITY",
             "PRICE_ACTION",
+            "OPTIONS_FLOW",
         }
         missing = required - emitted
         prod_ok = not missing

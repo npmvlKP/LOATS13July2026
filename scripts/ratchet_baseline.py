@@ -136,11 +136,17 @@ History (most recent last):
        docs/audit-history/08Sep2026-f8h02-closure-and-p5-evidence-
        hygiene.md registering F8-H-02 CLOSED with live evidence.
        Ceiling 397 = this tree.)
-  397  F8-H-02 closure-record wave (2026-09-08): +1
-       (docs/audit-history/08Sep2026-f8h02-closure-and-p5-evidence-
-       hygiene.md - closure of the Rule-7 per-order finding plus the
-       P5 evidence-stream contamination fix and its disk-state guard;
-       ceiling 397 = final tree).
+  397  F8-C-01 wave 2 - options_flow producer (2026-09-08): +0
+       (the 5th signal producer lands inside existing modules:
+       orchestrator producer + breaker-guarded chain fetch, per_source_
+       breakers fleet scope, lockstep gate pins in verify_f8c01_
+       external / probe_hc15_strength_gate / fr7_health_check, mock
+       walls and real-producer e2e drivers extended, ADR-005 amended
+       in place. One new file - docs/audit-history/08Sep2026-f8c01-
+       options-flow-producer.md - offset by untracking reports/
+       verify_f8h01_external.json: per-run verifier output now writes
+       the ignored reports/health/p5-verify-stubs/ path. Ceiling 397
+       = this tree.)
 """
 
 from __future__ import annotations

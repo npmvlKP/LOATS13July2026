@@ -117,6 +117,7 @@ class TestCMPStrategyExecution:
                         "_execute_sentiment_analysis",
                         "_execute_volatility_analysis",
                         "_execute_price_action_analysis",
+                        "_execute_options_flow_analysis",
                         "_execute_market_data_update",
                         "_execute_risk_management",
                     ):
@@ -498,24 +499,38 @@ class TestExecuteTradingCycle:
                             o, "_execute_volatility_analysis", new_callable=AsyncMock
                         ):
                             with patch.object(
-                                o, "_execute_risk_management", new_callable=AsyncMock
+                                o,
+                                "_execute_price_action_analysis",
+                                new_callable=AsyncMock,
                             ):
                                 with patch.object(
-                                    o, "_execute_cmp_strategy", new_callable=AsyncMock
+                                    o,
+                                    "_execute_options_flow_analysis",
+                                    new_callable=AsyncMock,
                                 ):
                                     with patch.object(
                                         o,
-                                        "_execute_strike_selection",
+                                        "_execute_risk_management",
                                         new_callable=AsyncMock,
                                     ):
-                                        with patch(
-                                            "loats.orchestrator.datetime"
-                                        ) as mdt:
-                                            mdt.datetime.now.return_value = (
-                                                dt.datetime.now(dt.UTC)
-                                            )
-                                            mdt.UTC = dt.UTC
-                                            await o._execute_trading_cycle()
+                                        with patch.object(
+                                            o,
+                                            "_execute_cmp_strategy",
+                                            new_callable=AsyncMock,
+                                        ):
+                                            with patch.object(
+                                                o,
+                                                "_execute_strike_selection",
+                                                new_callable=AsyncMock,
+                                            ):
+                                                with patch(
+                                                    "loats.orchestrator.datetime"
+                                                ) as mdt:
+                                                    mdt.datetime.now.return_value = (
+                                                        dt.datetime.now(dt.UTC)
+                                                    )
+                                                    mdt.UTC = dt.UTC
+                                                    await o._execute_trading_cycle()
 
 
 class TestExecuteMarketDataUpdate:

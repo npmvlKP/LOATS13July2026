@@ -2,17 +2,17 @@
 """F8-C-01 external verification: production CMP decision chain is live.
 
 Standalone, self-contained verifier proving the F8-C-01 remediation:
-  1. The orchestrator emits 4 distinct enum-tagged signal sources
+  1. The orchestrator emits 5 distinct enum-tagged signal sources
      (static source scan).
   2. The exact production source set passes the diversity gate
-     (4/7 = 0.571 >= 0.5), while the pre-fix 3-source set is rejected.
+     (5/7 = 0.714 >= 0.5), while the pre-fix 3-source set is rejected.
   3. The REAL price_action producer, driven against fixture OHLCV bars,
      persists a signal tagged ``price_action`` (live DB round-trip).
-  4. The REAL four producers, driven together, store >=4 signals whose
+  4. The REAL five producers, driven together, store >=5 signals whose
      sources satisfy ``validate_signal_sources`` - Step 1 of
      ``create_trade_decision`` passes on production-path output.
   5. Single-engine invariant: scheduler emits zero signals (F8-H-03) and
-    the orchestrator retains the full 4-enum production source set (static).
+    the orchestrator retains the full 5-enum production source set (static).
   6. A full decision cycle: real producer signals -> _execute_cmp_strategy
      -> TradeDecision persisted (gating rules mocked; ANALYZE-safe).
   7. Mutation safety: a mutated COPY of the orchestrator (price_action
@@ -82,6 +82,7 @@ REQUIRED_SOURCES = {
     "SENTIMENT": "sentiment",
     "VOLATILITY": "volatility",
     "PRICE_ACTION": "price_action",
+    "OPTIONS_FLOW": "options_flow",
 }
 
 
@@ -225,8 +226,8 @@ def check_2_gate_arithmetic() -> None:
     ):
         ok(
             "2. gate arithmetic",
-            f"3-src rejected ({div3:.4f} < 0.5); production 4-src set passes "
-            f"({div4:.4f} >= 0.5)",
+            f"3-src rejected ({div3:.4f} < 0.5); boundary 4-src set passes "
+            f"({div4:.4f} >= 0.5; production now emits 5 of 7)",
         )
     else:
         bad("2. gate arithmetic", f"pre={pre} post={post}")
@@ -280,6 +281,29 @@ def check_4_all_four_producers_stored_set() -> None:
     rows = fixture_rows(60)
     payload = payload_of(rows)
     quote = quote_payload_for(rows[-1].close)
+    chain = {
+        "status": "success",
+        "data": {
+            "options": [
+                {
+                    "symbol": "NIFTY24500CE",
+                    "strike_price": 24500,
+                    "expiry": "2026-09-10T00:00:00",
+                    "option_type": "CE",
+                    "volume": 120_000,
+                    "implied_volatility": 12.5,
+                },
+                {
+                    "symbol": "NIFTY24500PE",
+                    "strike_price": 24500,
+                    "expiry": "2026-09-10T00:00:00",
+                    "option_type": "PE",
+                    "volume": 80_000,
+                    "implied_volatility": 13.9,
+                },
+            ]
+        },
+    }
 
     with tempfile.TemporaryDirectory() as td:
         db = Database(db_path=Path(td) / "v.db", audit_log_path=Path(td) / "a.jsonl")
@@ -291,6 +315,9 @@ def check_4_all_four_producers_stored_set() -> None:
                 patch("loats.orchestrator.db", db),
                 patch.object(orch, "_safe_get_history", new_callable=AsyncMock) as mh,
                 patch.object(orch, "_safe_get_quotes", new_callable=AsyncMock) as mq,
+                patch.object(
+                    orch, "_safe_get_option_chain", new_callable=AsyncMock
+                ) as mc,
                 patch(
                     "loats.orchestrator.validate_rss_feed",
                     new_callable=AsyncMock,
@@ -302,12 +329,14 @@ def check_4_all_four_producers_stored_set() -> None:
             ):
                 mh.return_value = payload
                 mq.return_value = quote
+                mc.return_value = chain
                 mrss.return_value = True
                 msent.return_value = sentiment_fixture()
                 await orch._execute_ta_analysis()
                 await orch._execute_sentiment_analysis()
                 await orch._execute_volatility_analysis()
                 await orch._execute_price_action_analysis()
+                await orch._execute_options_flow_analysis()
             return await db.async_get_latest_signals("NIFTY", limit=10)
 
         stored = asyncio.run(run())
@@ -317,13 +346,13 @@ def check_4_all_four_producers_stored_set() -> None:
         vok, vdet = engine.validate_signal_sources(stored)
         if expected <= sources and vok is True:
             ok(
-                "4. four producers -> stored set passes gate",
+                "4. five producers -> stored set passes gate",
                 f"{len(stored)} signals, sources={sorted(sources)}, "
                 f"diversity={vdet.get('diversity_score'):.4f}",
             )
         else:
             bad(
-                "4. four producers -> stored set passes gate",
+                "4. five producers -> stored set passes gate",
                 f"stored={len(stored)} sources={sorted(sources)} vok={vok}",
             )
         db.close_all()

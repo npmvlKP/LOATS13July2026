@@ -85,3 +85,42 @@ boundary as its peers.
   is built by this ADR.
 - Option B (recalibrating `diversity_threshold` to 3/7) is explicitly
   rejected: it would weaken the correlation-risk gate the CMP specifies.
+
+## Amendment (2026-09-08): the 5th producer — `options_flow`
+
+F8-C-01's 4/7 closure left one gap: a single per-source breaker trip
+(e.g. the `price_action` fetch failing three times) drops a live cycle
+to 3 distinct sources — diversity 3/7 = 0.429 < 0.5 — and the chain
+goes dark again. The wave-2 remediation closes that residual by landing
+the 5th producer:
+
+- `_execute_options_flow_analysis` (orchestrator.py): put/call volume
+  flow and IV skew from the real broker option chain
+  (`AsyncOpenAlgoClient.get_option_chain` — existing endpoint with a
+  5-minute response cache and zero production callers before this
+  wave). Emission site `StrengthSource.OPTIONS_FLOW.value`, persisted
+  via `db.async_create_signal`; the fetch is guarded by the per-source
+  breaker through `_source_guarded_option_chain` ->
+  `_safe_get_option_chain` (the same three-layer shape as history and
+  quotes). Degradation is no-signal, never a fabricated `Signal` (the
+  F8-C-01 lesson).
+- Signal model: put/call volume ratio >= 1.2 -> SELL bias, <= 1/1.2 ->
+  BUY bias, inside the dead-band -> NEUTRAL 0.5; conviction scales with
+  PCR distance from parity, capped at +0.3. IV skew is recorded for
+  audit and deliberately does not gate direction (equity-index put
+  skew is structurally positive and would bias every signal SELL).
+- Production emission set is now
+  `{ta, sentiment, volatility, price_action, options_flow}` ->
+  diversity 5/7 = 0.714. A single breaker trip degrades coverage to
+  4/7 = 0.571, still >= 0.5: the chain survives any one producer's
+  outage. That outage-redundancy is the point of wave 2.
+- The per-source breaker fleet (`PerSourceBreakerRegistry.ACTIVE_SOURCES`)
+  now tracks `OPTIONS_FLOW` per the registry's documented landing rule;
+  `FUNDAMENTAL` and `MACHINE_LEARNING` remain dormant — broker
+  `get_funds` is account cash, not company fundamentals, and no ML
+  serving infrastructure exists. No fabricated producers.
+- HC-15's required set (`fr7_health_check` +
+  `probe_hc15_strength_gate`), `REQUIRED_SOURCES`
+  (`verify_f8c01_external`), and every cycle-gather mock wall were
+  extended in lockstep; `verify_f8c01_external` check_4 now drives the
+  real five producers and proves the stored set passes the gate.
