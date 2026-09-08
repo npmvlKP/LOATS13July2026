@@ -38,10 +38,12 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import re
 import threading
 import time
 import uuid
-from datetime import UTC, datetime
+from collections.abc import Callable
+from datetime import UTC, date, datetime, timedelta, timezone
 from typing import TYPE_CHECKING, Any
 
 import httpx
@@ -130,6 +132,295 @@ class KillSwitchError(OpenAlgoError):
     ) -> None:
         self.message = message
         super().__init__(self.message)
+
+
+#: Exchange segment holding index symbols on NSE. Indices are NOT quotable on
+#: the cash segment: the live deployment rejects ``{"exchange": "NSE",
+#: "symbol": "NIFTY"}`` with HTTP 400 "Symbol 'NIFTY' not found for exchange
+#: 'NSE'" while ``NSE_INDEX`` resolves every NSE index symbol (verified live
+#: 08Sep2026: NIFTY, BANKNIFTY, FINNIFTY, MIDCPNIFTY, NIFTYNXT50, INDIAVIX).
+_INDEX_EXCHANGES = frozenset(
+    {"NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "NIFTYNXT50", "INDIAVIX"}
+)
+
+
+def _quote_request_shape(symbol: str) -> dict[str, str]:
+    """Route a symbol to the exchange segment the deployment can quote.
+
+    Index symbols must go to ``NSE_INDEX``; everything else stays on the
+    cash segment. Verified live 08Sep2026 against the running OpenAlgo
+    deployment (RELIANCE -> 200 on NSE, NIFTY -> 200 on NSE_INDEX / 400
+    on NSE).
+    """
+    exchange = "NSE_INDEX" if symbol.strip().upper() in _INDEX_EXCHANGES else "NSE"
+    return {"exchange": exchange, "symbol": symbol}
+
+
+def _normalize_interval(interval: str) -> str:
+    """Map repo interval spellings onto the deployment's vocabulary.
+
+    The live /history endpoint validates against {1s, 5s, 10s, 15s, 30s,
+    45s, 1m, 2m, 3m, 5m, 10m, 15m, 20m, 30m, 1h, 2h, 3h, 4h, D, W, M, Q,
+    Y} (verified 08Sep2026 -- ``5min``/``5minute``/``1min`` are rejected
+    with HTTP 400). LOATS settings and call sites use ``<N>min`` (and
+    ``<N>minute`` appears in the wild); both map to ``Nm``. Already-valid
+    values (``5m``, ``1h``, ``D``) pass through untouched.
+    """
+    text = interval.strip()
+    for suffix in ("minute", "min"):
+        if text.endswith(suffix) and text[: -len(suffix)].isdigit():
+            return f"{text[: -len(suffix)]}m"
+    return interval
+
+
+#: Exchange-local timezone for default history windows. LOATS trades the
+#: NSE calendar (IST, UTC+05:30); defaulting the window in UTC made
+#: ``end_date`` roll to tomorrow's calendar date after 18:30 IST.
+_IST = timezone(timedelta(hours=5, minutes=30))
+
+#: Memoized listed-expiry resolutions (the /expiry listing moves at most
+#: once a day; the producer cadence is ~100ms).
+_EXPIRY_CACHE: dict[tuple[str, str], tuple[float, str]] = {}
+_EXPIRY_CACHE_LOCK = threading.Lock()
+_EXPIRY_TTL = 600.0
+
+
+def _normalize_flat_quotes(
+    symbols: list[str], fetch: Callable[[str], dict[str, Any]]
+) -> dict[str, Any]:
+    """Fan out per-symbol quote requests and reshape into canonical form.
+
+    Two live deployment behaviors are normalized here (both verified
+    08Sep2026):
+    - each per-symbol /quotes response returns ``data`` as ONE flat quote
+      dict ({ltp, prev_close, ...}) with NO symbol key, while every LOATS
+      caller parses ``quotes["data"][symbol]`` -- the flat dict is keyed
+      back under the requested symbol;
+    - the deployment speaks broker vocabulary (``ltp`` / ``prev_close``)
+      while callers read canonical QuoteData names (``last_price`` /
+      ``close``) -- canonical aliases are added on a COPY of each quote
+      dict (the response object is never mutated: it can be cached and
+      re-read) and only when the broker field is PRESENT, so a missing
+      ``ltp``/``prev_close`` stays missing -- callers' explicit
+      ``get(..., None)`` handling (e.g. the VIX gate) keeps working and
+      no fabricated 0.0 price can be injected.
+
+      A per-symbol fetch failure is isolated: the remaining symbols still
+      populate the result, and the exception is re-raised only when EVERY
+      requested symbol failed (a total outage must reach the circuit
+      breaker; one bad symbol must not starve the others' consumers).
+    """
+    data: dict[str, Any] = {}
+    errors: list[tuple[str, Exception]] = []
+    for symbol in symbols:
+        try:
+            result = fetch(symbol)
+        except Exception as exc:
+            errors.append((symbol, exc))
+            continue
+        raw = result.get("data") or {}
+        if (
+            isinstance(raw, dict)
+            and raw
+            and all(not isinstance(value, dict) for value in raw.values())
+        ):
+            # Flat single-quote response: key it under the requested symbol.
+            # (Discriminated by value type -- a symbol-keyed batch response
+            # carries dict values, a flat quote only scalars.)
+            raw = {symbol: raw}
+        if not isinstance(raw, dict):
+            raw = {}
+        normalized: dict[str, Any] = {}
+        for key, quote in raw.items():
+            if isinstance(quote, dict):
+                quote = dict(quote)
+                if "ltp" in quote:
+                    quote.setdefault("last_price", quote["ltp"])
+                if "prev_close" in quote:
+                    quote.setdefault("close", quote["prev_close"])
+            normalized[key] = quote
+        data.update(normalized)
+    if errors and len(errors) == len(symbols):
+        raise errors[0][1]
+    for symbol, err in errors:
+        logger.warning("Quote fetch failed for %s (isolated): %s", symbol, err)
+    return {"status": "success", "data": data}
+
+
+def _option_chain_expiry_date(days_ahead: int = 7) -> str:
+    """Fallback expiry hint in the deployment's compact ``DDMMMYY`` format.
+
+    The live /optionchain schema is {underlying, expiry_date, exchange}
+    (verified 08Sep2026: ``symbol``/``expiry`` fields are rejected as
+    unknown), and the strike lookup slices ``expiry_date[:2]-[2:5]-[5:]``
+    positionally, so only compact 7-char DDMMMYY strings like ``08SEP26``
+    reach the database. The hint is a FLOOR only --
+    ``_resolve_expiry_date`` resolves the nearest LISTED expiry through
+    the /expiry endpoint first; this computed guess is used solely when
+    that resolution fails.
+    """
+    return (datetime.now(UTC) + timedelta(days=days_ahead)).strftime("%d%b%y").upper()
+
+
+def _parse_expiry_dates(items: list[Any]) -> list[tuple[date, str]]:
+    """Parse broker expiry strings ({DD-MMM-YY, DDMMMYY, ISO} observed)
+    into (date, original) pairs, dropping unparseable entries."""
+    parsed: list[tuple[date, str]] = []
+    for item in items:
+        text = str(item).strip().upper().replace(" ", "")
+        candidate: date | None = None
+        for fmt in ("%d-%b-%y", "%d%b%y", "%Y-%m-%d"):
+            try:
+                candidate = datetime.strptime(text, fmt).replace(tzinfo=_IST).date()
+                break
+            except ValueError:
+                continue
+        if candidate is not None:
+            parsed.append((candidate, str(item)))
+    return parsed
+
+
+def _compact_expiry(expiry: str) -> str:
+    """Normalize a broker expiry string to compact ``DDMMMYY``."""
+    text = expiry.strip().upper().replace(" ", "")
+    if re.fullmatch(r"\d{2}[A-Z]{3}\d{2}", text):
+        return text
+    for fmt in ("%d-%b-%y", "%Y-%m-%d"):
+        try:
+            return (
+                datetime.strptime(text, fmt)
+                .replace(tzinfo=_IST)
+                .strftime("%d%b%y")
+                .upper()
+            )
+        except ValueError:
+            continue
+    return expiry
+
+
+def _choose_listed_expiry(items: Any, days_ahead: int = 7) -> str:
+    """Pick the nearest listed expiry at/after today (IST) from a broker
+    expiry listing; compact computed hint as the no-listing fallback."""
+    parsed = _parse_expiry_dates(items) if isinstance(items, list) else []
+    today = datetime.now(_IST).date()
+    candidates = [(d, raw) for d, raw in parsed if d >= today]
+    if candidates:
+        return _compact_expiry(min(candidates, key=lambda pair: pair[0])[1])
+    return _option_chain_expiry_date(days_ahead)
+
+
+def _resolve_expiry_date(
+    underlying: str,
+    exchange: str,
+    request: Callable[[dict[str, Any]], dict[str, Any]],
+    days_ahead: int = 7,
+) -> str:
+    """Nearest LISTED expiry for the underlying, hint-clamped (sync path).
+
+    Probes the deployment's /expiry endpoint
+    ({exchange, symbol, instrumenttype: 'options'} -- verified 08Sep2026:
+    lists the underlying's real expiries, e.g. NIFTY ->
+    ['08-SEP-26', '15-SEP-26', ...]) and picks the front listing, so an
+    expiry hint landing between listed dates never 404s the chain. The
+    listing is the source of truth for expiry format, so a broker-side
+    format change surfaces here rather than as empty chains.
+
+    The resolution is memoized per (underlying, exchange) for
+    ``_EXPIRY_TTL`` seconds: the listing moves at most once a day, while
+    the producer cadence is ~100ms -- memoization removes one broker
+    round-trip per chain call; a fresh call right after the roll finds
+    the new listing within the TTL anyway (chain cache and expiry cache
+    then agree).
+    """
+    now = time.monotonic()
+    cache_key = (underlying.upper(), exchange.upper())
+    with _EXPIRY_CACHE_LOCK:
+        cached = _EXPIRY_CACHE.get(cache_key)
+        if cached is not None and now - cached[0] < _EXPIRY_TTL:
+            return cached[1]
+    try:
+        listing = request(
+            {
+                "exchange": exchange,
+                "symbol": underlying,
+                "instrumenttype": "options",
+            }
+        )
+        items = listing.get("data")
+    except Exception:
+        items = None
+    resolved = _choose_listed_expiry(items, days_ahead)
+    if items is not None:
+        # Only successful listings are cached: a failed lookup retries on
+        # the next call instead of pinning the computed hint for the TTL.
+        with _EXPIRY_CACHE_LOCK:
+            _EXPIRY_CACHE[cache_key] = (now, resolved)
+    return resolved
+
+
+def _normalize_option_chain(result: dict[str, Any]) -> dict[str, Any]:
+    """Flatten the deployment's nested chain rows into contract rows.
+
+    The live response carries ``chain: [{strike, ce: {...}, pe: {...}}]``
+    (verified 08Sep2026). ``Orchestrator._extract_chain_rows`` and
+    ``_chain_int``/``_chain_float`` parse FLAT rows with ``option_type``
+    CE/PE, so each leg is flattened (strike + option_type merged in).
+    Payloads without a recognizable chain list -- or with no flattenable
+    entries -- pass through UNCHANGED, so provider-dependent shapes keep
+    reaching the tolerant extractor and an existing ``data`` payload is
+    never overwritten with an empty list.
+    """
+    chain = result.get("chain")
+    if not isinstance(chain, list):
+        data = result.get("data")
+        chain = data.get("chain") if isinstance(data, dict) else None
+        if not isinstance(chain, list):
+            return result
+    rows: list[dict[str, Any]] = []
+    for entry in chain:
+        if not isinstance(entry, dict):
+            continue
+        strike = entry.get("strike")
+        for opt_type, leg_key in (("CE", "ce"), ("PE", "pe")):
+            leg = entry.get(leg_key)
+            if isinstance(leg, dict):
+                row = dict(leg)
+                row["strike"] = strike
+                row["option_type"] = opt_type
+                if "expiry" in entry:
+                    row["expiry"] = entry["expiry"]
+                rows.append(row)
+    if not rows:
+        # Nothing flattenable -- never replace an existing data payload
+        # with []: the producer must see the payload as delivered.
+        return result
+    return {**result, "data": rows}
+
+
+def _history_payload(
+    symbol: str, interval: str, from_date: str | None, to_date: str | None
+) -> dict[str, Any]:
+    """Build a /history body that satisfies the live deployment schema.
+
+    Verified 08Sep2026: ``exchange`` is a REQUIRED field (its absence
+    yields 400 "Missing data for required field" -- the previous client
+    never sent it, so every history call failed), dates are
+    ``start_date``/``end_date`` (the repo's ``from_date``/``to_date``
+    names are rejected) and both are required; omitted dates default to a
+    5-day window ending today ON THE EXCHANGE CALENDAR (IST): defaulting
+    in UTC rolled ``end_date`` to tomorrow's date after 18:30 IST. Index
+    symbols route via ``_quote_request_shape`` (a NIFTY index history on
+    ``NSE`` 400s).
+    """
+    now_ist = datetime.now(_IST)
+    end = to_date or now_ist.strftime("%Y-%m-%d")
+    start = from_date or (now_ist - timedelta(days=5)).strftime("%Y-%m-%d")
+    return {
+        **_quote_request_shape(symbol),
+        "interval": _normalize_interval(interval),
+        "start_date": start,
+        "end_date": end,
+    }
 
 
 class OpenAlgoAPIError(OpenAlgoError):
@@ -360,12 +651,10 @@ class OpenAlgoClient:
         # SINGLE {apikey, exchange, symbol} body -- batch quotes belong to
         # /multiquotes. Fan out sequentially and reshape into the canonical
         # {"data": {symbol: {...}}} form every caller parses.
-        data: dict[str, Any] = {}
-        for symbol in symbols:
-            payload = {"exchange": "NSE", "symbol": symbol}
-            result = self._request("POST", "quotes", json=payload)
-            data.update(result.get("data") or {})
-        return {"status": "success", "data": data}
+        return _normalize_flat_quotes(symbols, self._request_quotes_single)
+
+    def _request_quotes_single(self, symbol: str) -> dict[str, Any]:
+        return self._request("POST", "quotes", json=_quote_request_shape(symbol))
 
     def get_history(
         self,
@@ -374,12 +663,7 @@ class OpenAlgoClient:
         from_date: str | None = None,
         to_date: str | None = None,
     ) -> dict[str, Any]:
-        payload = {
-            "symbol": symbol,
-            "interval": interval,
-            "from_date": from_date,
-            "to_date": to_date,
-        }
+        payload = _history_payload(symbol, interval, from_date, to_date)
         return self._request("POST", "history", json=payload)
 
     def get_option_chain(
@@ -388,8 +672,20 @@ class OpenAlgoClient:
         # Note: caching is intentionally omitted here; the shared cache_manager is
         # async-only and cannot be awaited from this synchronous client. Use
         # AsyncOpenAlgoClient.get_option_chain for cached access.
-        payload = {"symbol": symbol, "expiry": expiry}
-        return self._request("POST", "option_chain", json=payload)
+        payload = {
+            "underlying": symbol,
+            "expiry_date": (
+                _compact_expiry(expiry)
+                if expiry
+                else _resolve_expiry_date(symbol, "NFO", self._expiry_listing)
+            ),
+            "exchange": "NFO",
+        }
+        result = self._request("POST", "optionchain", json=payload)
+        return _normalize_option_chain(result)
+
+    def _expiry_listing(self, payload: dict[str, Any]) -> dict[str, Any]:
+        return self._request("POST", "expiry", json=payload)
 
     def get_position_book(self) -> dict[str, Any]:
         return self._request("POST", "position_book")
@@ -701,10 +997,41 @@ class AsyncOpenAlgoClient:
 
         data: dict[str, Any] = {}
         result: dict[str, Any] = {}
+        errors: list[tuple[str, Exception]] = []
         for symbol in symbols_sorted:
-            payload = {"exchange": "NSE", "symbol": symbol}
-            result = await self._request("POST", "quotes", json=payload)
-            data.update(result.get("data") or {})
+            try:
+                result = await self._request(
+                    "POST", "quotes", json=_quote_request_shape(symbol)
+                )
+            except Exception as exc:
+                errors.append((symbol, exc))
+                continue
+            raw = result.get("data") or {}
+            if (
+                isinstance(raw, dict)
+                and raw
+                and all(not isinstance(value, dict) for value in raw.values())
+            ):
+                # Flat single-quote response: key it under the requested
+                # symbol (value-type discrimination -- a symbol-keyed batch
+                # response carries dict values, a flat quote only scalars).
+                raw = {symbol: raw}
+            if not isinstance(raw, dict):
+                raw = {}
+            normalized: dict[str, Any] = {}
+            for key, quote in raw.items():
+                if isinstance(quote, dict):
+                    quote = dict(quote)
+                    if "ltp" in quote:
+                        quote.setdefault("last_price", quote["ltp"])
+                    if "prev_close" in quote:
+                        quote.setdefault("close", quote["prev_close"])
+                normalized[key] = quote
+            data.update(normalized)
+        if errors and len(errors) == len(symbols):
+            raise errors[0][1]
+        for symbol, err in errors:
+            logger.warning("Quote fetch failed for %s (isolated): %s", symbol, err)
         merged = {**result, "data": data}
 
         try:
@@ -737,12 +1064,7 @@ class AsyncOpenAlgoClient:
                 logger.warning(f"Failed to parse cached history result: {e}")
 
         # Cache miss - fetch from API
-        payload = {
-            "symbol": symbol,
-            "interval": interval,
-            "from_date": from_date,
-            "to_date": to_date,
-        }
+        payload = _history_payload(symbol, interval, from_date, to_date)
         result = await self._request("POST", "history", json=payload)
 
         # Cache the result for 5 minutes (300 seconds)
@@ -754,11 +1076,49 @@ class AsyncOpenAlgoClient:
 
         return result
 
+    async def _resolve_expiry_date_async(self, underlying: str, exchange: str) -> str:
+        """Listed-expiry resolution for the async client (mirrors
+        ``_resolve_expiry_date``, sharing its memo cache): the /expiry
+        listing is the format and roll date source of truth; falls back
+        to the computed hint. Failed lookups stay uncached and retry."""
+        cache_key = (underlying.upper(), exchange.upper())
+        now = time.monotonic()
+        with _EXPIRY_CACHE_LOCK:
+            cached = _EXPIRY_CACHE.get(cache_key)
+            if cached is not None and now - cached[0] < _EXPIRY_TTL:
+                return cached[1]
+        try:
+            listing = await self._request(
+                "POST",
+                "expiry",
+                json={
+                    "exchange": exchange,
+                    "symbol": underlying,
+                    "instrumenttype": "options",
+                },
+            )
+            items = listing.get("data")
+        except Exception:
+            items = None
+        resolved = _choose_listed_expiry(items)
+        if items is not None:
+            with _EXPIRY_CACHE_LOCK:
+                _EXPIRY_CACHE[cache_key] = (now, resolved)
+        return resolved
+
     async def get_option_chain(
         self, symbol: str, expiry: str | None = None
     ) -> dict[str, Any]:
-        # Create cache key based on parameters
-        cache_key_data = f"{symbol}:{expiry}"
+        # Create cache key based on parameters. The RESOLVED expiry (not the
+        # caller's None) is baked into the key so a 5-minute cached chain can
+        # never survive the expiry rollover: when /expiry flips to the next
+        # listing, the key changes and the stale chain cannot be served.
+        resolved_expiry = (
+            _compact_expiry(expiry)
+            if expiry
+            else await self._resolve_expiry_date_async(symbol, "NFO")
+        )
+        cache_key_data = f"{symbol}:{resolved_expiry}"
         cache_key = (
             f"option_chain:{hashlib.sha256(cache_key_data.encode('utf-8')).hexdigest()}"
         )
@@ -773,8 +1133,13 @@ class AsyncOpenAlgoClient:
                 logger.warning(f"Failed to parse cached option chain result: {e}")
 
         # Cache miss - fetch from API
-        payload = {"symbol": symbol, "expiry": expiry}
-        result = await self._request("POST", "option_chain", json=payload)
+        payload = {
+            "underlying": symbol,
+            "expiry_date": resolved_expiry,
+            "exchange": "NFO",
+        }
+        result = await self._request("POST", "optionchain", json=payload)
+        result = _normalize_option_chain(result)
 
         # Cache the result for 5 minutes (300 seconds)
         try:
