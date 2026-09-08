@@ -123,8 +123,9 @@ def _find_run_log(path: Path | None) -> Path | None:
             "P5 validator (scripts/verify_p5_forward_test.py) failed to load; "
             "cannot select the default run log"
         )
-    # select_default_run_log is loaded dynamically (Any); pin the declared
-    # return type so the annotation contract is checked here too.
+    # select_default_run_log is loaded dynamically (Any); the annotation
+    # documents the declared contract. Note: the repo mypy config excludes
+    # scripts/, so this file is checked only in default (non-strict) mode.
     selected: Path | None = validator.select_default_run_log(RUN_LOG_DIR)
     return selected
 
@@ -155,11 +156,14 @@ def _init_run_log(reason: str, dry_run: bool) -> Path:
         "unhandled_exceptions": 0,
         "restarts": 0,
         # Single-writer guard (2026-09-08): the PID of the supervisor
-        # process currently sampling this log (compare-and-set via
-        # _claim_run_log; cleared on graceful exit in _release_run_log).
-        # Lets a boot watchdog and an operator resume coexist without ever
-        # putting two writers on one graded run log.
+        # process currently sampling this log, plus that process's
+        # creation time -- the pair makes a recycled PID detectable (a
+        # recycled PID matching by image alone would permanently block
+        # takeover of an in-span run). Claim enforced by an OS-level lock
+        # on the <log>.claim sidecar; both JSON fields are human/status
+        # evidence, not the serialization point.
         "supervisor_pid": None,
+        "supervisor_started_at": None,
         "resume_refusal": None,
         # cycles_completed/counters are LIVE samples (orchestrator cycle
         # count, TradeDecisionEngine routing outcomes) folded in by the
@@ -342,16 +346,164 @@ def _current_process_image() -> str:
 _CURRENT_IMAGE_NORMCASE = os.path.normcase(_current_process_image())
 
 
-def _pid_alive_running_supervisor(pid: int | None) -> bool:
-    """True iff ``pid`` is alive AND running THIS supervisor's interpreter.
+def _process_creation_time(pid: int) -> str | None:
+    """The process's creation time as an ISO-8601 UTC string, or None.
 
-    Exact interpreter-image matching (not just liveness, not just name)
-    prevents the two classic false positives: PID reuse by an unrelated
-    process, and a different python.exe (e.g. an editor LSP) happening to
-    hold the recycled PID. An unreadable-but-alive PID counts as a live
-    writer — the guard must fail closed (refuse a takeover) rather than
-    risk two writers corrupting the graded counters. ``pid == os.getpid()``
-    is trivially this supervisor.
+    Windows: OpenProcess + GetProcessTimes. POSIX: field 22 of
+    /proc/<pid>/stat (clock ticks since boot; both sides of a comparison
+    run on the same host, so raw ticks are a valid identity).
+
+    None means "could not determine" — the caller decides (claim writers
+    record None; liveness checks treat a recorded value with an unreadable
+    live process as fail-closed).
+    """
+    if pid <= 0:
+        return None
+    if os.name == "nt":
+        import ctypes
+        from ctypes import wintypes
+
+        kernel32 = ctypes.WinDLL("kernel32.dll", use_last_error=True)
+        kernel32.OpenProcess.restype = wintypes.HANDLE
+        kernel32.OpenProcess.argtypes = [
+            wintypes.DWORD,
+            wintypes.BOOL,
+            wintypes.DWORD,
+        ]
+        handle = kernel32.OpenProcess(0x1000, False, pid)
+        if not handle:
+            return None
+        try:
+            creation = wintypes.FILETIME()
+            exit_ft = wintypes.FILETIME()
+            kernel = wintypes.FILETIME()
+            user = wintypes.FILETIME()
+            if not kernel32.GetProcessTimes(
+                handle,
+                ctypes.byref(creation),
+                ctypes.byref(exit_ft),
+                ctypes.byref(kernel),
+                ctypes.byref(user),
+            ):
+                return None
+            ft = (creation.dwHighDateTime << 32) | creation.dwLowDateTime
+            # FILETIME epoch 1601-01-01 → Unix epoch seconds.
+            seconds = (ft - 116444736000000000) / 10_000_000
+            return datetime.datetime.fromtimestamp(seconds, tz=datetime.UTC).isoformat()
+        finally:
+            kernel32.CloseHandle(handle)
+    try:
+        stat = Path(f"/proc/{pid}/stat").read_text(encoding="utf-8")
+    except OSError:
+        return None
+    # Field 22 (1-based) sits after the comm field, which may contain
+    # spaces/parentheses — split from the last ')'.
+    try:
+        after_comm = stat.rsplit(")", 1)[1].split()
+        return str(int(after_comm[19]))  # field 22 overall
+    except (IndexError, ValueError):
+        return None
+
+
+def _same_instant(a: str | None, b: str | None) -> bool:
+    """Compare two creation-time stamps for equality (tolerant).
+
+    Returns False when either side is None/unparseable — an identity that
+    cannot be proven equal must not be treated as a match.
+    """
+    if not a or not b:
+        return False
+    if a == b:
+        return True
+    try:
+        da = datetime.datetime.fromisoformat(a)
+        db = datetime.datetime.fromisoformat(b)
+    except ValueError:
+        return False
+    if da.tzinfo is None:
+        da = da.replace(tzinfo=datetime.UTC)
+    if db.tzinfo is None:
+        db = db.replace(tzinfo=datetime.UTC)
+    return da == db
+
+
+class _WriterClaim:
+    """An OS-level exclusive claim on a run log, held for the writer's
+    lifetime.
+
+    msvcrt.locking (Windows) / fcntl.flock (POSIX) on a ``<log>.claim``
+    sidecar. The kernel releases the lock when the process dies — a hard
+    kill cannot orphan a claim — which is what makes this deterministic
+    where the JSON read-modify-write was not (adversarial review
+    2026-09-08, blocking finding 2).
+    """
+
+    def __init__(self, run_log: Path):
+        self.run_log = run_log
+        self.sidecar = run_log.with_suffix(run_log.suffix + ".claim")
+        self._fh: Any = None
+        self.acquired = False
+        self._acquire()
+
+    def _acquire(self) -> None:
+        self._fh = open(self.sidecar, "a+b")
+        try:
+            if os.name == "nt":
+                import msvcrt
+
+                self._fh.seek(0)
+                msvcrt.locking(self._fh.fileno(), msvcrt.LK_NBLCK, 1)
+            else:
+                import fcntl  # POSIX-only; no stubs on Windows
+
+                fcntl.flock(  # type: ignore[attr-defined]
+                    self._fh.fileno(),
+                    fcntl.LOCK_EX | fcntl.LOCK_NB,  # type: ignore[attr-defined]
+                )
+            self.acquired = True
+        except OSError:
+            self.close()
+
+    def close(self) -> None:
+        if self._fh is not None:
+            try:
+                if self.acquired and os.name == "nt":
+                    import msvcrt
+
+                    self._fh.seek(0)
+                    msvcrt.locking(self._fh.fileno(), msvcrt.LK_UNLCK, 1)
+            except OSError:
+                pass  # lock dies with the handle anyway
+            finally:
+                try:
+                    self._fh.close()
+                except OSError:
+                    pass
+                self._fh = None
+                self.acquired = False
+
+    def release(self) -> None:
+        self.close()
+
+
+_ACTIVE_CLAIM: _WriterClaim | None = None
+
+
+def _pid_alive_running_supervisor(
+    pid: int | None, started_at: str | None = None
+) -> bool:
+    """True iff (pid, creation time) identifies a live writer process.
+
+    Identity is the process creation time bound at claim time, not the PID
+    alone: on this gate host ~19 unrelated processes share the supervisor's
+    interpreter image, so a recycled PID that merely matches by image would
+    PERMANENTLY BLOCK takeover of an in-span evidence run (adversarial
+    review 2026-09-08, blocking finding 1). A live same-image process whose
+    creation time differs from the recorded one is a recycler — dead.
+
+    A recorded PID with no creation-time stamp (pre-identity log) falls
+    back to image matching, and an unreadable-but-alive PID still fails
+    closed. ``pid == os.getpid()`` is trivially this supervisor.
     """
     if pid is None:
         return False
@@ -370,75 +522,135 @@ def _pid_alive_running_supervisor(pid: int | None) -> bool:
         return False  # PID free
     if image == _PROCESS_IMAGE_UNREADABLE:
         return True  # fail closed: assume a live writer we cannot inspect
-    return os.path.normcase(Path(image).resolve()) == _CURRENT_IMAGE_NORMCASE
+    if os.path.normcase(Path(image).resolve()) != _CURRENT_IMAGE_NORMCASE:
+        return False  # recycled by a different binary
+    if not started_at:
+        # Pre-identity log: image match is the best available evidence.
+        return True
+    created = _process_creation_time(pid)
+    if created is None:
+        return True  # fail closed: alive but uninspectable
+    return _same_instant(created, started_at)
 
 
-def _claim_run_log(run_log: Path, refusal: str | None = None) -> bool:
-    """Claim writer-ship of an ongoing run log (compare-and-set).
+def _claim_run_log(
+    run_log: Path,
+    refusal: str | None = None,
+    identity: tuple[int, str | None] | None = None,
+) -> bool:
+    """Claim writer-ship of an ongoing run log.
 
-    Succeeds only when the recorded ``supervisor_pid`` is absent, dead, or
-    this process itself (self re-claim — refreshes the claim and clears a
-    stale ``resume_refusal``). A live recorded writer makes the claim fail
-    and persists ``refusal`` into ``resume_refusal`` so operators and the
-    ``--status`` view can see WHY a resume did not start.
+    Mutual exclusion is an OS-level exclusive lock on a ``<log>.claim``
+    sidecar held for the writer's lifetime (the kernel releases it when the
+    process dies, so a hard kill cannot orphan a claim). The JSON record
+    (``supervisor_pid`` + ``supervisor_started_at``) is for humans and the
+    ``--status`` view, and doubles as the recycled-PID detector — NOT as
+    the serialization point: a JSON read-modify-write cannot close the
+    claim race (adversarial review 2026-09-08, blocking finding 2).
 
-    The claim is a read-modify-write, not an OS-level CAS: the protected
-    scenario is the realistic one (a boot watchdog and an operator resuming
-    hours apart), not two processes racing within microseconds. Called from
-    ``_resolve_resume_target`` and again (idempotently) from ``_run``.
+    Succeeds when the lock is acquired AND the recorded writer identity is
+    absent, dead, or this process itself (self re-claim — refreshes the
+    record and clears a stale ``resume_refusal``). A live recorded writer
+    or a foreign-held lock makes the claim fail and persists ``refusal``
+    into ``resume_refusal`` for operators.
 
-    ``refusal`` set means "claim by a second writer" — refused whenever a
-    live writer (including this same PID in an earlier role) holds the log;
-    ``refusal=None`` means "self re-claim / fresh claim" and always succeeds
-    against a dead or absent writer.
+    ``identity`` overrides this process's own (pid, creation-time) for
+    tests; the creation-time half is what makes a recycled PID detectable
+    (blocking finding 1).
     """
-    try:
-        data = json.loads(run_log.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return False
-    if not isinstance(data, dict) or data.get("ended_at") is not None:
-        return False
-    my_pid = os.getpid()
-    recorded = data.get("supervisor_pid")
-    if recorded is not None:
-        try:
-            recorded_int = int(recorded)
-        except (TypeError, ValueError):
-            recorded_int = 0  # corrupt field: no live writer provable
-        self_reclaim = recorded_int == my_pid and refusal is None
-        if not self_reclaim and _pid_alive_running_supervisor(recorded_int):
+    global _ACTIVE_CLAIM
+    if identity is None:
+        identity = (os.getpid(), _process_creation_time(os.getpid()))
+    my_pid, my_created = identity
+
+    new_claim: _WriterClaim | None = None
+    held_here = (
+        _ACTIVE_CLAIM is not None
+        and _ACTIVE_CLAIM.acquired
+        and _ACTIVE_CLAIM.run_log == run_log
+    )
+    if not held_here:
+        new_claim = _WriterClaim(run_log)
+        if not new_claim.acquired:
+            # A live writer's kernel lock is why we lost — exactly the
+            # single-writer guarantee, enforced by the OS.
             if refusal:
                 _update_run_log(run_log, {"resume_refusal": refusal})
+            new_claim.close()
             return False
-    _update_run_log(run_log, {"supervisor_pid": my_pid, "resume_refusal": None})
-    # Re-verify after writing (cheap claim-and-check): the claim itself is
-    # a read-modify-write, so a second claimant inside the sub-second
-    # window can clobber it. Re-reading settles the race deterministically
-    # in favor of whichever PID the file finally records -- the loser
-    # yields before any baseline is written.
+
+    promoted = False
     try:
-        reread = json.loads(run_log.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return True
-    if isinstance(reread, dict) and reread.get("supervisor_pid") not in (
-        None,
-        my_pid,
-    ):
-        return False
+        try:
+            data = json.loads(run_log.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return False
+        if not isinstance(data, dict) or data.get("ended_at") is not None:
+            return False
+        recorded_pid = data.get("supervisor_pid")
+        recorded_created = data.get("supervisor_started_at")
+        if recorded_pid is not None:
+            try:
+                recorded_int = int(recorded_pid)
+            except (TypeError, ValueError):
+                recorded_int = 0  # corrupt field: no live writer provable
+            self_reclaim = recorded_int == my_pid and refusal is None
+            if not self_reclaim and _pid_alive_running_supervisor(
+                recorded_int, recorded_created
+            ):
+                if refusal:
+                    _update_run_log(run_log, {"resume_refusal": refusal})
+                return False
+        _update_run_log(
+            run_log,
+            {
+                "supervisor_pid": my_pid,
+                "supervisor_started_at": my_created,
+                "resume_refusal": None,
+            },
+        )
+        promoted = True
+    finally:
+        # Promote the lock to the process-level claim on success; drop it
+        # on every refusal path so we never hold a lock without owning the
+        # recorded claim.
+        if new_claim is not None:
+            if promoted:
+                if _ACTIVE_CLAIM is not None:
+                    _ACTIVE_CLAIM.close()
+                _ACTIVE_CLAIM = new_claim
+            else:
+                new_claim.close()
+            new_claim = None
     return True
 
 
 def _release_run_log(run_log: Path) -> None:
-    """Clear this supervisor's claim on exit. Never touches ``ended_at`` —
-    releasing a claim must not resurrect an ended run (grading reads
-    ``ended_at``, not the claim)."""
+    """Release this supervisor's claim on exit.
+
+    Identity-scoped: only a claim recorded by THIS pid (or an unrecorded /
+    corrupt record) is cleared — a successor's claim is never touched.
+    Never touches ``ended_at``: releasing a claim must not resurrect an
+    ended run (grading reads ``ended_at``, not the claim).
+    """
+    global _ACTIVE_CLAIM
     try:
         data = json.loads(run_log.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
-        return
-    if not isinstance(data, dict) or data.get("supervisor_pid") is None:
-        return
-    _update_run_log(run_log, {"supervisor_pid": None})
+        data = None
+    if isinstance(data, dict):
+        recorded = data.get("supervisor_pid")
+        if recorded is not None:
+            try:
+                mine = int(recorded) == os.getpid()
+            except (TypeError, ValueError):
+                mine = False
+            if not mine:
+                return  # a successor's claim: not ours to clear
+        _update_run_log(run_log, {"supervisor_pid": None})
+    if _ACTIVE_CLAIM is not None and _ACTIVE_CLAIM.run_log == run_log:
+        _ACTIVE_CLAIM.release()
+        _ACTIVE_CLAIM = None
 
 
 def _resolve_resume_target(path: Path | None) -> Path | None:
@@ -498,7 +710,9 @@ def _resolve_resume_target(path: Path | None) -> Path | None:
             continue
         # Single-writer guard: a live supervisor process already sampling
         # this log makes a second writer a counter-corruption hazard.
-        if _pid_alive_running_supervisor(data.get("supervisor_pid")):
+        if _pid_alive_running_supervisor(
+            data.get("supervisor_pid"), data.get("supervisor_started_at")
+        ):
             print(
                 f"{FAIL_SYM} {candidate.name}: live supervisor "
                 f"(PID {data.get('supervisor_pid')}) holds this run log — "
@@ -506,6 +720,16 @@ def _resolve_resume_target(path: Path | None) -> Path | None:
                 file=sys.stderr,
             )
             if path is not None:
+                _update_run_log(
+                    candidate,
+                    {
+                        "resume_refusal": (
+                            "resume refused: live writer PID "
+                            f"{data.get('supervisor_pid')} holds this log "
+                            "(single-writer guard)"
+                        )
+                    },
+                )
                 return None
             continue
         return candidate
@@ -811,7 +1035,10 @@ def _status(path: Path | None) -> int:
     # recorded when a second writer was turned away.
     writer_pid = data.get("supervisor_pid")
     if writer_pid is not None:
-        state = "alive" if _pid_alive_running_supervisor(writer_pid) else "stale (dead)"
+        if _pid_alive_running_supervisor(writer_pid, data.get("supervisor_started_at")):
+            state = "alive"
+        else:
+            state = "stale (dead or recycled PID)"
         print(f"writer    : PID {writer_pid} [{state}]")
     else:
         print("writer    : none (unclaimed or pre-guard log)")
