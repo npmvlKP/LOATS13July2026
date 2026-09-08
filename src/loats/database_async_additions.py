@@ -361,9 +361,9 @@ async def _async_record_trade_decision(self: Database, decision: TradeDecision) 
                      trailing_stop_config, position_size_method, risk_percentage,
                      var_analysis, gating_rules_result, source_breakdown, metadata,
                      status, created_at, updated_at, created_at_ms, updated_at_ms,
-                     timestamp_ms)
+                     timestamp_ms, as_of_date)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                            ?, ?, ?)""",
+                            ?, ?, ?, ?)""",
                     (
                         decision.decision_id,
                         decision.symbol,
@@ -387,6 +387,12 @@ async def _async_record_trade_decision(self: Database, decision: TradeDecision) 
                         now_ms,
                         now_ms,
                         ts_ms,
+                        # F8-L-02: ISO-8601 snapshot date (nullable).
+                        (
+                            decision.as_of_date.isoformat()
+                            if decision.as_of_date is not None
+                            else None
+                        ),
                     ),
                 )
             await conn.commit()

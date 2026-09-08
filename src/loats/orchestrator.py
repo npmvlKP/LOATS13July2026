@@ -1167,8 +1167,20 @@ class TradingOrchestrator:
                     f"Risk management exceeded budget: {duration * 1000:.2f}ms"
                 )
 
-    async def _execute_cmp_strategy(self) -> None:
-        """Execute CMP strategy with TradeDecision creation and Analyzer routing."""
+    async def _execute_cmp_strategy(
+        self, as_of_date: datetime.date | None = None
+    ) -> None:
+        """Execute CMP strategy with TradeDecision creation and Analyzer routing.
+
+        Args:
+            as_of_date: F8-L-02 (CMP Rule 8) caller-supplied input snapshot
+                date. Propagated into the created TradeDecision and every
+                related audit record so backtests can pin records to the
+                data snapshot they were computed from. Never derived from
+                the wall clock here (the zero wall-clock-date invariant
+                holds across src/loats); the live default (None) leaves
+                records unpinned, unchanged.
+        """
         start_time = datetime.datetime.now(datetime.UTC)
 
         try:
@@ -1301,6 +1313,10 @@ class TradingOrchestrator:
                 current_price=current_price,
                 funds=funds,
                 current_positions=current_trades,
+                # F8-L-02: caller-supplied snapshot date flows into the
+                # decision and every downstream audit record; None (the
+                # live default) leaves records unpinned.
+                as_of_date=as_of_date,
             )
 
             if decision is None:

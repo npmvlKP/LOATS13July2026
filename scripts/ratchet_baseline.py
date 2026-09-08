@@ -104,8 +104,19 @@ History (most recent last):
        scripts/verify_carried_set_external.py — the clean-process
        outcome verifier for those dispositions, wired live by
        tests/test_repo_hygiene.py::TestCarriedSetExternalVerifier).
+  394  F8-L-02 acceptance net wave (2026-09-07): +1
+       (tests/test_as_of_date_propagation.py — 11-test acceptance net
+       for the caller-supplied as_of_date propagation into
+       decision/audit records: model field, engine + orchestrator
+       parameters, trade_decisions column round trip, CREATE/ROUTE
+       audit rows, and the zero-date.today() invariant).
+  395  F8-L-02 closure-record wave (2026-09-07): +1
+       (docs/audit-history/07Sep2026-F8-L-02-closure.md — the closure
+       record for the register's last open item, with the wave's
+       implementation surfaces, behaviour contract, and acceptance
+       evidence. Carried set now eight of eight CLOSED/DISCHARGED).
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 393
+TRACKED_FILE_CEILING = 395

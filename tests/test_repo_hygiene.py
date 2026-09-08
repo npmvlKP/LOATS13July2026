@@ -1016,7 +1016,9 @@ class TestF8M02M07ExternalVerifier:
 
 
 CARRIED_VERIFIER = REPO_ROOT / "scripts" / "verify_carried_set_external.py"
-CARRIED_RECORD_ANCHOR = "`as_of_date` convention (F8-L-02, CMP Rule 8) | **OPEN**"
+CARRIED_RECORD_ANCHOR = (
+    "`as_of_date` convention (F8-L-02, CMP Rule 8) | CLOSED 2026-09-07"
+)
 
 
 class TestCarriedSetExternalVerifier:
@@ -1025,10 +1027,11 @@ class TestCarriedSetExternalVerifier:
     GREEN direction: exits 0 against the live tree from a clean process,
     re-deriving every disposition in
     docs/audit-history/07Sep2026-carried-set-reconciliation.md.
-    RED direction: on a snapshot whose reconciliation record flips the
-    open item (as_of_date) to CLOSED without evidence, the verifier must
-    FAIL -- proving it verifies the recorded disposition against reality
-    rather than trusting the prose.
+    RED direction (F8-L-02 closed 2026-09-07): on a snapshot whose
+    trade_decisions schema drops the ``as_of_date`` column while the
+    record still claims closure, the verifier must FAIL -- proving it
+    verifies the recorded disposition against reality rather than
+    trusting the prose.
     """
 
     def test_verifier_passes_on_live_tree(self) -> None:
@@ -1043,7 +1046,7 @@ class TestCarriedSetExternalVerifier:
         assert "All carried-set dispositions VERIFIED." in proc.stdout
         assert "[FAIL]" not in proc.stdout
 
-    def test_verifier_fails_on_open_item_flipped_snapshot(self, tmp_path) -> None:
+    def test_verifier_fails_on_implementation_stripped_snapshot(self, tmp_path) -> None:
         rec = (
             REPO_ROOT
             / "docs"
@@ -1051,12 +1054,7 @@ class TestCarriedSetExternalVerifier:
             / "07Sep2026-carried-set-reconciliation.md"
         )
         text = rec.read_text(encoding="utf-8")
-        assert CARRIED_RECORD_ANCHOR in text, "open-item anchor missing from the record"
-        mutated = text.replace(
-            CARRIED_RECORD_ANCHOR,
-            "`as_of_date` convention (F8-L-02, CMP Rule 8) | **CLOSED**",
-        )
-        assert mutated != text
+        assert CARRIED_RECORD_ANCHOR in text, "closure anchor missing from the record"
 
         snapshot = tmp_path / "snap"
         (snapshot / "scripts").mkdir(parents=True)
@@ -1067,9 +1065,19 @@ class TestCarriedSetExternalVerifier:
             snapshot / "src" / "loats",
             ignore=shutil.ignore_patterns("__pycache__"),
         )
+        # Strip the persistence leg of the propagation chain while the
+        # record still registers the item as CLOSED: the verifier must
+        # catch the drift between prose and tree.
+        db_path = snapshot / "src" / "loats" / "database.py"
+        db_text = db_path.read_text(encoding="utf-8")
+        assert "as_of_date TEXT" in db_text
+        db_path.write_text(
+            db_text.replace("as_of_date TEXT", "as_of_date_stub TEXT"),
+            encoding="utf-8",
+        )
         (snapshot / "docs" / "audit-history").mkdir(parents=True)
         (snapshot / "docs" / "audit-history" / rec.name).write_text(
-            mutated, encoding="utf-8"
+            text, encoding="utf-8"
         )
         shutil.copy2(REPO_ROOT / ".env.example", snapshot / ".env.example")
         shutil.copytree(
@@ -1097,11 +1105,11 @@ class TestCarriedSetExternalVerifier:
             timeout=300,
         )
         assert proc.returncode != 0, (
-            "verifier PASSED on a record whose open item was flipped to "
-            "CLOSED -- it does not verify the recorded disposition"
+            "verifier PASSED on a snapshot whose as_of_date persistence "
+            "was stripped -- it does not verify the recorded disposition"
         )
-        assert "record registers as_of_date as the open item" in proc.stdout
-        assert "[FAIL] record registers as_of_date as the open item" in proc.stdout
+        assert "trade_decisions schema persists as_of_date" in proc.stdout
+        assert "[FAIL] trade_decisions schema persists as_of_date" in proc.stdout
 
 
 class TestFlake8HookGateAgreement:

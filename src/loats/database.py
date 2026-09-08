@@ -9,7 +9,7 @@ import json
 import sqlite3
 import threading
 import time
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 from typing import IO, TYPE_CHECKING, Any, TypeVar, cast
@@ -399,7 +399,12 @@ class Database:
                 updated_at TEXT NOT NULL,
                 created_at_ms INTEGER NOT NULL DEFAULT 0,
                 updated_at_ms INTEGER NOT NULL DEFAULT 0,
-                timestamp_ms INTEGER NOT NULL DEFAULT 0
+                timestamp_ms INTEGER NOT NULL DEFAULT 0,
+                -- F8-L-02: appended LAST on purpose. The row reader maps
+                -- columns positionally and the legacy migration path can
+                -- only ALTER TABLE ADD COLUMN (append), so fresh and
+                -- migrated schemas must agree on index 22.
+                as_of_date TEXT
             )
         """)
         # Create index for trade_decisions
@@ -493,6 +498,13 @@ class Database:
             ],
             "audit_log": [
                 ("timestamp_ms", "INTEGER NOT NULL DEFAULT 0"),
+            ],
+            # F8-L-02 (CMP Rule 8): nullable as-of date on legacy
+            # trade_decisions tables; fresh CREATE TABLE includes the
+            # column directly, this ALTER covers databases created before
+            # the field existed.
+            "trade_decisions": [
+                ("as_of_date", "TEXT"),
             ],
         }
         # Apply migrations for each table
@@ -1953,8 +1965,8 @@ class Database:
              entry_price, quantity, stop_loss, take_profit, trailing_stop_config,
              position_size_method, risk_percentage, var_analysis, gating_rules_result,
              source_breakdown, metadata, status, created_at, updated_at,
-             created_at_ms, updated_at_ms, timestamp_ms)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             created_at_ms, updated_at_ms, timestamp_ms, as_of_date)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 decision.decision_id,
@@ -1991,6 +2003,12 @@ class Database:
                 now_ms,
                 now_ms,
                 ts_ms,
+                # F8-L-02: ISO-8601 snapshot date (nullable).
+                (
+                    decision.as_of_date.isoformat()
+                    if decision.as_of_date is not None
+                    else None
+                ),
             ),
         )
         conn.commit()
@@ -2146,6 +2164,14 @@ class Database:
             source_breakdown=json.loads(row[14]) if row[14] else {},
             metadata=json.loads(row[15]) if row[15] else {},
             status=row[16],
+            # F8-L-02: as_of_date lives at index 22 in BOTH schema paths
+            # (fresh CREATE TABLE appends it last; the legacy migration is
+            # an ALTER TABLE ADD COLUMN, which also appends). Guarded by
+            # row length so rows produced before the column existed keep
+            # reading back as None.
+            as_of_date=(
+                date.fromisoformat(row[22]) if len(row) > 22 and row[22] else None
+            ),
         )
 
     # -------------------------------------------------------------------------

@@ -1,6 +1,6 @@
 """Data models LOATS13July2026 using Pydantic."""
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from enum import StrEnum
 from typing import Any
 from uuid import uuid4
@@ -363,6 +363,12 @@ class TradeDecision(BaseModel):
     decision_type: SignalType  # BUY, SELL, HOLD, NEUTRAL
     composite_strength: float = Field(ge=0, le=1)
     timestamp: datetime
+    # F8-L-02 (CMP Rule 8): caller-supplied as-of date -- the input
+    # snapshot date the decision was computed from, so backtests can pin
+    # results deterministically. Deliberately NOT derived from the wall
+    # clock here (the zero-wall-clock-date invariant holds across
+    # src/loats); None means the caller did not pin a snapshot date.
+    as_of_date: date | None = Field(default=None, description="Input snapshot date")
     entry_price: float = Field(gt=0)
     quantity: int = Field(gt=0)
     stop_loss: float = Field(gt=0)
@@ -395,6 +401,10 @@ class TradeDecision(BaseModel):
             "decision_type": str(self.decision_type),
             "composite_strength": self.composite_strength,
             "timestamp": self.timestamp.isoformat(),
+            # F8-L-02: the snapshot date travels with the payload.
+            "as_of_date": (
+                self.as_of_date.isoformat() if self.as_of_date is not None else None
+            ),
             "entry_price": self.entry_price,
             "quantity": self.quantity,
             "stop_loss": self.stop_loss,
