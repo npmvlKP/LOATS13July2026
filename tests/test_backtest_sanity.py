@@ -5,6 +5,7 @@ from decimal import Decimal
 
 import pytest
 
+from loats.backtest_sanity import backtest_sanity_pass_gate
 from loats.models import HistoricalData
 
 
@@ -364,3 +365,91 @@ class TestAsOfDatePinning:
             second = mock_db.get_historical_data.call_args.kwargs
 
         assert first == second
+
+
+class TestIntervalFromSettings:
+    """2026-09-08: the sanity check must fetch the interval LOATS stores.
+
+    The DB was found to hold only ``1min`` bars (settings.default_timeframe)
+    while the fetch hardcoded ``interval="5min"`` — the weekly P4 exit gate
+    raised "No historical data found" against the real database on every
+    run. The fetch interval now derives from settings.default_timeframe
+    (single source of truth) with an explicit override for callers that
+    must pin a different timeframe.
+    """
+
+    @staticmethod
+    def _make_bars(count: int, interval: str = "1min") -> list:
+        base = datetime(2026, 8, 31, 9, 15, tzinfo=UTC)
+        return [
+            HistoricalData(
+                symbol="NIFTY",
+                timestamp=base + timedelta(minutes=1 * i),
+                open=100.0 + i,
+                high=101.0 + i,
+                low=99.0 + i,
+                close=100.5 + i,
+                volume=10_000,
+                interval=interval,
+            )
+            for i in range(count)
+        ]
+
+    @pytest.mark.asyncio
+    async def test_fetch_uses_default_timeframe_not_hardcoded_5min(self):
+        from unittest.mock import MagicMock, patch
+
+        from loats.backtest_sanity import run_backtest_sanity_check
+
+        mock_db = MagicMock()
+        mock_db.get_historical_data.return_value = self._make_bars(50, "1min")
+
+        with (
+            patch("loats.backtest_sanity.db", mock_db),
+            patch("loats.backtest_sanity.settings.default_symbol", "NIFTY"),
+            patch("loats.backtest_sanity.settings.default_timeframe", "1min"),
+        ):
+            await run_backtest_sanity_check(symbol="NIFTY", days_back=7)
+
+        assert mock_db.get_historical_data.call_args.kwargs["interval"] == "1min"
+
+    @pytest.mark.asyncio
+    async def test_explicit_interval_overrides_settings(self):
+        from unittest.mock import MagicMock, patch
+
+        from loats.backtest_sanity import run_backtest_sanity_check
+
+        mock_db = MagicMock()
+        mock_db.get_historical_data.return_value = self._make_bars(50, "5min")
+
+        with (
+            patch("loats.backtest_sanity.db", mock_db),
+            patch("loats.backtest_sanity.settings.default_symbol", "NIFTY"),
+            patch("loats.backtest_sanity.settings.default_timeframe", "1min"),
+        ):
+            await run_backtest_sanity_check(
+                symbol="NIFTY", days_back=7, interval="5min"
+            )
+
+        assert mock_db.get_historical_data.call_args.kwargs["interval"] == "5min"
+
+    @pytest.mark.asyncio
+    async def test_real_world_db_shape_end_to_end(self):
+        """1-min bars (the shape actually in data/loats.db) analyze cleanly."""
+        from unittest.mock import MagicMock, patch
+
+        from loats.backtest_sanity import run_backtest_sanity_check
+
+        mock_db = MagicMock()
+        mock_db.get_historical_data.return_value = self._make_bars(120, "1min")
+
+        with (
+            patch("loats.backtest_sanity.db", mock_db),
+            patch("loats.backtest_sanity.settings.default_symbol", "NIFTY"),
+            patch("loats.backtest_sanity.settings.default_timeframe", "1min"),
+        ):
+            result = await run_backtest_sanity_check(symbol="NIFTY", days_back=7)
+
+        assert result.total_bars == 120
+        assert result.total_windows > 0
+        assert backtest_sanity_pass_gate(result) is True
