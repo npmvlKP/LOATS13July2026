@@ -810,3 +810,77 @@ class TestDatabaseAsyncAdditions:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+
+
+class TestProductionAsyncWiring:
+    """Regression: production must wire the aiosqlite implementations.
+
+    Found live 08Sep2026: the supervised P5 run attached the async pool
+    but every cycle died with ``'Database' object has no attribute
+    '_async_create_signal'`` -- the binding module was only ever imported
+    by tests (its import-time ``extend_database_class()`` call masked the
+    gap). ``async_initialize`` now performs the binding itself.
+    """
+
+    async def test_async_initialize_extends_database_class(
+        self, tmp_path: Path
+    ) -> None:
+        """async_initialize() binds the _async_* implementations even in a
+        process that never imported the additions module."""
+        db = Database(
+            db_path=tmp_path / "wiring.db",
+            audit_log_path=tmp_path / "wiring_audit.jsonl",
+        )
+        bound_names = [
+            "_async_create_signal",
+            "_async_store_quote",
+            "_async_store_historical_data",
+        ]
+        saved = {name: getattr(Database, name, None) for name in bound_names}
+        try:
+            # Simulate the production import order: no bindings present.
+            for name in bound_names:
+                if hasattr(Database, name):
+                    delattr(Database, name)
+            assert not any(hasattr(Database, name) for name in bound_names)
+
+            await db.async_initialize()
+
+            assert all(hasattr(Database, name) for name in bound_names), (
+                "async_initialize must bind the aiosqlite implementations"
+            )
+            assert db._async_pool is not None
+        finally:
+            for name, method in saved.items():
+                if method is not None and not hasattr(Database, name):
+                    setattr(Database, name, method)
+            if db._async_pool is not None:
+                try:
+                    await db.async_close_all()
+                except Exception:
+                    pass
+            db.close_all()
+
+    async def test_async_create_signal_works_with_pool_attached(
+        self, tmp_path: Path
+    ) -> None:
+        """The exact live failure: async_create_signal with the pool set
+        must persist via the bound aiosqlite path, not AttributeError."""
+        db = Database(
+            db_path=tmp_path / "outcome.db",
+            audit_log_path=tmp_path / "outcome_audit.jsonl",
+        )
+        await db.async_initialize()
+        try:
+            signal = Signal(
+                symbol="NIFTY",
+                signal_type=SignalType.BUY,
+                strength=0.8,
+                timestamp=datetime.now(UTC),
+                indicators={"put_call_volume_ratio": 1.4},
+                confidence=0.8,
+            )
+            assert await db.async_create_signal(signal) is True
+        finally:
+            await db.async_close_all()
+            db.close_all()
