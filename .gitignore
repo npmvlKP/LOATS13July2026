@@ -53,7 +53,9 @@ htmlcov/
 coverage.xml
 *.egg-info/
 coverage.json
-pytest-report.xml
+# Generated pytest junit artifacts (junitxml=<path>.xml and stray suffixed
+# variants like pytest-report.xmlcls observed staged 2026-09-08)
+pytest-report.xml*
 
 # IDE and editor files
 .vscode/
