@@ -426,6 +426,37 @@ def _normalize_history_rows(result: dict[str, Any]) -> dict[str, Any]:
     return {**result, "data": rows}
 
 
+def _normalize_funds_payload(result: dict[str, Any]) -> dict[str, Any]:
+    """Normalize the funds payload into the canonical LOATS vocabulary.
+
+    The live deployment returns ``data`` as a FLAT broker-vocabulary dict
+    (verified 08Sep2026: {availablecash, collateral, grossexposure,
+    utiliseddebits, totalpnl, m2mrealized, m2munrealized, ...}) while
+    ``TradingOrchestrator._create_funds_model`` reads the canonical keys
+    (available_cash / utilized_margin / available_margin / total_equity).
+    Canonical keys are added from the broker's actual fields -- derived
+    values degrade to 0 when their source field is absent, and original
+    broker fields are preserved. Non-dict payloads pass through.
+    """
+    data = result.get("data")
+    if not isinstance(data, dict):
+        return result
+    extended = dict(data)
+    if "available_cash" not in extended and "availablecash" in extended:
+        extended["available_cash"] = extended["availablecash"]
+    if "utilized_margin" not in extended and "utiliseddebits" in extended:
+        extended["utilized_margin"] = extended["utiliseddebits"]
+    if "available_margin" not in extended and "available_cash" in extended:
+        extended["available_margin"] = extended["available_cash"] - (
+            extended.get("utilized_margin") or 0
+        )
+    if "total_equity" not in extended and "available_cash" in extended:
+        extended["total_equity"] = extended["available_cash"] + (
+            extended.get("totalpnl") or 0
+        )
+    return {**result, "data": extended}
+
+
 def _history_payload(
     symbol: str, interval: str, from_date: str | None, to_date: str | None
 ) -> dict[str, Any]:
@@ -721,7 +752,7 @@ class OpenAlgoClient:
         return self._request("POST", "position_book")
 
     def get_funds(self) -> dict[str, Any]:
-        return self._request("POST", "funds")
+        return _normalize_funds_payload(self._request("POST", "funds"))
 
     def place_order(
         self,
@@ -1218,7 +1249,7 @@ class AsyncOpenAlgoClient:
                 logger.warning(f"Failed to parse cached funds result: {e}")
 
         # Cache miss - fetch from API
-        result = await self._request("POST", "funds")
+        result = _normalize_funds_payload(await self._request("POST", "funds"))
 
         # Cache the result for 60 seconds
         try:

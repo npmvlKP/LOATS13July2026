@@ -1797,15 +1797,23 @@ class TradingOrchestrator:
         )
 
     def _create_funds_model(self, funds_data: dict[str, Any]) -> Any:
-        """Create funds model from raw data."""
+        """Create funds model from raw data.
+
+        Reads degrade to 0 when the broker omits a field: an absent key
+        must never crash the market-data cycle (found live 08Sep2026 as
+        ``KeyError: 'available_cash'`` -- the deployment's funds payload
+        uses its own vocabulary, now normalized at the client, and any
+        future vocabulary drift degrades instead of starving every
+        producer of the cycle's funds step).
+        """
         from .models import FundsData
 
         available_margin = funds_data.get("available_margin", 0)
         return FundsData(
-            available_cash=funds_data["available_cash"],
-            utilized_margin=funds_data["utilized_margin"],
+            available_cash=funds_data.get("available_cash", 0),
+            utilized_margin=funds_data.get("utilized_margin", 0),
             available_margin=available_margin,
-            total_equity=funds_data["total_equity"],
+            total_equity=funds_data.get("total_equity", 0),
             timestamp=datetime.datetime.now(datetime.UTC),
         )
 

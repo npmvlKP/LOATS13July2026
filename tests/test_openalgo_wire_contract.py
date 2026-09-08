@@ -492,3 +492,53 @@ class TestHistoryTimestampNormalization:
         ts = result["data"][0]["timestamp"]
         assert isinstance(ts, str)
         datetime.fromisoformat(ts)
+
+
+class TestFundsNormalization:
+    """Funds payload vocabulary normalized for _create_funds_model."""
+
+    def test_broker_vocabulary_extended_with_canonical_keys(self) -> None:
+        live = {
+            "status": "success",
+            "data": {
+                "availablecash": 10000000.0,
+                "utiliseddebits": 0.0,
+                "totalpnl": 0.0,
+            },
+        }
+        result = oa._normalize_funds_payload(live)
+        funds = result["data"]
+        assert funds["available_cash"] == 10000000.0
+        assert funds["utilized_margin"] == 0.0
+        assert funds["available_margin"] == 10000000.0
+        assert funds["total_equity"] == 10000000.0
+        assert funds["availablecash"] == 10000000.0  # originals preserved
+
+    def test_non_dict_payload_passes_through(self) -> None:
+        payload = {"status": "error", "message": "x"}
+        assert oa._normalize_funds_payload(payload) is payload
+
+    @pytest.mark.asyncio
+    async def test_async_funds_normalized_before_cache(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        client = AsyncOpenAlgoClient(api_key="k", base_url="http://t")
+
+        async def fake_request(
+            method: str, endpoint: str, **kwargs: Any
+        ) -> dict[str, Any]:
+            assert endpoint == "funds"
+            return {"status": "success", "data": {"availablecash": 5.0}}
+
+        monkeypatch.setattr(client, "_request", fake_request)
+        await cache_manager.initialize()
+        result = await client.get_funds()
+        assert result["data"]["available_cash"] == 5.0
+
+    def test_orchestrator_funds_model_tolerates_missing_keys(self) -> None:
+        from loats.models import FundsData
+
+        orch = TradingOrchestrator.__new__(TradingOrchestrator)
+        model = orch._create_funds_model({})
+        assert isinstance(model, FundsData)
+        assert model.available_cash == 0 and model.total_equity == 0
