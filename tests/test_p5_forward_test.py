@@ -1248,10 +1248,19 @@ class TestWriterIdentity:
         try:
             log = tmp_path / "p5_forward_test_recycled.json"
             # Simulate recycle: the PID is alive but its creation time
-            # differs from the one the real writer recorded.
-            recycled_ts = (
-                datetime.datetime.fromisoformat(created) + datetime.timedelta(seconds=1)
-            ).isoformat()
+            # differs from the one the real writer recorded. POSIX records
+            # raw /proc starttime ticks (see _process_creation_time), so
+            # the drifted stamp must be built in the same representation
+            # the platform's identity takes.
+            if os.name == "nt":
+                recycled_ts = (
+                    datetime.datetime.fromisoformat(created)
+                    + datetime.timedelta(seconds=1)
+                ).isoformat()
+            else:
+                # Drift one starttime slot: an adjacent tick is a
+                # different process by construction.
+                recycled_ts = str(int(created) + 1)
             self._write_live_log(log, pid, recycled_ts)
             assert runner._resolve_resume_target(log) == log
         finally:
@@ -1311,13 +1320,28 @@ class TestWriterIdentity:
         sidecar = tmp_path / "p5_forward_test_foreign.json.claim"
         fh = open(sidecar, "a+b")
         try:
-            import msvcrt
+            if os.name == "nt":
+                import msvcrt
 
-            fh.seek(0)
-            msvcrt.locking(fh.fileno(), msvcrt.LK_NBLCK, 1)
-            assert runner._claim_run_log(log) is False
-            fh.seek(0)
-            msvcrt.locking(fh.fileno(), msvcrt.LK_UNLCK, 1)
+                fh.seek(0)
+                msvcrt.locking(fh.fileno(), msvcrt.LK_NBLCK, 1)
+                assert runner._claim_run_log(log) is False
+                fh.seek(0)
+                msvcrt.locking(fh.fileno(), msvcrt.LK_UNLCK, 1)
+            else:
+                # Same kernel contract the runner relies on on POSIX
+                # (fcntl.flock); a held lock makes the claim fail.
+                import fcntl
+
+                fcntl.flock(  # type: ignore[attr-defined]
+                    fh.fileno(),
+                    fcntl.LOCK_EX | fcntl.LOCK_NB,  # type: ignore[attr-defined]
+                )
+                assert runner._claim_run_log(log) is False
+                fcntl.flock(  # type: ignore[attr-defined]
+                    fh.fileno(),
+                    fcntl.LOCK_UN,  # type: ignore[attr-defined]
+                )
         finally:
             fh.close()
         assert runner._claim_run_log(log) is True
