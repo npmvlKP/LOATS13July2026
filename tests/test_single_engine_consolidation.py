@@ -142,6 +142,38 @@ def _sentiment_result(score: float = 0.6) -> SentimentAnalysisResult:
     )
 
 
+def _chain_payload() -> dict[str, object]:
+    """Nearest-expiry option-chain fixture for the options-flow producer.
+
+    Mirrors the OpenAlgo ``option_chain`` response envelope: 3:2 call-side
+    volume dominance (PCR = 2/3 -> BUY-side flow inside the dead-band) so
+    the producer persists a tagged ``options_flow`` signal.
+    """
+    return {
+        "status": "success",
+        "data": {
+            "options": [
+                {
+                    "symbol": "NIFTY24500CE",
+                    "strike_price": 24500,
+                    "expiry": "2026-09-10T00:00:00",
+                    "option_type": "CE",
+                    "volume": 120_000,
+                    "implied_volatility": 12.5,
+                },
+                {
+                    "symbol": "NIFTY24500PE",
+                    "strike_price": 24500,
+                    "expiry": "2026-09-10T00:00:00",
+                    "option_type": "PE",
+                    "volume": 80_000,
+                    "implied_volatility": 13.9,
+                },
+            ]
+        },
+    }
+
+
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
@@ -233,6 +265,11 @@ class TestOrchestratorSoleEngineOfRecord:
                 "loats.orchestrator.sentiment.analyze_symbol_sentiment",
                 new_callable=AsyncMock,
             ) as mock_sentiment,
+            patch.object(
+                orchestrator,
+                "_safe_get_option_chain",
+                new_callable=AsyncMock,
+            ) as mock_chain,
             patch("loats.trade_decision.rules_engine") as mock_rules,
         ):
             mock_history.return_value = history_payload
@@ -241,6 +278,7 @@ class TestOrchestratorSoleEngineOfRecord:
             mock_positions.return_value = {"data": []}
             mock_rss.return_value = True
             mock_sentiment.return_value = _sentiment_result(0.6)
+            mock_chain.return_value = _chain_payload()
             mock_rules.apply_gating_rules.return_value = (
                 True,
                 {"reason": "gating_passed"},
@@ -255,6 +293,7 @@ class TestOrchestratorSoleEngineOfRecord:
             await orchestrator._execute_sentiment_analysis()
             await orchestrator._execute_volatility_analysis()
             await orchestrator._execute_price_action_analysis()
+            await orchestrator._execute_options_flow_analysis()
 
             stored = await temp_db.async_get_latest_signals("NIFTY", limit=10)
             sources = {s.metadata.get("source") for s in stored}
@@ -316,6 +355,7 @@ class TestOrchestratorSoleEngineOfRecord:
             await orchestrator._execute_sentiment_analysis()
             await orchestrator._execute_volatility_analysis()
             await orchestrator._execute_price_action_analysis()
+            await orchestrator._execute_options_flow_analysis()
 
         stored = await temp_db.async_get_latest_signals("NIFTY", limit=10)
         source_counts: dict[str, int] = {}

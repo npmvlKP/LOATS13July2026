@@ -43,6 +43,44 @@ from loats.orchestrator import TradingOrchestrator
 from loats.scheduler import TradingScheduler
 from loats.strength import StrengthEngine, StrengthSource
 
+
+def make_chain_payload() -> dict[str, object]:
+    """Nearest-expiry option-chain fixture for the options-flow producer.
+
+    Mirrors the OpenAlgo ``option_chain`` response envelope
+    (``data.options`` rows, CE/PE ``option_type`` spellings): 3:2
+    call-side volume dominance (PCR = 2/3, inside the 1.2 dead-band's
+    BUY side) with a positive put-side IV skew recorded for audit.
+    """
+    return {
+        "status": "success",
+        "data": {
+            "options": [
+                {
+                    "symbol": "NIFTY24500CE",
+                    "strike_price": 24500,
+                    "expiry": "2026-09-10T00:00:00",
+                    "option_type": "CE",
+                    "last_price": 180.5,
+                    "open_interest": 1_250_000,
+                    "volume": 120_000,
+                    "implied_volatility": 12.5,
+                },
+                {
+                    "symbol": "NIFTY24500PE",
+                    "strike_price": 24500,
+                    "expiry": "2026-09-10T00:00:00",
+                    "option_type": "PE",
+                    "last_price": 165.25,
+                    "open_interest": 1_480_000,
+                    "volume": 80_000,
+                    "implied_volatility": 13.9,
+                },
+            ]
+        },
+    }
+
+
 # --------------------------------------------------------------------------
 # Helpers: deterministic fixtures
 # --------------------------------------------------------------------------
@@ -258,16 +296,23 @@ class TestRealProducersE2E:
                 "loats.orchestrator.sentiment.analyze_symbol_sentiment",
                 new_callable=AsyncMock,
             ) as mock_sentiment,
+            patch.object(
+                orchestrator,
+                "_safe_get_option_chain",
+                new_callable=AsyncMock,
+            ) as mock_chain,
         ):
             mock_history.return_value = payload
             mock_quotes.return_value = quote_payload
             mock_rss.return_value = True
             mock_sentiment.return_value = make_sentiment_result(0.6)
+            mock_chain.return_value = make_chain_payload()
 
             await orchestrator._execute_ta_analysis()
             await orchestrator._execute_sentiment_analysis()
             await orchestrator._execute_volatility_analysis()
             await orchestrator._execute_price_action_analysis()
+            await orchestrator._execute_options_flow_analysis()
 
         stored = await temp_db.async_get_latest_signals("NIFTY", limit=10)
         assert len(stored) >= 4, (
@@ -279,6 +324,7 @@ class TestRealProducersE2E:
             StrengthSource.SENTIMENT.value,
             StrengthSource.VOLATILITY.value,
             StrengthSource.PRICE_ACTION.value,
+            StrengthSource.OPTIONS_FLOW.value,
         }
         assert expected <= sources, (
             f"Producer sources {sources} must cover the 4 diversity-critical "
@@ -798,6 +844,7 @@ class TestMutationSafety:
             "_execute_sentiment_analysis",
             "_execute_volatility_analysis",
             "_execute_price_action_analysis",
+            "_execute_options_flow_analysis",
         ):
             assert hasattr(TradingOrchestrator, method), (
                 f"Missing producer {method} - diversity-critical producer set"

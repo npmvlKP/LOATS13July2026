@@ -96,6 +96,7 @@ async def _run_cycle(
             "_execute_sentiment_analysis",
             "_execute_volatility_analysis",
             "_execute_price_action_analysis",
+            "_execute_options_flow_analysis",
             "_execute_market_data_update",
         )
     }
@@ -304,7 +305,6 @@ _EVIDENCE_OF_RECORD = frozenset(
         "reports/production-verification.json",
         "reports/todo27_eval.json",
         "reports/todo27_external.json",
-        "reports/verify_f8h01_external.json",
     }
 )
 

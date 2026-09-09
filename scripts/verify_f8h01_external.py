@@ -131,7 +131,17 @@ def check_e_runner_validator() -> None:
         capture_output=True,
         text=True,
         cwd=REPO_ROOT,
-        env={**os.environ, "PYTHONIOENCODING": "utf-8"},
+        env={
+            **os.environ,
+            "PYTHONIOENCODING": "utf-8",
+            # The --dry-run smoke still writes its run log; keep it OUT of
+            # the production evidence stream (reports/) so external
+            # verification never drops a stub into the live P5 run-log
+            # directory (2026-09-08: a verification run created
+            # reports/p5_forward_test_<ts>.json there). Mirrors the
+            # test-suite isolation pin in tests/test_f8h01_fixes.py.
+            "P5_RUN_LOG_DIR": str(REPO_ROOT / "reports" / "health" / "p5-verify-stubs"),
+        },
         timeout=120,
     )
     record(
@@ -304,7 +314,13 @@ async def main_async() -> int:
         for name, ok, note in _CHECKS:
             if not ok:
                 print(f"  FAILED: {name} {note}")
-    out = REPO_ROOT / "reports" / "verify_f8h01_external.json"
+    out = (
+        REPO_ROOT
+        / "reports"
+        / "health"
+        / "p5-verify-stubs"
+        / "verify_f8h01_external.json"
+    )
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(
         json.dumps(

@@ -1022,3 +1022,390 @@ class TestResumeBaseline:
         )
         assert result.returncode == 2
         assert "resume target not found" in result.stderr
+
+
+def _find_unrelated_alive_pid(max_probe: int = 10000) -> int | None:
+    """Find an alive PID whose image is NOT this test's interpreter.
+
+    Exercises the image-mismatch arm of the writer-liveness check: the PID
+    is alive, but runs a different binary, so the guard must treat the
+    recorded writer as dead (PID reuse) and allow takeover. Returns None
+    when no such PID exists.
+    """
+    runner = _load_runner()
+    current_pid = os.getpid()
+    for pid in range(1, max_probe):
+        if pid == current_pid:
+            continue
+        image = runner._process_image_path(pid)
+        if image in ("", runner._PROCESS_IMAGE_UNREADABLE):
+            continue  # free or uninspectable — not usable for this scenario
+        if os.path.normcase(Path(image).resolve()) != runner._CURRENT_IMAGE_NORMCASE:
+            return pid
+    return None
+
+
+class TestSingleWriterGuard:
+    """Resume must never start a second writer on an actively-supervised log.
+
+    2026-09-08: the logon watchdog (LOATS_P5_Resume) was found DISABLED
+    while the evidence run sat abandoned; re-enabling it while an operator
+    also resumes manually would let two supervisors fold interleaved
+    counter baselines into one run log, corrupting the measured counters
+    the P5 gate grades. Resume must refuse when a live writer holds the
+    target log, and claim writer-ship atomically when it proceeds.
+    """
+
+    @staticmethod
+    def _write_live_log(path: Path, supervisor_pid: int | None) -> None:
+        start = datetime.datetime.now(datetime.UTC) - datetime.timedelta(hours=2)
+        record: dict[str, Any] = {
+            "metadata": {"phase_gate": "P5", "dry_run": False},
+            "routing": {"enabled_at_start": True},
+            "started_at": start.isoformat(),
+            "ended_at": None,
+            "unhandled_exceptions": 0,
+            "resume_refusal": None,
+            "supervisor_pid": supervisor_pid,
+            "restarts": 0,
+            "cycles_completed": 3,
+            "cycles_completed_baseline": 0,
+            "counters": {"success": 2, "disabled": 0, "error": 0},
+            "counters_baseline": {"success": 0, "disabled": 0, "error": 0},
+            "events": [],
+        }
+        path.write_text(json.dumps(record), encoding="utf-8")
+
+    def test_refuses_when_live_writer_holds_log(self, tmp_path: Path) -> None:
+        runner = _load_runner()
+        log = tmp_path / "p5_forward_test_live.json"
+        self._write_live_log(log, os.getpid())
+        # This test process is a real, alive interpreter recorded as the
+        # writer: refusing is the only safe answer.
+        assert runner._resolve_resume_target(log) is None
+
+    def test_takes_over_when_recorded_pid_is_dead(self, tmp_path: Path) -> None:
+        runner = _load_runner()
+        log = tmp_path / "p5_forward_test_dead.json"
+        self._write_live_log(log, 0)
+        # PID 0 is a reserved system pseudo-process, never a supervisor.
+        assert runner._resolve_resume_target(log) == log
+
+    def test_takes_over_when_no_pid_recorded(self, tmp_path: Path) -> None:
+        runner = _load_runner()
+        log = tmp_path / "p5_forward_test_legacy.json"
+        self._write_live_log(log, None)
+        assert runner._resolve_resume_target(log) == log
+
+    def test_image_mismatch_pid_counts_as_dead_writer(self, tmp_path: Path) -> None:
+        unrelated = _find_unrelated_alive_pid()
+        if unrelated is None:
+            pytest.skip("no alive unrelated-image PID found to probe with")
+        runner = _load_runner()
+        log = tmp_path / "p5_forward_test_pidreuse.json"
+        self._write_live_log(log, unrelated)
+        assert runner._resolve_resume_target(log) == log
+
+    def test_current_image_matches_own_process_image(self) -> None:
+        """The comparator baseline must equal this process's REAL image.
+
+        uv-venv trampolines make ``sys.executable`` differ from the actual
+        running image; comparing against it misclassifies live writers as
+        dead (fail-open). The baseline must be the queried self-image.
+        """
+        runner = _load_runner()
+        own = runner._process_image_path(os.getpid())
+        if own in ("", runner._PROCESS_IMAGE_UNREADABLE):
+            pytest.skip("own process image unreadable on this host")
+        assert runner._CURRENT_IMAGE_NORMCASE == os.path.normcase(Path(own).resolve())
+
+    def test_claim_records_live_pid(self, tmp_path: Path) -> None:
+        runner = _load_runner()
+        log = tmp_path / "p5_forward_test_claim.json"
+        self._write_live_log(log, None)
+        assert runner._claim_run_log(log) is True
+        data = json.loads(log.read_text(encoding="utf-8"))
+        assert data["supervisor_pid"] == os.getpid()
+
+    def test_second_claimant_loses(self, tmp_path: Path) -> None:
+        runner = _load_runner()
+        log = tmp_path / "p5_forward_test_race.json"
+        self._write_live_log(log, None)
+        # Winner records its own (alive) PID.
+        assert runner._claim_run_log(log) is True
+        # A second claimant must lose and must not overwrite the claim.
+        assert runner._claim_run_log(log, refusal="second writer detected") is False
+        data = json.loads(log.read_text(encoding="utf-8"))
+        assert data["supervisor_pid"] == os.getpid()
+        assert data["ended_at"] is None
+
+    def test_graceful_exit_clears_claim(self, tmp_path: Path) -> None:
+        runner = _load_runner()
+        log = tmp_path / "p5_forward_test_release.json"
+        self._write_live_log(log, None)
+        assert runner._claim_run_log(log) is True
+        runner._release_run_log(log)
+        data = json.loads(log.read_text(encoding="utf-8"))
+        assert data["supervisor_pid"] is None
+
+    def test_release_never_resurrects_ended_log(self, tmp_path: Path) -> None:
+        runner = _load_runner()
+        log = tmp_path / "p5_forward_test_ended.json"
+        self._write_live_log(log, None)
+        assert runner._claim_run_log(log) is True
+        data = json.loads(log.read_text(encoding="utf-8"))
+        data["ended_at"] = datetime.datetime.now(datetime.UTC).isoformat()
+        log.write_text(json.dumps(data), encoding="utf-8")
+        runner._release_run_log(log)
+        data = json.loads(log.read_text(encoding="utf-8"))
+        assert data["ended_at"] is not None
+        assert data["supervisor_pid"] is None
+
+    def test_resume_refusal_is_persisted_and_cleared(self, tmp_path: Path) -> None:
+        runner = _load_runner()
+        log = tmp_path / "p5_forward_test_refusal.json"
+        self._write_live_log(log, None)
+        assert runner._claim_run_log(log) is True
+        assert (
+            runner._claim_run_log(
+                log, refusal="second writer detected (operator resume)"
+            )
+            is False
+        )
+        data = json.loads(log.read_text(encoding="utf-8"))
+        assert data["resume_refusal"] is not None
+        # A later self-re-claim (same live PID) clears the stale refusal.
+        assert runner._claim_run_log(log) is True
+        data = json.loads(log.read_text(encoding="utf-8"))
+        assert data["resume_refusal"] is None
+        assert data["supervisor_pid"] == os.getpid()
+
+
+def _spawn_same_image_child() -> tuple[Any, int, str]:
+    """Spawn a live child on THIS interpreter image and return its identity.
+
+    sys.executable on a venv is a launcher whose CHILD is the real
+    interpreter; Popen on it would return the launcher (different image).
+    Spawning the queried self image directly yields a genuine same-image
+    process — a legitimate stand-in for a live supervisor.
+    """
+    runner = _load_runner()
+    image = runner._current_process_image()
+    proc = subprocess.Popen(
+        [image, "-c", "import time; time.sleep(60)"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    created = runner._process_creation_time(proc.pid)
+    assert created is not None, "child creation time unreadable"
+    return proc, proc.pid, created
+
+
+class TestWriterIdentity:
+    """Writer identity must survive PID recycling, and claims must be an
+    OS-level lock, not a JSON read-modify-write (adversarial review
+    2026-09-08, blocking findings 1 and 2).
+
+    Finding 1: exact-image liveness matches ANY live same-image process;
+    ~19 unrelated python processes share the base image on the gate host,
+    so a recycled supervisor PID permanently blocks takeover of an
+    in-span evidence run. Binding the claim to the writer's process
+    creation time makes recycling detectable.
+    Finding 2: two claimants can interleave read/write and both proceed;
+    a lockfile held for the writer's lifetime (auto-released on death)
+    closes the race deterministically.
+    """
+
+    @staticmethod
+    def _write_live_log(
+        path: Path,
+        supervisor_pid: int | None,
+        supervisor_started_at: str | None = None,
+    ) -> None:
+        start = datetime.datetime.now(datetime.UTC) - datetime.timedelta(hours=2)
+        record: dict[str, Any] = {
+            "metadata": {"phase_gate": "P5", "dry_run": False},
+            "routing": {"enabled_at_start": True},
+            "started_at": start.isoformat(),
+            "ended_at": None,
+            "unhandled_exceptions": 0,
+            "resume_refusal": None,
+            "supervisor_pid": supervisor_pid,
+            "supervisor_started_at": supervisor_started_at,
+            "restarts": 0,
+            "cycles_completed": 3,
+            "cycles_completed_baseline": 0,
+            "counters": {"success": 2, "disabled": 0, "error": 0},
+            "counters_baseline": {"success": 0, "disabled": 0, "error": 0},
+            "events": [],
+        }
+        path.write_text(json.dumps(record), encoding="utf-8")
+
+    def test_recycled_pid_same_image_allows_takeover(self, tmp_path: Path) -> None:
+        """A recorded PID now held by a DIFFERENT same-image process is dead."""
+        runner = _load_runner()
+        proc, pid, created = _spawn_same_image_child()
+        try:
+            log = tmp_path / "p5_forward_test_recycled.json"
+            # Simulate recycle: the PID is alive but its creation time
+            # differs from the one the real writer recorded. POSIX records
+            # raw /proc starttime ticks (see _process_creation_time), so
+            # the drifted stamp must be built in the same representation
+            # the platform's identity takes.
+            if os.name == "nt":
+                recycled_ts = (
+                    datetime.datetime.fromisoformat(created)
+                    + datetime.timedelta(seconds=1)
+                ).isoformat()
+            else:
+                # Drift one starttime slot: an adjacent tick is a
+                # different process by construction.
+                recycled_ts = str(int(created) + 1)
+            self._write_live_log(log, pid, recycled_ts)
+            assert runner._resolve_resume_target(log) == log
+        finally:
+            proc.terminate()
+            proc.wait(timeout=10)
+
+    def test_exact_identity_alive_writer_blocks(self, tmp_path: Path) -> None:
+        """A recorded (pid, creation-time) pair that still matches reality
+        is a live writer: resume must refuse."""
+        runner = _load_runner()
+        proc, pid, created = _spawn_same_image_child()
+        try:
+            log = tmp_path / "p5_forward_test_exact.json"
+            self._write_live_log(log, pid, created)
+            assert runner._resolve_resume_target(log) is None
+        finally:
+            proc.terminate()
+            proc.wait(timeout=10)
+
+    def test_lock_sidecar_blocks_concurrent_claim(self, tmp_path: Path) -> None:
+        """The second claim must lose even when the recorded writer is dead:
+        the sidecar lock (held for the first writer's lifetime) is the
+        serialization point, not the JSON file."""
+        runner = _load_runner()
+        log = tmp_path / "p5_forward_test_locked.json"
+        self._write_live_log(log, None)
+        assert runner._claim_run_log(log) is True
+        # A foreign claimant arriving while the lock is held: the JSON
+        # path alone would let it take over a dead writer's claim.
+        foreign = runner._claim_run_log(
+            log,
+            refusal="second writer detected",
+            identity=(424242, "2000-01-01T00:00:00.000000+00:00"),
+        )
+        assert foreign is False
+        data = json.loads(log.read_text(encoding="utf-8"))
+        assert data["supervisor_pid"] == os.getpid()
+
+    def test_lock_auto_released_on_death(self, tmp_path: Path) -> None:
+        """A writer that dies holding the lock must not block its successor:
+        the OS releases the lock, takeover re-locks and proceeds."""
+        runner = _load_runner()
+        log = tmp_path / "p5_forward_test_deceased.json"
+        self._write_live_log(log, None)
+        assert runner._claim_run_log(log) is True
+        # Simulate the writer's death: release our handle without the
+        # graceful _release_run_log path (as a hard kill would).
+        runner._ACTIVE_CLAIM.release()
+        runner._ACTIVE_CLAIM = None
+        assert runner._claim_run_log(log) is True
+
+    def test_external_lock_holder_blocks_claim(self, tmp_path: Path) -> None:
+        """A foreign process holding the sidecar lock blocks the claim."""
+        runner = _load_runner()
+        log = tmp_path / "p5_forward_test_foreign.json"
+        self._write_live_log(log, None)
+        sidecar = tmp_path / "p5_forward_test_foreign.json.claim"
+        fh = open(sidecar, "a+b")
+        try:
+            if os.name == "nt":
+                import msvcrt
+
+                fh.seek(0)
+                msvcrt.locking(fh.fileno(), msvcrt.LK_NBLCK, 1)
+                assert runner._claim_run_log(log) is False
+                fh.seek(0)
+                msvcrt.locking(fh.fileno(), msvcrt.LK_UNLCK, 1)
+            else:
+                # Same kernel contract the runner relies on on POSIX
+                # (fcntl.flock); a held lock makes the claim fail.
+                import fcntl
+
+                fcntl.flock(  # type: ignore[attr-defined]
+                    fh.fileno(),
+                    fcntl.LOCK_EX | fcntl.LOCK_NB,  # type: ignore[attr-defined]
+                )
+                assert runner._claim_run_log(log) is False
+                fcntl.flock(  # type: ignore[attr-defined]
+                    fh.fileno(),
+                    fcntl.LOCK_UN,  # type: ignore[attr-defined]
+                )
+        finally:
+            fh.close()
+        assert runner._claim_run_log(log) is True
+
+    def test_release_is_identity_scoped(self, tmp_path: Path) -> None:
+        """Release clears only THIS writer's claim, never a successor's."""
+        runner = _load_runner()
+        log = tmp_path / "p5_forward_test_scoped.json"
+        self._write_live_log(log, None)
+        assert runner._claim_run_log(log) is True
+        # Simulate a successor having taken over: the log records its pid.
+        runner._update_run_log(log, {"supervisor_pid": 424242})
+        runner._release_run_log(log)
+        data = json.loads(log.read_text(encoding="utf-8"))
+        assert data["supervisor_pid"] == 424242  # foreign claim untouched
+        # Our own recorded claim is still releasable.
+        runner._update_run_log(log, {"supervisor_pid": os.getpid()})
+        runner._release_run_log(log)
+        data = json.loads(log.read_text(encoding="utf-8"))
+        assert data["supervisor_pid"] is None
+
+    def test_resolver_persists_refusal(self, tmp_path: Path) -> None:
+        """A resolver-level refusal is persisted for --status visibility."""
+        runner = _load_runner()
+        proc, pid, created = _spawn_same_image_child()
+        try:
+            log = tmp_path / "p5_forward_test_persist.json"
+            self._write_live_log(log, pid, created)
+            assert runner._resolve_resume_target(log) is None
+            data = json.loads(log.read_text(encoding="utf-8"))
+            assert data["resume_refusal"] is not None
+        finally:
+            proc.terminate()
+            proc.wait(timeout=10)
+
+    def test_run_exit2_when_claim_refused(self, tmp_path: Path) -> None:
+        """_run's enforcement point exits 2 when the claim is refused."""
+        runner = _load_runner()
+        proc, pid, created = _spawn_same_image_child()
+        try:
+            log = tmp_path / "p5_forward_test_run2.json"
+            self._write_live_log(log, pid, created)
+            rc = asyncio.run(
+                runner._run(
+                    dry_run=False, reason="guard probe", duration=None, resume_log=log
+                )
+            )
+            assert rc == 2
+        finally:
+            proc.terminate()
+            proc.wait(timeout=10)
+
+    def test_free_pid_takeover_exercises_openprocess_error_path(
+        self, tmp_path: Path
+    ) -> None:
+        """A verified-free PID (not reserved PID 0) exercises the real
+        OpenProcess ERROR_INVALID_PARAMETER mapping to 'PID free'."""
+        runner = _load_runner()
+        free = next(
+            (p for p in range(1, 100000) if runner._process_image_path(p) == ""),
+            None,
+        )
+        if free is None:
+            pytest.skip("no free PID found to probe with")
+        log = tmp_path / "p5_forward_test_free.json"
+        self._write_live_log(log, free)
+        assert runner._resolve_resume_target(log) == log

@@ -2344,6 +2344,19 @@ class Database:
 
         if importlib.util.find_spec("aiosqlite") is not None:
             try:
+                # Bind the aiosqlite-backed ``_async_*`` implementations onto
+                # this class BEFORE attaching the pool: the public async
+                # wrappers dispatch to them whenever ``_async_pool`` is set,
+                # and the binding module is otherwise never imported in
+                # production (tests imported it as a side effect, masking the
+                # gap -- F-defect found live 08Sep2026: every supervised
+                # cycle died with "'Database' object has no attribute
+                # '_async_create_signal'"). Idempotent; existing bindings
+                # are left untouched.
+                from .database_async_additions import extend_database_class
+
+                extend_database_class()
+
                 from .utils.connection_pool import SimpleConnectionPool
 
                 self._async_pool = SimpleConnectionPool(

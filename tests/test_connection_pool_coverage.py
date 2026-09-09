@@ -7,6 +7,8 @@ max-size guard.
 
 from __future__ import annotations
 
+import asyncio
+
 import aiosqlite
 import pytest
 
@@ -49,12 +51,32 @@ class TestSimpleConnectionPool:
 
     @pytest.mark.asyncio
     async def test_maxsize_enforced(self, tmp_path) -> None:
-        pool = SimpleConnectionPool(str(tmp_path / "p.db"), maxsize=1)
+        # timeout is the bounded wait before exhaustion is declared; with a
+        # saturated pool and nothing releasing, acquire must still raise.
+        pool = SimpleConnectionPool(str(tmp_path / "p.db"), maxsize=1, timeout=0.2)
         conn = await pool.acquire()
         with pytest.raises(RuntimeError, match="Maximum pool size"):
-            await pool.acquire()  # pool empty, limit reached
+            await pool.acquire()  # pool empty, limit reached, wait expires
         await conn.close()
         pool._connections_created = 0
+
+    @pytest.mark.asyncio
+    async def test_acquire_waits_for_release_when_saturated(self, tmp_path) -> None:
+        # Regression (live 08Sep2026): a saturated pool previously raised
+        # immediately. acquire must now wait for a release and succeed.
+        pool = SimpleConnectionPool(str(tmp_path / "p.db"), maxsize=1, timeout=5.0)
+        conn = await pool.acquire()
+
+        async def release_later() -> None:
+            await asyncio.sleep(0.2)
+            await pool.release(conn)
+
+        task = asyncio.create_task(release_later())
+        conn2 = await pool.acquire()  # waits for the release, succeeds
+        assert conn2 is conn
+        await task
+        await pool.release(conn2)
+        await pool.close_all()
 
     @pytest.mark.asyncio
     async def test_close_all_closes_pooled_and_resets_count(self, tmp_path) -> None:

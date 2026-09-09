@@ -73,12 +73,13 @@ class TestRegistry:
             "sentiment",
             "volatility",
             "price_action",
+            "options_flow",
         }
         for source_status in status.values():
             assert source_status["state"] == CircuitState.CLOSED.value
 
     def test_active_sources_match_production_emitters(self):
-        """Fleet scope must equal the orchestrator's producer set (4)."""
+        """Fleet scope must equal the orchestrator's producer set (5)."""
         registry = get_source_breaker_registry()
         assert registry.ACTIVE_SOURCES == frozenset(
             {
@@ -86,6 +87,7 @@ class TestRegistry:
                 StrengthSource.SENTIMENT,
                 StrengthSource.VOLATILITY,
                 StrengthSource.PRICE_ACTION,
+                StrengthSource.OPTIONS_FLOW,
             }
         )
 
@@ -96,14 +98,12 @@ class TestRegistry:
         for dormant in (
             StrengthSource.FUNDAMENTAL,
             StrengthSource.MACHINE_LEARNING,
-            StrengthSource.OPTIONS_FLOW,
         ):
             with pytest.raises(ValueError, match="has no producer"):
                 registry.get(dormant)
         # Status never advertises dormant sources.
         assert "fundamental" not in registry.get_status()
         assert "ml" not in registry.get_status()
-        assert "options_flow" not in registry.get_status()
 
     def test_config_from_settings(self):
         registry = PerSourceBreakerRegistry()
@@ -143,6 +143,7 @@ class TestRegistry:
             "sentiment",
             "volatility",
             "price_action",
+            "options_flow",
         }
 
 
@@ -259,7 +260,13 @@ class TestOrchestratorWiring:
     def test_orchestrator_status_accessor(self):
         orch = TradingOrchestrator()
         status = orch.get_source_breaker_status()
-        assert set(status.keys()) == {"ta", "sentiment", "volatility", "price_action"}
+        assert set(status.keys()) == {
+            "ta",
+            "sentiment",
+            "volatility",
+            "price_action",
+            "options_flow",
+        }
 
     async def test_safe_get_history_records_rejection_on_source_breaker(self, caplog):
         """Fetch failures must be recorded by the per-source breaker.

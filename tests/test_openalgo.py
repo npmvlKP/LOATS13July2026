@@ -549,10 +549,19 @@ class TestAsyncClientCaching:
 
     @pytest.mark.asyncio
     async def test_option_chain_cache_roundtrip(self) -> None:
+        # The wire contract now resolves the LISTED expiry via /expiry
+        # before the chain call. This mock's generic response carries no
+        # expiry listing, so resolution re-attempts per call (by design:
+        # failed lookups are never memoized) -- the invariant under test
+        # is that the CHAIN itself is cached: exactly ONE optionchain
+        # post across the two calls.
         c = await self._cached_client()
         await c.get_option_chain("ZO1")
         await c.get_option_chain("ZO1")
-        assert c.client.post.await_count == 1
+        urls = [call.args[0] for call in c.client.post.await_args_list]
+        assert urls.count("/api/v1/optionchain") == 1
+        assert urls[0] == "/api/v1/expiry"
+        assert urls[1] == "/api/v1/optionchain"
 
     @pytest.mark.asyncio
     async def test_position_book_cache_roundtrip(self) -> None:

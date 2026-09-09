@@ -21,7 +21,7 @@ from .metrics import (
     record_cycle_time,
     set_circuit_breaker_status,
 )
-from .models import HistoricalData, OptionContract, QuoteData, Signal
+from .models import HistoricalData, OptionContract, QuoteData, Signal, SignalType
 from .openalgo import KillSwitchError, async_client
 from .rules import Rule7ModificationLimitError, rules_engine
 from .sentiment import sentiment
@@ -298,6 +298,54 @@ class TradingOrchestrator:
         )
         return result
 
+    async def _source_guarded_option_chain(
+        self, source: StrengthSource, symbol: str
+    ) -> dict[str, Any] | None:
+        """Option-chain fetch behind ``source``'s breaker + global protection.
+
+        ``_safe_get_option_chain`` is the innermost fetch seam (existing
+        tests patch it); the global breaker+retry and the per-source
+        breaker wrap AROUND it, so degradation happens outside both
+        breakers and both count real failures -- mirroring
+        ``_source_guarded_history``.
+        """
+        result: dict[str, Any] | None = await self._guarded_source_get(
+            source,
+            openalgo_circuit_breaker_retry_async(self._safe_get_option_chain),
+            symbol,
+        )
+        return result
+
+    async def _safe_get_option_chain(self, symbol: str) -> dict[str, Any] | None:
+        """Get option chain with circuit breaker protection.
+
+        The innermost fetch seam for the options-flow producer call site
+        (``_source_guarded_option_chain`` layers the per-source breaker and
+        a fresh global breaker+retry around this method, so both count real
+        failures); degradation to ``None`` happens OUTSIDE the breaker --
+        mirroring ``_safe_get_history`` / ``_safe_get_quotes``.
+        """
+        try:
+            return await openalgo_circuit_breaker_retry_async(
+                self._fetch_option_chain_bare
+            )(symbol)
+        except CircuitBreakerOpenError:
+            # Global breaker open -- degrade without disturbing source stats.
+            logger.error("Failed to get option chain: global circuit breaker open")
+            return None
+        except Exception:
+            logger.error("Failed to get option chain after retries")
+            return None
+
+    async def _fetch_option_chain_bare(self, symbol: str) -> dict[str, Any]:
+        """Bare option-chain fetch -- no breaker, no swallow; raises to caller.
+
+        ``AsyncOpenAlgoClient.get_option_chain`` carries its own 5-minute
+        response cache, so a 100ms producer cadence costs one broker call
+        per TTL window.
+        """
+        return await async_client.get_option_chain(symbol)
+
     @staticmethod
     def get_source_breaker_status() -> dict[str, Any]:
         """Per-source circuit breaker status (CMP P5 / F8-L-01 monitoring)."""
@@ -437,12 +485,16 @@ class TradingOrchestrator:
             price_action_task = asyncio.create_task(
                 self._execute_price_action_analysis()
             )
+            options_flow_task = asyncio.create_task(
+                self._execute_options_flow_analysis()
+            )
             market_data_task = asyncio.create_task(self._execute_market_data_update())
             producers = (
                 ta_task,
                 sentiment_task,
                 volatility_task,
                 price_action_task,
+                options_flow_task,
                 market_data_task,
             )
 
@@ -997,6 +1049,196 @@ class TradingOrchestrator:
                 logger.warning(
                     f"Price-action analysis exceeded budget: {duration * 1000:.2f}ms"
                 )
+
+    async def _execute_options_flow_analysis(self) -> None:
+        """Execute options-flow analysis -- 5th signal producer.
+
+        Reads option-market positioning the equity/sentiment producers
+        cannot see: put/call volume flow and IV skew from the real broker
+        option chain (``OPTIONS_FLOW``, dormant since F7-L-03). Follows
+        the ADR-005 producer contract: fetch through the per-source
+        breaker (``_source_guarded_option_chain``), degrade to no-signal
+        on any empty/malformed/illiquid payload (never a fabricated
+        Signal), persist via ``db.async_create_signal``.
+
+        Signal model (flow-imbalance positioning):
+        - put/call volume ratio (PCR) >= 1.2 -> put-side dominance ->
+          SELL bias; <= 1/1.2 -> call-side dominance -> BUY bias;
+          inside the dead-band -> NEUTRAL (positioning extremes only).
+        - conviction scales with the PCR distance from parity, capped at
+          +0.3 so a single source can never dominate the composite.
+        - IV skew (mean put IV - mean call IV) is recorded for audit; it
+          deliberately does NOT gate direction (equity-index put skew is
+          structurally positive and would bias every signal SELL).
+        """
+        start_time = datetime.datetime.now(datetime.UTC)
+
+        try:
+            global settings
+            if settings is None:
+                settings = get_settings()
+
+            symbol = settings.default_symbol
+
+            chain_raw = await self._source_guarded_option_chain(
+                StrengthSource.OPTIONS_FLOW,
+                symbol,
+            )
+            rows = self._extract_chain_rows(chain_raw)
+            if not rows:
+                logger.debug("No option-chain rows for options-flow analysis")
+                return
+            rows = self._nearest_expiry_rows(rows)
+
+            call_volume = 0
+            put_volume = 0
+            call_ivs: list[float] = []
+            put_ivs: list[float] = []
+            for row in rows:
+                opt_type = str(row.get("option_type", "")).strip().upper()
+                volume = self._chain_int(row, ("volume", "volume_btn", "traded_volume"))
+                iv = self._chain_float(row, ("implied_volatility", "iv"))
+                if opt_type in {"CE", "CALL"}:
+                    call_volume += volume
+                    if iv is not None:
+                        call_ivs.append(iv)
+                elif opt_type in {"PE", "PUT"}:
+                    put_volume += volume
+                    if iv is not None:
+                        put_ivs.append(iv)
+
+            if call_volume <= 0 or put_volume <= 0:
+                # One-sided or illiquid window -- usually a data artifact,
+                # not a market state; emit nothing rather than guess.
+                logger.debug(
+                    "Option-chain flow one-sided "
+                    f"(calls={call_volume} puts={put_volume}); skipping"
+                )
+                return
+
+            pcr = put_volume / call_volume
+            signal_type = "NEUTRAL"
+            signal_strength = 0.5
+            if pcr >= 1.2:
+                signal_type = "SELL"
+                signal_strength = 0.55 + min(0.3 * (pcr - 1.0), 0.3)
+            elif pcr <= 1.0 / 1.2:
+                signal_type = "BUY"
+                signal_strength = 0.55 + min(0.3 * (1.0 - pcr), 0.3)
+
+            iv_skew: float | None = None
+            if call_ivs and put_ivs:
+                iv_skew = float(np.mean(put_ivs) - np.mean(call_ivs))
+
+            signal = Signal(
+                symbol=symbol,
+                signal_type=SignalType(signal_type),
+                strength=signal_strength,
+                timestamp=datetime.datetime.now(datetime.UTC),
+                indicators={
+                    "put_call_volume_ratio": float(min(pcr, 10.0)),
+                    "call_volume": float(call_volume),
+                    "put_volume": float(put_volume),
+                    "iv_skew": iv_skew if iv_skew is not None else 0.0,
+                },
+                confidence=signal_strength,
+                metadata={
+                    "scan_type": "options_flow",
+                    "source": StrengthSource.OPTIONS_FLOW.value,
+                    "put_call_volume_ratio": float(min(pcr, 10.0)),
+                    "iv_skew": iv_skew,
+                    "chain_rows": len(rows),
+                },
+            )
+            await db.async_create_signal(signal)
+
+        except CircuitBreakerOpenError as e:
+            # Source breaker open -- skip gracefully (see TA handler).
+            logger.warning(f"Options-flow analysis skipped: source breaker open: {e}")
+        except Exception as e:
+            logger.error(f"Options-flow analysis failed: {e}")
+            raise
+        finally:
+            duration = (
+                datetime.datetime.now(datetime.UTC) - start_time
+            ).total_seconds()
+            if duration > 0.03:
+                logger.warning(
+                    f"Options-flow analysis exceeded budget: {duration * 1000:.2f}ms"
+                )
+
+    @staticmethod
+    def _extract_chain_rows(payload: dict[str, Any] | None) -> list[dict[str, Any]]:
+        """Best-effort extraction of contract rows from the chain payload.
+
+        The broker schema is provider-dependent (OpenAlgo fronts several
+        brokers), so this accepts the known shapes: ``data.options``,
+        ``data.chain``, ``data.records``, ``data.rows``, a bare list
+        under ``data``, or a top-level list. Anything unparseable yields
+        [] -- the producer then emits nothing rather than guessing.
+        """
+        if not isinstance(payload, dict):
+            return []
+        data = payload.get("data", payload)
+        if isinstance(data, list):
+            return [row for row in data if isinstance(row, dict)]
+        if isinstance(data, dict):
+            for key in ("options", "chain", "records", "rows"):
+                candidate = data.get(key)
+                if isinstance(candidate, list):
+                    return [row for row in candidate if isinstance(row, dict)]
+        return []
+
+    @staticmethod
+    def _nearest_expiry_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Keep the nearest-dated expiry when the payload mixes expiries.
+
+        Near-dated flow is the flow that expresses current positioning;
+        rows with absent/unparseable expiry keep the payload as delivered
+        (conservative) unless at least two distinct parseable dates exist.
+        """
+        by_expiry: dict[str, list[dict[str, Any]]] = {}
+        for row in rows:
+            expiry = row.get("expiry")
+            by_expiry.setdefault(str(expiry) if expiry is not None else "", []).append(
+                row
+            )
+        dated = {key: value for key, value in by_expiry.items() if key}
+        if len(dated) <= 1:
+            return rows
+        try:
+            nearest = min(dated, key=lambda k: datetime.datetime.fromisoformat(k))
+        except (ValueError, TypeError):
+            return rows
+        return dated[nearest]
+
+    @staticmethod
+    def _chain_int(row: dict[str, Any], keys: tuple[str, ...]) -> int:
+        """Read an int-ish chain field across broker schema spellings."""
+        for key in keys:
+            value = row.get(key)
+            if value is None:
+                continue
+            try:
+                return int(float(value))
+            except (TypeError, ValueError):
+                continue
+        return 0
+
+    @staticmethod
+    def _chain_float(row: dict[str, Any], keys: tuple[str, ...]) -> float | None:
+        """Read a float-ish chain field across broker schema spellings."""
+        for key in keys:
+            value = row.get(key)
+            if value is None:
+                continue
+            try:
+                candidate = float(value)
+            except (TypeError, ValueError):
+                continue
+            if not np.isnan(candidate):
+                return candidate
+        return None
 
     def _calculate_hurst_exponent(
         self,
@@ -1555,15 +1797,23 @@ class TradingOrchestrator:
         )
 
     def _create_funds_model(self, funds_data: dict[str, Any]) -> Any:
-        """Create funds model from raw data."""
+        """Create funds model from raw data.
+
+        Reads degrade to 0 when the broker omits a field: an absent key
+        must never crash the market-data cycle (found live 08Sep2026 as
+        ``KeyError: 'available_cash'`` -- the deployment's funds payload
+        uses its own vocabulary, now normalized at the client, and any
+        future vocabulary drift degrades instead of starving every
+        producer of the cycle's funds step).
+        """
         from .models import FundsData
 
         available_margin = funds_data.get("available_margin", 0)
         return FundsData(
-            available_cash=funds_data["available_cash"],
-            utilized_margin=funds_data["utilized_margin"],
+            available_cash=funds_data.get("available_cash", 0),
+            utilized_margin=funds_data.get("utilized_margin", 0),
             available_margin=available_margin,
-            total_equity=funds_data["total_equity"],
+            total_equity=funds_data.get("total_equity", 0),
             timestamp=datetime.datetime.now(datetime.UTC),
         )
 

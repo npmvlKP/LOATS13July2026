@@ -141,5 +141,11 @@ class TestSignalSourceInvariant:
         )
 
     def test_resolve_source_accepts_all_orchestrator_sources(self) -> None:
-        for src in ("ta", "sentiment", "price_action", "volatility"):
+        for src in (
+            "ta",
+            "sentiment",
+            "price_action",
+            "volatility",
+            "options_flow",
+        ):
             assert resolve_source(src) in StrengthSource

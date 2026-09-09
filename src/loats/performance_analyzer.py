@@ -20,6 +20,17 @@ from .ta import TechnicalAnalysis
 
 logger = get_logger(__name__)
 
+# P1/P5 phase-gate latency budgets, mirroring the authoritative collector
+# (scripts/collect_p1_phase_gate_evidence.py: DB_GATE_MS=20,
+# ROUND_TRIP_GATE_MS=100). The previous defaults (1ms/5ms) were impossible
+# for full round-trip operations and made the gate false-green.
+P1_GATE_S = 0.020
+P5_GATE_S = 0.100
+
+# Iterations for the focused latency benchmark (tests shrink this to keep
+# the real code path fast).
+BENCHMARK_ITERATIONS = 100
+
 
 class LatencyMeasurement:
     """Single latency measurement with metadata."""
@@ -177,29 +188,59 @@ class PerformanceAnalyzer:
 
     def validate_cmp_latency_gates(
         self,
-        p1_threshold: float = 0.001,  # 1ms for P1
-        p5_threshold: float = 0.005,  # 5ms for P5
+        p1_threshold: float = P1_GATE_S,  # 20ms DB-operation budget (P1)
+        p5_threshold: float = P5_GATE_S,  # 100ms round-trip budget (P5)
+        min_sample_pass_rate: float = 0.80,
     ) -> dict[str, Any]:
-        """Validate CMP P1/P5 latency gates."""
+        """Validate measured latencies against the P1/P5 phase-gate budgets.
+
+        Defaults mirror scripts/collect_p1_phase_gate_evidence.py
+        (DB_GATE_MS=20, ROUND_TRIP_GATE_MS=100): the previous 1ms/5ms
+        defaults were impossible for full round-trip operations, and the
+        resulting empty-registry verdict (``0 == 0``) graded as PASS.
+
+        Gate rule mirrors the authoritative collector: an operation passes
+        a budget when at least ``min_sample_pass_rate`` of its samples are
+        within that budget (the collector grades per-sample compliance and
+        discharges P1 at >= 80%). Percentiles are reported as informational
+        actuals, not as the gate.
+
+        Fail-closed: with no measured operations this returns an empty
+        result set, which callers must grade as a gate failure -- never
+        as a vacuous pass.
+        """
         stats = self.get_statistics()
 
         validation_results = {}
         for operation, metrics in stats.items():
-            if metrics["count"] == 0:
+            durations = self.operation_stats.get(operation, [])
+            if not durations:
                 continue
 
-            p1_pass = metrics["p95"] <= p1_threshold
-            p5_pass = metrics["p99"] <= p5_threshold
+            p1_rate = sum(1 for d in durations if d <= p1_threshold) / len(durations)
+            p5_rate = sum(1 for d in durations if d <= p5_threshold) / len(durations)
+            p1_pass = p1_rate >= min_sample_pass_rate
+            p5_pass = p5_rate >= min_sample_pass_rate
 
             validation_results[operation] = {
+                "samples": len(durations),
                 "p1_threshold": p1_threshold,
-                "p1_actual": metrics["p95"],
+                "p1_actual_p95": metrics["p95"],
+                "p1_pass_rate": p1_rate,
                 "p1_pass": p1_pass,
                 "p5_threshold": p5_threshold,
-                "p5_actual": metrics["p99"],
+                "p5_actual_p99": metrics["p99"],
+                "p5_pass_rate": p5_rate,
                 "p5_pass": p5_pass,
                 "overall_pass": p1_pass and p5_pass,
             }
+
+        if not validation_results:
+            logger.warning(
+                "validate_cmp_latency_gates: no measured operations in the "
+                "registry; returning an empty result set (fail-closed -- "
+                "grade as a gate failure, not a pass)"
+            )
 
         return validation_results
 
@@ -287,42 +328,44 @@ class DatabasePerformanceAnalyzer:
         def test_sync_get_signals() -> list[Signal]:
             return self.db.get_latest_signals("NIFTY", limit=10)
 
-        # Run measurements
+        # Run measurements. Stable operation names: percentile gates and
+        # summary stats need the full per-operation sample distribution;
+        # per-iteration names fragment each sample into an n=1 bucket.
         for i in range(iterations):
             # Async operations
             await self.analyzer.measure_latency(
-                f"async_create_signal_{i}",
+                "async_create_signal",
                 test_async_create_signal,
                 _metadata={"iteration": i, "operation_type": "async_write"},
             )
 
             await self.analyzer.measure_latency(
-                f"async_store_historical_{i}",
+                "async_store_historical",
                 test_async_store_historical,
                 _metadata={"iteration": i, "operation_type": "async_write"},
             )
 
             await self.analyzer.measure_latency(
-                f"async_get_signals_{i}",
+                "async_get_signals",
                 test_async_get_signals,
                 _metadata={"iteration": i, "operation_type": "async_read"},
             )
 
             # Sync operations
             await self.analyzer.measure_sync_latency(
-                f"sync_create_signal_{i}",
+                "sync_create_signal",
                 test_sync_create_signal,
                 _metadata={"iteration": i, "operation_type": "sync_write"},
             )
 
             await self.analyzer.measure_sync_latency(
-                f"sync_store_historical_{i}",
+                "sync_store_historical",
                 test_sync_store_historical,
                 _metadata={"iteration": i, "operation_type": "sync_write"},
             )
 
             await self.analyzer.measure_sync_latency(
-                f"sync_get_signals_{i}",
+                "sync_get_signals",
                 test_sync_get_signals,
                 _metadata={"iteration": i, "operation_type": "sync_read"},
             )
@@ -423,8 +466,11 @@ async def run_comprehensive_analysis(db: Database) -> dict[str, Any]:
         f"ANALYZE round-trip complete: {analyze_results['round_trip']['duration']:.4f}s"
     )
 
-    # CMP latency validation
-    validation_results = performance_analyzer.validate_cmp_latency_gates()
+    # CMP latency validation: grade the SAME registry this run measured
+    # into. The previous code validated the module-level singleton, which
+    # no in-process writer had populated, so every run graded an empty
+    # registry (the origin of the false-green "Operations Tested: 0").
+    validation_results = db_performance_analyzer.analyzer.validate_cmp_latency_gates()
     logger.info(
         f"CMP validation complete: {len(validation_results)} operations validated"
     )
@@ -480,17 +526,20 @@ async def run_latency_benchmark(db: Database) -> dict[str, Any]:
         indicators = await asyncio.to_thread(ta.calculate_indicators, test_data)
         return len(indicators)
 
-    # Run multiple iterations
-    iterations = 100
+    # Run multiple iterations. Operation names deliberately EXCLUDE the
+    # iteration index: percentile gates (p95/p99) are only meaningful over
+    # the full per-operation sample distribution, so every iteration
+    # records under the same stable name.
+    iterations = BENCHMARK_ITERATIONS
     for i in range(iterations):
         await performance_analyzer.measure_latency(
-            f"signal_round_trip_{i}",
+            "signal_round_trip",
             test_signal_round_trip,
             _metadata={"iteration": i, "test_type": "signal"},
         )
 
         await performance_analyzer.measure_latency(
-            f"historical_processing_{i}",
+            "historical_processing",
             test_historical_processing,
             _metadata={"iteration": i, "test_type": "historical"},
         )
@@ -498,11 +547,9 @@ async def run_latency_benchmark(db: Database) -> dict[str, Any]:
     # Get statistics
     stats = performance_analyzer.get_statistics()
 
-    # Validate CMP gates
-    validation = performance_analyzer.validate_cmp_latency_gates(
-        p1_threshold=0.001,  # 1ms
-        p5_threshold=0.005,  # 5ms
-    )
+    # Validate CMP gates against the phase-gate budgets (module defaults
+    # mirror scripts/collect_p1_phase_gate_evidence.py).
+    validation = performance_analyzer.validate_cmp_latency_gates()
 
     return {
         "statistics": stats,

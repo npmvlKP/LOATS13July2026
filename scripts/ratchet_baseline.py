@@ -115,8 +115,40 @@ History (most recent last):
        record for the register's last open item, with the wave's
        implementation surfaces, behaviour contract, and acceptance
        evidence. Carried set now eight of eight CLOSED/DISCHARGED).
+       [Subsequent stale-verifier removal wave (PR #10) took the tree
+       back to 394; the ceiling stayed 395.]
+  395  P5 resume-guard + sanity-interval wave (2026-09-08): +1
+       (docs/audit-history/08Sep2026-p5-resume-guard-interval-fix.md —
+       wave record for the single-writer resume guard on the P5
+       supervisor, the recovery of the abandoned forward-test run, and
+       the backtest-sanity interval source-of-truth fix; tree returns
+       to 395 = ceiling).
+  396  P5 evidence-stream isolation wave (2026-09-08): +0
+       (scripts/verify_f8h01_external.py check_e now pins
+       P5_RUN_LOG_DIR so verification runs stop dropping dry-run stub
+       logs into the live reports/ stream; check_repo_hygiene.py gains
+       the disk-state guard _p5_dry_run_stubs; .gitignore absorbs
+       reports/health/p5-verify-stubs/. No tracked files added.)
+  397  F8-H-02 closure-record wave (2026-09-08): +1
+       (scripts/verify_f8h02_external.py - outcome-scoped external
+       verifier for the Rule-7 per-order modification budget, GREEN/RED
+       netted in tests/test_repo_hygiene.py; plus
+       docs/audit-history/08Sep2026-f8h02-closure-and-p5-evidence-
+       hygiene.md registering F8-H-02 CLOSED with live evidence.
+       Ceiling 397 = this tree.)
+  397  F8-C-01 wave 2 - options_flow producer (2026-09-08): +0
+       (the 5th signal producer lands inside existing modules:
+       orchestrator producer + breaker-guarded chain fetch, per_source_
+       breakers fleet scope, lockstep gate pins in verify_f8c01_
+       external / probe_hc15_strength_gate / fr7_health_check, mock
+       walls and real-producer e2e drivers extended, ADR-005 amended
+       in place. One new file - docs/audit-history/08Sep2026-f8c01-
+       options-flow-producer.md - offset by untracking reports/
+       verify_f8h01_external.json: per-run verifier output now writes
+       the ignored reports/health/p5-verify-stubs/ path. Ceiling 397
+       = this tree.)
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 395
+TRACKED_FILE_CEILING = 398

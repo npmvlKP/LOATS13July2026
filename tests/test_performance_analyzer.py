@@ -297,76 +297,225 @@ async def test_run_latency_benchmark_short_path(
 
     monkeypatch.setattr(pamod.performance_analyzer, "measure_latency", limited_measure)
 
-    # Patch the iterations local by replacing the function source path:
-    # Instead call with a custom thin wrapper that mirrors the function with iters=1
-    async def thin_benchmark(db_arg: Any) -> dict[str, Any]:
-        async def test_signal_round_trip() -> int:
-            signal = Signal(
-                signal_id="benchmark_x",
-                symbol="NIFTY",
-                signal_type=SignalType.BUY,
-                strength=0.8,
-                timestamp=datetime.now(UTC),
-                indicators={"rsi": 70.0, "macd": 0.5},
-                metadata={"benchmark": "p1_p5"},
-            )
-            await db_arg.async_create_signal(signal)
-            signals = await db_arg.async_get_latest_signals("NIFTY", limit=1)
-            return len(signals)
+    # Shrink the iteration count and exercise the REAL benchmark path.
+    monkeypatch.setattr(pamod, "BENCHMARK_ITERATIONS", 1)
 
-        async def test_historical_processing() -> int:
-            test_data = [
-                HistoricalData(
-                    symbol="NIFTY",
-                    timestamp=datetime.now(UTC),
-                    open=100.0,
-                    high=101.0,
-                    low=99.0,
-                    close=100.5,
-                    volume=1000,
-                    interval="1min",
-                )
-            ]
-            await db_arg.async_store_historical_data(test_data)
-            return 1
-
-        for i in range(2):
-            await pamod.performance_analyzer.measure_latency(
-                f"signal_round_trip_{i}",
-                test_signal_round_trip,
-                _metadata={"iteration": i, "test_type": "signal"},
-            )
-            await pamod.performance_analyzer.measure_latency(
-                f"historical_processing_{i}",
-                test_historical_processing,
-                _metadata={"iteration": i, "test_type": "historical"},
-            )
-        stats = pamod.performance_analyzer.get_statistics()
-        validation = pamod.performance_analyzer.validate_cmp_latency_gates(
-            p1_threshold=0.001, p5_threshold=0.005
-        )
-        return {
-            "statistics": stats,
-            "validation": validation,
-            "iterations": 2,
-            "timestamp": datetime.now(UTC).isoformat(),
-        }
-
-    out = await thin_benchmark(db)
-    assert out["iterations"] == 2
+    out = await run_latency_benchmark(db)
+    assert out["iterations"] == 1
     assert "statistics" in out
 
-    # Also invoke the real run_latency_benchmark but stop early via measure raising StopAsyncIteration
-    stop = {"n": 0}
+    # Regression net (false-green benchmark gate): stable operation names,
+    # so percentiles accumulate per operation instead of n=1 buckets.
+    assert "signal_round_trip" in out["statistics"]
+    assert "historical_processing" in out["statistics"]
+    # The gate graded the operations with the phase-gate budgets, not the
+    # impossible 1ms/5ms defaults.
+    assert out["validation"]["signal_round_trip"]["p1_threshold"] == (pamod.P1_GATE_S)
+    assert out["validation"]["signal_round_trip"]["p5_threshold"] == (pamod.P5_GATE_S)
+    assert out["validation"]["signal_round_trip"]["samples"] == 1
 
-    async def stop_after_two(
-        operation: str, func: Any, *args: Any, **kwargs: Any
-    ) -> Any:
-        stop["n"] += 1
-        if stop["n"] > 2:
-            raise KeyboardInterrupt("stop benchmark early")
-        return await real_measure(operation, func, *args, **kwargs)
 
-    monkeypatch.setattr(pamod.performance_analyzer, "measure_latency", stop_after_two)
-    with pytest.raises(KeyboardInterrupt):
-        await run_latency_benchmark(db)
+def test_phase_gate_budgets_match_authoritative_collector() -> None:
+    """The validator defaults must mirror the authoritative P1/P5 gates.
+
+    Regression net: the original 1ms/5ms defaults were impossible for full
+    round-trip operations; the authoritative budgets live in
+    scripts/collect_p1_phase_gate_evidence.py (DB_GATE_MS, ROUND_TRIP_GATE_MS).
+    """
+    import re
+    from pathlib import Path
+
+    import loats.performance_analyzer as pamod
+
+    collector = (
+        Path(__file__).resolve().parents[1]
+        / "scripts"
+        / "collect_p1_phase_gate_evidence.py"
+    )
+    src = collector.read_text(encoding="utf-8")
+    db_match = re.search(r"DB_GATE_MS\s*=\s*([0-9.]+)", src)
+    rt_match = re.search(r"ROUND_TRIP_GATE_MS\s*=\s*([0-9.]+)", src)
+    assert db_match is not None and rt_match is not None
+    assert pamod.P1_GATE_S * 1000 == pytest.approx(float(db_match.group(1)))
+    assert pamod.P5_GATE_S * 1000 == pytest.approx(float(rt_match.group(1)))
+
+
+def _load_benchmark_script_module() -> Any:
+    """Load scripts/benchmark_performance.py as a module for unit probes."""
+    import importlib.util
+    from pathlib import Path
+
+    script = (
+        Path(__file__).resolve().parents[1] / "scripts" / "benchmark_performance.py"
+    )
+    spec = importlib.util.spec_from_file_location(
+        "loats_benchmark_performance_probe", script
+    )
+    assert spec is not None and spec.loader is not None
+    mod: Any = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def _summary_inputs(
+    cmp_validation: dict[str, Any], bench_validation: dict[str, Any]
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    comprehensive = {
+        "database_operations": {},
+        "analyze_round_trip": {
+            "round_trip": {
+                "duration": 0.1,
+                "ta_percentage": 50.0,
+                "db_percentage": 50.0,
+            }
+        },
+        "cmp_validation": cmp_validation,
+    }
+    benchmark = {"validation": bench_validation}
+    return comprehensive, benchmark
+
+
+def test_generate_summary_fails_closed_on_empty_measurement_set() -> None:
+    """A run that measured nothing must FAIL, never grade 0 == 0 as PASS."""
+    mod = _load_benchmark_script_module()
+    comprehensive, benchmark = _summary_inputs({}, {})
+    with pytest.raises(ValueError, match=r"fail-closed|empty"):
+        mod.generate_summary(comprehensive, benchmark)
+
+
+def test_generate_summary_grades_union_of_validations() -> None:
+    """The verdict must include benchmark validations the registry misses.
+
+    Regression net: the original code graded only the (empty) production
+    registry, hiding 200 failing benchmark operations behind a PASS.
+    """
+    mod = _load_benchmark_script_module()
+    bench = {
+        "good_op": {"overall_pass": True},
+        "bad_op": {"overall_pass": False},
+    }
+    comprehensive, benchmark = _summary_inputs({}, bench)
+    summary = mod.generate_summary(comprehensive, benchmark)
+    assert summary["overall_status"] == "PARTIAL"
+    assert summary["cmp_validation"]["total_operations"] == 2
+    assert summary["cmp_validation"]["passing_operations"] == 1
+    assert summary["benchmark_validation"]["total_operations"] == 2
+    assert summary["benchmark_validation"]["passing_operations"] == 1
+
+
+def test_generate_summary_passes_only_when_all_checks_pass() -> None:
+    mod = _load_benchmark_script_module()
+    cmp_val = {"registry_op": {"overall_pass": True}}
+    bench = {"bench_op": {"overall_pass": True}}
+    comprehensive, benchmark = _summary_inputs(cmp_val, bench)
+    summary = mod.generate_summary(comprehensive, benchmark)
+    assert summary["overall_status"] == "PASS"
+    assert summary["cmp_validation"]["pass_rate"] == pytest.approx(1.0)
+
+
+def test_measure_database_operations_stats_keys_are_stable() -> None:
+    """Per-iteration operation names fragment samples into n=1 buckets.
+
+    Regression net: the summary reads stable keys (``async_create_signal``,
+    ``sync_get_signals``); fragmented names made every lookup miss and the
+    benchmark printed ``0.000ms`` for every operation.
+    """
+    import tempfile
+    from pathlib import Path
+
+    from loats.database import Database
+
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as td:
+        tmp_db = Database(
+            db_path=Path(td) / "bench.db",
+            audit_log_path=Path(td) / "bench_audit.jsonl",
+        )
+        dpa = DatabasePerformanceAnalyzer(tmp_db)
+
+        async def run() -> dict[str, Any]:
+            await tmp_db.async_initialize()
+            try:
+                return await dpa.measure_database_operations(iterations=1)
+            finally:
+                await tmp_db.async_close_all()
+
+        stats = asyncio.run(run())
+        for key in (
+            "async_create_signal",
+            "async_store_historical",
+            "async_get_signals",
+            "sync_create_signal",
+            "sync_store_historical",
+            "sync_get_signals",
+        ):
+            assert key in stats, f"missing stable stats key: {key}"
+            assert stats[key]["count"] == 1
+
+
+def test_validate_gates_grade_the_registry_they_measured() -> None:
+    """run_comprehensive_analysis must validate the registry it populated.
+
+    Regression net: it measured into DatabasePerformanceAnalyzer's own
+    PerformanceAnalyzer but validated the module singleton, so the graded
+    registry was always empty (the ``Operations Tested: 0`` false-green).
+    """
+    import loats.performance_analyzer as pamod
+
+    dpa = DatabasePerformanceAnalyzer(MagicMock())
+    empty = dpa.analyzer.validate_cmp_latency_gates()
+    assert empty == {}
+    # The run's writer is the DPA-local analyzer, not the singleton:
+    # simulate a measurement and confirm it lands in the DPA registry and
+    # NOT in the singleton the old code graded.
+
+    async def seed() -> None:
+        await dpa.analyzer.measure_latency("probe_op", _noop_probe)
+
+    asyncio.run(seed())
+    assert dpa.analyzer.get_statistics("probe_op")["count"] == 1
+    assert pamod.performance_analyzer.get_statistics("probe_op")["count"] == 0
+
+
+async def _noop_probe() -> int:
+    return 1
+
+
+def test_benchmark_script_isolates_data_from_production() -> None:
+    """The standalone benchmark must never bind the production DB singleton.
+
+    Subprocess probe: a pre-import env probe prints the resolved paths;
+    the assertion is that they resolve inside the run's scratch dir, not
+    the repo's live data directory.
+    """
+    import os
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    repo = Path(__file__).resolve().parents[1]
+    env = dict(os.environ)
+    env.setdefault("ENVIRONMENT", "test")
+    env.setdefault("OPENALGO_API_KEY", "test_api_key")
+    env.setdefault("OPENALGO_BASE_URL", "https://test.openalgo.com")
+    env.setdefault("TELEGRAM_BOT_TOKEN", "test_bot_token")
+    env.setdefault("TELEGRAM_CHAT_ID", "123456789")
+    env.setdefault("LOATS_SUPPRESS_NLTK_WARNING", "1")
+    probe = (
+        "import os, sys;"
+        "sys.path.insert(0, r'" + str(repo) + "');"
+        "import scripts.benchmark_performance as bp;"
+        "print(bp.os.environ['SQLITE_DB_PATH']);"
+        "print(bp.os.environ['AUDIT_LOG_PATH'])"
+    )
+    proc = subprocess.run(
+        [sys.executable, "-c", probe],
+        capture_output=True,
+        text=True,
+        env=env,
+        cwd=str(repo),
+        timeout=120,
+    )
+    assert proc.returncode == 0, proc.stderr[-500:]
+    db_path, audit_path = proc.stdout.strip().splitlines()[-2:]
+    assert "loats_benchmark_" in db_path, db_path
+    assert "loats_benchmark_" in audit_path, audit_path

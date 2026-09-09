@@ -199,6 +199,7 @@ async def run_backtest_sanity_check(
     window_size: int = 20,
     step_size: int = 10,
     as_of_date: date | None = None,
+    interval: str | None = None,
 ) -> BacktestSanityResult:
     """
     Run backtest sanity check on historical data.
@@ -216,6 +217,10 @@ async def run_backtest_sanity_check(
             wall-clock now, so replaying the same snapshot date always yields
             the same walk-forward window; it is also stamped onto the result.
             None keeps the live wall-clock window (scheduler default).
+        interval: Candle interval to fetch. Defaults to
+            settings.default_timeframe -- the interval the market-data task
+            actually persists (a hardcoded "5min" here made this gate
+            unexecutable against the production DB, which stores 1min bars).
 
     Returns:
         BacktestSanityResult with complete analysis
@@ -224,6 +229,12 @@ async def run_backtest_sanity_check(
         ValueError: If insufficient data or validation fails
     """
     test_symbol = symbol or settings.default_symbol
+    # 2026-09-08: fetch the interval LOATS actually stores. The hardcoded
+    # "5min" predates the market-data task persisting
+    # settings.default_timeframe (1min) -- the weekly gate could never find
+    # data against the production DB. settings is the single source of
+    # truth; the parameter exists for callers that must pin a timeframe.
+    test_interval = interval or settings.default_timeframe
     logger.info(
         "Starting backtest sanity check",
         extra={
@@ -231,6 +242,7 @@ async def run_backtest_sanity_check(
             "days_back": days_back,
             "window_size": window_size,
             "step_size": step_size,
+            "interval": test_interval,
             "as_of_date": (as_of_date.isoformat() if as_of_date is not None else None),
         },
     )
@@ -262,7 +274,7 @@ async def run_backtest_sanity_check(
         def fetch_sync() -> list[HistoricalData]:
             return db.get_historical_data(
                 symbol=test_symbol,
-                interval="5min",  # Default interval
+                interval=test_interval,
                 start_date=cutoff_time,
                 end_date=window_end,
             )

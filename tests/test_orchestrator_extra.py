@@ -370,11 +370,20 @@ class TestTradingCycleException:
                                 "_execute_price_action_analysis",
                                 new_callable=AsyncMock,
                             ):
-                                with patch("loats.rules.rules_engine") as mre:
-                                    mre.is_trading_allowed.return_value = True
-                                    with patch("loats.orchestrator.record_cycle_time"):
-                                        with pytest.raises(RuntimeError, match="boom"):
-                                            await o._execute_trading_cycle()
+                                with patch.object(
+                                    o,
+                                    "_execute_options_flow_analysis",
+                                    new_callable=AsyncMock,
+                                ):
+                                    with patch("loats.rules.rules_engine") as mre:
+                                        mre.is_trading_allowed.return_value = True
+                                        with patch(
+                                            "loats.orchestrator.record_cycle_time"
+                                        ):
+                                            with pytest.raises(
+                                                RuntimeError, match="boom"
+                                            ):
+                                                await o._execute_trading_cycle()
 
     @pytest.mark.asyncio
     async def test_trading_not_allowed(self):
@@ -398,16 +407,21 @@ class TestTradingCycleException:
                             ):
                                 with patch.object(
                                     o,
-                                    "_execute_risk_management",
+                                    "_execute_options_flow_analysis",
                                     new_callable=AsyncMock,
                                 ):
-                                    with patch("loats.rules.rules_engine") as mre:
-                                        mre.is_trading_allowed.return_value = False
-                                        mre.session_state.value = "CLOSING"
-                                        with patch(
-                                            "loats.orchestrator.record_cycle_time"
-                                        ):
-                                            await o._execute_trading_cycle()
+                                    with patch.object(
+                                        o,
+                                        "_execute_risk_management",
+                                        new_callable=AsyncMock,
+                                    ):
+                                        with patch("loats.rules.rules_engine") as mre:
+                                            mre.is_trading_allowed.return_value = False
+                                            mre.session_state.value = "CLOSING"
+                                            with patch(
+                                                "loats.orchestrator.record_cycle_time"
+                                            ):
+                                                await o._execute_trading_cycle()
 
 
 class TestExecuteStrikeSelection:
@@ -791,6 +805,7 @@ class TestProducerWindowLifecycle:
                 "_execute_sentiment_analysis",
                 "_execute_volatility_analysis",
                 "_execute_price_action_analysis",
+                "_execute_options_flow_analysis",
                 "_execute_market_data_update",
             )
         }
@@ -981,3 +996,148 @@ class TestProducerWindowLifecycle:
         # warnings leak out of the test.
         cleanup_hung.set()
         await asyncio.wait([task], timeout=0.1)
+
+
+class TestOptionsFlowProducer:
+    """Edge-case net for the 5th producer (F8-C-01 wave 2).
+
+    Drives the REAL ``_execute_options_flow_analysis`` against fixture
+    chains, mocking only the ``_safe_get_option_chain`` boundary:
+    direction math, the dead-band, schema-spelling tolerance,
+    nearest-expiry pinning, and every degradation path (one-sided flow,
+    malformed payload, breaker-open). The producer must never persist a
+    fabricated signal -- empty/malformed input stores nothing.
+    """
+
+    @staticmethod
+    def _row(
+        opt_type: str, volume: float | None, iv: float | None = None
+    ) -> dict[str, Any]:
+        row: dict[str, Any] = {
+            "symbol": f"NIFTY24500{opt_type}",
+            "strike_price": 24500,
+            "expiry": "2026-09-10T00:00:00",
+            "option_type": opt_type,
+            "volume": volume,
+        }
+        if iv is not None:
+            row["implied_volatility"] = iv
+        return row
+
+    @staticmethod
+    def _chain(*rows: dict[str, Any]) -> dict[str, Any]:
+        return {"status": "success", "data": {"options": list(rows)}}
+
+    async def _stored(
+        self, chain_payload: dict[str, Any] | None, seam_side_effect: Any = None
+    ) -> list[Any]:
+        import tempfile
+        from pathlib import Path
+
+        from loats.database import Database
+        from loats.orchestrator import TradingOrchestrator
+
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as td:
+            db = Database(
+                db_path=Path(td) / "o.db", audit_log_path=Path(td) / "a.jsonl"
+            )
+            db._initialize_database()
+            orch = TradingOrchestrator()
+            with (
+                patch("loats.orchestrator.db", db),
+                patch.object(
+                    orch, "_safe_get_option_chain", new_callable=AsyncMock
+                ) as mc,
+            ):
+                mc.side_effect = seam_side_effect
+                mc.return_value = chain_payload
+                await orch._execute_options_flow_analysis()
+            stored = await db.async_get_latest_signals("NIFTY", limit=5)
+            db.close_all()
+            return stored
+
+    @pytest.mark.asyncio
+    async def test_put_dominance_emits_sell(self):
+        stored = await self._stored(
+            self._chain(self._row("CE", 60_000, 12.5), self._row("PE", 90_000, 13.9))
+        )
+        assert len(stored) == 1
+        sig = stored[0]
+        assert sig.metadata["source"] == "options_flow"
+        assert sig.signal_type.value == "SELL"
+        assert sig.strength == pytest.approx(0.55 + 0.3 * 0.5)  # pcr 1.5
+        assert sig.indicators["put_call_volume_ratio"] == pytest.approx(1.5)
+        assert sig.indicators["iv_skew"] == pytest.approx(1.4)
+
+    @pytest.mark.asyncio
+    async def test_call_dominance_emits_buy(self):
+        stored = await self._stored(
+            self._chain(self._row("CE", 90_000), self._row("PE", 60_000))
+        )
+        assert len(stored) == 1
+        assert stored[0].signal_type.value == "BUY"
+        assert stored[0].strength == pytest.approx(0.55 + 0.3 * (1 - 2 / 3))
+
+    @pytest.mark.asyncio
+    async def test_dead_band_emits_neutral_at_half_strength(self):
+        stored = await self._stored(
+            self._chain(self._row("CE", 100_000), self._row("PE", 100_000))
+        )
+        assert len(stored) == 1
+        assert stored[0].signal_type.value == "NEUTRAL"
+        assert stored[0].strength == pytest.approx(0.5)
+
+    @pytest.mark.asyncio
+    async def test_one_sided_volume_stores_nothing(self):
+        stored = await self._stored(self._chain(self._row("CE", 100_000)))
+        assert stored == []
+
+    @pytest.mark.asyncio
+    async def test_malformed_payloads_store_nothing(self):
+        for payload in (None, {}, {"status": "error"}, {"data": {"options": []}}):
+            stored = await self._stored(payload)
+            assert stored == [], f"payload {payload!r} must degrade to no-signal"
+
+    @pytest.mark.asyncio
+    async def test_mixed_expiry_pinned_to_nearest(self):
+        near = "2026-09-10T00:00:00"
+        far = "2026-10-30T00:00:00"
+        near_rows = [self._row("CE", 60_000), self._row("PE", 90_000)]
+        for row in near_rows:
+            row["expiry"] = near
+        # Far-expiry rows would flip the direction if they leaked in.
+        far_rows = [self._row("CE", 1_000), self._row("PE", 900_000)]
+        for row in far_rows:
+            row["expiry"] = far
+        stored = await self._stored(self._chain(*near_rows, *far_rows))
+        assert len(stored) == 1
+        assert stored[0].signal_type.value == "SELL"
+        assert stored[0].indicators["put_call_volume_ratio"] == pytest.approx(1.5)
+
+    @pytest.mark.asyncio
+    async def test_broker_volume_key_spellings(self):
+        ce_row = self._row("CE", None)
+        ce_row["volume_btn"] = 90_000  # broker spelling A
+        pe_row = self._row("PE", None)
+        pe_row["traded_volume"] = 60_000  # broker spelling B
+        stored = await self._stored(self._chain(ce_row, pe_row))
+        assert len(stored) == 1
+        assert stored[0].signal_type.value == "BUY"
+
+    @pytest.mark.asyncio
+    async def test_nan_iv_is_ignored_not_fatal(self):
+        ce_row = self._row("CE", 90_000)
+        ce_row["implied_volatility"] = float("nan")
+        pe_row = self._row("PE", 60_000, iv=13.9)
+        stored = await self._stored(self._chain(ce_row, pe_row))
+        assert len(stored) == 1
+        assert stored[0].indicators["iv_skew"] == 0.0  # no call-side IV
+
+    @pytest.mark.asyncio
+    async def test_breaker_open_degrades_without_signal(self):
+        from loats.utils.circuit_breaker import CircuitBreakerOpenError
+
+        stored = await self._stored(
+            None, seam_side_effect=CircuitBreakerOpenError("openalgo", 1.0)
+        )
+        assert stored == []

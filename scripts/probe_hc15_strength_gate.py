@@ -2,8 +2,8 @@
 
 The strength gate is diversity against the full canonical source space (7
 members in ``StrengthSource``). 3 distinct sources gives 3/7 ≈ 0.429,
-which is below the 0.5 floor and is rejected. 4 distinct sources gives
-4/7 ≈ 0.571, which passes. This reflects the CMP requirement that a
+which is below the 0.5 floor and is rejected. 5 distinct sources gives
+5/7 ≈ 0.714, which passes. This reflects the CMP requirement that a
 valid composite needs at least 4 independent producers.
 
 F8-C-01 hardening: the gate math alone cannot detect a production side
@@ -11,6 +11,12 @@ that emits fewer sources than the gate requires. This probe now ALSO
 statically asserts that ``orchestrator.py`` contains emission sites for
 at least 4 distinct ``StrengthSource`` members — the exact producer set
 the gate needs to pass in a live cycle.
+
+F8-C-01 wave 2 amendment (2026-09-08): the required production set is
+now the 5-member set {ta, sentiment, volatility, price_action,
+options_flow} — a single options_flow breaker trip degrades coverage to
+4/7 = 0.571, which still passes the gate (the redundancy F8-C-01's
+4/7 residue left on the table).
 """
 
 from __future__ import annotations
@@ -58,26 +64,26 @@ def main() -> int:
 
     # --- Part 1: gate math (original HC-15) ---
     sig3 = _build(3)
-    sig4 = _build(4)
+    sig5 = _build(5)
     ok3, det3 = strength_engine.validate_signal_sources(sig3)
-    ok4, det4 = strength_engine.validate_signal_sources(sig4)
+    ok5, det5 = strength_engine.validate_signal_sources(sig5)
     print(
         f"3 valid sources -> ok={ok3} diversity={det3.get('diversity_score')} reason={det3.get('reason')}"
     )
     print(
-        f"4 valid sources -> ok={ok4} diversity={det4.get('diversity_score')} reason={det4.get('reason')}"
+        f"5 valid sources -> ok={ok5} diversity={det5.get('diversity_score')} reason={det5.get('reason')}"
     )
     div3 = det3.get("diversity_score")
-    div4 = det4.get("diversity_score")
+    div5 = det5.get("diversity_score")
     score_ok = (
         isinstance(div3, (int, float))
-        and isinstance(div4, (int, float))
+        and isinstance(div5, (int, float))
         and div3 < 0.5
-        and div4 >= 0.5
+        and div5 >= 0.5
     )
-    print(f"3-src rejected AND 4-src accepted: {score_ok}")
+    print(f"3-src rejected AND 5-src accepted: {score_ok}")
     if not score_ok:
-        problems.append("gate math: 3-src/4-src expectation violated")
+        problems.append("gate math: 3-src/5-src expectation violated")
 
     # --- Part 2 (F8-C-01): production-side emission check ---
     emitted = _production_emission_sources()
@@ -86,6 +92,7 @@ def main() -> int:
         "SENTIMENT",
         "VOLATILITY",
         "PRICE_ACTION",
+        "OPTIONS_FLOW",
     }
     print(f"orchestrator emission sites: {sorted(emitted)}")
     print(f"required producers: {sorted(required)}")
@@ -93,7 +100,7 @@ def main() -> int:
     if missing:
         problems.append(f"orchestrator missing emission sites for: {sorted(missing)}")
     else:
-        print("production emission set covers all 4 required producers: True")
+        print("production emission set covers all 5 required producers: True")
 
     if problems:
         for p in problems:
