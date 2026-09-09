@@ -810,18 +810,28 @@ class TestWorkflowFlagCurrency:
                         f"installed pip-audit does not offer as a choice: {ln}"
                     )
 
-    def test_security_yml_has_no_deprecated_gitleaks_v2(self) -> None:
+    def test_workflows_have_no_deprecated_gitleaks_v2(self) -> None:
         """gitleaks-action@v2 dies with the Node 20 runner removal.
 
         GitHub removes Node 20 from hosted runners on 2026-09-16; @v2 is
         Node 20 and has no opt-out after that date. @v3 is the Node-24
-        release with unchanged inputs/behavior.
+        release with unchanged behavior (only the CONFIG_PATH input was
+        renamed to GITLEAKS_CONFIG). BOTH workflows must assert this:
+        the original security.yml-only test let the sibling ci.yml pin
+        drift to @v2, surfacing only as a live deprecation annotation
+        on a green run (2026-09-09) — sweep the class, not the first
+        hit.
         """
-        text = self.SECURITY_YML.read_text(encoding="utf-8")
-        assert "gitleaks-action@v2" not in text, (
-            "security.yml pins gitleaks-action@v2 (Node 20) — removed from"
-            " GitHub-hosted runners on 2026-09-16; use @v3"
-        )
+        for yml in (CI_YML, self.SECURITY_YML):
+            text = yml.read_text(encoding="utf-8")
+            assert "gitleaks-action@v2" not in text, (
+                f"{yml.name} pins gitleaks-action@v2 (Node 20) — removed"
+                " from GitHub-hosted runners on 2026-09-16; use @v3"
+            )
+            assert "gitleaks-action@v3" in text, (
+                f"{yml.name} must pin gitleaks-action@v3 (Node 24) so the"
+                " positive pin is asserted, not just the absence of v2"
+            )
 
     def test_workflows_use_node24_native_action_majors(self) -> None:
         """Every pinned action major must run on Node 24.
