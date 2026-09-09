@@ -35,6 +35,7 @@ from __future__ import annotations
 import subprocess
 import sys
 import time
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
 import pytest
@@ -287,4 +288,41 @@ class TestAdvisoryWaiverSurfaceLockstep:
             " waiver-free while ci.yml enforces the waiver; amend the"
             " ADR to the surface-lockstep decision instead of"
             " reintroducing the contradiction"
+        )
+
+    @staticmethod
+    def _installed_version(distribution: str) -> str | None:
+        try:
+            return version(distribution)
+        except PackageNotFoundError:
+            return None
+
+    def test_waiver_still_matches_installed_toolchain(self) -> None:
+        """The waived advisory must still be live where it can fire.
+
+        Root cause being guarded: an --ignore-vuln flag is invisible
+        when it waives nothing -- if nltk is upgraded past the
+        vulnerable range, or safety drops the nltk dependency, every
+        surface keeps passing a flag that no longer maps to any
+        advisory and nothing would ever prompt its removal (ADR-0010
+        documents the removal triggers; until this test nothing
+        enforced them). The local full environment (safety -> nltk) is
+        the one surface where the advisory can actually fire, so its
+        installed versions decide currency.
+        """
+        nltk_version = self._installed_version("nltk")
+        assert nltk_version is not None, (
+            "nltk is not installed in this environment, so"
+            f" {WAIVED_VULN_ID} can no longer fire: the waiver on all"
+            " surfaces is dead weight -- remove it everywhere (ADR-0010"
+            " removal trigger: safety drops nltk) and delete this test"
+            " with it"
+        )
+        major_minor = tuple(int(part) for part in nltk_version.split(".")[:2])
+        assert major_minor < (3, 11), (
+            f"nltk {nltk_version} is past the vulnerable range (<3.11);"
+            f" {WAIVED_VULN_ID} is fixed -- remove the --ignore-vuln"
+            " waiver from the pre-push hook, ci.yml, security.yml and"
+            " HC-11 in one sweep, then retire this test (ADR-0010"
+            " removal trigger: nltk 3.11 published)"
         )
