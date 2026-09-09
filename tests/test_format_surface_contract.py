@@ -306,17 +306,36 @@ class TestAdvisoryWaiverSurfaceLockstep:
         surface keeps passing a flag that no longer maps to any
         advisory and nothing would ever prompt its removal (ADR-0010
         documents the removal triggers; until this test nothing
-        enforced them). The local full environment (safety -> nltk) is
-        the one surface where the advisory can actually fire, so its
-        installed versions decide currency.
+        enforced them).
+
+        Environment quadrants (keyed on safety, the advisory's only
+        install path -- first CI run failed by demanding nltk in an
+        audit-only environment that installs no safety):
+
+          safety absent -> SKIP: the advisory cannot fire here (CI);
+             currency is assessed in the full dev environment.
+          safety present, nltk absent -> FAIL: removal trigger B
+             (safety dropped nltk) has tripped; remove the waiver.
+          nltk >= 3.11 -> FAIL: removal trigger A (fixed upstream)
+             has tripped; remove the waiver.
+          safety + nltk < 3.11 -> PASS: the waiver still maps to a
+             live advisory and must stay on every surface.
         """
+        if self._installed_version("safety") is None:
+            pytest.skip(
+                "safety is not installed here (audit-only environment,"
+                f" e.g. CI): {WAIVED_VULN_ID} cannot fire in this"
+                " environment; waiver currency is assessed where the"
+                " advisory can fire (full dev environment per ADR-0010)"
+            )
         nltk_version = self._installed_version("nltk")
         assert nltk_version is not None, (
-            "nltk is not installed in this environment, so"
-            f" {WAIVED_VULN_ID} can no longer fire: the waiver on all"
-            " surfaces is dead weight -- remove it everywhere (ADR-0010"
-            " removal trigger: safety drops nltk) and delete this test"
-            " with it"
+            f"safety is installed but no longer pulls nltk:"
+            f" {WAIVED_VULN_ID} can no longer fire anywhere -- the"
+            " waiver on all surfaces is dead weight. Remove it from the"
+            " pre-push hook, ci.yml, security.yml and HC-11 in one"
+            " sweep, retire this test with it (ADR-0010 removal"
+            " trigger: safety drops nltk), and amend ADR-0010."
         )
         major_minor = tuple(int(part) for part in nltk_version.split(".")[:2])
         assert major_minor < (3, 11), (
