@@ -77,6 +77,9 @@ gitleaks-report.json
 gitleaks_final.json
 gitleaks_out.txt
 gitleaks_results.json
+# per-invocation gitleaks session scratch (staged 09Sep pushed tracked count
+# to 399 vs ceiling 398 and blocked the pre-push repo-hygiene gate).
+gitleaks_session.json
 
 # Quality gate output files
 audit_results.json
