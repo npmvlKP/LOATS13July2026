@@ -2,6 +2,7 @@
 Tests for options module.
 """
 
+import math
 from datetime import datetime
 
 import pytest
@@ -16,6 +17,7 @@ except ImportError:  # pragma: no cover - legacy fallback
         implied_volatility,  # type: ignore[import-not-found]
     )
 
+from loats import options_math
 from loats.models import Greeks, OptionContract, OptionType
 from loats.options import (
     ExpiredContractError,
@@ -658,3 +660,115 @@ class TestOptionsAnalysis:
         assert greeks.vega == 0.1
         assert greeks.rho == 0.03
         assert greeks.implied_volatility == 0.25
+
+
+class TestOptionsMathExternalParity:
+    """Anchor options_math to externally-derived values (Risk-3 closure).
+
+    Root cause this class pins: ADR-0004 replaced ``vollib`` with the
+    hand-rolled ``loats.options_math``, but until now every options test
+    only checked *self-consistency* (engine vs its own formulas). A
+    systematic formula or scaling error (e.g. a wrong theta divisor)
+    would have been invisible. The vectors below were cross-validated
+    live against the original ``vollib`` package in the dev venv AND an
+    independent stdlib ``math.erf`` CDF implementation; call price
+    4.759422 is additionally the published worked example (Hull,
+    Options, Futures and Other Derivatives: S=42, K=40, r=10%,
+    sigma=20%, t=0.5). The deprecated vollib import stays optional so
+    the anchors still run on clean installs.
+    """
+
+    S, K, T, R, SIGMA = 42.0, 40.0, 0.5, 0.10, 0.20
+    # Captured from vollib.black_scholes.greeks.analytical (see ADR-0004).
+    GOLDEN = {
+        ("black_scholes", "c"): 4.759422392871532,
+        ("black_scholes", "p"): 0.808599372900095,
+        ("delta", "c"): 0.779131290942669,
+        ("delta", "p"): -0.220868709057331,
+        ("gamma", "c"): 0.049962670405912,
+        ("gamma", "p"): 0.049962670405912,
+        ("vega", "c"): 0.088134150596029,
+        ("vega", "p"): 0.088134150596029,
+        ("theta", "c"): -0.012490663546829,
+        ("theta", "p"): -0.002066231497506,
+        ("rho", "c"): 0.139820459133603,
+        ("rho", "p"): -0.050425425766540,
+    }
+    TOL = 1e-12
+
+    def _fn(self, name: str):
+        return getattr(options_math, name)
+
+    @pytest.mark.parametrize(
+        ("fn_name", "flag"),
+        [
+            ("black_scholes", "c"),
+            ("black_scholes", "p"),
+            ("delta", "c"),
+            ("delta", "p"),
+            ("gamma", "c"),
+            ("gamma", "p"),
+            ("vega", "c"),
+            ("vega", "p"),
+            ("theta", "c"),
+            ("theta", "p"),
+            ("rho", "c"),
+            ("rho", "p"),
+        ],
+    )
+    def test_matches_replaced_vollib_vectors(self, fn_name: str, flag: str) -> None:
+        fn = self._fn(fn_name)
+        got = fn(flag, self.S, self.K, self.T, self.R, self.SIGMA)
+        expected = self.GOLDEN[(fn_name, flag)]
+        assert got == pytest.approx(expected, abs=self.TOL), (
+            f"{fn_name}({flag!r}) drifted from the externally-validated"
+            f" vollib vector: got {got!r}, anchor {expected!r}"
+        )
+
+    def test_call_price_matches_published_hull_example(self) -> None:
+        # Hull worked example (Table 19.1, 9th ed): c = 4.76 to 2 dp.
+        got = options_math.black_scholes(
+            "c", self.S, self.K, self.T, self.R, self.SIGMA
+        )
+        assert round(got, 2) == 4.76
+
+    def test_put_call_parity_on_anchor_vector(self) -> None:
+        # C - P = S - K*e^{-rT} must hold to float round-off.
+        c = options_math.black_scholes("c", self.S, self.K, self.T, self.R, self.SIGMA)
+        p = options_math.black_scholes("p", self.S, self.K, self.T, self.R, self.SIGMA)
+        intrinsic = self.S - self.K * math.exp(-self.R * self.T)
+        assert (c - p) == pytest.approx(intrinsic, abs=1e-12)
+
+    def test_implied_vol_round_trip_on_anchor_price(self) -> None:
+        price = self.GOLDEN[("black_scholes", "c")]
+        iv = options_math.implied_volatility(price, self.S, self.K, self.T, self.R, "c")
+        assert iv == pytest.approx(self.SIGMA, abs=1e-4)
+
+    def test_vollib_cross_check_when_available(self) -> None:
+        """Live differential vs vollib when the legacy package exists.
+
+        On clean installs (vollib removed per ADR-0004) this skips; in
+        the dev venv it re-proves parity against the replaced library
+        itself rather than frozen constants.
+        """
+        vollib_bs = pytest.importorskip("vollib.black_scholes")
+        from vollib.black_scholes.greeks.analytical import delta as v_delta
+        from vollib.black_scholes.greeks.analytical import gamma as v_gamma
+        from vollib.black_scholes.greeks.analytical import rho as v_rho
+        from vollib.black_scholes.greeks.analytical import theta as v_theta
+        from vollib.black_scholes.greeks.analytical import vega as v_vega
+
+        args = (self.S, self.K, self.T, self.R, self.SIGMA)
+        pairs = [
+            (options_math.black_scholes, vollib_bs.black_scholes),
+            (options_math.delta, v_delta),
+            (options_math.gamma, v_gamma),
+            (options_math.vega, v_vega),
+            (options_math.theta, v_theta),
+            (options_math.rho, v_rho),
+        ]
+        for ours, theirs in pairs:
+            for flag in ("c", "p"):
+                assert ours(flag, *args) == pytest.approx(
+                    float(theirs(flag, *args)), abs=1e-12
+                ), f"{ours.__name__}({flag!r}) diverged from live vollib"

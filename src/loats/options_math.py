@@ -96,7 +96,8 @@ def black_scholes(
 
     Reference: Hull, Options, Futures and Other Derivatives, 7th ed.
     Matches vollib.black_scholes.black_scholes within <1e-10 for
-    standard test vectors (see tests/test_options_math.py).
+    standard test vectors (external parity anchors live in
+    tests/test_options.py::TestOptionsMathExternalParity).
     """
     if t <= 0:
         # At expiry: intrinsic value
