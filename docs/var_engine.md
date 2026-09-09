@@ -22,7 +22,7 @@ The VaR engine implements multiple approaches to Value-at-Risk calculation for c
 ```python
 engine = VaREngine(
     confidence_level=0.99,  # 99% confidence
-    window_size=252         # One year of trading days
+    window_size=252,  # One year of trading days
 )
 ```
 
@@ -31,9 +31,9 @@ engine = VaREngine(
 ```python
 # For standalone asset
 historical_result = engine.historical_standalone(
-    prices,                     # Historical price series
-    Decimal('1,000,000'),      # Asset value
-    days=10                    # 10-day holding period
+    prices,  # Historical price series
+    Decimal("1,000,000"),  # Asset value
+    days=10,  # 10-day holding period
 )
 ```
 
@@ -42,9 +42,9 @@ historical_result = engine.historical_standalone(
 ```python
 parametric_result = engine.parametric_normal(
     prices,
-    Decimal('1,000,000'),
+    Decimal("1,000,000"),
     days=10,
-    fat_tail_adj=1.2          # Adjust for fat tails
+    fat_tail_adj=1.2,  # Adjust for fat tails
 )
 ```
 
@@ -52,10 +52,7 @@ parametric_result = engine.parametric_normal(
 
 ```python
 monte_carlo_result = engine.monte_carlo(
-    current_price=Decimal('200'),
-    value=Decimal('2,000,000'),
-    days=7,
-    samples=50_000
+    current_price=Decimal("200"), value=Decimal("2,000,000"), days=7, samples=50_000
 )
 ```
 
@@ -68,11 +65,7 @@ monitor = CMPMonitor()
 results = monitor.evaluate_risk(
     {
         "var_method": "historical_standalone",
-        "parameters": {
-            "prices": [...],
-            "value": Decimal('1,000,000'),
-            "days": 10
-        }
+        "parameters": {"prices": [...], "value": Decimal("1,000,000"), "days": 10},
     }
 )
 ```
@@ -95,18 +88,14 @@ results = monitor.evaluate_risk(
 ### Portfolio Risk
 
 ```python
-portfolio_result = engine.historical_portfolio({
-    "AAPL": (Decimal('100'), 150.25),
-    "GOOG": (Decimal('50'), 2600.75)
-})
+portfolio_result = engine.historical_portfolio(
+    {"AAPL": (Decimal("100"), 150.25), "GOOG": (Decimal("50"), 2600.75)}
+)
 ```
 
 ### Risk Contribution
 ```python
-result = engine.parametric_normal(
-    ...,
-    risk_contribution=True
-)
+result = engine.parametric_normal(..., risk_contribution=True)
 ```
 
 ## Performance

@@ -147,8 +147,20 @@ History (most recent last):
        verify_f8h01_external.json: per-run verifier output now writes
        the ignored reports/health/p5-verify-stubs/ path. Ceiling 397
        = this tree.)
+  398  09Sep gate-integrity wave (PR #12, merged 2026-09-09): +1
+       (tests/test_openalgo_wire_contract.py - wire-contract net for
+       the OpenAlgo client surface; supervisor writer-identity tests
+       moved to the platform identity contract. Ceiling 398 = this
+       tree at the merge.)
+  399  Format-surface contract wave (2026-09-09): +1
+       (tests/test_format_surface_contract.py - pins root-wide format
+       sweep == enforced surface after ruff 0.16's markdown-fence
+       scope expansion flagged 40 frozen-evidence docs + 1 live doc:
+       frozen via pyproject extend-exclude at the *.md layer only,
+       docs/var_engine.md formatted canonical, pre-push pip-audit
+       hook mirrors the ADR-0010 waiver. Ceiling 399 = this tree.)
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 398
+TRACKED_FILE_CEILING = 399
