@@ -8,14 +8,15 @@ ignore =
     W503
 max-line-length = 88
 # Mirror ruff's per-file-ignores (pyproject.toml) so the pre-commit flake8
-# hook agrees with the formatter-of-record on tests/ and scripts/. The hook
-# passes explicit filenames, and flake8 does not apply `exclude` to those —
-# without the mirrored grants the hook false-fails on the tree's own files
-# (scripts/ verifiers' late sys.path-seeded imports = E402; frozen regex
-# literals in tests/ = E501). src/ stays fully strict.
+# hook agrees with the formatter-of-record on tests/, scripts/, and the
+# frozen audit-evidence trees. The hook passes explicit filenames, and
+# flake8 does not apply `exclude` to those — without the mirrored grants
+# the hook false-fails on the tree's own files (scripts/ verifiers' late
+# sys.path-seeded imports = E402; frozen regex literals in tests/ = E501).
+# src/ stays fully strict.
 per-file-ignores =
     tests/*:E501
-    scripts/*:E402,E501
+    scripts/*:E402,E501,F841
     # F8-H-01 (2026-09-07): conftest pins the test-data env vars BEFORE
     # importing loats on purpose — the ``db`` singleton binds Settings at
     # import, so the env-first layout IS the production-isolation
@@ -25,6 +26,18 @@ per-file-ignores =
     # via dummy-variable-rgx, so flake8 must agree (mirrors the
     # linter-of-record's effective behavior).
     tests/conftest.py:E402,F811,F841
+    # 2026-09-09: the pre-commit flake8 hook passes explicit filenames and
+    # flake8 does not honor `exclude` for those, so the tracked frozen
+    # audit-evidence trees (docs/audit-history/, reports/ai-generated/)
+    # ARE part of the hook's file set — `git pre-commit run --all-files`
+    # failed rc=1 on 56 findings there while every CI job stayed green.
+    # Grants mirror the tree's live emission classes only (E402 late
+    # sys.path-seeded imports, E501 frozen long lines); the files remain
+    # verbatim-frozen. Bounded by design: a new code class must fail the
+    # behavioral nets in tests/test_repo_hygiene.py, not be silently
+    # amnestied here.
+    docs/audit-history/*:E402,E501
+    reports/ai-generated/*:E501
 # Frozen audit evidence archived verbatim (mirrors pyproject.toml per-file-ignores,
 # which carry the same rationale): these directories are historical verification
 # artifacts and must not be mutated to satisfy lint. Excluded from repository-root
