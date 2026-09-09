@@ -96,7 +96,8 @@ def black_scholes(
 
     Reference: Hull, Options, Futures and Other Derivatives, 7th ed.
     Matches vollib.black_scholes.black_scholes within <1e-10 for
-    standard test vectors (see tests/test_options_math.py).
+    standard test vectors (external parity anchors live in
+    tests/test_options.py::TestOptionsMathExternalParity).
     """
     if t <= 0:
         # At expiry: intrinsic value
@@ -212,7 +213,6 @@ def implied_volatility(
 
     Mirrors the fallback strategy in OptionsEngine.calculate_implied_volatility
     and standalone helper, but as a pure function without external state.
-    Returns 0.2 on total failure (callers may handle bounds themselves).
 
     Args:
         price: market option price.
@@ -221,24 +221,44 @@ def implied_volatility(
         max_iter: Newton maxiter.
 
     Raises:
-        ValueError: if price violates arbitrage bounds (callers typically
-                    check bounds before calling; we raise to let them fallback).
+        ValueError: if t <= 0 (no implied vol at expiry), if flag is not
+                    'c'/'p', or if price violates no-arbitrage bounds
+                    (callers wanting a silent 0.2 fallback -- e.g.
+                    OptionsEngine -- should check bounds before calling).
     """
 
-    # Arbitrage bounds check -- let caller decide fallback if needed
-    # Keep minimal: if price is impossible, let solver fail gracefully.
+    # Expiry has no implied volatility: the option prices at intrinsic.
+    if t <= 0:
+        raise ValueError(
+            f"implied volatility is undefined for non-positive time to expiry (t={t})"
+        )
+
+    # No-arbitrage bounds (Hull 6.2, dividend-free): discounted-strike
+    # bound K*e^{-rt} for calls, K*e^{-rt} upper bound for puts. Bounds
+    # are validated BEFORE solving: a Brent bracket that cannot close
+    # must not silently resolve to garbage (pre-fix this returned
+    # sigma=-0.41 for a below-intrinsic price).
+    discount = math.exp(-r * t)
+    if flag == "c":
+        lower, upper = max(0.0, S - K * discount), S
+    elif flag == "p":
+        lower, upper = max(0.0, K * discount - S), K * discount
+    else:
+        raise ValueError(f"invalid option flag: {flag!r} (expected 'c' or 'p')")
+
+    if price <= lower or price >= upper:
+        raise ValueError(
+            f"price {price} violates arbitrage bounds [{lower}, {upper}]"
+            f" (flag={flag!r}, S={S}, K={K}, t={t}, r={r})"
+        )
+
     def _objective(sigma: float) -> float:
-        try:
-            return float(black_scholes(flag, S, K, t, r, sigma) - price)
-        except Exception:
-            return float("inf")
+        return float(black_scholes(flag, S, K, t, r, sigma) - price)
 
     # Quick bracket check: use [1e-4, 5.0] (wider than vollib's [1e-4,10] but safe)
     low, high = 1e-4, 5.0
     try:
-        f_low = _objective(low)
-        f_high = _objective(high)
-        if f_low * f_high < 0:
+        if _objective(low) * _objective(high) < 0:
             return float(brentq(_objective, low, high, xtol=tolerance))
     except Exception:  # nosec B110
         pass
@@ -246,32 +266,23 @@ def implied_volatility(
     # Newton fallback -- needs vega as derivative
     try:
 
-        def _vega_fn(sigma: float) -> float:
-            # Undo the *0.01 scaling for Newton: raw vega expected
-            return float(vega(flag, S, K, t, r, sigma) / 0.01)
-
-        # scipy newton expects fprime = derivative; our _vega is correct
-        # but we must pass raw vega, not scaled. Adjust by /0.01 already.
-        # For stability, try with scaled vega and let Newton handle it --
-        # our _objective uses price diff, so derivative should be raw vega.
-        # Bridge: raw = scaled / 0.01
-        def _objective_raw(sigma: float) -> float:
-            return _objective(sigma)
-
         def _fprime(sigma: float) -> float:
             return float(S * _norm_pdf(d1(S, K, t, r, sigma)) * math.sqrt(t))
 
         return float(
             newton(
-                _objective_raw,
+                _objective,
                 x0=0.2,
                 fprime=_fprime,
                 maxiter=max_iter,
                 tol=tolerance,
             )
         )
-    except Exception:
-        return 0.2
+    except (RuntimeError, OverflowError) as exc:
+        raise ValueError(
+            f"implied volatility did not converge for price={price} "
+            f"(S={S}, K={K}, t={t}, r={r}, flag={flag!r})"
+        ) from exc
 
 
 # ---------------------------------------------------------------------------

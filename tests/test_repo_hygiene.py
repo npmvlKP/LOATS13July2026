@@ -731,6 +731,180 @@ class TestHC21BareEnvBehavior:
         assert "BARE-ENV IMPORT OK" in proc.stdout
 
 
+class TestSecurityScheduleSemantics:
+    """security.yml's weekly cron must reach every gate unconditionally.
+
+    Root cause being guarded: on 2026-09-06 the only scheduled Security
+    Scan run on main concluded "skipped" in 2 seconds -- it fired before
+    the dead-gate repair (cf03d47) reached main, and no local gate could
+    see that the weekly audit safety net was silently dead (run
+    34065636491). Two regression shapes are pinned here, detected
+    statically so the contract holds on any tree, not just a green one:
+
+      1. every job carrying an explicit ``if:`` must keep the schedule
+         event in that condition -- naming only workflow_dispatch/push
+         is exactly how jobs silently stop running on schedule; a bare
+         ``always()`` (or no ``if:``) is unconditional and always fine;
+      2. the ``on:`` block must keep exactly one schedule trigger with
+         the documented cadence -- deleting or editing it changes the
+         audit cadence with no code diff to review.
+
+    The parser is unit-tested against synthetic YAML below, so the
+    detection logic itself is proven and not merely green by accident.
+    """
+
+    SECURITY_YML = REPO_ROOT / ".github" / "workflows" / "security.yml"
+
+    @staticmethod
+    def _job_blocks(text: str) -> dict[str, list[str]]:
+        """Map ``jobs.<id>:`` to its job-level (indent-4) ``if:`` lines.
+
+        Line-oriented parser, no yaml dependency (suite convention): a
+        job header is an indent-2 ``<name>:`` after the indent-0
+        ``jobs:`` key; its block-level conditions sit at indent 4.
+        Step-level ``if:`` (indent 8+) is intentionally ignored -- a
+        step may legitimately filter by event.
+        """
+        jobs: dict[str, list[str]] = {}
+        current: str | None = None
+        in_jobs = False
+        for raw in text.splitlines():
+            if not raw.strip():
+                continue
+            indent = len(raw) - len(raw.lstrip(" "))
+            stripped = raw.strip()
+            if indent == 0:
+                in_jobs = stripped == "jobs:"
+                current = None
+                continue
+            if not in_jobs:
+                continue
+            if indent == 2 and stripped.endswith(":"):
+                current = stripped[:-1]
+                jobs.setdefault(current, [])
+            elif indent == 4 and current is not None and stripped.startswith("if:"):
+                jobs[current].append(stripped)
+        return jobs
+
+    @staticmethod
+    def _schedule_blind_jobs(jobs: dict[str, list[str]]) -> list[str]:
+        """Jobs whose explicit conditions would skip a scheduled run."""
+        blind: list[str] = []
+        for name, conditions in jobs.items():
+            for cond in conditions:
+                if (
+                    "github.event_name == 'schedule'" not in cond
+                    and "always()" not in cond
+                ):
+                    blind.append(name)
+                    break
+        return blind
+
+    @staticmethod
+    def _cron_lines(text: str) -> list[str]:
+        """The ``- cron:`` entries of the top-level ``on: schedule:`` block."""
+        crons: list[str] = []
+        in_on = False
+        in_schedule = False
+        for raw in text.splitlines():
+            if not raw.strip():
+                continue
+            indent = len(raw) - len(raw.lstrip(" "))
+            stripped = raw.strip()
+            if indent == 0:
+                in_on = stripped == "on:"
+                in_schedule = False
+                continue
+            if not in_on:
+                continue
+            if indent <= 2:
+                in_schedule = stripped == "schedule:"
+                continue
+            if in_schedule and stripped.startswith("- cron:"):
+                crons.append(stripped)
+        return crons
+
+    def test_parser_flags_schedule_blind_job(self) -> None:
+        """RED-proof: the detector catches the silent-skip shape."""
+        synthetic = (
+            "name: scan\n"
+            "on:\n"
+            "  schedule:\n"
+            "    - cron: '30 21 * * 0'\n"
+            "jobs:\n"
+            "  dependency-scan:\n"
+            "    runs-on: ubuntu-latest\n"
+            "    if: github.event_name == 'workflow_dispatch'\n"
+            "    steps:\n"
+            "      - run: echo hi\n"
+        )
+        blocks = self._job_blocks(synthetic)
+        assert "dependency-scan" in blocks, "parser lost the job block"
+        assert self._schedule_blind_jobs(blocks) == ["dependency-scan"]
+
+    def test_parser_accepts_schedule_covering_job(self) -> None:
+        """The compliant shape (as security.yml is written) passes."""
+        synthetic = (
+            "on:\n"
+            "  schedule:\n"
+            "    - cron: '30 21 * * 0'\n"
+            "  workflow_dispatch:\n"
+            "    inputs:\n"
+            "      scan_type:\n"
+            "jobs:\n"
+            "  dependency-scan:\n"
+            "    if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.event.inputs.scan_type == 'full')\n"
+            "    steps:\n"
+            "      - run: echo hi\n"
+            "  summary:\n"
+            "    if: always() && (github.event_name == 'workflow_dispatch' || github.event_name == 'schedule')\n"
+            "    steps:\n"
+            "      - run: echo done\n"
+        )
+        blocks = self._job_blocks(synthetic)
+        assert set(blocks) == {"dependency-scan", "summary"}
+        assert self._schedule_blind_jobs(blocks) == []
+        assert len(self._cron_lines(synthetic)) == 1
+
+    def test_parser_ignores_step_level_event_filters(self) -> None:
+        """A step-level ``if:`` without schedule must not false-positive."""
+        synthetic = (
+            "jobs:\n"
+            "  dependency-scan:\n"
+            "    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'\n"
+            "    steps:\n"
+            "      - name: Upload\n"
+            "        if: github.event_name == 'workflow_dispatch'\n"
+            "        run: upload-artifact\n"
+        )
+        assert self._schedule_blind_jobs(self._job_blocks(synthetic)) == []
+
+    def test_every_security_job_is_reachable_on_schedule(self) -> None:
+        """Live invariant: no security.yml job may silently skip the cron."""
+        text = self.SECURITY_YML.read_text(encoding="utf-8")
+        blind = self._schedule_blind_jobs(self._job_blocks(text))
+        assert blind == [], (
+            f"security.yml jobs {blind} carry an explicit `if:` that does"
+            " not include the schedule event; a weekly cron fires with"
+            " event_name == 'schedule' and those jobs will conclude"
+            " 'skipped' in seconds -- the exact silent death of run"
+            " 34065636491. Add the schedule branch or drop the `if:`."
+        )
+
+    def test_security_schedule_trigger_is_exactly_one_cron(self) -> None:
+        """Live invariant: the weekly cadence is pinned and singular."""
+        crons = self._cron_lines(self.SECURITY_YML.read_text(encoding="utf-8"))
+        assert len(crons) == 1, (
+            f"expected exactly one schedule cron in security.yml, found"
+            f" {len(crons)}: {crons}; the weekly audit cadence is a"
+            " documented contract -- change it deliberately here"
+        )
+        assert crons[0].startswith("- cron: '30 21 * * 0'"), (
+            f"security.yml cron changed to {crons[0]!r}; update this"
+            " contract and CONTRIBUTING.md together or revert"
+        )
+
+
 @pytest.mark.skipif(not CI_YML.exists(), reason="CI workflow absent")
 class TestWorkflowFlagCurrency:
     """Every flag a committed workflow passes must exist in the pinned tool.

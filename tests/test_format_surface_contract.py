@@ -35,6 +35,7 @@ from __future__ import annotations
 import subprocess
 import sys
 import time
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
 import pytest
@@ -264,4 +265,83 @@ class TestAdvisoryWaiverSurfaceLockstep:
         )
         assert WAIVED_VULN_ID in ADR_0010.read_text(encoding="utf-8"), (
             "ADR-0010 no longer names the waived advisory id"
+        )
+
+    def test_triage_adr_agrees_with_enforced_surfaces(self) -> None:
+        """The ADR's decision text must not contradict the surfaces.
+
+        Drift class pinned here (2026-09-09): ADR-0010 originally
+        decided CI/security.yml stay waiver-free, then ci.yml gained
+        the flag (surface lockstep) and the ADR text was never amended
+        -- docs claimed one contract, gates enforced another, and
+        nothing detected it. If the waiver is enforced on CI surfaces
+        (test_ci_carries_the_same_waiver), the ADR must not claim the
+        opposite; re-triage and re-amend together or not at all.
+        """
+        assert f"--ignore-vuln {WAIVED_VULN_ID}" in _repo_relative(CI_YML), (
+            "precondition drifted: ci.yml no longer carries the waiver;"
+            " this test pins ADR/surface AGREEMENT, re-scope both"
+        )
+        adr_text = ADR_0010.read_text(encoding="utf-8")
+        assert "left WITHOUT the ignore" not in adr_text, (
+            "ADR-0010 decision text claims the CI surfaces are"
+            " waiver-free while ci.yml enforces the waiver; amend the"
+            " ADR to the surface-lockstep decision instead of"
+            " reintroducing the contradiction"
+        )
+
+    @staticmethod
+    def _installed_version(distribution: str) -> str | None:
+        try:
+            return version(distribution)
+        except PackageNotFoundError:
+            return None
+
+    def test_waiver_still_matches_installed_toolchain(self) -> None:
+        """The waived advisory must still be live where it can fire.
+
+        Root cause being guarded: an --ignore-vuln flag is invisible
+        when it waives nothing -- if nltk is upgraded past the
+        vulnerable range, or safety drops the nltk dependency, every
+        surface keeps passing a flag that no longer maps to any
+        advisory and nothing would ever prompt its removal (ADR-0010
+        documents the removal triggers; until this test nothing
+        enforced them).
+
+        Environment quadrants (keyed on safety, the advisory's only
+        install path -- first CI run failed by demanding nltk in an
+        audit-only environment that installs no safety):
+
+          safety absent -> SKIP: the advisory cannot fire here (CI);
+             currency is assessed in the full dev environment.
+          safety present, nltk absent -> FAIL: removal trigger B
+             (safety dropped nltk) has tripped; remove the waiver.
+          nltk >= 3.11 -> FAIL: removal trigger A (fixed upstream)
+             has tripped; remove the waiver.
+          safety + nltk < 3.11 -> PASS: the waiver still maps to a
+             live advisory and must stay on every surface.
+        """
+        if self._installed_version("safety") is None:
+            pytest.skip(
+                "safety is not installed here (audit-only environment,"
+                f" e.g. CI): {WAIVED_VULN_ID} cannot fire in this"
+                " environment; waiver currency is assessed where the"
+                " advisory can fire (full dev environment per ADR-0010)"
+            )
+        nltk_version = self._installed_version("nltk")
+        assert nltk_version is not None, (
+            f"safety is installed but no longer pulls nltk:"
+            f" {WAIVED_VULN_ID} can no longer fire anywhere -- the"
+            " waiver on all surfaces is dead weight. Remove it from the"
+            " pre-push hook, ci.yml, security.yml and HC-11 in one"
+            " sweep, retire this test with it (ADR-0010 removal"
+            " trigger: safety drops nltk), and amend ADR-0010."
+        )
+        major_minor = tuple(int(part) for part in nltk_version.split(".")[:2])
+        assert major_minor < (3, 11), (
+            f"nltk {nltk_version} is past the vulnerable range (<3.11);"
+            f" {WAIVED_VULN_ID} is fixed -- remove the --ignore-vuln"
+            " waiver from the pre-push hook, ci.yml, security.yml and"
+            " HC-11 in one sweep, then retire this test (ADR-0010"
+            " removal trigger: nltk 3.11 published)"
         )
