@@ -251,3 +251,388 @@ async def test_alert_system_shutdown_no_polling_task(mock_settings):
     await alert_system.shutdown()
     mock_updater.stop.assert_called()
     mock_app.stop.assert_called()
+
+
+def _make_context(args=None):
+    """Context mock with an explicit args list (auto-attr MagicMock would
+    make ``context.args`` truthy and break ``" ".join(...)`` paths)."""
+    ctx = MagicMock()
+    ctx.args = [] if args is None else args
+    return ctx
+
+
+class TestTelegramCommandHandlers:
+    """Operator command-surface tests (F8-H-04 follow-up).
+
+    Covers the Telegram control handlers that the 09Sep branch-coverage
+    artifact showed uncovered: /kill, /resume, /positions, /orders,
+    /signals, /help, _handle_message routing, and signal/order formatter
+    edge branches. kill/resume are the highest-consequence paths in the
+    module (they gate all trading).
+    """
+
+    @pytest.fixture
+    def alert_system(self):
+        system = AlertSystem()
+        system.bot = AsyncMock()
+        return system
+
+    @staticmethod
+    def _make_update(message=True, user_id="999", text=None):
+        update = MagicMock()
+        update.effective_user = MagicMock()
+        update.effective_user.id = user_id
+        update.message = AsyncMock() if message else None
+        if text is not None:
+            update.message.text = text
+        return update
+
+    # ---------- /kill ----------
+
+    @pytest.mark.asyncio
+    async def test_kill_unauthorized_rejected(self, alert_system):
+        with patch("loats.alerts.settings") as m:
+            m.telegram_admin_ids = []
+            update = self._make_update()
+            await alert_system._kill_switch(update, _make_context())
+            text = update.message.reply_text.call_args.args[0]
+            assert "not authorized" in text
+            assert alert_system.kill_switch_active is False
+
+    @pytest.mark.asyncio
+    async def test_kill_idempotent_rejects_second_activation(self, alert_system):
+        alert_system.kill_switch_active = True
+        with patch("loats.alerts.settings") as m:
+            m.telegram_admin_ids = ["999"]
+            update = self._make_update()
+            await alert_system._kill_switch(update, _make_context())
+            assert "already active" in update.message.reply_text.call_args.args[0]
+
+    @pytest.mark.asyncio
+    async def test_kill_success_activates_cancels_and_confirms(self, alert_system):
+        with (
+            patch("loats.alerts.settings") as m,
+            patch("loats.alerts.async_client", new_callable=AsyncMock) as mock_client,
+        ):
+            m.telegram_admin_ids = ["999"]
+            m.telegram_chat_id = "chat1"
+            mock_client.get_all_orders.return_value = {
+                "data": [
+                    {"order_id": "1", "status": "OPEN"},
+                    {"order_id": "2", "status": "PENDING"},
+                    {"order_id": "3", "status": "FILLED"},
+                ]
+            }
+            update = self._make_update()
+            await alert_system._kill_switch(update, _make_context())
+            assert alert_system.kill_switch_active is True
+            cancelled = [c.args[0] for c in mock_client.cancel_order.await_args_list]
+            assert cancelled == ["1", "2"]
+            assert (
+                "activated successfully"
+                in (update.message.reply_text.call_args.args[0])
+            )
+
+    @pytest.mark.asyncio
+    async def test_kill_fetch_failure_rolls_back(self, alert_system):
+        with (
+            patch("loats.alerts.settings") as m,
+            patch("loats.alerts.async_client", new_callable=AsyncMock) as mock_client,
+        ):
+            m.telegram_admin_ids = ["999"]
+            mock_client.get_all_orders.return_value = None
+            update = self._make_update()
+            await alert_system._kill_switch(update, _make_context())
+            assert alert_system.kill_switch_active is False
+            assert "Failed to activate" in (update.message.reply_text.call_args.args[0])
+
+    @pytest.mark.asyncio
+    async def test_kill_handler_exception_reports_error(self, alert_system):
+        with patch("loats.alerts.settings") as m:
+            m.telegram_admin_ids = ["999"]
+            update = self._make_update()
+            with patch.object(
+                AlertSystem,
+                "activate_kill_switch",
+                AsyncMock(side_effect=RuntimeError("boom")),
+            ):
+                await alert_system._kill_switch(update, _make_context())
+            assert "Error:" in update.message.reply_text.call_args.args[0]
+
+    # ---------- /resume ----------
+
+    @pytest.mark.asyncio
+    async def test_resume_unauthorized_rejected(self, alert_system):
+        with patch("loats.alerts.settings") as m:
+            m.telegram_admin_ids = []
+            update = self._make_update()
+            await alert_system._resume(update, _make_context())
+            assert "not authorized" in update.message.reply_text.call_args.args[0]
+
+    @pytest.mark.asyncio
+    async def test_resume_without_active_switch_is_noop(self, alert_system):
+        with patch("loats.alerts.settings") as m:
+            m.telegram_admin_ids = ["999"]
+            update = self._make_update()
+            await alert_system._resume(update, _make_context())
+            assert "not active" in update.message.reply_text.call_args.args[0]
+            assert alert_system.kill_switch_active is False
+
+    @pytest.mark.asyncio
+    async def test_resume_success_deactivates_and_confirms(self, alert_system):
+        alert_system.kill_switch_active = True
+        with patch("loats.alerts.settings") as m:
+            m.telegram_admin_ids = ["999"]
+            m.telegram_chat_id = "chat1"
+            update = self._make_update()
+            await alert_system._resume(update, _make_context())
+            assert alert_system.kill_switch_active is False
+            assert (
+                "deactivated successfully"
+                in (update.message.reply_text.call_args.args[0])
+            )
+
+    # ---------- /positions, /orders, /signals, /help ----------
+
+    @pytest.mark.asyncio
+    async def test_positions_failure_reports_error(self):
+        system = AlertSystem()  # no bot: every send path fails closed
+        with patch("loats.alerts.async_client", new_callable=AsyncMock) as mock_client:
+            mock_client.get_position_book.return_value = None
+            update = self._make_update()
+            await system._positions(update, _make_context())
+            assert (
+                "Failed to get positions"
+                in (update.message.reply_text.call_args.args[0])
+            )
+
+    @pytest.mark.asyncio
+    async def test_orders_empty_reports_none(self, alert_system):
+        with patch("loats.alerts.async_client", new_callable=AsyncMock) as mock_client:
+            mock_client.get_all_orders.return_value = {"data": []}
+            update = self._make_update()
+            await alert_system._orders(update, _make_context())
+            assert "No open orders" in update.message.reply_text.call_args.args[0]
+
+    @pytest.mark.asyncio
+    async def test_orders_renders_open_order_row(self, alert_system):
+        with patch("loats.alerts.async_client", new_callable=AsyncMock) as mock_client:
+            mock_client.get_all_orders.return_value = {
+                "data": [
+                    {
+                        "order_id": "O-1",
+                        "symbol": "NIFTY",
+                        "order_type": "LIMIT",
+                        "transaction_type": "BUY",
+                        "quantity": 50,
+                        "price": "18550.25",
+                        "status": "OPEN",
+                    }
+                ]
+            }
+            update = self._make_update()
+            await alert_system._orders(update, _make_context())
+            text = update.message.reply_text.call_args.args[0]
+            assert "O-1" in text and "NIFTY" in text and "18550.25" in text
+
+    @pytest.mark.asyncio
+    async def test_signals_empty_reports_none(self, alert_system):
+        alert_system._explicit_db = AsyncMock()
+        alert_system._explicit_db.async_get_latest_signals = AsyncMock(return_value=[])
+        update = self._make_update()
+        await alert_system._signals(update, _make_context())
+        assert "No recent signals" in update.message.reply_text.call_args.args[0]
+
+    @pytest.mark.asyncio
+    async def test_signals_renders_recent_rows(self, alert_system):
+        from datetime import UTC, datetime
+
+        alert_system._explicit_db = AsyncMock()
+        alert_system._explicit_db.async_get_latest_signals = AsyncMock(
+            return_value=[
+                Signal(
+                    symbol="NIFTY",
+                    signal_type=SignalType.BUY,
+                    strength=0.9,
+                    confidence=0.8,
+                    indicators={"rsi": 70.0},
+                    metadata={},
+                    timestamp=datetime.now(UTC),
+                )
+            ]
+        )
+        update = self._make_update()
+        await alert_system._signals(update, _make_context())
+        text = update.message.reply_text.call_args.args[0]
+        assert "RECENT SIGNALS" in text and "BUY" in text
+
+    @pytest.mark.asyncio
+    async def test_help_delegates_to_start(self, alert_system):
+        update = self._make_update()
+        await alert_system._help(update, _make_context())
+        assert "Available commands" in (update.message.reply_text.call_args.args[0])
+
+    # ---------- _handle_message routing ----------
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("text", "handler"),
+        [
+            ("status now", "_status"),
+            ("my positions", "_positions"),
+            ("open orders", "_orders"),
+            ("latest signal", "_signals"),
+            ("kill it", "_kill_switch"),
+            ("resume trading", "_resume"),
+        ],
+    )
+    async def test_handle_message_routes_by_keyword(self, alert_system, text, handler):
+        target = AsyncMock()
+        update = self._make_update(text=text)
+        with patch.object(AlertSystem, handler, target):
+            await alert_system._handle_message(update, _make_context())
+        target.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_handle_message_unknown_replies_fallback(self, alert_system):
+        update = self._make_update(text="hello there")
+        await alert_system._handle_message(update, _make_context())
+        assert "Didn't understand" in update.message.reply_text.call_args.args[0]
+
+    # ---------- formatter and send edge branches ----------
+
+    @pytest.mark.asyncio
+    async def test_send_signal_alert_hold_branch(self, alert_system):
+        from datetime import UTC, datetime
+
+        signal = Signal(
+            symbol="NIFTY",
+            signal_type=SignalType.HOLD,
+            strength=0.4,
+            confidence=0.5,
+            indicators={"rsi": 50.0},
+            metadata={},
+            timestamp=datetime.now(UTC),
+        )
+        with patch("loats.alerts.settings") as m:
+            m.telegram_chat_id = "chat1"
+            assert await alert_system.send_signal_alert(signal) is True
+
+    @pytest.mark.asyncio
+    async def test_send_signal_alert_metadata_string_values(self, alert_system):
+        from datetime import UTC, datetime
+
+        signal = Signal(
+            symbol="NIFTY",
+            signal_type=SignalType.SELL,
+            strength=0.9,
+            confidence=0.8,
+            indicators={},
+            metadata={"strategy": "test"},
+            timestamp=datetime.now(UTC),
+        )
+        with patch("loats.alerts.settings") as m:
+            m.telegram_chat_id = "chat1"
+            assert await alert_system.send_signal_alert(signal) is True
+
+    def test_format_alert_message_unknown_type_defaults_info(self, alert_system):
+        assert "INFO" in alert_system._format_alert_message("m", "other")
+
+    @pytest.mark.asyncio
+    async def test_send_order_alert_unknown_action_defaults_info(self, alert_system):
+        from datetime import UTC, datetime
+
+        from loats.models import (
+            Order,
+            OrderStatus,
+            OrderType,
+            OrderVariety,
+            ProductType,
+            TransactionType,
+        )
+
+        order = Order(
+            order_id="O-9",
+            symbol="NIFTY",
+            order_type=OrderType.LIMIT,
+            transaction_type=TransactionType.BUY,
+            quantity=10,
+            price=100.0,
+            variety=OrderVariety.REGULAR,
+            product_type=ProductType.MIS,
+            status=OrderStatus.OPEN,
+            filled_quantity=0,
+            timestamp=datetime.now(UTC),
+            stop_loss=None,
+            take_profit=None,
+            trailing_stop_loss=None,
+        )
+        with patch("loats.alerts.settings") as m:
+            m.telegram_chat_id = "chat1"
+            assert await alert_system.send_order_alert(order, "mystery") is True
+
+    @pytest.mark.asyncio
+    async def test_send_trade_alert_closed_flat(self, alert_system):
+        from datetime import UTC, datetime
+
+        from loats.models import ProductType, Trade, TransactionType
+
+        trade = Trade(
+            trade_id="T-1",
+            symbol="NIFTY",
+            strategy="momentum",
+            transaction_type=TransactionType.BUY,
+            product_type=ProductType.MIS,
+            quantity=10,
+            entry_price=100.0,
+            status="CLOSED",
+            entry_time=datetime.now(UTC),
+            exit_price=100.0,
+            exit_time=datetime.now(UTC),
+            pnl=0.0,
+            stop_loss=None,
+            take_profit=None,
+            trailing_stop_loss=None,
+        )
+        with patch("loats.alerts.settings") as m:
+            m.telegram_chat_id = "chat1"
+            assert await alert_system.send_trade_alert(trade, "closed") is True
+
+    @pytest.mark.asyncio
+    async def test_send_trade_alert_unknown_action(self, alert_system):
+        from datetime import UTC, datetime
+
+        from loats.models import ProductType, Trade, TransactionType
+
+        trade = Trade(
+            trade_id="T-2",
+            symbol="NIFTY",
+            strategy="momentum",
+            transaction_type=TransactionType.BUY,
+            product_type=ProductType.MIS,
+            quantity=10,
+            entry_price=100.0,
+            status="OPEN",
+            entry_time=datetime.now(UTC),
+            exit_price=None,
+            exit_time=None,
+            pnl=None,
+            stop_loss=None,
+            take_profit=None,
+            trailing_stop_loss=None,
+        )
+        with patch("loats.alerts.settings") as m:
+            m.telegram_chat_id = "chat1"
+            assert await alert_system.send_trade_alert(trade, "adjusted") is True
+
+    @pytest.mark.asyncio
+    async def test_send_funds_alert_missing_data_sends_warning(self, alert_system):
+        """No funds data must alert loudly (warning) and report success."""
+        with patch("loats.alerts.async_client", new_callable=AsyncMock) as mock_client:
+            mock_client.get_funds.return_value = {"data": {}}
+            assert await alert_system.send_funds_alert() is True
+        assert alert_system.bot.send_message.await_count == 1
+        assert (
+            "No funds data available"
+            in (alert_system.bot.send_message.await_args.kwargs["text"])
+        )
