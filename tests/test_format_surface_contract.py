@@ -265,3 +265,26 @@ class TestAdvisoryWaiverSurfaceLockstep:
         assert WAIVED_VULN_ID in ADR_0010.read_text(encoding="utf-8"), (
             "ADR-0010 no longer names the waived advisory id"
         )
+
+    def test_triage_adr_agrees_with_enforced_surfaces(self) -> None:
+        """The ADR's decision text must not contradict the surfaces.
+
+        Drift class pinned here (2026-09-09): ADR-0010 originally
+        decided CI/security.yml stay waiver-free, then ci.yml gained
+        the flag (surface lockstep) and the ADR text was never amended
+        -- docs claimed one contract, gates enforced another, and
+        nothing detected it. If the waiver is enforced on CI surfaces
+        (test_ci_carries_the_same_waiver), the ADR must not claim the
+        opposite; re-triage and re-amend together or not at all.
+        """
+        assert f"--ignore-vuln {WAIVED_VULN_ID}" in _repo_relative(CI_YML), (
+            "precondition drifted: ci.yml no longer carries the waiver;"
+            " this test pins ADR/surface AGREEMENT, re-scope both"
+        )
+        adr_text = ADR_0010.read_text(encoding="utf-8")
+        assert "left WITHOUT the ignore" not in adr_text, (
+            "ADR-0010 decision text claims the CI surfaces are"
+            " waiver-free while ci.yml enforces the waiver; amend the"
+            " ADR to the surface-lockstep decision instead of"
+            " reintroducing the contradiction"
+        )
