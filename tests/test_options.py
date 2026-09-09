@@ -772,3 +772,31 @@ class TestOptionsMathExternalParity:
                 assert ours(flag, *args) == pytest.approx(
                     float(theirs(flag, *args)), abs=1e-12
                 ), f"{ours.__name__}({flag!r}) diverged from live vollib"
+
+    def test_expiry_returns_exact_intrinsic(self) -> None:
+        """Primitive expiry convention: t<=0 prices intrinsic, no error."""
+        assert options_math.black_scholes("c", 100.0, 90.0, 0.0, 0.01, 0.2) == 10.0
+        assert options_math.black_scholes("p", 100.0, 90.0, 0.0, 0.01, 0.2) == 0.0
+        assert options_math.black_scholes("p", 100.0, 110.0, 0.0, 0.01, 0.2) == 10.0
+        assert options_math.black_scholes("c", 100.0, 110.0, 0.0, 0.01, 0.2) == 0.0
+
+    def test_implied_vol_rejects_price_below_lower_bound(self) -> None:
+        with pytest.raises(ValueError, match="arbitrage bounds"):
+            options_math.implied_volatility(-5.0, 100.0, 90.0, 0.5, 0.01, "c")
+
+    def test_implied_vol_rejects_price_at_upper_bound(self) -> None:
+        with pytest.raises(ValueError, match="arbitrage bounds"):
+            options_math.implied_volatility(100.0, 100.0, 90.0, 0.5, 0.01, "c")
+
+    def test_implied_vol_rejects_out_of_bounds_put(self) -> None:
+        with pytest.raises(ValueError, match="arbitrage bounds"):
+            options_math.implied_volatility(200.0, 100.0, 90.0, 0.5, 0.01, "p")
+
+    def test_implied_vol_rejects_expired_contract(self) -> None:
+        with pytest.raises(ValueError, match="time to expiry"):
+            options_math.implied_volatility(12.11, 100.0, 90.0, 0.0, 0.01, "c")
+
+    def test_implied_vol_solves_in_bound_price(self) -> None:
+        price = options_math.black_scholes("c", 100.0, 90.0, 0.5, 0.01, 0.2)
+        iv = options_math.implied_volatility(price, 100.0, 90.0, 0.5, 0.01, "c")
+        assert 0.0 < iv < 5.0
