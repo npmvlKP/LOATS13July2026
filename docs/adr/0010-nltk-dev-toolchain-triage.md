@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted — 2026-09-06
+Accepted — 2026-09-06 (amended 2026-09-09: waiver surface lockstep)
 
 ## Context
 
@@ -40,15 +40,24 @@ artifact loaders) are never exercised by the audit tool's own execution.
 3. Removal triggers (any one lifts the ignore):
    * safety ships a release that drops the nltk dependency;
    * nltk 3.11 (or a patched 3.10.x) is published.
-4. CI/`security.yml` are left WITHOUT the ignore: those jobs install
-   only `pip-audit` (no safety → no nltk → nothing to waive), so adding
-   it there would be dead configuration. The local full environment is
-   the only place the advisory can fire.
+4. CI/`security.yml` also carry the ignore (amendment 2026-09-09,
+   superseding the original waiver-free-CI decision of 2026-09-06):
+   those jobs install no `safety` — hence no nltk — so the flag is a
+   functional no-op there, but it is kept on every audit surface in
+   lockstep (pre-push hook, ci.yml, security.yml, HC-11) so all
+   surfaces enforce one contract. A surface missing the flag fails
+   closed on this advisory while the others stay green — the
+   live-verified defect class pinned by
+   tests/test_format_surface_contract.py::
+   TestAdvisoryWaiverSurfaceLockstep after the pre-push hook died on
+   exactly this mismatch. The no-op flag on safety-free surfaces is
+   accepted, documented dead weight; any future RUNTIME advisory
+   still fails every surface.
 
 ## Consequences
 
 * HC-11 returns to green online without weakening the audit's scope.
-* The waiver is loud, single-site, self-documenting, and carries an
-  explicit removal trigger — it cannot silently become permanent.
+* The waiver is loud, self-documenting on every surface, and carries
+  an explicit removal trigger — it cannot silently become permanent.
 * If a *runtime* dependency ever gains an unpatched advisory, this
   decision does not apply: that remains a hard gate failure by design.
