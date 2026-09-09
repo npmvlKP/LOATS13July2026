@@ -203,11 +203,17 @@ filterwarnings = ["error::RuntimeWarning"]
 
 [tool.coverage.run]
 source = ["src"]
+branch = true
 omit = ["tests/*", "*/__init__.py"]
 
 [tool.coverage.report]
 fail_under = 80
 show_missing = true
+
+# branch = true pins CI parity locally: ci.yml measures with --cov-branch,
+# and the F8-H-04 per-module floor gate
+# (scripts/check_per_module_coverage.py) must grade the same branch-aware
+# artifact a bare local `pytest --cov` produces, not a weaker statement-only one.
 
 # F8-H-04: per-module floors are enforced by scripts/check_per_module_coverage.py
 # reading coverage_floor_map.json. The aggregate 80% floor is retained as a
