@@ -28,7 +28,7 @@ TODO-27b required a drop-or-adopt decision.
 
 Rationale:
 1. **Zero usage** — library not imported anywhere; all indicators are custom.
-2. **Performance** — custom Supertrend uses numba `njit(cache=True, fastmath=True)` 
+2. **Performance** — custom Supertrend uses numba `njit(cache=True, fastmath=True)`
    and is benchmarked within the 80 ms orchestrator window; the library's
    generic wrappers are slower and add pandas overhead.
 3. **Maintenance** — `ta==0.11.0` last release 2023-10, depends on unpinned

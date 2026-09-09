@@ -80,4 +80,3 @@ Trade-off recorded: the settle can cost up to 50 ms inside the exception /
 timeout boundary, but only when producers are actually mid-cleanup — the
 fast path (all producers done) returns immediately. Cycle liveness is
 ranked above cleanup completeness; telemetry covers the gap.
-

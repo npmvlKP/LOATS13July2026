@@ -81,7 +81,15 @@ exclude = [
     "*.env",
     ".ruff_cache",
 ]
-extend-exclude = []
+# Formatter + root-scope sweep surface freeze (ruff 0.16 formats python
+# fences inside Markdown, silently widening every repo-root sweep to
+# docs/ and reports/). docs/audit-history/ and reports/ai-generated/
+# hold point-in-time audit evidence preserved verbatim — see the E501
+# per-file-ignores below: "Historical frozen audit evidence ... must
+# not be mutated". Frozen at the *.md layer ONLY: tracked *.py under
+# those trees remains gated by both the formatter and the root-scope
+# lint job. tests/test_format_surface_contract.py pins this contract.
+extend-exclude = ["docs/audit-history/*.md", "reports/ai-generated/*.md"]
 
 [tool.ruff.lint.mccabe]
 max-complexity = 20

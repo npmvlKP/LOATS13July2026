@@ -428,6 +428,6 @@ For issues and questions:
 
 ---
 
-**Version**: 0.1.0  
-**Last Updated**: 2026-07-21  
+**Version**: 0.1.0
+**Last Updated**: 2026-07-21
 **Author**: npmvlKP

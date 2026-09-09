@@ -30,6 +30,7 @@ validate them against the installed pinned tool's own CLI parser.
 
 from __future__ import annotations
 
+import configparser
 import fnmatch
 import importlib.util
 import json
@@ -38,6 +39,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -810,18 +812,28 @@ class TestWorkflowFlagCurrency:
                         f"installed pip-audit does not offer as a choice: {ln}"
                     )
 
-    def test_security_yml_has_no_deprecated_gitleaks_v2(self) -> None:
+    def test_workflows_have_no_deprecated_gitleaks_v2(self) -> None:
         """gitleaks-action@v2 dies with the Node 20 runner removal.
 
         GitHub removes Node 20 from hosted runners on 2026-09-16; @v2 is
         Node 20 and has no opt-out after that date. @v3 is the Node-24
-        release with unchanged inputs/behavior.
+        release with unchanged behavior (only the CONFIG_PATH input was
+        renamed to GITLEAKS_CONFIG). BOTH workflows must assert this:
+        the original security.yml-only test let the sibling ci.yml pin
+        drift to @v2, surfacing only as a live deprecation annotation
+        on a green run (2026-09-09) — sweep the class, not the first
+        hit.
         """
-        text = self.SECURITY_YML.read_text(encoding="utf-8")
-        assert "gitleaks-action@v2" not in text, (
-            "security.yml pins gitleaks-action@v2 (Node 20) — removed from"
-            " GitHub-hosted runners on 2026-09-16; use @v3"
-        )
+        for yml in (CI_YML, self.SECURITY_YML):
+            text = yml.read_text(encoding="utf-8")
+            assert "gitleaks-action@v2" not in text, (
+                f"{yml.name} pins gitleaks-action@v2 (Node 20) — removed"
+                " from GitHub-hosted runners on 2026-09-16; use @v3"
+            )
+            assert "gitleaks-action@v3" in text, (
+                f"{yml.name} must pin gitleaks-action@v3 (Node 24) so the"
+                " positive pin is asserted, not just the absence of v2"
+            )
 
     def test_workflows_use_node24_native_action_majors(self) -> None:
         """Every pinned action major must run on Node 24.
@@ -1118,11 +1130,33 @@ class TestFlake8HookGateAgreement:
     a broken pre-commit hook. Root cause fixed by mirroring ruff's grants
     into .flake8 per-file-ignores; this net pins the agreement in both
     directions so a future grant divergence (either side) fails here.
+
+    2026-09-09 hardening: the original probe enumerated three hand-picked
+    files while the hook's real file set is EVERY tracked *.py — and the
+    tracked frozen-evidence trees (docs/audit-history/,
+    reports/ai-generated/) carried 56 live findings (26 E402 + 29 E501 in
+    22 files, plus 1 F841 in scripts/) at those three files' clean
+    verdict. The probe now sweeps the full tracked surface in the hook's
+    explicit-filename mode, and the grant agreement is asserted against
+    ruff's LIVE pyproject config (tomllib-derived), not a hard-coded
+    subset. A RED net pins the frozen trees' grants to the exact live
+    emission classes so the amnesty cannot silently widen.
     """
 
     def test_explicit_path_mode_agrees_with_ruff(self) -> None:
-        # The exact false-positive class: HEAD's own tests/scripts files,
-        # in the hook's explicit-filename mode.
+        # The exact false-positive class, at full surface: HEAD's own
+        # tracked *.py files, in the hook's explicit-filename mode. Must
+        # stay enumeration-free so no future tracked file escapes the net
+        # (the 2026-09-09 blind spot was exactly an incomplete hand list).
+        tracked = subprocess.run(
+            ["git", "ls-files", "*.py"],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            timeout=120,
+            check=True,
+        ).stdout.splitlines()
+        assert tracked, "git ls-files returned no tracked python files"
         proc = subprocess.run(
             [
                 sys.executable,
@@ -1130,18 +1164,16 @@ class TestFlake8HookGateAgreement:
                 "flake8",
                 "--config",
                 str(REPO_ROOT / ".flake8"),
-                str(REPO_ROOT / "scripts" / "verify_f8m01_external.py"),
-                str(REPO_ROOT / "scripts" / "verify_f8m02_m07_external.py"),
-                str(REPO_ROOT / "tests" / "test_repo_hygiene.py"),
+                *tracked,
             ],
             cwd=REPO_ROOT,
             capture_output=True,
             text=True,
-            timeout=120,
+            timeout=600,
         )
         assert proc.returncode == 0, (
-            f"flake8 hook-mode false positive on the repo's own files: "
-            f"{proc.stdout[:800]}"
+            f"flake8 hook-mode false positive on the repo's own files "
+            f"({len(tracked)} tracked): {proc.stdout[:800]}"
         )
 
     def test_src_scope_stays_strict(self) -> None:
@@ -1163,30 +1195,300 @@ class TestFlake8HookGateAgreement:
             f"src/ no longer flake8-strict: {proc.stdout[:800]}"
         )
 
+    @staticmethod
+    def _ruff_per_file_ignores() -> dict[str, list[str]]:
+        with open(REPO_ROOT / "pyproject.toml", "rb") as fh:
+            data = tomllib.load(fh)
+        return {
+            pattern: list(codes)
+            for pattern, codes in data["tool"]["ruff"]["lint"][
+                "per-file-ignores"
+            ].items()
+        }
+
     def test_grant_sets_match_ruff(self) -> None:
-        cfg = (REPO_ROOT / ".flake8").read_text(encoding="utf-8")
-        m = re.search(
-            r"per-file-ignores\s*=\s*\n\s*tests/\*:([A-Z0-9,]+)\s*\n\s*scripts/\*:([A-Z0-9,]+)",
-            cfg,
+        # Parity direction that matters: any tracked file the linter of
+        # record (ruff) grants a pycodestyle/pyflakes amnesty must hold
+        # the SAME amnesty under flake8's mirror, or the pre-commit hook
+        # false-fails on a file ruff accepts. Union-per-file semantics:
+        # a file's effective grant is the union of every pattern that
+        # matches it, on both sides — so file-scoped ruff grants
+        # (scripts/verify_*.py = [F841] ...) are satisfied by the wider
+        # scripts/* mirror without demanding per-pattern duplication.
+        # Codes outside flake8's visible classes (EXE001, FA102, PGH003,
+        # RUF..., PL..., and C901 which needs --max-complexity) have no
+        # mirror semantics and are excluded by the [EWF]\d+ filter. The
+        # inverse direction is intentionally looser — flake8 may pass
+        # files ruff rejects (ruff is the linter of record); the
+        # full-surface behavioral probe pins the tree itself.
+        ruff_grants = self._ruff_per_file_ignores()
+        tracked = subprocess.run(
+            ["git", "ls-files", "*.py"],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            timeout=120,
+            check=True,
+        ).stdout.splitlines()
+        assert tracked, "git ls-files returned no tracked python files"
+        parser = configparser.ConfigParser()
+        parser.read(REPO_ROOT / ".flake8", encoding="utf-8")
+        assert parser.has_section("flake8"), ".flake8 lost its [flake8] section"
+        mirror: list[tuple[str, set[str]]] = []
+        for entry in parser["flake8"].get("per-file-ignores", "").splitlines():
+            entry = entry.strip()
+            if not entry or entry.startswith("#") or ":" not in entry:
+                continue
+            pattern, _, codes = entry.partition(":")
+            mirror.append(
+                (pattern.strip(), {c.strip() for c in codes.split(",") if c.strip()})
+            )
+        assert mirror, ".flake8 per-file-ignores block missing or reshaped"
+        checked = 0
+        for pattern, codes in ruff_grants.items():
+            must = {c for c in codes if re.fullmatch(r"[EWF]\d+", c)}
+            if not must:
+                continue
+            for path in (f for f in tracked if fnmatch.fnmatch(f, pattern)):
+                amnesty: set[str] = set()
+                for mp, mcodes in mirror:
+                    if fnmatch.fnmatch(path, mp):
+                        amnesty |= mcodes
+                assert must <= amnesty, (
+                    f"{path}: flake8 mirror amnesty {sorted(amnesty)} lacks "
+                    f"ruff grant {sorted(must - amnesty)} (pattern {pattern})"
+                )
+                checked += 1
+        assert checked > 0, (
+            "parity net matched no tracked files — ruff per-file-ignores "
+            "patterns and the tracked tree have diverged"
         )
-        assert m, ".flake8 per-file-ignores block missing or reshaped"
-        assert {c.strip() for c in m.group(1).split(",")} == {"E501"}, (
-            "tests/ grant diverged from ruff (ruff tests/* carries E501)"
+
+    def test_frozen_tree_grants_bounded_to_live_emissions(self, tmp_path) -> None:
+        # RED net for the 2026-09-09 fix: the frozen trees' amnesty must
+        # stay exactly as wide as the codes the files actually emit. The
+        # faithful probe is the repo's OWN base config (global ignore
+        # list, max-line-length) with per-file-ignores stripped — that
+        # yields precisely the codes the grants must cover. (--isolated
+        # is wrong here: it reverts to the 79-col default and flake8's
+        # stock ignore list, so globally-ignored W503 leaked into the
+        # class set and false-failed the net on a config that no longer
+        # exists.)
+        parser = configparser.ConfigParser()
+        parser.read(REPO_ROOT / ".flake8", encoding="utf-8")
+        assert parser.has_section("flake8"), ".flake8 lost its [flake8] section"
+        parser.remove_option("flake8", "per-file-ignores")
+        stripped = tmp_path / "flake8-no-per-file-ignores.cfg"
+        with open(stripped, "w", encoding="utf-8") as fh:
+            parser.write(fh)
+        emission_classes: dict[str, set[str]] = {}
+        for tree in ("docs/audit-history", "reports/ai-generated"):
+            tracked = subprocess.run(
+                ["git", "ls-files", f"{tree}/*.py"],
+                cwd=REPO_ROOT,
+                capture_output=True,
+                text=True,
+                timeout=120,
+                check=True,
+            ).stdout.splitlines()
+            if not tracked:
+                continue
+            proc = subprocess.run(
+                [sys.executable, "-m", "flake8", "--config", str(stripped), *tracked],
+                cwd=REPO_ROOT,
+                capture_output=True,
+                text=True,
+                timeout=600,
+            )
+            for line in proc.stdout.splitlines():
+                parts = line.split(":", 3)
+                if len(parts) == 4:
+                    emission_classes.setdefault(tree, set()).add(
+                        parts[3].strip().split(" ", 1)[0]
+                    )
+        assert emission_classes == {
+            "docs/audit-history": {"E402", "E501"},
+            "reports/ai-generated": {"E501"},
+        }, (
+            "frozen-evidence trees emit a lint class outside their bounded "
+            f"grants: {emission_classes} — extend .flake8 consciously if new "
+            "grants are justified, never silently"
         )
-        assert {c.strip() for c in m.group(2).split(",")} == {"E402", "E501"}, (
-            "scripts/ grant diverged from ruff (ruff scripts/* carries E402, E501)"
+        # The conftest-specific grant stays part of the mirror contract:
+        # ruff's "tests/conftest.py" = ["E402"] plus F811/F841 for the
+        # dummy-variable reset fixture (see the .flake8 block comment).
+        parser = configparser.ConfigParser()
+        parser.read(REPO_ROOT / ".flake8", encoding="utf-8")
+        conftest_grant: set[str] = set()
+        for entry in parser["flake8"]["per-file-ignores"].splitlines():
+            entry = entry.strip()
+            if entry.startswith("tests/conftest.py:"):
+                conftest_grant = {c.strip() for c in entry.partition(":")[2].split(",")}
+        assert conftest_grant == {"E402", "F811", "F841"}, (
+            f"conftest grant diverged from the ruff-mirror contract: {conftest_grant}"
         )
-        # F8-H-01 (2026-09-07): the conftest-specific grant mirrors ruff's
-        # "tests/conftest.py" = ["E402"] (env-first isolation layout) plus
-        # F811/F841 for the dummy-variable reset fixture ruff's
-        # dummy-variable-rgx already ignores.
-        mc = re.search(r"tests/conftest\.py:([A-Z0-9,]+)", cfg)
-        assert mc, ".flake8 conftest per-file grant missing"
-        assert {c.strip() for c in mc.group(1).split(",")} == {
-            "E402",
-            "F811",
-            "F841",
-        }, "conftest grant diverged from the ruff-mirror contract"
+
+
+class TestFixerHooksSpareFrozenEvidence:
+    """Fixer hooks must never rewrite the frozen audit-evidence trees.
+
+    Defect class (2026-09-09): `pre_commit run --all-files` passes every
+    tracked filename explicitly and trailing-whitespace /
+    end-of-file-fixer / ruff-format rewrite files they are handed — their
+    own exclude configs do not apply to explicit paths (same bypass as
+    the flake8 hook). One sweep rewrote 118 tracked files including 83
+    missing-EOF-newline and 19 trailing-whitespace members of
+    docs/audit-history/ and reports/ai-generated/ — point-in-time
+    evidence that must never be mutated. Root cause: hook-level
+    `exclude:` (pre-commit's filename filter, which DOES apply in
+    explicit-filename mode) on every content-mutating hook. These nets
+    pin the mechanism end-to-end against the real pre-commit runner:
+    with the shipped config the frozen trees stay byte-stable; with an
+    excludes-stripped mutant they get rewritten (proving the exclude is
+    the operative protection, not hook passivity).
+    """
+
+    FROZEN_TREES = ("docs/audit-history/", "reports/ai-generated/")
+    MUTATOR_HOOKS = ("trailing-whitespace", "end-of-file-fixer")
+
+    @staticmethod
+    def _dirty_paths() -> set[str]:
+        out = subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            timeout=120,
+            check=True,
+        ).stdout
+        return {line[3:] for line in out.splitlines() if line.startswith(" M ")}
+
+    def _run_hook(self, hook: str, config: Path) -> None:
+        subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "pre_commit",
+                "run",
+                "--config",
+                str(config),
+                hook,
+                "--all-files",
+            ],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            timeout=600,
+        )
+
+    @staticmethod
+    def _strip_mutator_excludes(config_text: str) -> str:
+        lines = config_text.splitlines()
+        kept: list[str] = []
+        skip_indent = ""
+        for line in lines:
+            stripped = line.strip()
+            if stripped.startswith("exclude: ^docs/audit-history/") or (
+                skip_indent and line.startswith(skip_indent) and "exclude:" in stripped
+            ):
+                skip_indent = line[: len(line) - len(line.lstrip())]
+                continue
+            skip_indent = ""
+            kept.append(line)
+        return "\n".join(kept) + "\n"
+
+    def _sweep_legs(self, config: Path, expect_frozen_rewrites: bool) -> None:
+        before = self._dirty_paths()
+        frozen_rewritten: list[str] = []
+        try:
+            for hook in self.MUTATOR_HOOKS:
+                self._run_hook(hook, config)
+                frozen_rewritten.extend(
+                    p
+                    for p in self._dirty_paths() - before
+                    if p.startswith(self.FROZEN_TREES)
+                )
+        finally:
+            # Self-repairing net: restore anything the sweep mutated so a
+            # RED result cannot leave the working tree damaged.
+            collateral = self._dirty_paths() - before
+            if collateral:
+                subprocess.run(
+                    ["git", "checkout", "--", *sorted(collateral)],
+                    cwd=REPO_ROOT,
+                    capture_output=True,
+                    text=True,
+                    timeout=300,
+                )
+        if expect_frozen_rewrites:
+            assert frozen_rewritten, (
+                f"{config.name}: expected the excludes-stripped mutant to let "
+                "the fixer hooks rewrite frozen-evidence files, but nothing "
+                "was rewritten — the net no longer proves the exclude works"
+            )
+        else:
+            assert not frozen_rewritten, (
+                f"fixer hooks rewrote frozen-evidence files: {frozen_rewritten[:5]} "
+                "— hook-level exclude on the mutator hooks is missing or narrowed"
+            )
+
+    def test_shipped_config_spares_frozen_evidence(self) -> None:
+        self._sweep_legs(REPO_ROOT / ".pre-commit-config.yaml", False)
+
+    def test_excludes_stripped_mutant_proves_the_mechanism(self) -> None:
+        # The mutant config MUST live on the repo's own drive: pre-commit
+        # computes a relative path between --config and the repo root and
+        # dies with "path is on mount 'C:', start on mount 'G:'" otherwise
+        # (observed rc=3, zero hooks run). .git/ is inside the repo,
+        # invisible to git status, and never staged.
+        mutant = REPO_ROOT / ".git" / "pre-commit-no-excludes.yaml"
+        mutant.write_text(
+            self._strip_mutator_excludes(
+                (REPO_ROOT / ".pre-commit-config.yaml").read_text(encoding="utf-8")
+            ),
+            encoding="utf-8",
+        )
+        try:
+            self._sweep_legs(mutant, True)
+        finally:
+            mutant.unlink(missing_ok=True)
+
+    def test_mutator_excludes_present_and_scoped(self) -> None:
+        import yaml
+
+        cfg = yaml.safe_load(
+            (REPO_ROOT / ".pre-commit-config.yaml").read_text(encoding="utf-8")
+        )
+        mutators = {
+            "trailing-whitespace",
+            "end-of-file-fixer",
+            "ruff",
+            "ruff-format",
+        }
+        found: set[str] = set()
+        for repo in cfg["repos"]:
+            for hook in repo.get("hooks", []):
+                if hook["id"] not in mutators:
+                    continue
+                found.add(hook["id"])
+                exclude = hook.get("exclude")
+                assert exclude, (
+                    f"fixer hook {hook['id']} lost its frozen-evidence exclude"
+                )
+                rx = re.compile(exclude)
+                for tree in self.FROZEN_TREES:
+                    assert rx.search(f"{tree}x.py"), (
+                        f"{hook['id']} exclude no longer matches {tree}"
+                    )
+                assert not rx.search("src/loats/orchestrator.py"), (
+                    f"{hook['id']} exclude amnesties production source"
+                )
+                assert not rx.search("tests/test_repo_hygiene.py"), (
+                    f"{hook['id']} exclude amnesties the test tree"
+                )
+        assert found == mutators, (
+            f"mutator hooks missing from config: {mutators - found}"
+        )
 
 
 class TestShebangExecBit:

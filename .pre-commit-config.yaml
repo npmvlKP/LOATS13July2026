@@ -3,7 +3,16 @@ repos:
     rev: v4.6.0
     hooks:
       - id: trailing-whitespace
+        # Frozen audit evidence (docs/audit-history/, reports/ai-generated/)
+        # must never be rewritten by fixer hooks: --all-files passes every
+        # tracked filename explicitly and the underlying tools ignore their
+        # own exclude configs for explicit paths (the same bypass that hit
+        # the flake8 hook). pre-commit's hook-level exclude DOES apply in
+        # that mode — it is the correct filtering layer. Pinned by
+        # TestFixerHooksSpareFrozenEvidence in tests/test_repo_hygiene.py.
+        exclude: ^docs/audit-history/|^reports/ai-generated/
       - id: end-of-file-fixer
+        exclude: ^docs/audit-history/|^reports/ai-generated/
       - id: check-yaml
       - id: check-toml
       - id: check-added-large-files
@@ -16,7 +25,9 @@ repos:
     hooks:
       - id: ruff
         args: [--fix, --exit-non-zero-on-fix]
+        exclude: ^docs/audit-history/|^reports/ai-generated/
       - id: ruff-format
+        exclude: ^docs/audit-history/|^reports/ai-generated/
 
   # ADR-0013: Windows cannot record exec bits, so a shebang'd script
   # staged from Windows lands at 100644 and fails the Linux CI EXE001
@@ -90,7 +101,10 @@ repos:
 
       - id: pip-audit
         name: pip-audit
-        entry: pip-audit
+        # ADR-0010: the nltk advisory fires from the audit toolchain's own
+        # dev-tree transitive; CI carries the identical --ignore-vuln. The
+        # hook surface must match or every pre-push fails closed here.
+        entry: pip-audit --ignore-vuln PYSEC-2026-3740
         language: system
         pass_filenames: false
         stages: [pre-push]
