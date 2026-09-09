@@ -90,7 +90,10 @@ repos:
 
       - id: pip-audit
         name: pip-audit
-        entry: pip-audit
+        # ADR-0010: the nltk advisory fires from the audit toolchain's own
+        # dev-tree transitive; CI carries the identical --ignore-vuln. The
+        # hook surface must match or every pre-push fails closed here.
+        entry: pip-audit --ignore-vuln PYSEC-2026-3740
         language: system
         pass_filenames: false
         stages: [pre-push]
