@@ -135,6 +135,54 @@ which nothing ever routed would still grade PASS.
    bare ``main()``, discarding its return value — a failed live run exited
    0 to Task Scheduler. The entry point now ``sys.exit(main())``.
 
+## Amendment 3 (2026-09-10, wire-contract route repair; /analyze intake open)
+
+Live forensics during the supervised run (124455) proved the client was
+calling REST routes this deployment does not serve. Verified live
+against 127.0.0.1:5000 (gateway commit d36936a6): the deployment's
+/api/v1 routes are underscore-free one-word names (/positionbook,
+/tradebook, /orderbook, /orderstatus, /placeorder, /placesmartorder,
+/modifyorder, /cancelorder); the client's snake_case spellings returned
+HTTP 404 on every call. The supervised run logged 10,332 position_book
+404s; each market-data step's failure flapped the openalgo circuit
+breaker open (52,804 trading-cycle errors logged), which cascaded into
+every source breaker and starved the CMP funnel: zero decisions and
+zero routing outcomes during 10Sep market hours despite 10,026 stored
+signals.
+
+1. **Route names aligned.** All 16 call sites (8 endpoints x sync +
+   async) renamed to the deployment's routes. This completes the 555e39e
+   alignment (which fixed quotes/history/optionchain but missed this
+   class).
+
+2. **Position-book vocabulary normalized.** The deployment's position
+   rows carry ``ltp`` while the orchestrator reads ``last_price``; the
+   client now aliases it per row (same pattern as funds/quotes).
+
+3. **OPEN QUESTION (deliberately unresolved): the Analyzer intake
+   semantic.** The gateway has NO decision-intake endpoint: POST
+   /api/v1/analyze 404s on this deployment, and /api/v1/analyzer is a
+   MODE STATUS endpoint (AnalyzerSchema takes only apikey; the service
+   returns mode/logs-count). Analyzer Mode is an order-interception
+   mode: when analyze-mode is on, order placement (/placeorder) is
+   routed to the sandbox instead of the broker. Consequently the 380
+   historical ROUTE "success" outcomes are provably not gateway
+   responses: ``{"status": "accepted"}`` is emitted by nothing in the
+   gateway tree, and 186+ carry the test-fixture marker
+   ``analyzer_id: "abc-123"`` (ADR-006 Amendment 2 finding 3). With
+   place_analyzer_request still posting to /analyze, a real routed
+   decision resolves as an ``error`` outcome (HTTP 404) -- honestly
+   counted, but not yet a conformant Analyzer intake. **The semantic
+   mapping (real orders via /placeorder under analyze-mode vs a
+   read-only status telemetry) is deferred to a later session and must
+   be recorded here before the P5 gate can close.** Until then, the P5
+   PASS criterion's "measured decisional activity" counts any resolved
+   outcome (incl. the honest /analyze 404 errors), per Amendment 2 §3.
+
+4. **Run restart ordered.** Per Amendment 2, the zero-decisional run
+   124455 is structurally INCOMPLETE and was ended/restarted by the
+   operator after this amendment's fixes were verified live.
+
 Run logs written by the upgraded supervisor are the P5 phase-gate
 evidence; dry-run smoke logs now grade INCOMPLETE/FAIL on span and (for
 upgraded writers) would fail the activity requirement rather than

@@ -175,8 +175,12 @@ History (most recent last):
        P5 run, breaker flap, CMP funnel starvation) and the
        position-book ltp -> last_price vocabulary alias; ADR-006
        Amendment 3. Ceiling 402 = this tree.)
+  403  Analyzer wire-contract wave record (2026-09-10): +1
+       (docs/audit-history/10Sep2026-analyzer-wire-contract-route-
+       repair.md - the forensic + verification record for the route
+       repair above. Ceiling 403 = this tree.)
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 402
+TRACKED_FILE_CEILING = 403
