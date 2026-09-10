@@ -167,8 +167,16 @@ History (most recent last):
        default_install_hook_types covering the pre-push shim;
        docs/audit-history/10Sep2026-gitleaks-prepush-net.md - wave
        record. Ceiling 401 = this tree.)
+  402  Analyzer wire-contract route repair (2026-09-10): +1
+       (tests/test_openalgo_wire_contract_routes.py - pins every
+       client endpoint to the deployment's underscore-free REST route
+       (live-verified 10Sep2026: the snake_case spellings 404'd on
+       every call, 10,332 position_book 404s during the supervised
+       P5 run, breaker flap, CMP funnel starvation) and the
+       position-book ltp -> last_price vocabulary alias; ADR-006
+       Amendment 3. Ceiling 402 = this tree.)
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 401
+TRACKED_FILE_CEILING = 402
