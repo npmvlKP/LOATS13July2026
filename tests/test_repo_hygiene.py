@@ -2073,7 +2073,18 @@ class TestGitleaksPrepushNet:
         with_local = self._clone_with_local_commit(tmp_path)
         runner2 = self._clone_runner(with_local)
         introduced = runner2.introduced_commits(with_local)
-        assert len(introduced) == 1, "exactly the probe commit is introduced"
+        probe = subprocess.run(
+            ["git", "rev-parse", "probe-net"],
+            cwd=with_local,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        assert probe in introduced, "the probe commit must be scanned"
+        # No exact-count pin: a source with grafted (shallow) history --
+        # the actions/checkout default -- legitimately yields a
+        # superset (the source HEAD itself counts as unproven).
+        # Superset = more scanned = the fail-closed-safe direction.
 
     def test_injected_config_is_pure_default_rules(self, runner):
         parsed = tomllib.loads(runner.DEFAULT_RULES_TOML)
