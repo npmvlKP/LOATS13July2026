@@ -225,6 +225,15 @@ jobs:
   # ============================================================
   # Summary Report
   # ============================================================
+  # The summary gate derives its required-leg set from the scan_type
+  # selector: a leg that concluded "skipped" was deliberately not
+  # selected, so it never gates the summary. Pinned defect (run
+  # 34438112203): the gate demanded literal success from all three
+  # scan legs even when the selector skipped them, so every selector
+  # dispatch reported a false summary failure. Any leg that RAN and
+  # did not succeed still fails the summary, and a run where zero legs
+  # executed is a configuration error, not a pass. Pinned by
+  # TestSecuritySummaryGateSelectorParity in tests/test_repo_hygiene.py.
   summary:
     name: Security Scan Summary
     runs-on: ubuntu-latest
@@ -233,22 +242,46 @@ jobs:
 
     steps:
       - name: Generate Summary
+        # Results arrive as job env (not inline ${{ }} expansion): the
+        # committed script is then executable verbatim in tests, and
+        # unquoted expression interpolation cannot reach the shell.
+        env:
+          SECRETS_RESULT: ${{ needs.secrets-scan.result }}
+          DEPENDENCY_RESULT: ${{ needs.dependency-scan.result }}
+          CODE_RESULT: ${{ needs.code-security.result }}
+          SBOM_RESULT: ${{ needs.sbom.result }}
         run: |
-          echo "## Security Scan Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Scan Type | Status |" >> $GITHUB_STEP_SUMMARY
-          echo "|-----------|--------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Secret Scanning | ${{ needs.secrets-scan.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Dependency Vulnerabilities | ${{ needs.dependency-scan.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Code Security | ${{ needs.code-security.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| SBOM Generation | ${{ needs.sbom.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Security Scan Summary" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Scan Type | Status |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|-----------|--------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Secret Scanning | $SECRETS_RESULT |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Dependency Vulnerabilities | $DEPENDENCY_RESULT |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Code Security | $CODE_RESULT |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| SBOM Generation | $SBOM_RESULT |" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
 
-          if [[ "${{ needs.secrets-scan.result }}" == "success" ]] && \
-             [[ "${{ needs.dependency-scan.result }}" == "success" ]] && \
-             [[ "${{ needs.code-security.result }}" == "success" ]]; then
-            echo "✅ All security scans passed" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "❌ Some security scans failed - please review" >> $GITHUB_STEP_SUMMARY
+          # bash -e safe: explicit if blocks only -- a false condition
+          # in a short-circuit `[[ ]] &&` list would abort the step.
+          RAN=0
+          FAILED=0
+          for r in "$SECRETS_RESULT" "$DEPENDENCY_RESULT" "$CODE_RESULT" "$SBOM_RESULT"; do
+            if [[ "$r" == "success" ]]; then
+              RAN=$((RAN + 1))
+            elif [[ "$r" == "skipped" ]]; then
+              :  # not selected by the scan_type selector - never gates
+            else
+              RAN=$((RAN + 1))
+              FAILED=1
+            fi
+          done
+
+          if [[ "$FAILED" == "1" ]]; then
+            echo "❌ Some selected security scans failed - please review" >> "$GITHUB_STEP_SUMMARY"
             exit 1
           fi
+          if [[ "$RAN" == "0" ]]; then
+            echo "❌ No security scan leg ran - selector configuration error" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          echo "✅ All selected security scans passed" >> "$GITHUB_STEP_SUMMARY"
