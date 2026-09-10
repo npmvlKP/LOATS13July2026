@@ -40,6 +40,7 @@ import shutil
 import subprocess
 import sys
 import tomllib
+import uuid
 from pathlib import Path
 
 import pytest
@@ -1890,3 +1891,229 @@ class TestF8H02ExternalVerifier:
             "was stripped -- it does not verify the behavior"
         )
         assert "[FAIL] 3. boundary gate fires at modify_order" in proc.stdout
+
+
+class TestGitleaksPrepushNet:
+    """ADR-0014 (F8-C-02 NEXT item): the defense-in-depth pre-push net.
+
+    Outcome-scoped: the runner must scan the push's introduced commits
+    under pure default gitleaks rules (no repo allowlist), fail closed
+    on a missing binary or a finding, and stay silent-compatible with
+    pre-commit (which consumes pre-push stdin itself -- verified in the
+    installed pre-commit 4.6.2 hook_impl.py). Live gitleaks is not
+    required: every scan runs through a fake binary whose verdict the
+    test controls.
+    """
+
+    RUNNER_PATH = REPO_ROOT / "scripts" / "gitleaks_prepush.py"
+
+    @staticmethod
+    def _load_runner():
+        spec = importlib.util.spec_from_file_location(
+            "gitleaks_prepush", str(TestGitleaksPrepushNet.RUNNER_PATH)
+        )
+        assert spec is not None and spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    @pytest.fixture()
+    def runner(self):
+        return self._load_runner()
+
+    @staticmethod
+    def _make_clone(base: Path) -> Path:
+        clone = base / f"clone-{uuid.uuid4().hex[:8]}"
+        subprocess.run(
+            ["git", "clone", "--quiet", "--no-hardlinks", str(REPO_ROOT), str(clone)],
+            check=True,
+            capture_output=True,
+        )
+        # The clone is of committed HEAD; the wave's runner rides along
+        # so the clone models this wave's committed tree.
+        scripts = clone / "scripts"
+        scripts.mkdir(exist_ok=True)
+        shutil.copy2(
+            TestGitleaksPrepushNet.RUNNER_PATH, scripts / "gitleaks_prepush.py"
+        )
+        return clone
+
+    def _write_fake_gitleaks(self, tmp_path: Path, *, fire_on: str) -> str:
+        """Platform-executable stand-in for the gitleaks binary.
+
+        Returns the path to set as GITLEAKS_BINARY. The shim fires
+        (rc 1) when its --log-opts argument contains ``fire_on``, else
+        exits 0; rc 126 when fire_on == \"__rc126__\".
+        """
+        py = tmp_path / "fake_gitleaks_impl.py"
+        py.write_text(
+            "import sys\n"
+            "opts = ' '.join(sys.argv[1:])\n"
+            f"if {fire_on!r} in opts:\n"
+            "    print('[fake-gitleaks] leak found')\n"
+            "    sys.exit(1)\n"
+            f"if {fire_on!r} == '__rc126__':\n"
+            "    sys.exit(126)\n"
+            "sys.exit(0)\n",
+            encoding="utf-8",
+        )
+        exe = sys.executable
+        if IS_WINDOWS:
+            shim = tmp_path / "fake-gitleaks.bat"
+            shim.write_text(f'@echo off\n"{exe}" "{py}" %*\n', encoding="utf-8")
+        else:
+            shim = tmp_path / "fake-gitleaks"
+            shim.write_text(f'#!/bin/sh\nexec "{exe}" "{py}" "$@"\n', encoding="utf-8")
+            shim.chmod(0o755)
+        return str(shim)
+
+    def _clone_with_local_commit(self, tmp_path: Path) -> Path:
+        """Hermetic clone holding exactly one commit no remote has.
+
+        The probe is committed on an explicitly created branch: a clone
+        taken from a source with a detached HEAD (the CI Actions
+        checkout) would otherwise leave the probe unreachable from any
+        branch and invisible to --branches (live-verified on the PR
+        runner: 3 tests failed with 0 introduced commits).
+        """
+        clone = self._make_clone(tmp_path)
+        env = {
+            **{
+                k: v
+                for k, v in os.environ.items()
+                if k.startswith(("GIT_", "SYSTEMROOT", "PATH", "HOME"))
+            },
+            "GIT_AUTHOR_NAME": "t",
+            "GIT_AUTHOR_EMAIL": "t@t",
+            "GIT_COMMITTER_NAME": "t",
+            "GIT_COMMITTER_EMAIL": "t@t",
+        }
+        subprocess.run(
+            ["git", "checkout", "-q", "-B", "probe-net"],
+            cwd=clone,
+            check=True,
+            capture_output=True,
+            env=env,
+        )
+        subprocess.run(
+            ["git", "commit", "--allow-empty", "--quiet", "-m", "probe"],
+            cwd=clone,
+            check=True,
+            capture_output=True,
+            env=env,
+        )
+        return clone
+
+    def _clone_runner(self, clone: Path):
+        """Load the CLONE's copy so REPO_ROOT is the clone (true
+        end-to-end: the scan target is the clone, not this repo)."""
+        spec = importlib.util.spec_from_file_location(
+            "gitleaks_prepush_clone", str(clone / "scripts" / "gitleaks_prepush.py")
+        )
+        assert spec is not None and spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    def test_fail_closed_when_binary_missing(self, tmp_path, monkeypatch):
+        clone = self._clone_with_local_commit(tmp_path)
+        runner = self._clone_runner(clone)
+        monkeypatch.setenv("PATH", str(tmp_path))
+        monkeypatch.delenv("GITLEAKS_BINARY", raising=False)
+        rc = runner.main()
+        assert rc == 1, "a push introducing commits must fail closed without gitleaks"
+
+    def test_noop_push_passes_with_clean_verdict(self, tmp_path, monkeypatch):
+        clone = self._make_clone(tmp_path)  # zero introduced commits
+        runner = self._clone_runner(clone)
+        binary = self._write_fake_gitleaks(tmp_path, fire_on="__never__")
+        monkeypatch.setenv("GITLEAKS_BINARY", binary)
+        assert runner.main() == 0, "nothing to scan: pass (binary present, unused)"
+
+    def test_missing_binary_fails_even_with_zero_commits(self, tmp_path, monkeypatch):
+        """Absolute fail-closed ordering: the binary gate precedes the
+        empty-range shortcut. A contributor without gitleaks must fix
+        the install, not ride on an empty rev-list -- otherwise a stale
+        remote-tracking state could void the net entirely."""
+        clone = self._make_clone(tmp_path)
+        runner = self._clone_runner(clone)
+        monkeypatch.setenv("PATH", str(tmp_path))
+        monkeypatch.delenv("GITLEAKS_BINARY", raising=False)
+        assert runner.main() == 1
+
+    def test_finding_over_introduced_commit_fails_push(self, tmp_path, monkeypatch):
+        clone = self._clone_with_local_commit(tmp_path)
+        runner = self._clone_runner(clone)
+        # The runner passes commit SHAs (not paths) via --log-opts, so
+        # "--log-opts" in argv is exactly "a scan over commits ran".
+        binary = self._write_fake_gitleaks(tmp_path, fire_on="--log-opts")
+        monkeypatch.setenv("GITLEAKS_BINARY", binary)
+        assert runner.main() == 1, "a leak finding must fail the push"
+
+    def test_clean_verdict_passes(self, tmp_path, monkeypatch):
+        clone = self._clone_with_local_commit(tmp_path)
+        runner = self._clone_runner(clone)
+        binary = self._write_fake_gitleaks(tmp_path, fire_on="__never__")
+        monkeypatch.setenv("GITLEAKS_BINARY", binary)
+        assert runner.main() == 0
+
+    def test_rc126_surface_change_is_actionable_failure(self, tmp_path, monkeypatch):
+        clone = self._clone_with_local_commit(tmp_path)
+        runner = self._clone_runner(clone)
+        binary = self._write_fake_gitleaks(tmp_path, fire_on="__rc126__")
+        monkeypatch.setenv("GITLEAKS_BINARY", binary)
+        assert runner.main() == 1
+
+    def test_scan_targets_only_local_only_commits(self, tmp_path):
+        clone = self._make_clone(tmp_path)
+        runner = self._clone_runner(clone)
+        assert runner.introduced_commits(clone) == [], (
+            "a fresh clone holds no unpushed commits"
+        )
+        with_local = self._clone_with_local_commit(tmp_path)
+        runner2 = self._clone_runner(with_local)
+        introduced = runner2.introduced_commits(with_local)
+        probe = subprocess.run(
+            ["git", "rev-parse", "probe-net"],
+            cwd=with_local,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        assert probe in introduced, "the probe commit must be scanned"
+        # No exact-count pin: a source with grafted (shallow) history --
+        # the actions/checkout default -- legitimately yields a
+        # superset (the source HEAD itself counts as unproven).
+        # Superset = more scanned = the fail-closed-safe direction.
+
+    def test_injected_config_is_pure_default_rules(self, runner):
+        parsed = tomllib.loads(runner.DEFAULT_RULES_TOML)
+        assert parsed == {"extend": {"useDefault": True}}, (
+            "injected config must be default rules and NOTHING else -- "
+            "no allowlist table, no paths, no .env exceptions"
+        )
+
+    def test_hook_wiring_pins_prepush_stage(self):
+        text = _repo_relative(PRECOMMIT_YML)
+        assert "default_install_hook_types:" in text
+        assert "[pre-commit, commit-msg, pre-push]" in text
+        assert "id: gitleaks-prepush" in text
+        entry = text.index("id: gitleaks-prepush")
+        block = text[entry : text.index("- id: deps-sync", entry)]
+        assert "stages: [pre-push]" in block
+        assert "language: system" in block
+        assert "pass_filenames: false" in block
+
+    def test_hook_range_semantics_cover_any_pushed_ref(self):
+        """The net's range must not depend on the pushed ref name (the
+        08Sep staged-snapshot class: a branch with an unusual name must
+        still be scanned). --branches --not --remotes covers every
+        local branch; the fake-binary runs above prove end-to-end
+        wiring; this pins the exact expressions the script builds."""
+        source = self.RUNNER_PATH.read_text(encoding="utf-8")
+        assert '"--branches", "--not", "--remotes"' in source
+        # The gitleaks --log-opts argument must carry the same
+        # exclusion, or gitleaks walks full ancestry and re-flags the
+        # dispositioned report-artifact history on every push
+        # (live-verified false-positive class).
+        assert "--log-opts={' '.join(commits)} --not --remotes" in source

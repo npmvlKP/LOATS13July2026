@@ -159,8 +159,16 @@ History (most recent last):
        frozen via pyproject extend-exclude at the *.md layer only,
        docs/var_engine.md formatted canonical, pre-push pip-audit
        hook mirrors the ADR-0010 waiver. Ceiling 399 = this tree.)
+  401  Defense-in-depth gitleaks pre-push net wave (2026-09-10): +2
+       (scripts/gitleaks_prepush.py - the F8-C-02 NEXT item landed:
+       default-rules gitleaks scan of the push's introduced commits,
+       fail-closed on leak/missing binary, wired as the
+       gitleaks-prepush local hook in .pre-commit-config.yaml with
+       default_install_hook_types covering the pre-push shim;
+       docs/audit-history/10Sep2026-gitleaks-prepush-net.md - wave
+       record. Ceiling 401 = this tree.)
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 399
+TRACKED_FILE_CEILING = 401

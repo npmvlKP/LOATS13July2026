@@ -1,3 +1,9 @@
+# ADR-0014 (defense-in-depth gitleaks pre-push net): the hook inventory
+# below includes a pre-push-stage net, so installs must create the
+# pre-push shim too (a bare `pre-commit install` otherwise creates only
+# pre-commit + commit-msg, which is exactly the silent pre-push death
+# found on the dev host: .git/hooks had no pre-push hook at all).
+default_install_hook_types: [pre-commit, commit-msg, pre-push]
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.6.0
@@ -105,6 +111,23 @@ repos:
         # dev-tree transitive; CI carries the identical --ignore-vuln. The
         # hook surface must match or every pre-push fails closed here.
         entry: pip-audit --ignore-vuln PYSEC-2026-3740
+        language: system
+        pass_filenames: false
+        stages: [pre-push]
+
+      # ADR-0014: defense-in-depth secret net. The repo config
+      # (.gitleaks.toml) allowlists .env.test ON PURPOSE, so the CI job
+      # that loads it can never re-flag the 14Jul/26Aug .env.test blob
+      # class; this hook scans the push's introduced commits under PURE
+      # default rules (no allowlist) and fails the push closed on a
+      # leak or a missing gitleaks binary. pre-commit consumes the
+      # pre-push stdin itself (hook_impl._run_ns), so the script never
+      # reads stdin: it scans `git rev-list --branches --not --remotes`
+      # directly (pre-commit's own fallback uses the same --not
+      # --remotes range semantics).
+      - id: gitleaks-prepush
+        name: gitleaks default-rules pre-push secret net
+        entry: python scripts/gitleaks_prepush.py
         language: system
         pass_filenames: false
         stages: [pre-push]
