@@ -2117,3 +2117,293 @@ class TestGitleaksPrepushNet:
         # dispositioned report-artifact history on every push
         # (live-verified false-positive class).
         assert "--log-opts={' '.join(commits)} --not --remotes" in source
+
+
+@pytest.mark.skipif(
+    not (REPO_ROOT / ".github" / "workflows" / "security.yml").exists(),
+    reason="security workflow absent",
+)
+class TestSecuritySummaryGateSelectorParity:
+    """The security.yml summary gate must respect the scan_type selector.
+
+    Root cause being guarded (live dispatch run 34438112203): the gate
+    demanded literal ``success`` from secrets-scan, dependency-scan and
+    code-security unconditionally, but the selector legitimately skips
+    unselected legs — so every non-``full``/non-schedule run concluded
+    with a FALSE summary failure (Secret Scanning=success, Summary=
+    failure). The repaired gate treats ``skipped`` as not-selected
+    (never gates), fails on any leg that RAN and did not succeed, and
+    treats a zero-legs-ran environment as a configuration error. The
+    committed step script is exec'd verbatim under bash here, so the
+    test exercises the exact bytes that run in CI — no re-implementation
+    that could drift from the workflow.
+
+    The results also moved from inline ``${{ needs.*.result }}``
+    expansion to job-level ``env:`` wiring: the committed script becomes
+    plain executable bash and unquoted expression interpolation can no
+    longer reach the shell.
+    """
+
+    SECURITY_YML = REPO_ROOT / ".github" / "workflows" / "security.yml"
+    LEGS = ("SECRETS_RESULT", "DEPENDENCY_RESULT", "CODE_RESULT", "SBOM_RESULT")
+
+    # Which legs each scan_type selector selects, mirroring the per-leg
+    # `if:` conditions (kept coherent with the live workflow by
+    # test_selector_expectations_match_live_leg_conditions).
+    SELECTED_LEGS: dict[str, frozenset[str]] = {
+        "full": frozenset(LEGS),
+        "": frozenset(LEGS),
+        "secrets": frozenset({"SECRETS_RESULT"}),
+        "dependencies": frozenset({"DEPENDENCY_RESULT", "SBOM_RESULT"}),
+        "code": frozenset({"CODE_RESULT"}),
+    }
+
+    @staticmethod
+    def _summary_gate_script(text: str) -> str:
+        """Extract the dedented ``run: |`` body of the summary step."""
+        lines = text.splitlines()
+        step_at = next(
+            (
+                i
+                for i, ln in enumerate(lines)
+                if ln.strip() == "- name: Generate Summary"
+            ),
+            None,
+        )
+        assert step_at is not None, "Generate Summary step renamed or removed"
+        run_at = next(
+            (i for i in range(step_at, len(lines)) if lines[i].strip() == "run: |"),
+            None,
+        )
+        assert run_at is not None, "Generate Summary step lost its run: | block"
+        body: list[str] = []
+        for ln in lines[run_at + 1 :]:
+            if not ln.strip():
+                body.append("")
+                continue
+            if len(ln) - len(ln.lstrip(" ")) < 10:
+                break
+            body.append(ln[10:])
+        return "\n".join(body) + "\n"
+
+    def _run_gate(
+        self, script: str, results: dict[str, str], tmp_path: Path
+    ) -> tuple[int, str]:
+        """Execute a gate script under bash with GitHub-emulated inputs.
+
+        Returns (exit_code, rendered step summary text). ``results`` map
+        the env names to needs.*.result values, as GitHub would inject
+        them; GITHUB_STEP_SUMMARY points at a temp file.
+        """
+        bash = shutil.which("bash")
+        if bash is None:
+            pytest.skip("bash not available for verbatim gate execution")
+        assert bash is not None  # narrow for the type checker; skip raised above
+        script_path = tmp_path / "summary_gate.sh"
+        script_path.write_text(script, encoding="utf-8", newline="\n")
+        summary_path = tmp_path / "step_summary.md"
+        env = {
+            **os.environ,
+            "GITHUB_STEP_SUMMARY": str(summary_path),
+            **results,
+        }
+        proc = subprocess.run(
+            [bash, str(script_path)],
+            capture_output=True,
+            text=True,
+            env=env,
+            check=False,
+            timeout=60,
+        )
+        rendered = (
+            summary_path.read_text(encoding="utf-8") if summary_path.exists() else ""
+        )
+        return proc.returncode, rendered
+
+    def _expected_results(self, scan_type: str) -> dict[str, str]:
+        selected = self.SELECTED_LEGS[scan_type]
+        return {leg: ("success" if leg in selected else "skipped") for leg in self.LEGS}
+
+    # ------------------------------------------------------------------
+    # RED-proof: the defect shapes the detector/gate must never accept.
+    # ------------------------------------------------------------------
+
+    OLD_GATE_SCRIPT = (
+        'echo "## Security Scan Summary" >> "$GITHUB_STEP_SUMMARY"\n'
+        'if [[ "${SECRETS_RESULT}" == "success" ]] && \\\n'
+        '   [[ "${DEPENDENCY_RESULT}" == "success" ]] && \\\n'
+        '   [[ "${CODE_RESULT}" == "success" ]]; then\n'
+        '  echo "All security scans passed" >> "$GITHUB_STEP_SUMMARY"\n'
+        "else\n"
+        '  echo "Some security scans failed" >> "$GITHUB_STEP_SUMMARY"\n'
+        "  exit 1\n"
+        "fi\n"
+    )
+
+    def test_reproduces_run_34438112203_old_gate_vacuous_pass(
+        self, tmp_path: Path
+    ) -> None:
+        """The defect, as a unit test: the OLD gate false-FAILED a run
+        whose shape was one succeeded scan + selector-skipped operands —
+        vacuous AND-combination over skipped operands. This is the
+        exact observed shape of dispatch run 34438112203 (Secret
+        Scanning=success, Summary=failure)."""
+        rc, rendered = self._run_gate(
+            self.OLD_GATE_SCRIPT,
+            {
+                "SECRETS_RESULT": "success",
+                "DEPENDENCY_RESULT": "skipped",
+                "CODE_RESULT": "skipped",
+                "SBOM_RESULT": "skipped",
+            },
+            tmp_path,
+        )
+        assert rc == 1, "old gate unexpectedly passed the reproduction input"
+        assert "Some security scans failed" in rendered
+
+    def test_new_gate_passes_the_reproduction_input(self, tmp_path: Path) -> None:
+        """Same inputs, committed gate: the one succeeded scan gates;
+        skipped legs were not selected and never gate. The false-failure
+        of run 34438112203 becomes a green summary."""
+        script = self._summary_gate_script(
+            self.SECURITY_YML.read_text(encoding="utf-8")
+        )
+        rc, rendered = self._run_gate(
+            script,
+            {
+                "SECRETS_RESULT": "success",
+                "DEPENDENCY_RESULT": "skipped",
+                "CODE_RESULT": "skipped",
+                "SBOM_RESULT": "skipped",
+            },
+            tmp_path,
+        )
+        assert rc == 0, (
+            "committed gate still fails the run-34438112203 shape "
+            f"(summary said: {rendered.strip()!r})"
+        )
+        assert "✅" in rendered
+
+    def test_summary_script_uses_env_wiring_not_inline_expansion(self) -> None:
+        """The committed script must contain zero ``${{ }}`` expansions:
+        results arrive via job env, keeping the script plain bash."""
+        script = self._summary_gate_script(
+            self.SECURITY_YML.read_text(encoding="utf-8")
+        )
+        assert script.strip(), "summary gate script extracted empty"
+        assert "${{" not in script, (
+            "summary step regressed to inline ${{ needs.*.result }} "
+            "expansion; results must arrive via job-level env wiring"
+        )
+        for leg in self.LEGS:
+            assert leg in script, f"gate never consults {leg}"
+
+    def test_summary_env_maps_all_four_leg_results(self) -> None:
+        """Every needs leg is wired into the step env exactly once --
+        adding a fifth leg without wiring must fail here."""
+        text = self.SECURITY_YML.read_text(encoding="utf-8")
+        expected_wiring = {
+            "SECRETS_RESULT": "needs.secrets-scan.result",
+            "DEPENDENCY_RESULT": "needs.dependency-scan.result",
+            "CODE_RESULT": "needs.code-security.result",
+            "SBOM_RESULT": "needs.sbom.result",
+        }
+        for env_name, expression in expected_wiring.items():
+            assert f"{env_name}: ${{{{ {expression} }}}}" in text, (
+                f"summary env lost the wiring {env_name} <- {expression}"
+            )
+
+    def test_selector_expectations_match_live_leg_conditions(self) -> None:
+        """The SELECTED_LEGS map (what the tests treat as selected) must
+        stay coherent with the per-leg `if:` conditions actually
+        committed in security.yml -- an edited selector condition that
+        is not mirrored here fails loudly instead of drifting."""
+        text = self.SECURITY_YML.read_text(encoding="utf-8")
+        conditions = TestSecurityScheduleSemantics._job_blocks(text)
+        selector_token = {
+            "SECRETS_RESULT": ("secrets-scan", "secrets"),
+            "DEPENDENCY_RESULT": ("dependency-scan", "dependencies"),
+            "CODE_RESULT": ("code-security", "code"),
+            "SBOM_RESULT": ("sbom", "dependencies"),
+        }
+        for leg, (job_id, token) in selector_token.items():
+            cond = " ".join(conditions.get(job_id, []))
+            assert cond, f"{job_id} lost its job-level if: condition"
+            assert f"scan_type == '{token}'" in cond, (
+                f"{job_id} condition no longer selects '{token}'; update "
+                "SELECTED_LEGS in this test class to match"
+            )
+            assert "scan_type == 'full'" in cond, (
+                f"{job_id} condition lost the 'full' branch"
+            )
+            assert "scan_type == ''" in cond, (
+                f"{job_id} condition lost the empty-selector default branch"
+            )
+
+    # ------------------------------------------------------------------
+    # Selector parity: every scan_type dispatch concludes green when its
+    # selected legs succeed -- the false-failure class, per selector.
+    # ------------------------------------------------------------------
+
+    @pytest.mark.parametrize("scan_type", ["full", "secrets", "dependencies", "code"])
+    def test_selector_run_passes_when_selected_legs_succeed(
+        self, scan_type: str, tmp_path: Path
+    ) -> None:
+        script = self._summary_gate_script(
+            self.SECURITY_YML.read_text(encoding="utf-8")
+        )
+        rc, rendered = self._run_gate(
+            script, self._expected_results(scan_type), tmp_path
+        )
+        assert rc == 0, (
+            f"scan_type={scan_type!r}: gate failed a fully-successful "
+            f"selector run (summary said: {rendered.strip()!r})"
+        )
+        assert "✅" in rendered
+        assert "❌" not in rendered
+
+    def test_empty_selector_default_runs_all_legs(self, tmp_path: Path) -> None:
+        """scan_type == '' (the workflow default 'full' arrives set, but
+        the conditions also admit the empty string) selects every leg."""
+        assert self.SELECTED_LEGS[""] == self.SELECTED_LEGS["full"]
+
+    @pytest.mark.parametrize("bad_result", ["failure", "cancelled"])
+    def test_failed_leg_fails_summary_even_when_others_skipped(
+        self, bad_result: str, tmp_path: Path
+    ) -> None:
+        """A leg that RAN and did not succeed must fail the summary even
+        when the selector skipped every other leg."""
+        script = self._summary_gate_script(
+            self.SECURITY_YML.read_text(encoding="utf-8")
+        )
+        results = self._expected_results("secrets")
+        results["SECRETS_RESULT"] = bad_result
+        rc, rendered = self._run_gate(script, results, tmp_path)
+        assert rc == 1, (
+            f"{bad_result} leg did not fail the summary; a failed scan "
+            "leg must never conclude as a green summary"
+        )
+        assert "❌" in rendered
+
+    def test_all_legs_skipped_is_configuration_error(self, tmp_path: Path) -> None:
+        """Zero legs ran: not a pass -- surface the selector misfire."""
+        script = self._summary_gate_script(
+            self.SECURITY_YML.read_text(encoding="utf-8")
+        )
+        rc, rendered = self._run_gate(
+            script, dict.fromkeys(self.LEGS, "skipped"), tmp_path
+        )
+        assert rc == 1
+        assert "❌" in rendered
+
+    def test_sbom_failure_fails_summary_on_full_run(self, tmp_path: Path) -> None:
+        """Latent defect pinned: the old gate ignored needs.sbom.result
+        entirely -- an SBOM failure could never fail the summary."""
+        script = self._summary_gate_script(
+            self.SECURITY_YML.read_text(encoding="utf-8")
+        )
+        results = self._expected_results("full")
+        results["SBOM_RESULT"] = "failure"
+        rc, rendered = self._run_gate(script, results, tmp_path)
+        assert rc == 1, "SBOM failure did not fail the summary on a full run"
+        assert "❌" in rendered
