@@ -2142,6 +2142,16 @@ class TestSecuritySummaryGateSelectorParity:
     expansion to job-level ``env:`` wiring: the committed script becomes
     plain executable bash and unquoted expression interpolation can no
     longer reach the shell.
+
+    Bash resolution is launcher-independent (pinned 2026-09-10): a
+    PATH-ordered ``shutil.which("bash")`` follows whichever shell
+    launched pytest. From PowerShell the registry PATH resolves the WSL
+    stub (``System32\bash.exe``) — Git's ``usr\bin`` is not on PATH and
+    ``System32`` precedes every other entry — and the stub cannot open a
+    Windows script path, so every gate execution died with rc=127 and an
+    empty summary, failing pass-expected and fail-expected tests
+    identically. ``_resolve_gate_bash`` pins Git Bash by location before
+    falling back to PATH, and refuses the WSL stub explicitly.
     """
 
     SECURITY_YML = REPO_ROOT / ".github" / "workflows" / "security.yml"
@@ -2186,6 +2196,37 @@ class TestSecuritySummaryGateSelectorParity:
             body.append(ln[10:])
         return "\n".join(body) + "\n"
 
+    @staticmethod
+    def _resolve_gate_bash() -> str | None:
+        """Resolve a bash capable of executing a Windows-path script.
+
+        ``shutil.which("bash")`` is launcher-PATH-dependent and on
+        Windows a PowerShell session resolves the WSL launcher stub
+        (``System32\\bash.exe``): the stub forwards to the default WSL
+        distro, where a ``C:\\...`` script path does not exist, and the
+        gate dies as rc=127 ("No such file or directory") before any
+        line executes. Resolve Git Bash by its documented install
+        locations first; only then fall back to PATH, refusing any
+        ``bash`` under the Windows directory (always the WSL stub).
+        CI runners (ubuntu) take the plain ``which`` path unchanged.
+        """
+        if sys.platform != "win32":
+            return shutil.which("bash")
+        program_files = os.environ.get("ProgramFiles", r"C:\Program Files")
+        for candidate in (
+            Path(program_files) / "Git" / "bin" / "bash.exe",
+            Path(program_files) / "Git" / "usr" / "bin" / "bash.exe",
+        ):
+            if candidate.is_file():
+                return str(candidate)
+        which_hit = shutil.which("bash")
+        if which_hit is None:
+            return None
+        windows_dir = Path(os.environ.get("SystemRoot", r"C:\Windows"))
+        if Path(which_hit).is_relative_to(windows_dir):
+            return None  # WSL launcher stub: cannot run Windows-path scripts
+        return which_hit
+
     def _run_gate(
         self, script: str, results: dict[str, str], tmp_path: Path
     ) -> tuple[int, str]:
@@ -2195,9 +2236,9 @@ class TestSecuritySummaryGateSelectorParity:
         the env names to needs.*.result values, as GitHub would inject
         them; GITHUB_STEP_SUMMARY points at a temp file.
         """
-        bash = shutil.which("bash")
+        bash = self._resolve_gate_bash()
         if bash is None:
-            pytest.skip("bash not available for verbatim gate execution")
+            pytest.skip("no capable bash for verbatim gate execution")
         assert bash is not None  # narrow for the type checker; skip raised above
         script_path = tmp_path / "summary_gate.sh"
         script_path.write_text(script, encoding="utf-8", newline="\n")
