@@ -1968,24 +1968,39 @@ class TestGitleaksPrepushNet:
         return str(shim)
 
     def _clone_with_local_commit(self, tmp_path: Path) -> Path:
-        """Hermetic clone holding exactly one commit no remote has."""
+        """Hermetic clone holding exactly one commit no remote has.
+
+        The probe is committed on an explicitly created branch: a clone
+        taken from a source with a detached HEAD (the CI Actions
+        checkout) would otherwise leave the probe unreachable from any
+        branch and invisible to --branches (live-verified on the PR
+        runner: 3 tests failed with 0 introduced commits).
+        """
         clone = self._make_clone(tmp_path)
+        env = {
+            **{
+                k: v
+                for k, v in os.environ.items()
+                if k.startswith(("GIT_", "SYSTEMROOT", "PATH", "HOME"))
+            },
+            "GIT_AUTHOR_NAME": "t",
+            "GIT_AUTHOR_EMAIL": "t@t",
+            "GIT_COMMITTER_NAME": "t",
+            "GIT_COMMITTER_EMAIL": "t@t",
+        }
+        subprocess.run(
+            ["git", "checkout", "-q", "-B", "probe-net"],
+            cwd=clone,
+            check=True,
+            capture_output=True,
+            env=env,
+        )
         subprocess.run(
             ["git", "commit", "--allow-empty", "--quiet", "-m", "probe"],
             cwd=clone,
             check=True,
             capture_output=True,
-            env={
-                **{
-                    k: v
-                    for k, v in os.environ.items()
-                    if k.startswith(("GIT_", "SYSTEMROOT", "PATH", "HOME"))
-                },
-                "GIT_AUTHOR_NAME": "t",
-                "GIT_AUTHOR_EMAIL": "t@t",
-                "GIT_COMMITTER_NAME": "t",
-                "GIT_COMMITTER_EMAIL": "t@t",
-            },
+            env=env,
         )
         return clone
 
