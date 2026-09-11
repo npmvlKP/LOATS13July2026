@@ -135,6 +135,77 @@ which nothing ever routed would still grade PASS.
    bare ``main()``, discarding its return value — a failed live run exited
    0 to Task Scheduler. The entry point now ``sys.exit(main())``.
 
+## Amendment 4 (2026-09-11, intake semantic decided: read-only telemetry; routing-failure isolation)
+
+The OPEN question of Amendment 3 section 3 is resolved by operator
+decision (2026-09-10 21:40 IST): **the Analyzer intake semantic is
+read-only status telemetry.** TradeDecisions continue to route through
+the real HTTP path (POST /analyze); until the gateway grows a
+decision-intake endpoint, each routed decision resolves as an
+honestly-counted ``error`` outcome (HTTP 404), which the Amendment 2
+decisional criterion already accepts ("any resolved outcome ... success,
+disabled, or error all count"). The real-orders-via-/placeorder
+alternative was rejected for P5: order placement under analyze-mode
+changes the system under test from decision-routing telemetry to order
+interception, requires fail-closed Analyzer-mode verification before any
+placement, and would have forced a restart of the accruing 14-day span
+before any decisional evidence existed. Implementation of the chosen
+semantic (a real gateway-side telemetry intake) is deferred as a P5
+follow-up; the run accrues decisional error outcomes meanwhile.
+
+1. **Routing failures are isolated from market data (P1, fixed).**
+   Forensic review of the deferral found a predictable
+   evidence-poisoning path: ``place_analyzer_request`` counted its
+   failures on the SHARED ``OPENALGO_CIRCUIT_BREAKER`` (threshold 3,
+   60 s). The first three routed decisions of any session -- expected
+   404s under this amendment -- would have opened the same breaker every
+   market-data call flows through: mechanically the Amendment 3
+   starvation cascade (breaker flap -> cycle errors -> CMP funnel
+   starvation) through a different route, burying the run's first real
+   decisional evidence under thousands of cycle errors. Routed decisions
+   now flow through a dedicated ``ANALYZER_CIRCUIT_BREAKER`` (5
+   consecutive failures / 120 s recovery -- an error BUDGET, because a
+   routing 404 is expected telemetry under the read-only semantic, not a
+   gateway-outage signal). The shared breaker never sees analyzer-routing
+   outcomes; the isolation contract (analyzer open implies market data
+   unaffected; shared breaker counts zero routing failures) is pinned
+   RED-first in ``tests/test_analyzer_breaker_isolation.py``; the
+   operator surface (``AlertSystem.get_circuit_breaker_status``) exposes
+   the new ``analyzer`` member.
+
+2. **Restart continuity completed (operational).** Amendment 3 section
+   4's fresh run (134427) was killed externally at 20:35 IST 10 Sep
+   (host up throughout, no WER event): it ran attached to an interactive
+   terminal and died with that terminal's teardown -- the exact
+   0xC000013A kill vector the 06Sep hidden-wrapper discipline exists
+   for. Moments later a fresh run (151114) was started from a VS Code
+   terminal WITHOUT ``--resume``, creating a second ongoing log. The
+   operator disposition (2026-09-10 ~21:40 IST): 151114 ended with a
+   recorded ``operator_termination`` event (its 393 post-market cycles
+   carry no phase-gate weight); 134427 was resumed through the
+   production task (``restarts`` incremented, counters floored
+   honestly, span preserved from the 13:44 start). A 5-minute watchdog
+   task (``LOATS_P5_Watchdog``, same hidden wrapper as the logon task)
+   now covers mid-session supervisor deaths; the OS-level claim lock
+   makes overlapping fires refuse (rc=2) instead of double-writing.
+   Overnight the machinery absorbed a further host event unattended
+   (restarts=2, writer re-claimed, span preserved).
+
+### Consequences
+
+- From the next session (11 Sep 09:15 IST) the P5 decisional criterion
+  accrues as ``error``-counter ROUTE rows carrying
+  ``OpenAlgoAPIError``/404. That is the recorded intended behavior of
+  this amendment, not a defect state; the deferred intake work replaces
+  it with a real endpoint later without touching the run.
+- The only consumer-visible API change is the added ``analyzer`` key in
+  ``AlertSystem.get_circuit_breaker_status()``; market-data behavior is
+  unchanged by construction (the shared breaker no longer receives
+  routing outcomes).
+- Watchdog coverage is host-local like the logon task: it heals a dead
+  supervisor on this machine within ~5 minutes; it cannot act while the
+  host is off (span gap is honest and visible in the run log).
+
 ## Amendment 3 (2026-09-10, wire-contract route repair; /analyze intake open)
 
 Live forensics during the supervised run (124455) proved the client was
