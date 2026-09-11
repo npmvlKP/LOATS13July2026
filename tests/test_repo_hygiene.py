@@ -46,6 +46,27 @@ from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+
+
+def _absolute_git_dir() -> Path:
+    """Absolute .git dir of the checkout (worktree-safe).
+
+    In the main checkout this is ``REPO_ROOT/.git``; in a linked worktree
+    ``REPO_ROOT/.git`` is a FILE (a gitdir pointer), and the real admin
+    dir lives under the main repo's ``.git/worktrees/<name>``. Anything
+    that must write inside the git dir resolves it via
+    ``git rev-parse --absolute-git-dir``.
+    """
+    out = subprocess.run(
+        ["git", "rev-parse", "--absolute-git-dir"],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return Path(out.stdout.strip())
+
+
 GUARD_PATH = REPO_ROOT / "scripts" / "check_repo_hygiene.py"
 HELPER_PATH = REPO_ROOT / "scripts" / "win32_root_junk.py"
 HC15_PROBE = REPO_ROOT / "scripts" / "probe_hc15_strength_gate.py"
@@ -1614,9 +1635,13 @@ class TestFixerHooksSpareFrozenEvidence:
         # The mutant config MUST live on the repo's own drive: pre-commit
         # computes a relative path between --config and the repo root and
         # dies with "path is on mount 'C:', start on mount 'G:'" otherwise
-        # (observed rc=3, zero hooks run). .git/ is inside the repo,
-        # invisible to git status, and never staged.
-        mutant = REPO_ROOT / ".git" / "pre-commit-no-excludes.yaml"
+        # (observed rc=3, zero hooks run). Inside the resolved git dir it
+        # is also inside the repo, invisible to git status, and never
+        # staged -- in BOTH supported checkout shapes: the main checkout
+        # (git dir = REPO_ROOT/.git) and a linked worktree (git dir =
+        # <main>/.git/worktrees/<name>; REPO_ROOT/.git is a file there,
+        # so writing under it raises FileNotFoundError).
+        mutant = _absolute_git_dir() / "pre-commit-no-excludes.yaml"
         mutant.write_text(
             self._strip_mutator_excludes(
                 (REPO_ROOT / ".pre-commit-config.yaml").read_text(encoding="utf-8")
@@ -1891,6 +1916,77 @@ class TestF8H02ExternalVerifier:
             "was stripped -- it does not verify the behavior"
         )
         assert "[FAIL] 3. boundary gate fires at modify_order" in proc.stdout
+
+
+class TestGitEnvRedirectionHermeticity:
+    """2026-09-11 pre-push incident: git exports GIT_DIR / GIT_INDEX_FILE /
+    GIT_WORK_TREE into hook subprocesses (upstream pre-commit ships
+    ``no_git_env`` for exactly this reason), while every fixture git call in
+    this module is scoped by ``cwd=`` alone. Under the pre-push pytest stage
+    those redirections re-targeted probe commits at the LIVE worktree:
+    ``probe-net`` branch churn, a ``core.bare`` flip on the shared git dir,
+    ~300 staged deletions, and fixture artifacts (plain.py / shebang.py /
+    p5-verify stubs) in the real index. The pre-push net failed the push
+    closed -- designed behavior -- and this class pins the class-level
+    defense instead of per-instance cleanup.
+
+    Contract: tests/conftest.py hard-scrubs the redirection triplet from
+    the suite process env before any loats import, and the threat itself
+    is pinned so the scrub can never rot into decoration.
+    """
+
+    _REDIRECTION_VARS = ("GIT_DIR", "GIT_INDEX_FILE", "GIT_WORK_TREE")
+
+    def test_conftest_scrubs_redirection_before_loats_imports(self) -> None:
+        text = (REPO_ROOT / "tests" / "conftest.py").read_text(encoding="utf-8")
+        for var in self._REDIRECTION_VARS:
+            anchor = f'os.environ.pop("{var}", None)'
+            assert anchor in text, (
+                f"conftest must hard-scrub {var}: git exports it into hook "
+                "subprocesses and cwd-scoped fixture git calls then "
+                "re-target the live worktree (2026-09-11 pre-push incident)"
+            )
+        assert text.index('os.environ.pop("GIT_DIR", None)') < text.index(
+            "from loats.database import Database"
+        ), "the scrub must run before the module-level loats imports"
+
+    def test_suite_env_carries_no_git_redirections(self) -> None:
+        # Real-time leg: under the pre-push pytest stage this fails loudly
+        # the moment the conftest scrub is removed; in a bare pytest run it
+        # documents the env contract the cwd-scoped fixtures rely on.
+        live = {v for v in self._REDIRECTION_VARS if v in os.environ}
+        assert not live, (
+            f"git redirection vars leaked into the suite env: {sorted(live)}"
+        )
+
+    def test_redirection_threat_is_real_so_scrub_is_load_bearing(
+        self, tmp_path: Path
+    ) -> None:
+        victim = tmp_path / "victim"
+        victim.mkdir()
+        subprocess.run(
+            ["git", "init", "-q"],
+            cwd=victim,
+            check=True,
+            capture_output=True,
+        )
+        poisoned = dict(os.environ)
+        poisoned["GIT_DIR"] = str(REPO_ROOT / ".git")
+        poisoned["GIT_WORK_TREE"] = str(REPO_ROOT)
+        proc = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            cwd=victim,
+            capture_output=True,
+            text=True,
+            env=poisoned,
+        )
+        assert proc.returncode == 0
+        toplevel = Path(proc.stdout.strip()).resolve()
+        assert toplevel == REPO_ROOT.resolve(), (
+            "GIT_DIR/GIT_WORK_TREE no longer redirect a cwd-scoped git call; "
+            "the conftest scrub now defends against a threat that no longer "
+            "exists -- re-evaluate this net"
+        )
 
 
 class TestGitleaksPrepushNet:

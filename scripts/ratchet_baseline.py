@@ -188,8 +188,17 @@ History (most recent last):
        RED-first net pinning the dedicated ANALYZER_CIRCUIT_BREAKER that
        isolates routing failures from the shared market-data breaker.
        Ceiling 405 = this tree.)
+  407  Analyzer intake-contract setting wave (2026-09-11): +2
+       (docs/audit-history/11Sep2026-analyzer-intake-contract-setting.md -
+       ADR-006 Amendment 5: analyzer_intake_path as a real per-call-resolved
+       setting, so the deferred gateway decision-intake endpoint activates
+       via config with zero code change and no restart of the accruing
+       14-day P5 span; tests/test_analyzer_intake_contract.py - the
+       RED-first net pinning default preservation ("analyze"), per-call
+       resolution, endpoint flow, payload immutability, and the single-
+       source ceiling. Ceiling 407 = this tree.)
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 405
+TRACKED_FILE_CEILING = 407

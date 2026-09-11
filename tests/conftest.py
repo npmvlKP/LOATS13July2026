@@ -40,6 +40,19 @@ _TEST_DATA_DIR = Path(tempfile.mkdtemp(prefix="loats-test-data-"))
 os.environ["SQLITE_DB_PATH"] = str(_TEST_DATA_DIR / "test_loats.db")
 os.environ["AUDIT_LOG_PATH"] = str(_TEST_DATA_DIR / "test_audit.log")
 
+# 2026-09-11 pre-push incident (git-env redirection hermeticity): git
+# exports GIT_DIR / GIT_INDEX_FILE / GIT_WORK_TREE into hook subprocesses
+# (upstream pre-commit ships no_git_env() for exactly this reason), and
+# any fixture git call scoped by cwd= alone then re-targets the live
+# worktree instead of its disposable clone. Hard-scrub the redirection
+# triplet before any loats import; pinned by
+# TestGitEnvRedirectionHermeticity in tests/test_repo_hygiene.py.
+# Literal per-variable pops (not a loop) so the pinning net can anchor on
+# the exact statements:
+os.environ.pop("GIT_DIR", None)
+os.environ.pop("GIT_INDEX_FILE", None)
+os.environ.pop("GIT_WORK_TREE", None)
+
 from loats.database import Database
 from loats.models import (
     HistoricalData,

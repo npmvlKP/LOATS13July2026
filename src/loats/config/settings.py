@@ -76,6 +76,21 @@ class Settings(BaseSettings):
             "(default False to prevent default-on fabrication)"
         ),
     )
+    # ADR-006 Amendment 5: the decision-intake endpoint is deferred on the
+    # gateway side (read-only semantic: every routed decision resolves as an
+    # honest 404 "error" outcome until the gateway ships an intake). The
+    # path is a real setting resolved per call, so activating the future
+    # intake is one config value -- no code change, no restart of the
+    # accruing 14-day P5 span. Default is exactly today's behaviour.
+    analyzer_intake_path: str = Field(
+        "analyze",
+        description=(
+            "Endpoint path (relative to /api/v1/) that receives routed "
+            "TradeDecision payloads. Default 'analyze' matches the current "
+            "read-only semantic (gateway 404s it by design); set to the "
+            "gateway's decision-intake route once it exists."
+        ),
+    )
     # F8-H-01: producer-window budget for the trading cycle. The legacy
     # hard-coded 80 ms window always expired mid-fetch under live feed
     # latencies (TA/sentiment take ~1.3 s), so every producer was
