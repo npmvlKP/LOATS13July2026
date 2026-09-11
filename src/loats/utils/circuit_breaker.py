@@ -306,8 +306,26 @@ OPENALGO_CIRCUIT_BREAKER = CircuitBreaker(
 TELEGRAM_CIRCUIT_BREAKER = CircuitBreaker(
     name="telegram",
     config=CircuitBreakerConfig(
-        failure_threshold=5,  # More tolerant for Telegram
+        failure_threshold=5,  # More tolerant for alerts
         success_threshold=2,
         timeout=30.0,  # Shorter timeout for alerts
+    ),
+)
+
+# Analyzer routing (ADR-006 Amendment 4): routed decisions get their OWN
+# breaker. They previously flowed through OPENALGO_CIRCUIT_BREAKER, so a
+# handful of routing failures opened the same breaker every market-data
+# call shares -- the Amendment 3 starvation cascade through a different
+# route. Under the Am4 read-only intake semantic, the gateway's missing
+# /analyze endpoint makes a routing 404 EXPECTED telemetry, so this member
+# tolerates an error budget (5 consecutive failures, 120 s recovery) rather
+# than the shared breaker's outage posture (3 / 60 s). Market data keeps
+# flowing no matter how the analyzer endpoint behaves.
+ANALYZER_CIRCUIT_BREAKER = CircuitBreaker(
+    name="analyzer",
+    config=CircuitBreakerConfig(
+        failure_threshold=5,
+        success_threshold=2,
+        timeout=120.0,
     ),
 )

@@ -23,6 +23,7 @@ from .loats_logging import get_logger
 from .models import Order, Signal, SignalType, Trade
 from .openalgo import async_client
 from .utils.circuit_breaker import (
+    ANALYZER_CIRCUIT_BREAKER,
     OPENALGO_CIRCUIT_BREAKER,
     TELEGRAM_CIRCUIT_BREAKER,
 )
@@ -614,6 +615,7 @@ class AlertSystem:
         return {
             "openalgo": OPENALGO_CIRCUIT_BREAKER.get_status(),
             "telegram": TELEGRAM_CIRCUIT_BREAKER.get_status(),
+            "analyzer": ANALYZER_CIRCUIT_BREAKER.get_status(),
         }
 
     def _is_authorized_admin(self, update: Update) -> bool:

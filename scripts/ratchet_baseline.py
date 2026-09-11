@@ -167,8 +167,29 @@ History (most recent last):
        default_install_hook_types covering the pre-push shim;
        docs/audit-history/10Sep2026-gitleaks-prepush-net.md - wave
        record. Ceiling 401 = this tree.)
+  402  Analyzer wire-contract route repair (2026-09-10): +1
+       (tests/test_openalgo_wire_contract_routes.py - pins every
+       client endpoint to the deployment's underscore-free REST route
+       (live-verified 10Sep2026: the snake_case spellings 404'd on
+       every call, 10,332 position_book 404s during the supervised
+       P5 run, breaker flap, CMP funnel starvation) and the
+       position-book ltp -> last_price vocabulary alias; ADR-006
+       Amendment 3. Ceiling 402 = this tree.)
+  403  Analyzer wire-contract wave record (2026-09-10): +1
+       (docs/audit-history/10Sep2026-analyzer-wire-contract-route-
+       repair.md - the forensic + verification record for the route
+       repair above. Ceiling 403 = this tree.)
+  405  Analyzer intake decision + breaker isolation wave (2026-09-11): +2
+       (docs/audit-history/11Sep2026-analyzer-intake-decision-breaker-
+       isolation.md - ADR-006 Amendment 4: the OPEN intake semantic
+       resolved to read-only telemetry by operator decision, and the
+       5-minute LOATS_P5_Watchdog closing the mid-session supervisor-
+       continuity gap; tests/test_analyzer_breaker_isolation.py - the
+       RED-first net pinning the dedicated ANALYZER_CIRCUIT_BREAKER that
+       isolates routing failures from the shared market-data breaker.
+       Ceiling 405 = this tree.)
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 401
+TRACKED_FILE_CEILING = 405

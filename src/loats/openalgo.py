@@ -62,7 +62,7 @@ from .models import (
     TransactionType,
 )
 from .utils.cache import cache_manager
-from .utils.circuit_breaker import OPENALGO_CIRCUIT_BREAKER
+from .utils.circuit_breaker import ANALYZER_CIRCUIT_BREAKER, OPENALGO_CIRCUIT_BREAKER
 from .utils.lazy_singleton import lazy_singleton
 from .utils.payload_builder import (
     build_modify_order_payload,
@@ -457,6 +457,37 @@ def _normalize_funds_payload(result: dict[str, Any]) -> dict[str, Any]:
     return {**result, "data": extended}
 
 
+def _normalize_position_book(result: dict[str, Any]) -> dict[str, Any]:
+    """Normalize position-book rows into the canonical LOATS vocabulary.
+
+    The live deployment returns ``data`` as a list of broker-mapped rows
+    (verified 10Sep2026 in the gateway source: transform_positions_data
+    emits symbol/exchange/product/quantity/pnl/average_price/ltp) while
+    ``TradingOrchestrator._create_position_model`` reads ``last_price``.
+    ``ltp`` is mirrored to ``last_price`` per row (explicit broker
+    ``last_price`` wins); original fields are preserved and non-list
+    payloads pass through untouched. Without this alias, fixing the
+    endpoint 404 would trade it for a KeyError('last_price') in the
+    market-data cycle -- the same drift class already normalized for
+    funds (``availablecash``) and quotes (``ltp``/``prev_close``).
+    """
+    data = result.get("data")
+    if not isinstance(data, list):
+        return result
+    normalized: list[Any] = []
+    for row in data:
+        if not isinstance(row, dict):
+            normalized.append(row)
+            continue
+        if "last_price" not in row and "ltp" in row:
+            extended = dict(row)
+            extended["last_price"] = row["ltp"]
+            normalized.append(extended)
+        else:
+            normalized.append(row)
+    return {**result, "data": normalized}
+
+
 def _history_payload(
     symbol: str, interval: str, from_date: str | None, to_date: str | None
 ) -> dict[str, Any]:
@@ -749,7 +780,7 @@ class OpenAlgoClient:
         return self._request("POST", "expiry", json=payload)
 
     def get_position_book(self) -> dict[str, Any]:
-        return self._request("POST", "position_book")
+        return _normalize_position_book(self._request("POST", "positionbook"))
 
     def get_funds(self) -> dict[str, Any]:
         return _normalize_funds_payload(self._request("POST", "funds"))
@@ -798,7 +829,7 @@ class OpenAlgoClient:
         def _place_order_impl() -> dict[str, Any]:
             return self._request(
                 "POST",
-                "place_order",
+                "placeorder",
                 json=payload,
                 idempotency_key=_get_idempotency_key(
                     f"place:{_order_payload_digest(payload)}"
@@ -853,7 +884,7 @@ class OpenAlgoClient:
         def _place_smart_order_impl() -> dict[str, Any]:
             return self._request(
                 "POST",
-                "place_smart_order",
+                "placesmartorder",
                 json=payload,
                 idempotency_key=_get_idempotency_key(
                     f"place_smart_order:{_order_payload_digest(payload)}"
@@ -909,7 +940,7 @@ class OpenAlgoClient:
         def _modify_order_impl() -> dict[str, Any]:
             return self._request(
                 "POST",
-                "modify_order",
+                "modifyorder",
                 json=payload,
                 idempotency_key=_get_idempotency_key(f"modify:{order_id}"),
             )
@@ -936,7 +967,7 @@ class OpenAlgoClient:
         def _cancel_order_impl() -> dict[str, Any]:
             return self._request(
                 "POST",
-                "cancel_order",
+                "cancelorder",
                 json=payload,
                 idempotency_key=_get_idempotency_key(f"cancel:{order_id}"),
             )
@@ -945,13 +976,13 @@ class OpenAlgoClient:
 
     def get_order_status(self, order_id: str) -> dict[str, Any]:
         payload = {"order_id": order_id}
-        return self._request("POST", "order_status", json=payload)
+        return self._request("POST", "orderstatus", json=payload)
 
     def get_all_orders(self) -> dict[str, Any]:
-        return self._request("POST", "all_orders")
+        return self._request("POST", "orderbook")
 
     def get_trade_book(self) -> dict[str, Any]:
-        return self._request("POST", "trade_book")
+        return self._request("POST", "tradebook")
 
 
 class AsyncOpenAlgoClient:
@@ -1225,7 +1256,7 @@ class AsyncOpenAlgoClient:
                 logger.warning(f"Failed to parse cached position book result: {e}")
 
         # Cache miss - fetch from API
-        result = await self._request("POST", "position_book")
+        result = _normalize_position_book(await self._request("POST", "positionbook"))
 
         # Cache the result for 30 seconds
         try:
@@ -1327,7 +1358,7 @@ class AsyncOpenAlgoClient:
 
             return await self._request(
                 "POST",
-                "place_order",
+                "placeorder",
                 json=payload,
                 idempotency_key=_get_idempotency_key(
                     f"place:{_order_payload_digest(payload)}"
@@ -1403,7 +1434,7 @@ class AsyncOpenAlgoClient:
 
             return await self._request(
                 "POST",
-                "place_smart_order",
+                "placesmartorder",
                 json=payload,
                 idempotency_key=_get_idempotency_key(
                     f"place_smart_order:{_order_payload_digest(payload)}"
@@ -1463,7 +1494,7 @@ class AsyncOpenAlgoClient:
 
             return await self._request(
                 "POST",
-                "modify_order",
+                "modifyorder",
                 json=payload,
                 idempotency_key=_get_idempotency_key(f"modify:{order_id}"),
             )
@@ -1490,7 +1521,7 @@ class AsyncOpenAlgoClient:
             payload = {"order_id": order_id}
             return await self._request(
                 "POST",
-                "cancel_order",
+                "cancelorder",
                 json=payload,
                 idempotency_key=_get_idempotency_key(f"cancel:{order_id}"),
             )
@@ -1522,22 +1553,25 @@ class AsyncOpenAlgoClient:
         """
 
         # Analyzer requests don't require kill switch check (analysis-only, not trading)
-        # Use circuit breaker with retry for analyzer requests
+        # Use the DEDICATED analyzer circuit breaker (ADR-006 Amendment 4):
+        # routing failures (e.g. the gateway's absent /analyze intake, an
+        # expected 404 under the read-only semantic) must never open the
+        # shared OpenAlgo breaker that market data depends on.
         # (idempotent GET-like behavior)
         async def _analyze_impl() -> dict[str, Any]:
             return await self._request("POST", "analyze", json=payload)
 
-        return await OPENALGO_CIRCUIT_BREAKER.call_async(_analyze_impl)
+        return await ANALYZER_CIRCUIT_BREAKER.call_async(_analyze_impl)
 
     async def get_order_status(self, order_id: str) -> dict[str, Any]:
         payload = {"order_id": order_id}
-        return await self._request("POST", "order_status", json=payload)
+        return await self._request("POST", "orderstatus", json=payload)
 
     async def get_all_orders(self) -> dict[str, Any]:
-        return await self._request("POST", "all_orders")
+        return await self._request("POST", "orderbook")
 
     async def get_trade_book(self) -> dict[str, Any]:
-        return await self._request("POST", "trade_book")
+        return await self._request("POST", "tradebook")
 
 
 # F8-C-03 (2026-09-02): ``AsyncOpenAlgoClient.__init__`` reads ``Settings()``
