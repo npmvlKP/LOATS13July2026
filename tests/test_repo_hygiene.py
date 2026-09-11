@@ -46,6 +46,27 @@ from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+
+
+def _absolute_git_dir() -> Path:
+    """Absolute .git dir of the checkout (worktree-safe).
+
+    In the main checkout this is ``REPO_ROOT/.git``; in a linked worktree
+    ``REPO_ROOT/.git`` is a FILE (a gitdir pointer), and the real admin
+    dir lives under the main repo's ``.git/worktrees/<name>``. Anything
+    that must write inside the git dir resolves it via
+    ``git rev-parse --absolute-git-dir``.
+    """
+    out = subprocess.run(
+        ["git", "rev-parse", "--absolute-git-dir"],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return Path(out.stdout.strip())
+
+
 GUARD_PATH = REPO_ROOT / "scripts" / "check_repo_hygiene.py"
 HELPER_PATH = REPO_ROOT / "scripts" / "win32_root_junk.py"
 HC15_PROBE = REPO_ROOT / "scripts" / "probe_hc15_strength_gate.py"
@@ -1614,9 +1635,13 @@ class TestFixerHooksSpareFrozenEvidence:
         # The mutant config MUST live on the repo's own drive: pre-commit
         # computes a relative path between --config and the repo root and
         # dies with "path is on mount 'C:', start on mount 'G:'" otherwise
-        # (observed rc=3, zero hooks run). .git/ is inside the repo,
-        # invisible to git status, and never staged.
-        mutant = REPO_ROOT / ".git" / "pre-commit-no-excludes.yaml"
+        # (observed rc=3, zero hooks run). Inside the resolved git dir it
+        # is also inside the repo, invisible to git status, and never
+        # staged -- in BOTH supported checkout shapes: the main checkout
+        # (git dir = REPO_ROOT/.git) and a linked worktree (git dir =
+        # <main>/.git/worktrees/<name>; REPO_ROOT/.git is a file there,
+        # so writing under it raises FileNotFoundError).
+        mutant = _absolute_git_dir() / "pre-commit-no-excludes.yaml"
         mutant.write_text(
             self._strip_mutator_excludes(
                 (REPO_ROOT / ".pre-commit-config.yaml").read_text(encoding="utf-8")
