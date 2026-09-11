@@ -62,7 +62,7 @@ from .models import (
     TransactionType,
 )
 from .utils.cache import cache_manager
-from .utils.circuit_breaker import OPENALGO_CIRCUIT_BREAKER
+from .utils.circuit_breaker import ANALYZER_CIRCUIT_BREAKER, OPENALGO_CIRCUIT_BREAKER
 from .utils.lazy_singleton import lazy_singleton
 from .utils.payload_builder import (
     build_modify_order_payload,
@@ -1553,12 +1553,15 @@ class AsyncOpenAlgoClient:
         """
 
         # Analyzer requests don't require kill switch check (analysis-only, not trading)
-        # Use circuit breaker with retry for analyzer requests
+        # Use the DEDICATED analyzer circuit breaker (ADR-006 Amendment 4):
+        # routing failures (e.g. the gateway's absent /analyze intake, an
+        # expected 404 under the read-only semantic) must never open the
+        # shared OpenAlgo breaker that market data depends on.
         # (idempotent GET-like behavior)
         async def _analyze_impl() -> dict[str, Any]:
             return await self._request("POST", "analyze", json=payload)
 
-        return await OPENALGO_CIRCUIT_BREAKER.call_async(_analyze_impl)
+        return await ANALYZER_CIRCUIT_BREAKER.call_async(_analyze_impl)
 
     async def get_order_status(self, order_id: str) -> dict[str, Any]:
         payload = {"order_id": order_id}
