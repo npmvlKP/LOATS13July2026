@@ -135,6 +135,42 @@ which nothing ever routed would still grade PASS.
    bare ``main()``, discarding its return value — a failed live run exited
    0 to Task Scheduler. The entry point now ``sys.exit(main())``.
 
+## Amendment 5 (2026-09-11, deferred intake made config-activatable: analyzer_intake_path)
+
+Amendment 4 recorded that the gateway-side decision-telemetry intake
+replaces the 404-error class "later without touching the run." At HEAD
+that activation would have required a code change: the intake path lived
+as a hard-coded ``"analyze"`` literal inside
+``AsyncOpenAlgoClient.place_analyzer_request``, so the day the gateway
+ships the intake, flipping the route would have meant a source edit,
+a deploy, and a restart of the accruing 14-day P5 span.
+
+1. **The intake path is a real setting (fixed).**
+   ``Settings.analyzer_intake_path`` (default ``"analyze"`` -- exactly
+   today's behavior, zero change while the read-only semantic is live) is
+   resolved PER CALL by ``place_analyzer_request`` via ``get_settings()``.
+   No constructor-time capture: a client built before the flip follows
+   the flip. Activating the future intake becomes one config value
+   (``ANALYZER_INTAKE_PATH`` in the environment / .env); the supervised
+   run keeps accruing decisional error outcomes until then, untouched.
+2. **Contract pinned RED-first** in
+   ``tests/test_analyzer_intake_contract.py``: default preservation,
+   operator settability, singleton default, per-call resolution (a path
+   change takes effect without client reconstruction), endpoint flow into
+   the ``/api/v1/`` URL builder, ``TradeDecision.to_analyzer_payload``
+   immutability (the wire shape the future intake must accept), and the
+   single-source ceiling pin.
+
+### Consequences
+
+- No behavior change at the default: the gateway keeps 404ing
+  ``/api/v1/analyze`` and each routed decision still resolves as an
+  honestly-counted ``error`` outcome (the Amendment 4 semantic is
+  untouched by construction).
+- The gateway-side intake implementation itself remains deferred exactly
+  as Amendment 4 recorded it; this amendment only removes the client-side
+  code-change dependency from its activation.
+
 ## Amendment 4 (2026-09-11, intake semantic decided: read-only telemetry; routing-failure isolation)
 
 The OPEN question of Amendment 3 section 3 is resolved by operator
