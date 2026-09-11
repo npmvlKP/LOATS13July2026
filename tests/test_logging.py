@@ -2,10 +2,17 @@
 Test logging functionality LOATS13July2026.
 """
 
+import contextlib
+import io
 import logging
 import os
+import re
 from pathlib import Path
 from unittest.mock import patch
+
+_ISO_TS = re.compile(
+    r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?"
+)
 
 
 def test_configure_logging_test_mode():
@@ -89,6 +96,56 @@ def test_configure_logging_production_mode(tmp_path, monkeypatch):
     for handler in file_handlers:
         handler.close()
         root_logger.removeHandler(handler)
+
+
+def _render_one_warning() -> str:
+    """Configure test-mode logging and capture one rendered warning line."""
+    logging.root.handlers = []
+    from loats.loats_logging import configure_logging, get_logger
+
+    buf = io.StringIO()
+    with contextlib.redirect_stderr(buf):
+        configure_logging(test_mode=True)
+        # Fresh logger name: cache_logger_on_first_use must not serve a
+        # logger bound by a previous test's structlog.configure call.
+        get_logger("loats.render_contract").warning("single-render contract probe")
+    return buf.getvalue()
+
+
+def test_console_line_renders_timestamp_once():
+    """A rendered line carries exactly one timestamp (ProcessorFormatter
+    double-render regression, F-2026-09-11)."""
+    out = _render_one_warning()
+    line = next(t for t in out.splitlines() if "single-render contract probe" in t)
+    assert len(_ISO_TS.findall(line)) == 1, (
+        f"timestamp rendered more than once: {line!r}"
+    )
+
+
+def test_console_line_renders_message_once():
+    """The message appears exactly once in the rendered line."""
+    out = _render_one_warning()
+    line = next(t for t in out.splitlines() if "loats.render_contract" in t)
+    assert line.count("single-render contract probe") == 1, (
+        f"message duplicated: {line!r}"
+    )
+
+
+def test_foreign_stdlib_record_renders_without_error():
+    """Foreign stdlib records (httpx, apscheduler...) format cleanly through
+    the same handler: wrap_for_formatter must never run over them."""
+    logging.root.handlers = []
+    from loats.loats_logging import configure_logging
+
+    buf = io.StringIO()
+    with contextlib.redirect_stderr(buf):
+        configure_logging(test_mode=True)
+        logging.getLogger("httpx").info("foreign record probe")
+    assert "--- Logging error ---" not in buf.getvalue(), (
+        "foreign record formatting raised inside the handler"
+    )
+    line = next(t for t in buf.getvalue().splitlines() if "foreign record probe" in t)
+    assert len(_ISO_TS.findall(line)) == 1, f"foreign line double-rendered: {line!r}"
 
 
 def test_logs_directory_not_created_in_test_mode():

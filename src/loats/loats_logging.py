@@ -22,7 +22,19 @@ def configure_logging(test_mode: bool = False) -> None:
         log_dir = Path("logs")
         log_dir.mkdir(exist_ok=True)
 
-    # Shared processors for both console and file logging
+    # Shared processors for both console and file logging. These PREPARE
+    # each event (context, logger name, level, timestamp, exc info); the
+    # final renderer lives ONLY in the handlers' ProcessorFormatter below.
+    # This list is also the handlers' foreign_pre_chain, so it must NOT
+    # contain wrap_for_formatter (that terminator is for structlog-native
+    # events only -- running it over foreign stdlib records corrupts them
+    # into tuples).
+    #
+    # Defect fixed here (F-2026-09-11): configure_logging previously ended
+    # structlog's chain with a ConsoleRenderer while the handler's
+    # ProcessorFormatter rendered the result a second time, so every line
+    # in reports/p5_supervisor.log carried its timestamp/level/logger
+    # rendered twice.
     shared_processors: list[Processor] = [
         structlog.contextvars.merge_contextvars,
         structlog.stdlib.add_logger_name,
@@ -33,15 +45,17 @@ def configure_logging(test_mode: bool = False) -> None:
         structlog.processors.format_exc_info,
     ]
 
-    # Configure structlog FIRST (before dictConfig)
-    # This ensures proper handler integration and allows
-    # ProcessorFormatter.wrap_for_formatter to work correctly
-    # for foreign records from stdlib loggers (httpx, apscheduler, etc.)
+    # Configure structlog FIRST (before dictConfig).
+    # The chain ENDS with ProcessorFormatter.wrap_for_formatter: it hands the
+    # prepared event dict to the stdlib handlers, whose ProcessorFormatter
+    # (dictConfig below) performs the one and only rendering. A renderer in
+    # this chain would render the event before the handler renders it again.
     structlog.configure(
         processors=shared_processors
         + [
-            # Final processor: render to console
-            structlog.dev.ConsoleRenderer(colors=False),
+            # Final processor: mark the event as prepared and hand it to
+            # the stdlib handler's ProcessorFormatter for rendering.
+            structlog.stdlib.ProcessorFormatter.wrap_for_formatter,
         ],
         logger_factory=structlog.stdlib.LoggerFactory(),
         wrapper_class=structlog.stdlib.BoundLogger,
