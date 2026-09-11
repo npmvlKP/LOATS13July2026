@@ -47,8 +47,11 @@ os.environ["AUDIT_LOG_PATH"] = str(_TEST_DATA_DIR / "test_audit.log")
 # worktree instead of its disposable clone. Hard-scrub the redirection
 # triplet before any loats import; pinned by
 # TestGitEnvRedirectionHermeticity in tests/test_repo_hygiene.py.
-for _git_redirection_var in ("GIT_DIR", "GIT_INDEX_FILE", "GIT_WORK_TREE"):
-    os.environ.pop(_git_redirection_var, None)
+# Literal per-variable pops (not a loop) so the pinning net can anchor on
+# the exact statements:
+os.environ.pop("GIT_DIR", None)
+os.environ.pop("GIT_INDEX_FILE", None)
+os.environ.pop("GIT_WORK_TREE", None)
 
 from loats.database import Database
 from loats.models import (

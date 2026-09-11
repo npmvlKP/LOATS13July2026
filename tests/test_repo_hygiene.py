@@ -1918,6 +1918,77 @@ class TestF8H02ExternalVerifier:
         assert "[FAIL] 3. boundary gate fires at modify_order" in proc.stdout
 
 
+class TestGitEnvRedirectionHermeticity:
+    """2026-09-11 pre-push incident: git exports GIT_DIR / GIT_INDEX_FILE /
+    GIT_WORK_TREE into hook subprocesses (upstream pre-commit ships
+    ``no_git_env`` for exactly this reason), while every fixture git call in
+    this module is scoped by ``cwd=`` alone. Under the pre-push pytest stage
+    those redirections re-targeted probe commits at the LIVE worktree:
+    ``probe-net`` branch churn, a ``core.bare`` flip on the shared git dir,
+    ~300 staged deletions, and fixture artifacts (plain.py / shebang.py /
+    p5-verify stubs) in the real index. The pre-push net failed the push
+    closed -- designed behavior -- and this class pins the class-level
+    defense instead of per-instance cleanup.
+
+    Contract: tests/conftest.py hard-scrubs the redirection triplet from
+    the suite process env before any loats import, and the threat itself
+    is pinned so the scrub can never rot into decoration.
+    """
+
+    _REDIRECTION_VARS = ("GIT_DIR", "GIT_INDEX_FILE", "GIT_WORK_TREE")
+
+    def test_conftest_scrubs_redirection_before_loats_imports(self) -> None:
+        text = (REPO_ROOT / "tests" / "conftest.py").read_text(encoding="utf-8")
+        for var in self._REDIRECTION_VARS:
+            anchor = f'os.environ.pop("{var}", None)'
+            assert anchor in text, (
+                f"conftest must hard-scrub {var}: git exports it into hook "
+                "subprocesses and cwd-scoped fixture git calls then "
+                "re-target the live worktree (2026-09-11 pre-push incident)"
+            )
+        assert text.index('os.environ.pop("GIT_DIR", None)') < text.index(
+            "from loats.database import Database"
+        ), "the scrub must run before the module-level loats imports"
+
+    def test_suite_env_carries_no_git_redirections(self) -> None:
+        # Real-time leg: under the pre-push pytest stage this fails loudly
+        # the moment the conftest scrub is removed; in a bare pytest run it
+        # documents the env contract the cwd-scoped fixtures rely on.
+        live = {v for v in self._REDIRECTION_VARS if v in os.environ}
+        assert not live, (
+            f"git redirection vars leaked into the suite env: {sorted(live)}"
+        )
+
+    def test_redirection_threat_is_real_so_scrub_is_load_bearing(
+        self, tmp_path: Path
+    ) -> None:
+        victim = tmp_path / "victim"
+        victim.mkdir()
+        subprocess.run(
+            ["git", "init", "-q"],
+            cwd=victim,
+            check=True,
+            capture_output=True,
+        )
+        poisoned = dict(os.environ)
+        poisoned["GIT_DIR"] = str(REPO_ROOT / ".git")
+        poisoned["GIT_WORK_TREE"] = str(REPO_ROOT)
+        proc = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            cwd=victim,
+            capture_output=True,
+            text=True,
+            env=poisoned,
+        )
+        assert proc.returncode == 0
+        toplevel = Path(proc.stdout.strip()).resolve()
+        assert toplevel == REPO_ROOT.resolve(), (
+            "GIT_DIR/GIT_WORK_TREE no longer redirect a cwd-scoped git call; "
+            "the conftest scrub now defends against a threat that no longer "
+            "exists -- re-evaluate this net"
+        )
+
+
 class TestGitleaksPrepushNet:
     """ADR-0014 (F8-C-02 NEXT item): the defense-in-depth pre-push net.
 
