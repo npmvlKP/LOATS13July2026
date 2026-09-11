@@ -1558,8 +1558,15 @@ class AsyncOpenAlgoClient:
         # expected 404 under the read-only semantic) must never open the
         # shared OpenAlgo breaker that market data depends on.
         # (idempotent GET-like behavior)
+        #
+        # ADR-006 Amendment 5: the intake path is a settings field resolved
+        # PER CALL -- flipping analyzer_intake_path redirects routing to the
+        # gateway's future decision-intake endpoint without a code deploy or
+        # a restart of the supervised run.
+        intake_path = get_settings().analyzer_intake_path
+
         async def _analyze_impl() -> dict[str, Any]:
-            return await self._request("POST", "analyze", json=payload)
+            return await self._request("POST", intake_path, json=payload)
 
         return await ANALYZER_CIRCUIT_BREAKER.call_async(_analyze_impl)
 
