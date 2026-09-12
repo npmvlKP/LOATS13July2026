@@ -96,6 +96,12 @@ mypy_src_errors.txt
 mypy_tests_errors.txt
 pip_audit_out.txt
 pip_audit_results.json
+# Ad-hoc pip-audit invocation output at the repo root (staged 12Sep pushed
+# tracked count 409 -> 411 and failed the repo-hygiene ceiling; evidence of
+# record stays reports/security/pip-audit-*.json). Both spellings, per the
+# reports/health precedent.
+/pip_audit_*.json
+/pip-audit_*.json
 pytest_output.txt
 ruff_alerts.txt
 ruff_all_errors.txt
