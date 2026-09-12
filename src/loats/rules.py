@@ -52,6 +52,7 @@ class TradingSession(StrEnum):
     REGULAR = "REGULAR"
     POST_CLOSE = "POST_CLOSE"
     AFTER_HOURS = "AFTER_HOURS"
+    CLOSED = "CLOSED"
 
 
 class CMPRulesEngine:
@@ -79,12 +80,25 @@ class CMPRulesEngine:
         - REGULAR: 9:15 AM - 3:30 PM IST
         - POST_CLOSE: 3:30 - 4:00 PM IST
         - AFTER_HOURS: 4:00 PM - 9:00 AM IST
+        - CLOSED: Saturdays and Sundays (all day, IST) -- NSE equity
+          trading days are Monday-Friday; the weekday check runs on the
+          IST datetime so a UTC-weekend instant already in an IST weekday
+          resolves through that weekday's buckets.
         """
         if current_time is None:
             current_time = datetime.datetime.now(datetime.UTC)
 
         # Convert to IST (UTC+5:30)
         ist_time = current_time + datetime.timedelta(hours=5, minutes=30)
+
+        # Weekends are CLOSED regardless of the intraday bucket. The
+        # bucket table below is weekday-blind: without this guard a
+        # weekend 11:00 IST returned REGULAR and the full CMP decision
+        # funnel ran on non-trading days (observed live 2026-09-12, a
+        # Saturday: 500+ signal-batch REJECT audit rows and thousands of
+        # weekend cycles in the supervised P5 run).
+        if ist_time.weekday() >= 5:  # 5 = Saturday, 6 = Sunday
+            return TradingSession.CLOSED
 
         # Determine session
         if ist_time.hour == 9 and ist_time.minute < 15:
@@ -116,6 +130,15 @@ class CMPRulesEngine:
         """Check if trading is allowed in current session."""
         self.update_session_state()
         return self.session_state == TradingSession.REGULAR
+
+    def is_trading_allowed_at(self, current_time: datetime.datetime) -> bool:
+        """Session gate evaluated at an explicit instant.
+
+        Same semantics as :meth:`is_trading_allowed` (REGULAR only),
+        resolved for *current_time* instead of "now" -- used by tests and
+        backtests that must not depend on the wall clock.
+        """
+        return self.get_current_session(current_time) == TradingSession.REGULAR
 
     def calculate_iv_rank(
         self, historical_data: list[HistoricalData], window: int = 30

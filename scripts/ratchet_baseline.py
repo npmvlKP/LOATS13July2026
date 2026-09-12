@@ -197,8 +197,17 @@ History (most recent last):
        RED-first net pinning default preservation ("analyze"), per-call
        resolution, endpoint flow, payload immutability, and the single-
        source ceiling. Ceiling 407 = this tree.)
+  408  Weekend-session and audited-rejections wave (2026-09-12): +1
+       (docs/audit-history/12Sep2026-weekend-session-audited-rejections.md
+       - the forensic + verification record: get_current_session was
+       weekday-blind (weekends resolved REGULAR and the full CMP funnel
+       ran on non-trading days; 529 Saturday signal-batch REJECT rows,
+       thousands of weekend cycles in the supervised P5 run), and the
+       CMP workflow audited only Step-1 rejections while Steps 2-5
+       returned silent dicts (1,024 gating + 3,948 strength rejections
+       invisible in the Friday audit trail). Ceiling 408 = this tree.)
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 407
+TRACKED_FILE_CEILING = 408

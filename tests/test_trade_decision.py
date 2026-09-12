@@ -600,3 +600,191 @@ class TestMisc:
         assert DecisionStatus.APPROVED == "APPROVED"
         assert DecisionStatus.REJECTED == "REJECTED"
         assert DecisionStatus.EXECUTED == "EXECUTED"
+
+
+class TestRejectionAuditRows:
+    """Every workflow rejection leaves an audited REJECT row.
+
+    Forensic finding 2026-09-12: only Step 1 (signal validation) wrote an
+    audit row; Steps 2-5 returned silent dicts. During the Friday
+    2026-09-11 session 1,024 gating_rules_failed and 3,948
+    insufficient_strength rejections were invisible in the audit trail --
+    the DB showed a healthy-but-decisionless funnel while the supervisor
+    log carried the truth. Dual-write (SQLite + JSONL, SHA-256-chained)
+    and best-effort (never cascades), mirroring the Step 1 row exactly.
+    """
+
+    @staticmethod
+    async def _rejected(signals, hist, funds):
+        engine = TradeDecisionEngine()
+        with (
+            patch("loats.trade_decision.db") as mdb,
+            patch("loats.trade_decision.settings") as msettings,
+        ):
+            msettings.environment = "production"
+            msettings.composite_strength_threshold = 0.5
+            mdb.async_log_audit = AsyncMock()
+            _, result = await engine.create_trade_decision(
+                signals=signals,
+                historical_data=hist,
+                current_price=24500.0,
+                funds=funds,
+                current_positions=[],
+            )
+        return result, mdb.async_log_audit.await_args_list
+
+    @pytest.mark.asyncio
+    async def test_step2_insufficient_strength_is_audited(self, hist, funds):
+        # 4 sources pass Step 1, but the weighted composite (~0.42) falls
+        # below the threshold 0.5 (Step 2 fail).
+        result, calls = await self._rejected(_sigs(4, base_str=0.45), hist, funds)
+        assert result["reason"] == "insufficient_strength"
+        rejects = [c for c in calls if c.kwargs.get("action") == "REJECT"]
+        assert rejects, "Step 2 rejection must write an audit row"
+        meta = rejects[0].kwargs["metadata"]
+        assert meta["step"] == "composite_strength"
+        assert meta["reason"] == "insufficient_strength"
+
+    @pytest.mark.asyncio
+    async def test_step3_gating_rules_failure_is_audited(self, hist, funds):
+        engine = TradeDecisionEngine()
+        with (
+            patch("loats.trade_decision.db") as mdb,
+            patch("loats.trade_decision.settings") as msettings,
+            patch("loats.trade_decision.rules_engine") as mrules,
+        ):
+            msettings.environment = "production"
+            msettings.composite_strength_threshold = 0.5
+            mdb.async_log_audit = AsyncMock()
+            mrules.apply_gating_rules = lambda *a, **k: (
+                False,
+                {"reason": "gating_failed", "iv_pass": False},
+            )
+            _, result = await engine.create_trade_decision(
+                signals=_sigs(4, base_str=0.9),
+                historical_data=hist,
+                current_price=24500.0,
+                funds=funds,
+                current_positions=[],
+            )
+        assert result["reason"] == "gating_rules_failed"
+        rejects = [
+            c
+            for c in mdb.async_log_audit.await_args_list
+            if c.kwargs.get("action") == "REJECT"
+        ]
+        assert rejects, "Step 3 rejection must write an audit row"
+        meta = rejects[0].kwargs["metadata"]
+        assert meta["step"] == "gating_rules"
+        assert meta["details"] == {"reason": "gating_failed", "iv_pass": False}
+
+    @pytest.mark.asyncio
+    async def test_step4_position_limit_is_audited(self, hist, funds):
+        engine = TradeDecisionEngine()
+        from loats.models import Trade, TransactionType
+
+        open_position = Trade(
+            symbol="NIFTY",
+            quantity=200,
+            entry_price=24000.0,
+            entry_time=datetime.now(UTC),
+            transaction_type=TransactionType.BUY,
+            status="OPEN",
+        )
+        with (
+            patch("loats.trade_decision.db") as mdb,
+            patch("loats.trade_decision.settings") as msettings,
+            patch("loats.trade_decision.rules_engine") as mrules,
+        ):
+            msettings.environment = "production"
+            msettings.composite_strength_threshold = 0.5
+            mdb.async_log_audit = AsyncMock()
+            mrules.apply_gating_rules = lambda *a, **k: (
+                True,
+                {"reason": "gating_passed"},
+            )
+            mrules.check_position_limits = lambda *a, **k: (
+                False,
+                {"reason": "position_limit_exceeded"},
+            )
+            _, result = await engine.create_trade_decision(
+                signals=_sigs(4, base_str=0.9),
+                historical_data=hist,
+                current_price=24500.0,
+                funds=funds,
+                current_positions=[open_position],
+            )
+        assert result["reason"] == "position_limit_exceeded"
+        rejects = [
+            c
+            for c in mdb.async_log_audit.await_args_list
+            if c.kwargs.get("action") == "REJECT"
+        ]
+        assert rejects, "Step 4 rejection must write an audit row"
+        meta = rejects[0].kwargs["metadata"]
+        assert meta["step"] == "position_limits"
+        assert meta["reason"] == "position_limit_exceeded"
+
+    @pytest.mark.asyncio
+    async def test_step1_rejection_row_shape_unchanged(self, funds):
+        """Step 1's row keeps its exact contract (step field added)."""
+        result, calls = await self._rejected(_sigs(2), None, funds)
+        assert result["reason"] == "signal_validation_failed"
+        rejects = [c for c in calls if c.kwargs.get("action") == "REJECT"]
+        assert len(rejects) == 1
+        meta = rejects[0].kwargs["metadata"]
+        assert meta["step"] == "signal_validation"
+        assert meta["reason"] == "insufficient_unique_sources"
+
+    @pytest.mark.asyncio
+    async def test_no_audit_row_when_created(self, hist, funds):
+        """A created decision writes no REJECT row (only later CREATE/ROUTE)."""
+        engine = TradeDecisionEngine()
+        with (
+            patch("loats.trade_decision.db") as mdb,
+            patch("loats.trade_decision.settings") as msettings,
+            patch("loats.trade_decision.rules_engine") as mrules,
+        ):
+            msettings.environment = "production"
+            msettings.composite_strength_threshold = 0.5
+            mdb.async_log_audit = AsyncMock()
+            mrules.apply_gating_rules.return_value = (
+                True,
+                {"reason": "gating_passed", "iv_rank": 50.0, "adx": 30.0, "vix": 14.0},
+            )
+            mrules.check_position_limits.return_value = (True, {"reason": "ok"})
+            mrules.session_state = "REGULAR"
+            _, result = await engine.create_trade_decision(
+                signals=_sigs(4, base_str=0.9),
+                historical_data=hist,
+                current_price=24500.0,
+                funds=funds,
+                current_positions=[],
+            )
+        assert result["status"] == "created"
+        rejects = [
+            c
+            for c in mdb.async_log_audit.await_args_list
+            if c.kwargs.get("action") == "REJECT"
+        ]
+        assert rejects == []
+
+    @pytest.mark.asyncio
+    async def test_audit_store_failure_never_cascades(self, hist, funds):
+        """Best-effort: a raising audit store must not fail the workflow."""
+        engine = TradeDecisionEngine()
+        with (
+            patch("loats.trade_decision.db") as mdb,
+            patch("loats.trade_decision.settings") as msettings,
+        ):
+            msettings.environment = "production"
+            msettings.composite_strength_threshold = 0.5
+            mdb.async_log_audit = AsyncMock(side_effect=RuntimeError("store down"))
+            _, result = await engine.create_trade_decision(
+                signals=_sigs(4, base_str=0.45),
+                historical_data=hist,
+                current_price=24500.0,
+                funds=funds,
+                current_positions=[],
+            )
+        assert result["reason"] == "insufficient_strength"
