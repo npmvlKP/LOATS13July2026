@@ -131,3 +131,41 @@ backed by same-day live evidence on every externally observable item.
 Finding 1 transfers to the operator as the top standing risk (OpenAlgo
 instance health + Monday re-measurement); Finding 2 is closed by this
 wave's ref purge.
+
+## Same-day addendum — Finding 1 RESOLVED after instance restart (13:29 IST)
+
+The operator restarted the OpenAlgo instance before the re-measurement:
+old PID 36504 no longer existed; a new `python.exe` (PID 30492) was
+LISTENING on `127.0.0.1:5000` (netstat, `GET /` → HTTP 200). The standing
+risk was re-measured the same day instead of waiting for Monday:
+
+| Run | Symbol | Samples | ok | Mean | Median | P95 | Gate pass |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| 4 | TEST (harness default) | 40 | 0 | 24.97 ms | 23.02 ms | 44.10 ms | 0% — symbol-not-found, expected |
+| 5 | TCS | 100 | 100 | 67.36 ms | 63.70 ms | 89.54 ms | **98% — PASS** |
+
+Run 4 was the pre-restart artifact of this addendum wave's own harness
+invocation: the default probe symbol `TEST` is not in master contracts
+(0/40, HTTP 400), exactly as the Finding 1 harness note predicted — but
+its transport timings (25 ms mean even on rejected requests) already
+signalled a recovered instance. Run 5 is the like-for-like TCS
+re-measurement: `scripts/collect_p1_phase_gate_evidence.py --live-endpoint
+--samples 100 --symbol TCS` → **P1 PHASE-GATE: PASSED (98.00% ≥ 80%)**,
+exit 0, evidence `reports/p1_analyze_latency_20260912_132927.json`
+(gitignored run artifact; the tracked evidence-of-record for 04Sep is
+unchanged and remains pinned by `select_p1_evidence_file()`).
+
+Disposition update: the degradation profile (235–399 ms mean, 20–22%
+gate) is attributable to the long-running instance process and did not
+survive its restart — mean 67.36 ms / 98% is back inside the 04Sep
+profile (57.62 ms / 100%). Finding 1's standing risk is DOWNGRADED:
+Monday's session re-run becomes a routine live-session confirmation, not
+a risk-holding action.
+
+Hygiene incident recorded in the same wave: the manual `pip-audit
+--format json --output pip_audit_*.json` scratch files from this morning
+were found STAGED (tracked count 409 → 411) and failed the repo-hygiene
+ceiling. Root-cause fix in `.gitignore` (root-anchored `/pip_audit_*.json`
+and `/pip-audit_*.json`, both spellings, matching the 09Sep
+`gitleaks_session.json` precedent); the staged copies were unstaged and
+removed. Net tracked delta of this addendum: 0 (409 = ceiling).
