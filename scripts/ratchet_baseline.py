@@ -225,8 +225,15 @@ History (most recent last):
        silent-append failure class (cmd >> against the
        supervisor-held log) root-caused and routed to a dedicated
        ops log. Ceiling 410 = this tree.)
+  411  Trade-decision persistence coverage wave (2026-09-13): +1
+       (docs/audit-history/13Sep2026-trade-decision-persistence-wave.md
+       - wave record for the two never-wired async dispatch fixes
+       (async_create_trade_decision / async_log_audit) and the
+       11-test trade-decision persistence net; db-module margins
+       moved 81.9/82.0 -> 85/88 measured. Ceiling 410->411; the
+       wave's code delta itself was append-only and held 410.)
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 410
+TRACKED_FILE_CEILING = 411
