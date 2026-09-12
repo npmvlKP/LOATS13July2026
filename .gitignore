@@ -196,6 +196,11 @@ pip-audit-full.json
 safety-report.json
 bandit-full-report.json
 results.json
+# coverage_floor_map.json is UNTRACKED BY DESIGN (a TODO-21 junk-pattern
+# artifact): scripts/check_per_module_coverage.py falls back to the
+# canonical FR floor map (FR_FLOOR_MAP in that script), double-entry
+# pinned by tests/test_coverage_floor_map.py. Keep it out of the tree --
+# a local copy must never become authoritative; edit the script's map.
 coverage_floor_map.json
 opencode.json
 

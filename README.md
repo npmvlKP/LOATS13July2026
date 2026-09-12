@@ -23,7 +23,8 @@ Designed for **ANALYZE mode only** via OpenAlgo REST API integration.
 - **Rate Limited**: Conservative NVIDIA NIM API usage (≤20 req/min, ≥3s gap)
 - **Type Safe**: Full mypy --strict compliance
 - **Security Focused**: Bandit, gitleaks, and comprehensive security scanning
-- **Test Coverage**: 89.02% branch coverage with pytest (784/801 tests passing)
+- **Test Coverage**: 88.21% branch coverage with pytest (1777 tests passing;
+  per-module floors enforced by `scripts/check_per_module_coverage.py`)
 
 ## Project Structure
 
@@ -121,9 +122,9 @@ docker compose -f docker-compose.runtime.yml up
 Run all quality gates:
 
 ```powershell
-# Linting and formatting
-ruff check src/ tests/ --config pyproject.toml
-ruff format --check src/ tests/ --config pyproject.toml
+# Linting and formatting (same scope as the CI ruff jobs)
+ruff check src/ tests/ scripts/ --config pyproject.toml
+ruff format --check src/ tests/ scripts/ --config pyproject.toml
 
 # Type checking
 mypy src/ --strict --config-file pyproject.toml
@@ -134,8 +135,14 @@ bandit -r src/ -c pyproject.toml
 # Secret scanning
 gitleaks detect --source . --config .gitleaks.toml --no-banner
 
-# Run tests
-pytest tests/ --cov=src --cov-branch --cov-fail-under=80
+# Dependency audit (the --ignore-vuln waiver is ADR-0010: nltk is a
+# dev-toolchain transitive of safety, no runtime import -- remove the
+# flag the day nltk 3.11 or a safety release without nltk lands)
+pip-audit --format=json --output pip-audit-report.json --ignore-vuln PYSEC-2026-3740
+
+# Run tests with coverage, then enforce the per-module floors
+pytest tests/ --cov=src --cov-branch --cov-fail-under=80 --cov-report=json:coverage.json
+python scripts/check_per_module_coverage.py
 ```
 
 ## Development Principles
