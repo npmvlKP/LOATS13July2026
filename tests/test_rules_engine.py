@@ -79,12 +79,67 @@ def test_session_detection_all_buckets() -> None:
     after = datetime(2026, 8, 31, 12, 30, tzinfo=UTC)
     assert eng.get_current_session(after) == TradingSession.AFTER_HOURS
 
-    # IST 02:00 -> UTC 20:30 previous day
-    night = datetime(2026, 8, 30, 20, 30, tzinfo=UTC)
+    # IST 02:00 -> UTC 20:30 previous day (2026-09-03 is a Thursday, so
+    # this exercises the weekday AFTER_HOURS bucket; weekend instants
+    # belong to CLOSED -- see test_weekend_market_closed_all_ist_day)
+    night = datetime(2026, 9, 3, 20, 30, tzinfo=UTC)
     assert eng.get_current_session(night) == TradingSession.AFTER_HOURS
 
     # None uses now
     assert eng.get_current_session(None) in set(TradingSession)
+
+
+def test_weekend_market_closed_all_ist_day() -> None:
+    """Sat/Sun are CLOSED all day (IST), not session-bucketed.
+
+    Regression: the IST hour buckets were weekday-blind, so a weekend
+    11:00 IST returned REGULAR and the full CMP decision funnel ran on
+    non-trading days -- observed live 2026-09-12 (a Saturday): 500+
+    signal-batch REJECT audit rows and thousands of weekend cycles in
+    the supervised P5 run. The weekday check runs on IST (post
+    +5:30 conversion) so a UTC-Sunday instant that is IST Monday
+    pre-dawn is handled by the IST weekday, not the UTC one.
+    """
+    eng = CMPRulesEngine()
+    saturday = datetime(2026, 9, 12)
+    sunday = datetime(2026, 9, 13)
+    buckets = (
+        (2, 0),  # IST 07:30 -- would be AFTER_HOURS pre-fix
+        (9, 0),  # IST 14:30 -- would be AFTER_HOURS pre-fix
+        (3, 45),  # IST 09:15 -- would be REGULAR pre-fix
+        (5, 55),  # IST 11:25 -- would be REGULAR pre-fix
+        (9, 45),  # IST 15:15 -- would be REGULAR pre-fix
+        (10, 5),  # IST 15:35 -- would be POST_CLOSE pre-fix
+        (13, 0),  # IST 18:30 -- would be AFTER_HOURS pre-fix
+    )
+    for day in (saturday, sunday):
+        for h, m in buckets:
+            session = eng.get_current_session(day.replace(hour=h, minute=m))
+            assert session == TradingSession.CLOSED, (
+                f"{day:%Y-%m-%d} {h:02d}:{m:02d} UTC -> {session}, expected CLOSED"
+            )
+
+
+def test_utc_weekend_instant_resolved_by_ist_weekday() -> None:
+    """UTC Sunday 20:30 is IST Monday 02:00 -> AFTER_HOURS, not CLOSED.
+
+    The weekday check runs on the IST (post-conversion) datetime: a UTC
+    weekend instant whose IST datetime is already a weekday belongs to
+    that weekday's session buckets. (Every such instant lands in an
+    AFTER_HOURS/PRE_OPEN bucket; only pure-IST weekends are CLOSED.)
+    """
+    eng = CMPRulesEngine()
+    utc_sunday_night = datetime(2026, 9, 13, 20, 30, tzinfo=UTC)
+    assert eng.get_current_session(utc_sunday_night) == TradingSession.AFTER_HOURS
+
+
+def test_is_trading_allowed_at_explicit_instant() -> None:
+    """The explicit-instant check gates on the same session semantics."""
+    eng = CMPRulesEngine()
+    # Saturday 11:25 IST -> market closed
+    assert eng.is_trading_allowed_at(datetime(2026, 9, 12, 5, 55, tzinfo=UTC)) is False
+    # Monday 11:25 IST -> regular session
+    assert eng.is_trading_allowed_at(datetime(2026, 9, 14, 5, 55, tzinfo=UTC)) is True
 
 
 def test_update_session_and_trading_allowed(monkeypatch: pytest.MonkeyPatch) -> None:
