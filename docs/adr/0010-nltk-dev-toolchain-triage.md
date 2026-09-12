@@ -2,7 +2,9 @@
 
 ## Status
 
-Accepted — 2026-09-06 (amended 2026-09-09: waiver surface lockstep)
+Accepted — 2026-09-06 (amended 2026-09-09: waiver surface lockstep;
+re-affirmed 2026-09-12: live currency re-check, see the closing
+section)
 
 ## Context
 
@@ -61,3 +63,21 @@ artifact loaders) are never exercised by the audit tool's own execution.
   an explicit removal trigger — it cannot silently become permanent.
 * If a *runtime* dependency ever gains an unpatched advisory, this
   decision does not apply: that remains a hard gate failure by design.
+
+## Currency re-check (2026-09-12)
+
+Both removal triggers verified UNLIFTED against live sources on
+2026-09-12 (repo venv, Windows host):
+
+* PyPI JSON API: latest nltk release is still 3.10.3 — no 3.11 and no
+  patched 3.10.x exists upstream.
+* PyPI JSON API and the installed tree: latest safety is still 3.8.1
+  and still declares `nltk>=3.9`; the environment runs safety 3.8.1
+  with nltk 3.10.3 (importlib.metadata).
+
+Live full-environment audit re-run (128 packages audited): the raw
+scan exits 1 with PYSEC-2026-3740 as the ONLY finding; the identical
+scan carrying `--ignore-vuln PYSEC-2026-3740` exits 0 ("No known
+vulnerabilities found, 1 ignored"). The waiver remains required and
+current; the surface lockstep and the currency pin
+(tests/test_format_surface_contract.py) stay as decided above.
