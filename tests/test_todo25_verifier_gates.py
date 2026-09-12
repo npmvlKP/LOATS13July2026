@@ -562,3 +562,91 @@ class TestVerifierCwdIndependence:
             f"default project root resolved to {validator.project_root}, "
             f"expected the script's repository {REPO_ROOT}"
         )
+
+
+# ---------------------------------------------------------------------------
+# 7. P1 evidence selection determinism (2026-09-12 P3 carried-set round)
+# ---------------------------------------------------------------------------
+
+
+class TestP1EvidenceSelectionDeterminism:
+    """A local ad-hoc P1 measurement must never flip a verifier verdict.
+
+    reports/*.json run artifacts are gitignored by design. Both TODO-25
+    verifiers selected the evidence file with a newest-on-disk glob, so
+    an operator re-measurement with the live harness (an honest FAIL
+    under degraded endpoint conditions) silently hijacked Stage 3 and
+    HC-29 before the tracked evidence-of-record was even read. CI only
+    passed because the tracked artifact happened to be the only file
+    matching the glob on a fresh checkout. The tracked evidence-of-
+    record must win; newest-on-disk is fallback only.
+    """
+
+    CANONICAL = "p1_analyze_latency_20260904_040609.json"
+
+    def _load_module(self, script: Path, alias: str):
+        spec = importlib.util.spec_from_file_location(alias, script)
+        assert spec is not None and spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    def _load_final_module(self):
+        return self._load_module(FINAL_VERIFIER, "verify_todo25_final_selection")
+
+    def _load_external_module(self):
+        return self._load_module(EXTERNAL_VERIFIER, "verify_todo25_external_selection")
+
+    def test_final_selects_canonical_over_newer_local_run(self, tmp_path: Path) -> None:
+        module = self._load_final_module()
+        (tmp_path / self.CANONICAL).write_text("{}", encoding="utf-8")
+        (tmp_path / "p1_analyze_latency_20260912_999999.json").write_text(
+            "{}", encoding="utf-8"
+        )
+        selected = module.select_p1_evidence_file(tmp_path)
+        assert selected == tmp_path / self.CANONICAL, (
+            f"final verifier picked {selected} over the tracked "
+            "evidence-of-record — a local ad-hoc run can flip the gate"
+        )
+
+    def test_external_selects_canonical_over_newer_local_run(
+        self, tmp_path: Path
+    ) -> None:
+        module = self._load_external_module()
+        (tmp_path / self.CANONICAL).write_text("{}", encoding="utf-8")
+        (tmp_path / "p1_analyze_latency_20260912_999999.json").write_text(
+            "{}", encoding="utf-8"
+        )
+        selected = module.select_p1_evidence_file(tmp_path)
+        assert selected == tmp_path / self.CANONICAL, (
+            f"external verifier picked {selected} over the tracked "
+            "evidence-of-record — a local ad-hoc run can flip the gate"
+        )
+
+    def test_final_falls_back_to_newest_only_when_canonical_absent(
+        self, tmp_path: Path
+    ) -> None:
+        module = self._load_final_module()
+        (tmp_path / "p1_analyze_latency_20260912_083107.json").write_text(
+            "{}", encoding="utf-8"
+        )
+        (tmp_path / "p1_analyze_latency_20260901_020219.json").write_text(
+            "{}", encoding="utf-8"
+        )
+        selected = module.select_p1_evidence_file(tmp_path)
+        assert selected == tmp_path / "p1_analyze_latency_20260912_083107.json"
+
+    def test_final_returns_none_without_any_evidence(self, tmp_path: Path) -> None:
+        module = self._load_final_module()
+        assert module.select_p1_evidence_file(tmp_path) is None
+
+    def test_both_verifiers_pin_the_tracked_evidence_of_record(self) -> None:
+        """Lockstep: the canonical name matches the tracked artifact and
+        is pinned in both verifier sources (the tracked-ness itself is
+        asserted by TestNoUntrackedP1Evidence via git ls-files)."""
+        assert GENUINE_EVIDENCE.name == self.CANONICAL
+        for script in (FINAL_VERIFIER, EXTERNAL_VERIFIER):
+            source = script.read_text(encoding="utf-8")
+            assert self.CANONICAL in source, (
+                f"{script.name} no longer pins the canonical P1 evidence-of-record name"
+            )
