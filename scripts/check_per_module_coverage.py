@@ -35,10 +35,16 @@ FR_FLOOR_MAP: dict[str, float] = {
     "strike_selection.py": 75.0,
 }
 
+# Exclusions are for non-module artifacts only. History (pinned by
+# tests/test_coverage_floor_map.py::test_no_floor_mapped_module_is_also_excluded):
+# this list once also carried database_async_additions.py and its
+# _clean/_temp junk-pattern variants; naming a FR-mapped module here
+# voids its floor BEFORE grading (check_floor_map_thresholds skips
+# excluded names first) while the report still printed the module as
+# [PASS] -- a silently narrowed gate on every fresh checkout, where the
+# gitignored floor-map file is absent and this fallback is authoritative.
+# Live modules must never be listed; retire them from the map instead.
 EXCLUDED_MODULES: list[str] = [
-    "database_async_additions.py",
-    "database_async_additions_clean.py",
-    "database_async_additions_temp.py",
     "__init__.py",
 ]
 
