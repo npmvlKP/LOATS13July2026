@@ -2476,7 +2476,7 @@ class Database:
         if hasattr(self, "_async_pool") and self._async_pool is not None:
             try:
                 return bool(
-                    await cast("Any", self)._async_create_trade_decision(decision)
+                    await cast("Any", self)._async_record_trade_decision(decision)
                 )
             except Exception as e:  # pragma: no cover - fallback safety
                 logger.warning(
@@ -2524,7 +2524,28 @@ class Database:
         previous_state: dict[str, Any] | None = None,
         new_state: dict[str, Any] | None = None,
     ) -> None:
-        """Async wrapper _log_audit() avoid blocking event loop."""
+        """Async audit dual-write; prefers aiosqlite pool when available.
+
+        Dispatch precedence per ASYNC_DISPATCH_DOCUMENTATION.md: the
+        aiosqlite-backed ``_async_log_audit`` (bound by
+        ``extend_database_class``) is primary whenever the pool is
+        attached; without a pool the to_thread sync wrapper runs. A pooled
+        failure falls back rather than losing the audit record.
+        """
+        if hasattr(self, "_async_pool") and self._async_pool is not None:
+            try:
+                await cast("Any", self)._async_log_audit(
+                    action,
+                    entity_type,
+                    entity_id,
+                    user,
+                    metadata,
+                    previous_state,
+                    new_state,
+                )
+                return
+            except Exception as e:  # pragma: no cover - fallback safety
+                logger.warning(f"aiosqlite log_audit failed, falling back: {e}")
         await asyncio.to_thread(
             self._log_audit,
             action,

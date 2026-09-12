@@ -8,9 +8,13 @@ private helpers in ``database_async_additions``.  Tests are written against the
 """
 
 import asyncio
+import inspect
+import json
 import tempfile
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
+from decimal import Decimal
 from pathlib import Path
+from typing import Any, cast
 
 import pytest
 
@@ -26,8 +30,59 @@ from loats.models import (
     Signal,
     SignalType,
     Trade,
+    TradeDecision,
     TransactionType,
 )
+
+# ---------------------------------------------------------------------------
+# TradeDecision persistence coverage (R7 margin round, 2026-09-12).
+#
+# The whole trade-decision layer (sync CRUD in database.py:1947-2179 and the
+# aiosqlite-backed _async_record_trade_decision in
+# database_async_additions.py:342-401) carried zero test references before
+# this block: the 58-line optimized async implementation was uncovered, and
+# the dispatch pins below were born RED — ``async_create_trade_decision``
+# dispatched to ``_async_create_trade_decision``, a name the extension never
+# registered, so the preferred aiosqlite branch died on AttributeError and
+# silently fell back whenever the pool was attached.
+#
+# Determinism: seeded ids/UTC datetimes (no wall-clock dependence), Decimal
+# strings for money fields, timezone-aware IST-offset timestamps, and the
+# F8-L-02 ``as_of_date`` snapshot pinned so round-trips are assertable.
+# ---------------------------------------------------------------------------
+
+_SEED_EPOCH = datetime(2026, 9, 12, 9, 15, 0, tzinfo=UTC)
+_LOATS_SEED = 785641230
+
+
+def _make_decision(
+    decision_id: str = "decision_20260912091500000000_feedface",
+    *,
+    symbol: str = "TCS",
+    decision_type: SignalType = SignalType.BUY,
+    as_of_date: date | None = date(2026, 9, 11),
+) -> TradeDecision:
+    """Deterministic TradeDecision factory (seeded id, pinned snapshot date)."""
+    return TradeDecision(
+        decision_id=decision_id,
+        symbol=symbol,
+        decision_type=decision_type,
+        composite_strength=float(Decimal("0.73")),
+        timestamp=_SEED_EPOCH,
+        as_of_date=as_of_date,
+        entry_price=float(Decimal("4100.50")),
+        quantity=25,
+        stop_loss=float(Decimal("4050.00")),
+        take_profit=float(Decimal("4210.00")),
+        trailing_stop_config={"mode": "atr", "atr_multiplier": 2.5},
+        position_size_method="fixed_fraction",
+        risk_percentage=float(Decimal("0.01")),
+        var_analysis={"var_95": float(Decimal("1234.56")), "horizon_days": 1},
+        gating_rules_result={"passed": True, "rules_evaluated": 7},
+        source_breakdown={"ta": 0.6, "sentiment": 0.4},
+        metadata={"session": "EQ", "seed": _LOATS_SEED},
+        status="PENDING",
+    )
 
 
 @pytest.fixture
@@ -884,3 +939,278 @@ class TestProductionAsyncWiring:
         finally:
             await db.async_close_all()
             db.close_all()
+
+
+class TestTradeDecisionSyncPersistence:
+    """Sync trade-decision CRUD (database.py 1947-2179) — previously untested."""
+
+    def test_create_and_get_round_trip(self, temp_db: Database) -> None:
+        """INSERT then SELECT preserves every column incl. F8-L-02 snapshot."""
+        decision = _make_decision()
+        assert temp_db.create_trade_decision(decision) is True
+
+        loaded = temp_db.get_trade_decision(decision.decision_id)
+        assert loaded is not None
+        assert loaded.decision_id == decision.decision_id
+        assert loaded.symbol == "TCS"
+        assert loaded.decision_type is SignalType.BUY
+        assert Decimal(str(loaded.composite_strength)) == Decimal("0.73")
+        assert loaded.timestamp == _SEED_EPOCH
+        assert loaded.as_of_date == date(2026, 9, 11)
+        assert Decimal(str(loaded.entry_price)) == Decimal("4100.50")
+        assert loaded.quantity == 25
+        assert Decimal(str(loaded.stop_loss)) == Decimal("4050.00")
+        assert loaded.take_profit == float(Decimal("4210.00"))
+        assert loaded.trailing_stop_config == {"mode": "atr", "atr_multiplier": 2.5}
+        assert Decimal(str(loaded.risk_percentage)) == Decimal("0.01")
+        assert loaded.var_analysis["horizon_days"] == 1
+        assert Decimal(str(loaded.var_analysis["var_95"])) == Decimal("1234.56")
+        assert loaded.gating_rules_result == {"passed": True, "rules_evaluated": 7}
+        assert loaded.source_breakdown == {"ta": 0.6, "sentiment": 0.4}
+        assert loaded.status == "PENDING"
+
+    def test_get_missing_decision_returns_none(self, temp_db: Database) -> None:
+        """Unknown decision_id maps to None, not an exception."""
+        assert temp_db.get_trade_decision("decision_does_not_exist") is None
+
+    def test_minimal_decision_null_json_columns_round_trip(
+        self, temp_db: Database
+    ) -> None:
+        """Defaults-only decision reads back through the NULL-JSON guards."""
+        decision = _make_decision(
+            decision_id="decision_20260912091500000000_00000000",
+            as_of_date=None,
+        )
+        decision.trailing_stop_config = {}
+        decision.var_analysis = {}
+        decision.gating_rules_result = {}
+        decision.source_breakdown = {}
+        decision.metadata = {}
+        decision.take_profit = None
+        assert temp_db.create_trade_decision(decision) is True
+
+        loaded = temp_db.get_trade_decision(decision.decision_id)
+        assert loaded is not None
+        assert loaded.trailing_stop_config == {}
+        assert loaded.var_analysis == {}
+        assert loaded.gating_rules_result == {}
+        assert loaded.source_breakdown == {}
+        assert loaded.metadata == {}
+        assert loaded.take_profit is None
+        assert loaded.as_of_date is None
+
+    def test_list_filters_symbol_status_and_limit(self, temp_db: Database) -> None:
+        """All four WHERE-branch shapes of get_trade_decisions are exercised."""
+        ids = {
+            "decision_20260912091500000000_a0000001": ("TCS", "PENDING"),
+            "decision_20260912091500000000_a0000002": ("TCS", "ROUTED"),
+            "decision_20260912091500000000_a0000003": ("INFY", "PENDING"),
+        }
+        for i, (did, (symbol, status)) in enumerate(sorted(ids.items())):
+            decision = _make_decision(decision_id=did, symbol=symbol)
+            decision.status = status
+            decision.timestamp = _SEED_EPOCH + timedelta(minutes=i)
+            assert temp_db.create_trade_decision(decision) is True
+
+        by_symbol = temp_db.get_trade_decisions(symbol="TCS")
+        assert [d.decision_id for d in by_symbol] == [
+            "decision_20260912091500000000_a0000002",
+            "decision_20260912091500000000_a0000001",
+        ]
+
+        by_status = temp_db.get_trade_decisions(status="PENDING")
+        assert {d.decision_id for d in by_status} == {
+            "decision_20260912091500000000_a0000001",
+            "decision_20260912091500000000_a0000003",
+        }
+
+        both = temp_db.get_trade_decisions(symbol="TCS", status="PENDING")
+        assert [d.decision_id for d in both] == [
+            "decision_20260912091500000000_a0000001"
+        ]
+
+        limited = temp_db.get_trade_decisions(limit=2)
+        assert len(limited) == 2
+
+    def test_update_status_round_trip_and_audit(self, temp_db: Database) -> None:
+        """Status update persists, returns False on missing id, and dual-writes."""
+        decision = _make_decision(decision_id="decision_20260912091500000000_b0000001")
+        assert temp_db.create_trade_decision(decision) is True
+
+        assert (
+            temp_db.update_trade_decision_status(decision.decision_id, "ROUTED") is True
+        )
+        loaded = temp_db.get_trade_decision(decision.decision_id)
+        assert loaded is not None
+        assert loaded.status == "ROUTED"
+
+        entries = temp_db.get_audit_log(entity_type="trade_decision")
+        actions = [e.action for e in entries]
+        assert actions.count("CREATE") == 1
+        assert actions.count("UPDATE") == 1
+
+        assert (
+            temp_db.update_trade_decision_status("decision_missing_zz", "ROUTED")
+            is False
+        )
+
+
+class TestTradeDecisionAsyncDispatch:
+    """Async trade-decision paths: the dispatch pins were born RED (2026-09-12)."""
+
+    def test_extension_registers_the_dispatched_name(self) -> None:
+        """async_create_trade_decision must dispatch to a REGISTERED name.
+
+        Born RED (twice over): (1) pre-fix, ``_async_create_trade_decision``
+        — the name the wrapper dispatched to — was never registered by the
+        extension, so the preferred aiosqlite branch died on AttributeError
+        and silently fell back whenever the pool was attached; (2) the
+        source-level pin below also fails on the pre-fix wrapper text. The
+        fix dispatches to the registered ``_async_record_trade_decision``.
+        """
+        extend_database_class()
+        assert hasattr(Database, "_async_record_trade_decision")
+        # The dispatch target must be the registered implementation: assert
+        # on the wrapper's own source so a future rename cannot silently
+        # resurrect the never-wired AttributeError fallback.
+        wrapper_src = inspect.getsource(Database.async_create_trade_decision)
+        assert "_async_record_trade_decision" in wrapper_src
+        assert "_async_create_trade_decision" not in wrapper_src
+
+    def test_async_log_audit_binding_is_registered(self) -> None:
+        """Contract prerequisite: the extension binds _async_log_audit.
+
+        ASYNC_DISPATCH_DOCUMENTATION.md lists it as a primary method; the
+        dispatch itself is pinned by the spy test below.
+        """
+        extend_database_class()
+        assert hasattr(Database, "_async_log_audit")
+
+    @pytest.mark.asyncio
+    async def test_async_log_audit_dispatches_to_registered_impl(
+        self, temp_db: Database, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Pooled async_log_audit must run the REGISTERED implementation.
+
+        Born RED: ``async_log_audit`` was a bare to_thread wrapper that never
+        consulted the pool, so the registered dual-write implementation was
+        unreachable and the documented tri-modal dispatch contract
+        (ASYNC_DISPATCH_DOCUMENTATION.md) was violated for this method.
+        """
+        extend_database_class()
+        dispatch_flag: list[bool] = []
+
+        original = cast("Any", Database)._async_log_audit
+
+        async def _spy(self: Database, *args: object, **kwargs: object) -> None:
+            dispatch_flag.append(True)
+            await original(self, *args, **kwargs)
+
+        monkeypatch.setattr(Database, "_async_log_audit", _spy)
+
+        await temp_db.async_initialize()
+        try:
+            assert temp_db._async_pool is not None
+            await temp_db.async_log_audit(
+                action="ROUTE",
+                entity_type="trade_decision",
+                entity_id="decision_20260912091500000000_c0000004",
+                metadata={"outcome": "dispatch-probe"},
+            )
+            assert dispatch_flag == [True]
+        finally:
+            await temp_db.async_close_all()
+            temp_db.close_all()
+
+    @pytest.mark.asyncio
+    async def test_pooled_create_round_trips_via_aiosqlite(
+        self, temp_db: Database
+    ) -> None:
+        """With the pool attached, the pooled path persists and reads back."""
+        await temp_db.async_initialize()
+        try:
+            assert temp_db._async_pool is not None
+            assert AIOSQLITE_AVAILABLE is True
+
+            decision = _make_decision(
+                decision_id="decision_20260912091500000000_c0000001"
+            )
+            assert await temp_db.async_create_trade_decision(decision) is True
+
+            loaded = await temp_db.async_get_trade_decision(decision.decision_id)
+            assert loaded is not None
+            assert loaded.symbol == "TCS"
+            assert loaded.as_of_date == date(2026, 9, 11)
+            assert Decimal(str(loaded.entry_price)) == Decimal("4100.50")
+        finally:
+            await temp_db.async_close_all()
+            temp_db.close_all()
+
+    @pytest.mark.asyncio
+    async def test_unpooled_create_falls_back_to_sync_row(
+        self, temp_db: Database
+    ) -> None:
+        """Without a pool the to_thread fallback still persists the row."""
+        assert temp_db._async_pool is None
+
+        decision = _make_decision(decision_id="decision_20260912091500000000_c0000002")
+        assert await temp_db.async_create_trade_decision(decision) is True
+
+        loaded = temp_db.get_trade_decision(decision.decision_id)
+        assert loaded is not None
+        assert loaded.decision_id == decision.decision_id
+
+    @pytest.mark.asyncio
+    async def test_async_log_audit_dual_writes_jsonl_and_db(
+        self, temp_db: Database
+    ) -> None:
+        """The dual-write audit path lands in BOTH trails with a valid chain.
+
+        Born RED as a unit: the registered implementation ran only when the
+        dispatch existed; now both the dispatch contract and the write
+        behavior (JSONL row + sha-chained DB row) are pinned.
+        """
+        await temp_db.async_initialize()
+        try:
+            assert temp_db._async_pool is not None
+            await temp_db.async_log_audit(
+                action="ROUTE",
+                entity_type="trade_decision",
+                entity_id="decision_20260912091500000000_c0000003",
+                metadata={"outcome": "success", "decision_type": "BUY"},
+                new_state={"status": "ROUTED"},
+            )
+
+            # JSONL trail: parse the temp audit file for the entity id.
+            jsonl_rows = [
+                json.loads(line)
+                for line in temp_db.audit_log_path.read_text(
+                    encoding="utf-8"
+                ).splitlines()
+                if line.strip()
+            ]
+            jsonl_hits = [
+                r
+                for r in jsonl_rows
+                if r["entity_id"] == "decision_20260912091500000000_c0000003"
+            ]
+            assert len(jsonl_hits) == 1
+            assert jsonl_hits[0]["action"] == "ROUTE"
+            assert jsonl_hits[0]["metadata"]["outcome"] == "success"
+
+            # DB trail: sha256 over the entry minus the hash field itself.
+            rows = temp_db.get_audit_log(entity_type="trade_decision", limit=10)
+            db_hits = [
+                r
+                for r in rows
+                if r.entity_id == "decision_20260912091500000000_c0000003"
+            ]
+            assert len(db_hits) == 1
+            raw = json.loads(
+                temp_db.audit_log_path.read_text(encoding="utf-8").splitlines()[-1]
+            )
+            expected = {k: v for k, v in raw.items() if k != "sha256_hash"}
+            assert temp_db._calculate_sha256(expected) == raw["sha256_hash"]
+        finally:
+            await temp_db.async_close_all()
+            temp_db.close_all()
