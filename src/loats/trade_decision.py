@@ -75,6 +75,52 @@ class TradeDecisionEngine:
             "error": 0,
         }
 
+    async def _audit_rejection(
+        self,
+        symbol: str,
+        timestamp: datetime.datetime,
+        step: str,
+        reason: str | None,
+        details: Any = None,
+        **extra: Any,
+    ) -> None:
+        """Audited rejection row for any CMP workflow step (dual-write).
+
+        Writes a best-effort ``REJECT``/``signal_batch`` audit row via the
+        canonical ``db.async_log_audit`` (dual-write SQLite + JSONL,
+        SHA-256-chained). Forensic finding 2026-09-12: only Step 1 wrote
+        this row while Steps 2-5 returned silent dicts, so 1,024
+        gating_rules_failed and 3,948 insufficient_strength rejections in
+        the Friday 2026-09-11 session were invisible in the audit trail.
+
+        Uniform row shape: ``metadata={"step": ..., "reason": ...,
+        "details": <step result>, **extra}``; the Step 1 caller keeps its
+        ``excluded_unknown_sources`` diagnostic as an extra key.
+
+        Best-effort: an audit-store failure is logged but never cascades
+        into the cycle. Skipped under the test environment so unit tests
+        stay hermetic (no writes to data/loats.db from unpatched tests).
+        """
+        if settings.environment == "test":
+            return
+        metadata: dict[str, Any] = {"step": step, "reason": reason}
+        if details is not None:
+            metadata["details"] = details
+        metadata.update(extra)
+        try:
+            await db.async_log_audit(
+                action="REJECT",
+                entity_type="signal_batch",
+                entity_id=f"{symbol}:{timestamp.isoformat()}",
+                user="trade_decision_engine",
+                metadata=metadata,
+            )
+        except Exception as e:
+            logger.error(
+                f"Failed to write signal-batch rejection audit row "
+                f"(step={step}) for {symbol}: {e}"
+            )
+
     async def create_trade_decision(
         self,
         signals: list[Signal],
@@ -159,33 +205,16 @@ class TradeDecisionEngine:
         validation_result = strength_engine.validate_signal_sources(valid_signals)
         if not validation_result[0]:
             rejected_details = validation_result[1]
-            # F8-M-01: audited rejection -- dual-write (SQLite + JSONL,
-            # SHA-256-chained) row with the per-offender diagnostics so
-            # operators can trace exactly which producer was excluded and
-            # why the batch was rejected. Best-effort: an audit-store
-            # failure is logged but never cascades into the cycle. Skipped
-            # under the test environment so unit tests stay hermetic (no
-            # writes to data/loats.db from unpatched tests).
-            if settings.environment != "test":
-                try:
-                    await db.async_log_audit(
-                        action="REJECT",
-                        entity_type="signal_batch",
-                        entity_id=f"{symbol}:{timestamp.isoformat()}",
-                        user="trade_decision_engine",
-                        metadata={
-                            "reason": rejected_details.get("reason"),
-                            "details": rejected_details,
-                            "excluded_unknown_sources": rejected_details.get(
-                                "excluded_unknown_sources", []
-                            ),
-                        },
-                    )
-                except Exception as e:
-                    logger.error(
-                        f"Failed to write signal-batch rejection audit row "
-                        f"for {symbol}: {e}"
-                    )
+            await self._audit_rejection(
+                symbol=symbol,
+                timestamp=timestamp,
+                step="signal_validation",
+                reason=rejected_details.get("reason"),
+                details=rejected_details,
+                excluded_unknown_sources=rejected_details.get(
+                    "excluded_unknown_sources", []
+                ),
+            )
             return None, {
                 "status": "rejected",
                 "reason": "signal_validation_failed",
@@ -208,6 +237,14 @@ class TradeDecisionEngine:
         if (
             composite_strength <= settings.composite_strength_threshold
         ):  # Minimum strength threshold
+            await self._audit_rejection(
+                symbol=symbol,
+                timestamp=timestamp,
+                step="composite_strength",
+                reason="insufficient_strength",
+                details=strength_details,
+                composite_strength=composite_strength,
+            )
             return None, {
                 "status": "rejected",
                 "reason": "insufficient_strength",
@@ -228,6 +265,13 @@ class TradeDecisionEngine:
         )
 
         if not gating_passed:
+            await self._audit_rejection(
+                symbol=symbol,
+                timestamp=timestamp,
+                step="gating_rules",
+                reason="gating_rules_failed",
+                details=gating_result,
+            )
             return None, {
                 "status": "rejected",
                 "reason": "gating_rules_failed",
@@ -242,6 +286,13 @@ class TradeDecisionEngine:
             symbol, current_positions
         )
         if not position_check:
+            await self._audit_rejection(
+                symbol=symbol,
+                timestamp=timestamp,
+                step="position_limits",
+                reason="position_limit_exceeded",
+                details=position_result,
+            )
             return None, {
                 "status": "rejected",
                 "reason": "position_limit_exceeded",
@@ -258,6 +309,13 @@ class TradeDecisionEngine:
         )
 
         if position_size <= 0:
+            await self._audit_rejection(
+                symbol=symbol,
+                timestamp=timestamp,
+                step="position_sizing",
+                reason="invalid_position_size",
+                details=sizing_details,
+            )
             return None, {
                 "status": "rejected",
                 "reason": "invalid_position_size",
