@@ -216,8 +216,17 @@ History (most recent last):
        28-29 hook-testing junk commits each, local + origin) purged
        after branch-side exclusivity was proven zero. Ceiling 409 =
        this tree.)
+  410  P5 span restart wave (2026-09-12): +1 (docs/audit-history/
+       12Sep2026-p5-span-restart-wave.md — the restart-decision
+       execution record: zero-decisional run 134427 honestly ended
+       (FAIL per the official validator), fresh run 150243 started
+       under the hidden-wrapper discipline, watchdog continuity
+       upgraded (probe → resume → guarded fresh fallback), and the
+       silent-append failure class (cmd >> against the
+       supervisor-held log) root-caused and routed to a dedicated
+       ops log. Ceiling 410 = this tree.)
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 409
+TRACKED_FILE_CEILING = 410
