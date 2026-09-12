@@ -87,6 +87,72 @@ the ten observable behaviors from the finding (before: 4/10 → after:
 10/10), and the external verifier `scripts/verify_f8h01_external.py`
 re-checks the same facts from a clean process without the test suite.
 
+## Amendment 6 (2026-09-12, P5 span restart: zero-decisional run terminated; continuity machinery hardened)
+
+The P5 restart decision recorded in the 2026-09-12 handoff ("4299 cycles /
+0 decisions predates the weekend-session fix; the span without valid
+activity is unusable as evidence") is executed.
+
+1. **Run 134427 terminated honestly.** Started 2026-09-10T13:44:27Z,
+   operator-terminated 2026-09-12T14:55:58Z (span 2.05d, 1968 cycles
+   measured, zero decisional outcomes, 0 unhandled exceptions). Per the
+   Amendment 2/3 precedent a zero-decisional span measures nothing about
+   decisioning and can never grade PASS; ending it now converts an
+   INCOMPLETE-carrying-forever log into an honest FAIL. Pre-restart
+   snapshot preserved outside the evidence stream
+   (`~/loats-ops/p5_134427_prerestart_snapshot.json`). The writer tree was
+   identified first: PIDs 19756/19796 are the Windows venv launcher and its
+   real interpreter child (creation times 140 microseconds apart;
+   `taskkill /T` confirmed the parent/child edge) — a single writer, NOT a
+   double-writer. The watchdog was disabled for the kill window so no
+   resume race could occur, then re-enabled.
+
+2. **Fresh run 150243 started under the hidden-wrapper discipline.**
+   `p5_forward_test_20260912_150243.json`, started 2026-09-12T15:02:43Z,
+   launched via `~/loats-ops/p5_fresh_wrapper.cmd` +
+   `p5_fresh_hidden.vbs` through a one-shot scheduled task (windowless,
+   detached — the 0xC000013A kill-vector discipline; an interactive
+   terminal killed the 134427 writer lineage on 10 Sep). The P5 14-day
+   clock restarts with this run.
+
+3. **Watchdog continuity upgraded (Amendment 5-era wrapper was
+   resume-only).** Once 134427 ended, the old wrapper's `--resume` would
+   have refused (rc=2) forever, leaving the evidence run unsupervised
+   after any supervisor death. The wrapper order of operations is now:
+   (0) a live supervisor process exists → nothing to do
+   (`p5_supervisor_guard.ps1` probe; also closes the fresh-start init
+   window where no run log exists yet); (1) `--resume` (span-preserving);
+   (2) fresh start ONLY when the newest run log is ended — an ongoing log
+   with an unresolved writer state never triggers a fresh fork (the 151114
+   second-writer accident class is closed by construction).
+
+4. **Silent-append failure class recorded.** While a supervisor is alive
+   it holds `reports/p5_supervisor.log` open; `cmd >>` appends to that file
+   from OTHER processes fail silently (verified empirically 2026-09-12 via
+   scheduled-task probes writing to a held vs dedicated file). This is why
+   wrapper trace lines and single-writer refusal echoes vanished from the
+   supervisor log exactly when a supervisor was running (e.g. the 07:54
+   12 Sep "resume starting" line has no exit trace anywhere). All wrapper
+   output now goes to the dedicated `~/loats-ops/p5_watchdog.log`; nothing
+   but the supervisor's loguru stream ever touches
+   `reports/p5_supervisor.log`. The Hermes route-watch cron was repointed
+   to run 150243 (run-log path + RUN_ID).
+
+### Consequences
+
+- The P5 evidence run of record is **150243**; 134427 and all earlier logs
+  remain on disk as honest FAIL/INCOMPLETE history. Earliest possible gate
+  PASS is ~2026-09-26 (14 days from the new start).
+- Decisional evidence still requires the OpenAlgo endpoint to stay up
+  through market hours: the 12 Sep 18:20–18:53 IST endpoint outage (before
+  the operator's 18:50:59 IST instance restart) produced 5.5k breaker
+  lines within the first hour of the new supervisor — the machinery
+  self-healed (breakers CLOSED 18:53 IST), but a full session outage would
+  starve decisional evidence exactly as the killed spans did.
+- Wrapper/launch-chain changes live OUTSIDE the repo (`~/loats-ops/`,
+  scheduled tasks); the repo records the policy, the operator host
+  implements it.
+
 ## Amendment (2026-09-05, P5 evidence integrity: measured activity + freshness)
 
 Preparing the supervised run exposed an evidence-integrity shortfall in
