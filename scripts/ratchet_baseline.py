@@ -206,8 +206,18 @@ History (most recent last):
        CMP workflow audited only Step-1 rejections while Steps 2-5
        returned silent dicts (1,024 gating + 3,948 strength rejections
        invisible in the Friday audit trail). Ceiling 408 = this tree.)
+  409  P3 carried-set round (2026-09-12): +1 (docs/audit-history/
+       12Sep2026-f8-l-carried-set-p3-round.md — the live re-derivation
+       record: carried-set verifier 31/31 and F8-M-02..07 verifier 19/19
+       green at HEAD, live RSS re-validation 3/3, live P1 round trips
+       re-measured (endpoint degraded vs the 04Sep artifact — standing
+       risk transferred to the operator), and the F8-L-04 ref-form
+       residue (debris branches production-hardening / test-hooks,
+       28-29 hook-testing junk commits each, local + origin) purged
+       after branch-side exclusivity was proven zero. Ceiling 409 =
+       this tree.)
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 408
+TRACKED_FILE_CEILING = 409

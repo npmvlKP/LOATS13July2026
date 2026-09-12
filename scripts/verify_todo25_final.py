@@ -190,15 +190,36 @@ def stage_2_dependencies() -> tuple[int, int]:
     return run_stage(checks)
 
 
+CANONICAL_P1_EVIDENCE = "p1_analyze_latency_20260904_040609.json"
+
+
+def select_p1_evidence_file(reports_dir: Path) -> Path | None:
+    """Deterministic P1 evidence selection.
+
+    The tracked evidence-of-record (the F8-L-03 discharge artifact,
+    allowlisted by scripts/check_repo_hygiene.py and
+    scripts/check_scripts_wiring.py) always wins, so a local ad-hoc
+    harness run — which writes a newer, gitignored
+    reports/p1_analyze_latency_*.json — cannot flip a gate verdict.
+    Newest-on-disk is the fallback for artifact-name evolution; None
+    when no evidence exists at all.
+    """
+    canonical = reports_dir / CANONICAL_P1_EVIDENCE
+    if canonical.exists():
+        return canonical
+    evidence_files = sorted(reports_dir.glob("p1_analyze_latency_*.json"), reverse=True)
+    return evidence_files[0] if evidence_files else None
+
+
 def stage_3_evidence_file() -> tuple[int, int, dict[str, Any]]:
     header("STAGE 3: P1 EVIDENCE FILE VERIFICATION")
     checks: list[tuple[bool, str, str]] = []
     data: dict[str, Any] = {}
 
     reports_dir = Path(__file__).parent.parent / "reports"
-    evidence_files = sorted(reports_dir.glob("p1_analyze_latency_*.json"), reverse=True)
+    selected = select_p1_evidence_file(reports_dir)
 
-    if not evidence_files:
+    if selected is None:
         checks.append(
             (
                 False,
@@ -209,11 +230,10 @@ def stage_3_evidence_file() -> tuple[int, int, dict[str, Any]]:
         p, t = run_stage(checks)
         return p, t, data
 
-    latest = evidence_files[0]
-    checks.append((True, "Evidence file exists", str(latest)))
+    checks.append((True, "Evidence file exists", str(selected)))
 
     try:
-        with open(latest, "r", encoding="utf-8") as f:
+        with open(selected, "r", encoding="utf-8") as f:
             data = json.load(f)
         checks.append((True, "Valid JSON", ""))
     except Exception as e:

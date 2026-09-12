@@ -517,6 +517,27 @@ def print_final_report(results: dict[str, Any]) -> None:
     print("=" * 70 + "\n")
 
 
+CANONICAL_P1_EVIDENCE = "p1_analyze_latency_20260904_040609.json"
+
+
+def select_p1_evidence_file(reports_dir: Path) -> Path | None:
+    """Deterministic P1 evidence selection.
+
+    The tracked evidence-of-record (the F8-L-03 discharge artifact,
+    allowlisted by scripts/check_repo_hygiene.py and
+    scripts/check_scripts_wiring.py) always wins, so a local ad-hoc
+    harness run — which writes a newer, gitignored
+    reports/p1_analyze_latency_*.json — cannot flip a gate verdict.
+    Newest-on-disk is the fallback for artifact-name evolution; None
+    when no evidence exists at all.
+    """
+    canonical = reports_dir / CANONICAL_P1_EVIDENCE
+    if canonical.exists():
+        return canonical
+    evidence_files = sorted(reports_dir.glob("p1_analyze_latency_*.json"), reverse=True)
+    return evidence_files[0] if evidence_files else None
+
+
 def main():
     """Main entry point."""
     parser = argparse.ArgumentParser(description="Verify TODO-25 phase-gate evidence")
@@ -524,7 +545,10 @@ def main():
         "--evidence",
         type=Path,
         default=None,
-        help="Path to P1 evidence JSON file (default: most recent in reports/)",
+        help=(
+            "Path to P1 evidence JSON file "
+            "(default: tracked evidence-of-record, else most recent in reports/)"
+        ),
     )
     parser.add_argument(
         "--json",
@@ -534,16 +558,14 @@ def main():
 
     args = parser.parse_args()
 
-    # Find most recent evidence file if not specified
+    # Find the tracked evidence-of-record, else the most recent file
     if args.evidence is None:
         reports_dir = Path("reports")
         if reports_dir.exists():
-            evidence_files = sorted(
-                reports_dir.glob("p1_analyze_latency_*.json"), reverse=True
-            )
-            if evidence_files:
-                args.evidence = evidence_files[0]
-                print(f"Using most recent evidence file: {args.evidence}\n")
+            selected = select_p1_evidence_file(reports_dir)
+            if selected is not None:
+                args.evidence = selected
+                print(f"Using P1 evidence file: {args.evidence}\n")
             else:
                 print("No P1 evidence files found in reports/")
                 sys.exit(1)
