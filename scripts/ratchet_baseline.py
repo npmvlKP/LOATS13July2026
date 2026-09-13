@@ -251,8 +251,13 @@ History (most recent last):
        repo-wide lock or are refused rc=4 before any test runs;
        born-RED proven, green in plain and --cov parent modes.
        Ceiling 412->413.)
+  414  Coverage mutual-exclusion wave (2026-09-13), commit 2 of 2:
+       +1 (docs/audit-history/13Sep2026-coverage-lock-guard-wave.md -
+       wave record: writer-class inventory, root cause, guard
+       contract, measured verification state. Ceiling 413->414;
+       the record itself is the +1 this entry accounts for.)
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 413
+TRACKED_FILE_CEILING = 414
