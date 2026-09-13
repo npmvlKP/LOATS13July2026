@@ -53,13 +53,25 @@ def test_logging_test_mode(monkeypatch):
     assert len(console_handlers) > 0, "Console handler should be configured"
 
 
-def test_logging_production_mode(monkeypatch):
-    """Test that logging is configured correctly in production mode."""
+def test_logging_production_mode(monkeypatch, tmp_path):
+    """Production mode anchors logs/ to the repo root, NOT the CWD.
+
+    Contract change (2026-09-13): configure_logging previously created a
+    CWD-relative ./logs, which crashed with PermissionError under any
+    scheduled task whose CWD is not the repo (System32) -- the 06:17-06:23
+    watchdog resume crashes. The directory must appear at the anchored
+    repo-root location and never in a foreign CWD.
+    """
     # Remove test environment if set (monkeypatch restores it afterwards)
     monkeypatch.delenv("ENVIRONMENT", raising=False)
 
     # Import after setting environment
-    from loats.loats_logging import configure_logging
+    from loats.loats_logging import configure_logging, resolve_log_dir
+
+    # Foreign CWD: the old implementation created ./logs HERE (System32 in
+    # production). After the fix, nothing may appear in the CWD.
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("LOATS_LOG_DIR", raising=False)
 
     # Configure logging in production mode. The real directory creation is
     # the behavior under test: mocking Path.mkdir away (the old pattern)
@@ -67,16 +79,21 @@ def test_logging_production_mode(monkeypatch):
     # "Unable to configure handler 'file'" on a fresh environment.
     configure_logging(test_mode=False)
 
-    # Check that the logs directory was created for real
-    assert Path("logs").is_dir()
+    # CWD-independence: no logs directory in the foreign CWD.
+    assert not (tmp_path / "logs").exists()
 
-    # Check that both console and file handlers are configured
+    # Anchored creation: the repo-root logs/ exists and the file handler
+    # writes INSIDE it (absolute path, not a CWD-relative spelling).
+    anchored = resolve_log_dir()
+    assert anchored.is_dir()
     root_logger = logging.getLogger()
     file_handlers = [
         handler
         for handler in root_logger.handlers
         if isinstance(handler, logging.FileHandler)
     ]
+    assert len(file_handlers) > 0, "File handler should be configured"
+    assert Path(file_handlers[0].baseFilename) == anchored / "loats.log"
     console_handlers = [
         handler
         for handler in root_logger.handlers

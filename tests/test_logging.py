@@ -53,7 +53,14 @@ def test_configure_logging_test_mode():
 
 
 def test_configure_logging_production_mode(tmp_path, monkeypatch):
-    """Test logging configured correctly production mode."""
+    """Production logging anchors logs/ to the repo root, not the CWD.
+
+    Contract change (2026-09-13): the CWD-relative ./logs crashed with
+    PermissionError under scheduled tasks whose CWD is not the repo
+    (System32) -- the 06:17-06:23 watchdog resume crashes. The chdir to a
+    foreign temp cwd is the regression leg: the old implementation created
+    ./logs there; the fixed implementation must not.
+    """
     # Reset logging configuration avoid interference
     logging.root.handlers = []
 
@@ -61,20 +68,22 @@ def test_configure_logging_production_mode(tmp_path, monkeypatch):
     monkeypatch.delenv("ENVIRONMENT", raising=False)
 
     # Import after setting environment
-    from loats.loats_logging import configure_logging
+    from loats.loats_logging import configure_logging, resolve_log_dir
 
-    # Run in a hermetic cwd: a fresh checkout has no logs/ directory, and
-    # production mode must create it. The real directory creation is the
-    # behavior under test -- mocking Path.mkdir away (the old pattern)
+    # Run in a hermetic FOREIGN cwd. The real directory creation is still
+    # the behavior under test -- mocking Path.mkdir away (the old pattern)
     # starves the RotatingFileHandler and dictConfig fails with
     # "Unable to configure handler 'file'" on a fresh environment.
     monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("LOATS_LOG_DIR", raising=False)
 
     # Configure logging production mode
     configure_logging(test_mode=False)
 
-    # Check logs directory was created for real
-    assert Path("logs").is_dir()
+    # CWD-independence: nothing in the foreign cwd, everything anchored.
+    assert not (tmp_path / "logs").exists()
+    anchored = resolve_log_dir()
+    assert anchored.is_dir()
 
     # Check both console file handlers configured
     root_logger = logging.getLogger()
@@ -90,12 +99,27 @@ def test_configure_logging_production_mode(tmp_path, monkeypatch):
     ]
 
     assert len(file_handlers) > 0, "File handler configured production mode"
+    assert Path(file_handlers[0].baseFilename) == anchored / "loats.log"
     assert len(console_handlers) > 0, "Console handler configured production mode"
 
-    # Release the file handles on the temp directory.
+    # Release the file handles on the anchored directory.
     for handler in file_handlers:
         handler.close()
         root_logger.removeHandler(handler)
+
+
+def test_resolve_log_dir_env_override(tmp_path, monkeypatch):
+    """LOATS_LOG_DIR redirects the anchored logs directory (P5_RUN_LOG_DIR pattern)."""
+    from loats.loats_logging import resolve_log_dir
+
+    monkeypatch.chdir(tmp_path)
+    override = tmp_path / "ops-logs"
+    monkeypatch.setenv("LOATS_LOG_DIR", str(override))
+    assert resolve_log_dir() == override
+    monkeypatch.delenv("LOATS_LOG_DIR", raising=False)
+    monkeypatch.delenv("ENVIRONMENT", raising=False)
+    assert resolve_log_dir() != override
+    assert resolve_log_dir().name == "logs"
 
 
 def _render_one_warning() -> str:
@@ -169,7 +193,7 @@ def test_logs_directory_not_created_in_test_mode():
 
 
 def test_logs_directory_created_in_production_mode(tmp_path, monkeypatch):
-    """Test logs directory created production mode."""
+    """Production mode creates the ANCHORED logs dir, not ./logs in the CWD."""
     # Reset logging configuration avoid interference
     logging.root.handlers = []
 
@@ -177,19 +201,22 @@ def test_logs_directory_created_in_production_mode(tmp_path, monkeypatch):
     monkeypatch.delenv("ENVIRONMENT", raising=False)
 
     # Import after setting environment
-    from loats.loats_logging import configure_logging
+    from loats.loats_logging import configure_logging, resolve_log_dir
 
-    # Hermetic cwd: assert the real directory creation (see
-    # test_configure_logging_production_mode for why mkdir is not mocked).
+    # Hermetic FOREIGN cwd: assert the real directory creation at the
+    # anchored location (see test_configure_logging_production_mode for
+    # why mkdir is not mocked).
     monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("LOATS_LOG_DIR", raising=False)
 
     # Configure logging production mode
     configure_logging(test_mode=False)
 
-    # Check logs directory created
-    assert Path("logs").is_dir()
+    # Check anchored logs directory created; nothing in the foreign CWD.
+    assert not (tmp_path / "logs").exists()
+    assert resolve_log_dir().is_dir()
 
-    # Release the file handles on the temp directory.
+    # Release the file handles on the anchored directory.
     root_logger = logging.getLogger()
     for handler in [
         h for h in root_logger.handlers if isinstance(h, logging.FileHandler)
@@ -199,7 +226,7 @@ def test_logs_directory_created_in_production_mode(tmp_path, monkeypatch):
 
 
 def test_environment_based_logging_configuration(tmp_path, monkeypatch):
-    """Test logging configuration based ENVIRONMENT variable."""
+    """ENVIRONMENT=test suppresses file logging; production anchors logs/."""
     # Test ENVIRONMENT=test verify logs directory created
     monkeypatch.setenv("ENVIRONMENT", "test")
 
@@ -216,16 +243,18 @@ def test_environment_based_logging_configuration(tmp_path, monkeypatch):
     logging.root.handlers = []
 
     # Import configure logging explicitly test production mode
-    from loats.loats_logging import configure_logging
+    from loats.loats_logging import configure_logging, resolve_log_dir
 
-    # Hermetic cwd (see test_configure_logging_production_mode).
+    # Hermetic FOREIGN cwd (see test_configure_logging_production_mode).
     monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("LOATS_LOG_DIR", raising=False)
 
     # Configure logging production mode
     configure_logging(test_mode=False)
 
-    # Check logs directory created (this indicates production mode)
-    assert Path("logs").is_dir()
+    # Check anchored logs directory created; nothing in the foreign CWD.
+    assert not (tmp_path / "logs").exists()
+    assert resolve_log_dir().is_dir()
 
     # Release the file handles on the temp directory.
     root_logger = logging.getLogger()
