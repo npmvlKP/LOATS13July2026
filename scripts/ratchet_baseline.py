@@ -232,8 +232,21 @@ History (most recent last):
        11-test trade-decision persistence net; db-module margins
        moved 81.9/82.0 -> 85/88 measured. Ceiling 410->411; the
        wave's code delta itself was append-only and held 410.)
+  412  Verifier-gate integrity wave (2026-09-13): +1
+       (docs/audit-history/13Sep2026-verifier-gate-integrity.md -
+       wave record for the two born-red external verifier gates
+       repaired to outcome-scoped grading: verify_coverage_full.py
+       (undeclared pytest-timeout flag, stale-artifact grading,
+       failing-summary substring heuristic, frozen 5-file subset
+       scope vs the repo-wide fail_under) and
+       verify_todo24_external.py (line-number pin, exact test-name
+       list, historical docstring prose on the canonical floor
+       gate); +12 regression nets in
+       tests/test_todo25_verifier_gates.py sections 8-9. Ceiling
+       411->412; the wave's code delta itself was append-only and
+       held 411.)
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 411
+TRACKED_FILE_CEILING = 412
