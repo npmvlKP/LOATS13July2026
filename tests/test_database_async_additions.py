@@ -1214,3 +1214,88 @@ class TestTradeDecisionAsyncDispatch:
         finally:
             await temp_db.async_close_all()
             temp_db.close_all()
+
+    @pytest.mark.asyncio
+    async def test_async_log_audit_jsonl_failure_aborts_db_write(
+        self, temp_db: Database
+    ) -> None:
+        """A failed JSONL write aborts the DB write and raises RuntimeError.
+
+        Pins the async half of the dual-write guarantee documented on the
+        sync ``_log_audit`` (database.py: "If JSONL write fails, exception
+        is raised before DB commit"): the raise-and-abort branch in the
+        aiosqlite-backed implementation (database_async_additions.py) was
+        never executed by any test.  The failure is REAL filesystem I/O --
+        the audit path is pointed at an existing directory, so the append
+        open fails with PermissionError (Windows) / IsADirectoryError
+        (POSIX), both OSError subtypes -- not a mock.
+        """
+        await temp_db.async_initialize()
+        try:
+            assert temp_db._async_pool is not None
+
+            jsonl_dir = temp_db.audit_log_path.with_suffix(".jsonl_dir")
+            jsonl_dir.mkdir()
+            temp_db.audit_log_path = jsonl_dir
+
+            entity_id = "decision_20260913020000000000_c0000010"
+            with pytest.raises(RuntimeError, match="Database commit aborted"):
+                await temp_db.async_log_audit(
+                    action="ROUTE",
+                    entity_type="trade_decision",
+                    entity_id=entity_id,
+                    metadata={"outcome": "injected_jsonl_failure"},
+                )
+
+            # DB trail: the commit must never have happened.
+            rows = temp_db.get_audit_log(entity_type="trade_decision", limit=10)
+            assert [r for r in rows if r.entity_id == entity_id] == []
+            # JSONL trail: the path is still the directory -- no file was
+            # half-written behind the failed append.
+            assert temp_db.audit_log_path.is_dir()
+        finally:
+            await temp_db.async_close_all()
+            temp_db.close_all()
+
+    @pytest.mark.asyncio
+    async def test_async_log_audit_no_pool_delegates_to_sync_dual_write(
+        self, temp_db: Database
+    ) -> None:
+        """Without a pool, the bound impl delegates to the public wrapper.
+
+        Pins the pool-None branch of ``_async_log_audit``: it re-enters
+        ``Database.async_log_audit``, which routes to the to_thread sync
+        dual-write.  The public wrapper never reaches that branch on its
+        own when the pool is absent, so the delegation is exercised
+        directly against the bound implementation and asserted as the
+        dual-write consistency invariant: the SAME entry (same sha256
+        hash) lands in BOTH trails.
+        """
+        assert temp_db._async_pool is None
+
+        entity_id = "decision_20260913020000000000_c0000011"
+        # Bound at runtime by extend_database_class(); invisible statically.
+        await cast("Any", temp_db)._async_log_audit(
+            action="ROUTE",
+            entity_type="trade_decision",
+            entity_id=entity_id,
+            metadata={"outcome": "no_pool_delegation"},
+            new_state={"status": "ROUTED"},
+        )
+
+        # JSONL trail: exactly one row for the entity.
+        rows = [
+            json.loads(line)
+            for line in temp_db.audit_log_path.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+        hits = [r for r in rows if r["entity_id"] == entity_id]
+        assert len(hits) == 1
+
+        # DB trail: the sync dual-write persisted the same entry with the
+        # same chain hash -- the two trails agree.
+        db_rows = temp_db.get_audit_log(entity_type="trade_decision", limit=10)
+        db_hits = [r for r in db_rows if r.entity_id == entity_id]
+        assert len(db_hits) == 1
+        assert db_hits[0].action == "ROUTE"
+        assert db_hits[0].sha256_hash == hits[0]["sha256_hash"]
