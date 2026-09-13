@@ -256,8 +256,13 @@ History (most recent last):
        wave record: writer-class inventory, root cause, guard
        contract, measured verification state. Ceiling 413->414;
        the record itself is the +1 this entry accounts for.)
+  415  Bandit nosec-currency wave (2026-09-13), commit 1 of 2: +1
+       (tests/test_bandit_nosec_currency.py - 3-test net: zero
+       "nosec encountered" notes on the src/ scan, zero findings,
+       retry.py B311 annotation pinned; born-RED proven with exactly
+       the four database.py notes. Ceiling 414->415.)
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 414
+TRACKED_FILE_CEILING = 415
