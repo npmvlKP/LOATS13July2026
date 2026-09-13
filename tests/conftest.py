@@ -53,6 +53,93 @@ os.environ.pop("GIT_DIR", None)
 os.environ.pop("GIT_INDEX_FILE", None)
 os.environ.pop("GIT_WORK_TREE", None)
 
+# Coverage mutual-exclusion guard (2026-09-13 incident). Every coverage
+# writer in this repo -- manual ``pytest --cov`` runs, CI's
+# pytest-coverage job, the pre-push pytest hook, and the embedded
+# full-suite runs of scripts/verify_coverage_full.py,
+# fr7_health_check.py (HC-12) and verify_hc_all.py -- is a pytest
+# process, so THIS conftest is the single choke point for the class.
+# pytest-cov writes a per-process parallel data file
+# (.coverage.<host>.<pid>.<rand>) and combines every sibling file at
+# session end; two concurrent writers make one combine() sweep the
+# other's still-open file, which on Windows dies with
+# ``PermissionError: [WinError 32]`` as a pytest INTERNALERROR (live
+# 2026-09-13: 1815 passed, then the verdict was lost at combine time,
+# and the surviving green run overwrote .pytest_cache lastfailed so the
+# lost run's single real failure became unidentifiable). A --cov run
+# therefore takes an exclusive cross-process lock for the whole session
+# or is refused fail-closed (exit code 4) BEFORE any test runs.
+# The lock file lives in .git/: invisible to status by construction
+# (the tracked-file ceiling sits at zero headroom; no slot is spent),
+# and on the same drive as the data it guards.
+COV_LOCK_ENABLED = os.environ.get("LOATS_COV_LOCK_DISABLED") != "1"
+import sys  # conftest env-first layout; E402 granted per-file in pyproject
+
+if sys.platform == "win32":
+    import msvcrt
+else:
+    import fcntl
+
+# Module-global handle: a pytest_configure local would be garbage
+# collected when the hook returns, closing the file and silently
+# releasing the OS lock after the first test. Held for the interpreter
+# lifetime; the OS reclaims the lock at process exit on any path.
+_COV_LOCK_HANDLE = None
+
+
+def _cov_lock_path(repo_root: Path) -> Path:
+    """Exclusive-lock file for coverage writers (inside .git/: untracked)."""
+    return repo_root / ".git" / "coverage_gate.lock"
+
+
+def _cov_requested(argv: list[str]) -> bool:
+    """True when this pytest invocation requests coverage anywhere.
+
+    Any ``--cov*`` token counts (``--cov``, ``--cov=src``,
+    ``--cov-branch``, ``--cov-report=...``), wherever it appears: a run
+    that asks for coverage writes coverage data files and participates
+    in the combine sweep. False-positive direction is fail-safe (a
+    non-coverage run may be refused; a coverage run must never be
+    admitted while the gate is held).
+    """
+    return any(arg.startswith("--cov") for arg in argv)
+
+
+def _acquire_coverage_lock(lock_path: Path):
+    """Take an exclusive cross-process lock; ``None`` when already held.
+
+    msvcrt byte-range lock on Windows, fcntl.flock elsewhere. Returns
+    the open binary handle (the lock lives as long as the handle) or
+    ``None`` when another coverage writer holds the gate -- or when the
+    guard is disabled via ``LOATS_COV_LOCK_DISABLED=1`` (callers gate
+    on ``COV_LOCK_ENABLED`` before treating ``None`` as a refusal).
+    """
+    if not COV_LOCK_ENABLED:
+        return None
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    handle = open(lock_path, "a+b")
+    try:
+        if sys.platform == "win32":
+            msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+        else:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        handle.close()
+        return None
+    return handle
+
+
+def _release_coverage_lock(handle) -> None:
+    """Unlock and close a lock handle; tolerates a refused (``None``)."""
+    if handle is None:
+        return
+    try:
+        if sys.platform == "win32":
+            msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+    finally:
+        handle.close()
+
+
 from loats.database import Database
 from loats.models import (
     HistoricalData,
@@ -207,12 +294,37 @@ def pytest_configure(config: pytest.Config) -> None:
     to prevent import-time Settings() validation failures.  The assignments
     below are kept as a defensive backstop using setdefault so they never
     accidentally overwrite values injected by a CI pipeline or tox config.
+
+    Coverage mutual-exclusion guard (session scope, before any test
+    runs): a --cov invocation acquires the repo-wide exclusive lock or
+    refuses fail-closed. Non-coverage runs are never gated; a refused
+    re-acquire (this process already holds the lock) proceeds silently.
     """
     os.environ.setdefault("ENVIRONMENT", "test")
     os.environ.setdefault("OPENALGO_API_KEY", "test_api_key")
     os.environ.setdefault("OPENALGO_BASE_URL", "https://test.openalgo.com")
     os.environ.setdefault("TELEGRAM_BOT_TOKEN", "test_bot_token")
     os.environ.setdefault("TELEGRAM_CHAT_ID", "123456789")
+
+    global _COV_LOCK_HANDLE
+    if COV_LOCK_ENABLED and _cov_requested(sys.argv):
+        repo_root = Path(__file__).resolve().parent.parent
+        handle = _acquire_coverage_lock(_cov_lock_path(repo_root))
+        if handle is None:
+            # pytest.exit is the only sanctioned exit from a hook:
+            # sys.exit() here is swallowed by the mainloop and
+            # re-raised as an INTERNALERROR with exit code 3.
+            pytest.exit(
+                "REFUSED: another pytest --cov run is active in this "
+                "repo. Concurrent coverage writers corrupt each other's "
+                "combine step on Windows (WinError 32); this guard "
+                "serializes them. Wait for the active run to finish, or "
+                "set LOATS_COV_LOCK_DISABLED=1 to bypass "
+                "(single-writer-certain situations only).",
+                returncode=4,
+            )
+        _COV_LOCK_HANDLE = handle
+        os.environ["LOATS_COV_LOCK_ACTIVE"] = "1"
 
 
 @pytest.fixture(autouse=True, scope="function")

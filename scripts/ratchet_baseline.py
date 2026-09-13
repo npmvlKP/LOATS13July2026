@@ -245,8 +245,19 @@ History (most recent last):
        tests/test_todo25_verifier_gates.py sections 8-9. Ceiling
        411->412; the wave's code delta itself was append-only and
        held 411.)
+  413  Coverage mutual-exclusion wave (2026-09-13), commit 1 of 2: +1
+       (tests/test_coverage_lock_guard.py - 14-test net for the
+       conftest coverage-writer lock: --cov runs take an exclusive
+       repo-wide lock or are refused rc=4 before any test runs;
+       born-RED proven, green in plain and --cov parent modes.
+       Ceiling 412->413.)
+  414  Coverage mutual-exclusion wave (2026-09-13), commit 2 of 2:
+       +1 (docs/audit-history/13Sep2026-coverage-lock-guard-wave.md -
+       wave record: writer-class inventory, root cause, guard
+       contract, measured verification state. Ceiling 413->414;
+       the record itself is the +1 this entry accounts for.)
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 412
+TRACKED_FILE_CEILING = 414
