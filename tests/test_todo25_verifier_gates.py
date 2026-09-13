@@ -24,6 +24,13 @@ surface (hygiene ceiling, F8-C-02 verifier, both TODO-21 verifiers)
 must agree on a single baseline, so re-pinning one surface without the
 others cannot pass CI again (the 416-vs-426 split shipped exactly that
 way and left two committed gates failing at HEAD).
+
+Sections 8-9 (2026-09-13 verifier-gate-integrity wave) extend the file
+beyond its original TODO-25 scope: they pin the gate contracts of
+verify_coverage_full.py (fresh evidence, CI-parity scope, rc+count
+grading) and verify_todo24_external.py (outcome-based pins instead of
+stale line-number/name-list/prose idioms) after both verifiers were
+repaired from born-red states.
 """
 
 from __future__ import annotations
@@ -650,3 +657,193 @@ class TestP1EvidenceSelectionDeterminism:
             assert self.CANONICAL in source, (
                 f"{script.name} no longer pins the canonical P1 evidence-of-record name"
             )
+
+
+# ---------------------------------------------------------------------------
+# 8. verify_coverage_full.py gate contract (2026-09-13 wave)
+# ---------------------------------------------------------------------------
+_COVERAGE_VERIFIER = REPO_ROOT / "scripts" / "verify_coverage_full.py"
+
+
+class TestVerifyCoverageFullGate:
+    """verify_coverage_full.py must grade a fresh, real pytest run.
+
+    Three defects, live-reproduced 2026-09-13: (1) the embedded pytest
+    command carried ``--timeout=10``, a flag owned by the undeclared
+    ``pytest-timeout`` plugin, so the run died with an argparse usage
+    error (rc 4) on every compliant environment; (2) the verifier then
+    graded a STALE root coverage.json left by an earlier unrelated run
+    and printed "[PASS] coverage.json generated"; (3) the stdout
+    heuristic ``"passed" in line`` also accepts a failing summary such
+    as ``2 failed, 500 passed``.
+    """
+
+    def test_embedded_pytest_uses_no_undeclared_plugin_flags(self) -> None:
+        """Every pytest flag the verifier embeds must exist in the
+        installed pytest's own vocabulary -- a flag from an absent
+        plugin (pytest-timeout et al.) makes the gate born-red."""
+        source = _COVERAGE_VERIFIER.read_text(encoding="utf-8")
+        assert source, "verify_coverage_full.py is empty"
+
+        # Extract the embedded command list and pull its flags.
+        cmd_match = re.search(r"cmd = \[(.*?)\]", source, re.DOTALL)
+        assert cmd_match, "embedded pytest command list not found"
+        flags = set(re.findall(r'"(--[A-Za-z-]+)', cmd_match.group(1)))
+
+        # Canonical vocabulary: the installed pytest's --help text.
+        proc = subprocess.run(
+            [_python(), "-m", "pytest", "--help"],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=60,
+        )
+        help_text = proc.stdout
+        assert help_text, "pytest --help produced no output"
+
+        unknown = [
+            f for f in flags if not (f in help_text or f.split("=", 1)[0] in help_text)
+        ]
+        assert not unknown, (
+            f"verify_coverage_full.py embeds pytest flags unknown to the "
+            f"installed pytest: {unknown}. A flag owned by an undeclared "
+            "plugin makes the embedded run die with an argparse usage "
+            "error before any test executes (born-red gate)."
+        )
+        # The defect that motivated this net, pinned by name.
+        assert "--timeout" not in flags or "pytest-timeout" in help_text, (
+            "--timeout requires the pytest-timeout plugin, which is not "
+            "a declared dependency of this repository"
+        )
+
+    def test_report_path_is_pinned_and_stale_copy_is_unlinked(self) -> None:
+        """The report path must be pinned via --cov-report=json:<path>
+        and any pre-existing file at that path deleted BEFORE the run,
+        so a crashed run can never leave stale evidence to be graded."""
+        source = _COVERAGE_VERIFIER.read_text(encoding="utf-8")
+        cov_marker = re.search(r"--cov-report=json:([A-Za-z0-9_.\\/-]+)", source)
+        assert cov_marker, (
+            "coverage report path not pinned via --cov-report=json:<path>; "
+            "an unpinned path lets pytest write wherever its config points "
+            "while the verifier reads a different file"
+        )
+        assert cov_marker.group(1).endswith("coverage.json")
+        # Unlink must precede the subprocess.run invocation in the source.
+        unlink_pos = source.find("cov_path.unlink()")
+        run_pos = source.find("subprocess.run(")
+        assert unlink_pos != -1 and run_pos != -1 and unlink_pos < run_pos, (
+            "stale coverage.json must be unlinked before the embedded "
+            "pytest run starts (fresh-evidence contract)"
+        )
+
+    def test_grade_requires_rc_zero_and_zero_failed(self) -> None:
+        """The pass verdict must combine exit code and parsed counts:
+        a summary like '2 failed, 500 passed' must NOT satisfy the
+        substring heuristic that previously graded it green."""
+        source = _COVERAGE_VERIFIER.read_text(encoding="utf-8")
+        assert "result.returncode == 0" in source, (
+            "verdict must require the embedded pytest exit code to be 0"
+        )
+        assert "n_failed == 0" in source, (
+            "verdict must require zero failed tests, not merely the "
+            "substring 'passed' (which failing summaries also contain)"
+        )
+        assert '"passed" in line for line in lines' not in source, (
+            "the old substring grading heuristic is still present"
+        )
+        # Both counters must be parsed from the summary via regexes.
+        assert re.search(r"_SUMMARY_(PASSED|FAILED)_RE", source)
+
+
+# ---------------------------------------------------------------------------
+# 9. verify_todo24_external.py outcome-based pins (2026-09-13 wave)
+# ---------------------------------------------------------------------------
+_T24_VERIFIER = REPO_ROOT / "scripts" / "verify_todo24_external.py"
+
+
+class TestVerifyTodo24ExternalOutcomePins:
+    """The TODO-24 verifier must pin the gate's CONTRACT, not its text.
+
+    Live-verified 2026-09-13: three checks failed on a correct
+    implementation because the gate legitimately outgrew the pinned
+    idioms -- the success sys.exit(0) moved off line 177, unit tests
+    were renamed by the behavioral-class wave, and the docstring
+    stopped carrying the historical "80%"/"threshold" prose. A
+    verifier that fails on correct code is as broken as one that
+    passes broken code (F8-M-03 lesson, outcome-scoped restatement).
+    """
+
+    def test_no_line_number_pin_in_verifier(self) -> None:
+        source = _T24_VERIFIER.read_text(encoding="utf-8")
+        # The historical bug: "line 177" pinned the success exit's line.
+        assert "line 177" not in source, (
+            "verifier still pins a historical line number; the success "
+            "exit must be graded by position (final exit statement), "
+            "not by line number"
+        )
+        assert re.search(r"exit_lines\[-1\]", source), (
+            "verifier must grade the final exit statement positionally"
+        )
+
+    def test_unit_test_discovery_is_ast_based(self) -> None:
+        source = _T24_VERIFIER.read_text(encoding="utf-8")
+        assert "ast.parse" in source, (
+            "unit-test discovery must parse the test file with ast "
+            "(renames/additions must not require verifier edits)"
+        )
+        assert "def test_exit_0_all_modules_pass_threshold" not in source, (
+            "the exact historical test-name list is still pinned"
+        )
+        for behavioral in ("_passes", "_fails", "stale", "explicit"):
+            assert behavioral in source, (
+                f"behavioral class marker {behavioral!r} missing from "
+                "the verifier's coverage requirements"
+            )
+
+    def test_documentation_check_pins_contract_not_prose(self) -> None:
+        source = _T24_VERIFIER.read_text(encoding="utf-8")
+        assert 'required_keywords = ["coverage", "floor map", "fallback"]' in source, (
+            "docstring check must demand the fail-closed fallback-map "
+            "contract (the anti-narrowing property F8-H-04 pins)"
+        )
+        # Negative half, graded on the function's CODE only (its own
+        # docstring legitimately documents the historical prose).
+        seg = source.split("def verify_documentation", 1)[1]
+        _pre, rest = seg.split('"""', 1)
+        _doc, code = rest.split('"""', 1)
+        assert '"80%"' not in code and '"threshold"' not in code, (
+            "docstring check still demands historical prose percentages"
+        )
+
+    def test_unit_test_runner_uses_repo_venv_and_counts(self) -> None:
+        source = _T24_VERIFIER.read_text(encoding="utf-8")
+        assert '"uv", "run"' not in source, (
+            "the uv-run branch resolves the wrong environment when uv "
+            "exists without the project venv; the repo venv interpreter "
+            "must be explicit"
+        )
+        assert "exit_code != 0" in source and "n_failed != 0" in source, (
+            "unit-test grading must combine exit code and parsed summary "
+            "counts (the 'passed' substring also matches failing summaries)"
+        )
+
+    def test_t24_verifier_passes_against_the_live_gate(self) -> None:
+        """End-to-end: the repaired verifier is GREEN against the real
+        gate (proves the outcome pins hold on the current tree)."""
+        proc = subprocess.run(
+            [_python(), str(_T24_VERIFIER)],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            env=_child_env(),
+            timeout=300,
+        )
+        assert proc.returncode == 0, (
+            f"verify_todo24_external.py failed on the live tree "
+            f"(rc={proc.returncode}):\n{proc.stdout[-800:]}"
+        )
+        assert "[FAIL]" not in proc.stdout
