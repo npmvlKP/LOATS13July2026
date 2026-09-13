@@ -4,6 +4,7 @@ Implements SQLite database audit trail JSONL dual-write.
 """
 
 import asyncio
+import contextlib
 import hashlib
 import json
 import sqlite3
@@ -1722,10 +1723,8 @@ class Database:
                     f"Failed to reset Rule-7 modification count for "
                     f"{order_id} on closure: {exc}"
                 )
-                try:
+                with contextlib.suppress(Exception):
                     conn.rollback()
-                except Exception:  # nosec B110
-                    pass
         return True
 
     def get_modification_count(self, order_id: str) -> int:
@@ -1788,10 +1787,8 @@ class Database:
                 )
             return int(row[0])
         except Exception as exc:
-            try:
+            with contextlib.suppress(Exception):
                 conn.rollback()
-            except Exception:  # nosec B110
-                pass
             logger.error(
                 f"Rule-7 fail-closed: modification count increment failed "
                 f"for {order_id}: {exc}"
@@ -1824,10 +1821,8 @@ class Database:
             )
             conn.commit()
         except Exception as exc:
-            try:
+            with contextlib.suppress(Exception):
                 conn.rollback()
-            except Exception:  # nosec B110
-                pass
             logger.error(f"Rule-7 count rollback failed for {order_id}: {exc}")
         finally:
             self._release_connection(conn)
@@ -1850,10 +1845,8 @@ class Database:
             conn.commit()
             return deleted
         except Exception as exc:
-            try:
+            with contextlib.suppress(Exception):
                 conn.rollback()
-            except Exception:  # nosec B110
-                pass
             logger.error(
                 f"Rule-7 fail-closed: modification count reset failed "
                 f"for {order_id}: {exc}"
