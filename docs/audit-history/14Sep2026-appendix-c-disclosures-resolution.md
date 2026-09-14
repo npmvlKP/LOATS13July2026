@@ -69,8 +69,9 @@ external verifiers, tracked-artifact JSON reads, and git object reads.
    `e6c2da34`. Its `live_evidence` scope records 100 real
    `POST /api/v1/quotes` HTTP round trips to the configured OpenAlgo
    endpoint with the quotes cache bypassed before every sample:
-   mean 57.62 ms, p95 74.05 ms, max 53.05 ms p99 (in-process scope:
-   mean 10.44 ms), against a 100 ms round-trip gate — 100/100 gate
+   mean 57.62 ms, p95 74.05 ms, max 88.2 ms (in-process scope:
+   mean 10.44 ms, max 53.05 ms), against a 100 ms round-trip gate —
+   100/100 gate
    compliance, 90/100 all-gates (the db scope's 20 ms gate absorbs the
    10 slowest local writes by design). The verifier's P1 block re-passed
    live at this HEAD (artifact tracked at the canonical path; scope
