@@ -1075,6 +1075,111 @@ class TestWorkflowFlagCurrency:
             f"ci.yml mypy step uses removed flag --output-format: {mypy_lines[0]}"
         )
 
+    @staticmethod
+    def _retention_values(text: str) -> dict[tuple[str, str], int]:
+        """Map (job, artifact name) -> retention-days for upload steps.
+
+        Line-oriented parser, no yaml dependency (suite convention): a
+        job header is an indent-2 ``<id>:`` after indent-0 ``jobs:``,
+        the ``uses: actions/upload-artifact@`` step flips the collector
+        on, and the following indent-10 ``name:`` / ``retention-days:``
+        keys feed the map.
+        """
+        retentions: dict[tuple[str, str], int] = {}
+        job: str | None = None
+        in_jobs = False
+        armed = False
+        artifact: str | None = None
+        for raw in text.splitlines():
+            stripped = raw.strip()
+            if not stripped:
+                continue
+            indent = len(raw) - len(raw.lstrip(" "))
+            if indent == 0:
+                in_jobs = stripped == "jobs:"
+                job = None
+                continue
+            if not in_jobs:
+                continue
+            if indent == 2 and stripped.endswith(":"):
+                job = stripped[:-1]
+                continue
+            if job is None:
+                continue
+            if "actions/upload-artifact@" in stripped:
+                armed = True
+                artifact = None
+                continue
+            if not armed:
+                continue
+            if stripped.startswith("name:") and artifact is None:
+                artifact = stripped.split(":", 1)[1].strip().strip("'\"")
+            elif stripped.startswith("retention-days:"):
+                retentions[(job, artifact or "<unnamed>")] = int(
+                    stripped.split(":", 1)[1].strip()
+                )
+                armed = False
+        return retentions
+
+    def test_security_yml_retention_days_within_repository_cap(self) -> None:
+        """Every upload-artifact retention-days must be <= the repo cap.
+
+        Root cause being guarded (2026-09-14): security.yml uploaded the
+        SBOM with ``retention-days: 365`` while the repository setting
+        caps artifact retention at 90. GitHub clamps the value to 90 AND
+        attaches a warning annotation to the SBOM check-run on every
+        Security Scan (verified live: runs 34789490230 and
+        34756650984, check-runs 103844601863 / 103810950455) —
+        persistent warning noise that buries real drift signals.
+        Values at or under 90 clamp to themselves silently.
+        """
+        text = self.SECURITY_YML.read_text(encoding="utf-8")
+        retentions = self._retention_values(text)
+        assert retentions, (
+            "parser found no retention-days under any upload-artifact step"
+            " in security.yml; the workflow's upload shape drifted and"
+            " this net is grading nothing — re-anchor it"
+        )
+        capped = {k: v for k, v in retentions.items() if v > 90}
+        assert not capped, (
+            "security.yml requests artifact retention beyond the"
+            f" repository cap of 90 days: {capped}. GitHub clamps these"
+            " to 90 and warns on every run; set <= 90 or raise the"
+            " repository setting deliberately"
+        )
+
+    def test_retention_parser_rejects_over_cap_synthetic(self) -> None:
+        """The parser must flag an over-cap value in synthetic YAML.
+
+        RED self-proof: guards the guard. If the line-oriented parser
+        ever stops seeing retention-days (indent drift, key rename),
+        the cap test above passes vacuously on a workflow that drifted.
+        Asserts the violation shape is detected and the compliant and
+        false-positive shapes are not.
+        """
+        violation = (
+            "jobs:\n"
+            "  sbom:\n"
+            "    steps:\n"
+            "      - uses: actions/upload-artifact@v7\n"
+            "        with:\n"
+            "          name: sbom-github\n"
+            "          retention-days: 365\n"
+        )
+        compliant = violation.replace("retention-days: 365", "retention-days: 90")
+        no_retention = (
+            "jobs:\n"
+            "  sbom:\n"
+            "    steps:\n"
+            "      - uses: actions/upload-artifact@v7\n"
+            "        with:\n"
+            "          name: sbom-github\n"
+        )
+        parser = self._retention_values
+        assert parser(violation) == {("sbom", "sbom-github"): 365}
+        assert parser(compliant) == {("sbom", "sbom-github"): 90}
+        assert parser(no_retention) == {}
+
     def test_ci_yml_gating_jobs_install_editable(self) -> None:
         """Both CI gating jobs must install the package EDITABLE.
 
