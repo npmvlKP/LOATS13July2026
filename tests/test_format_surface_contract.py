@@ -32,6 +32,7 @@ Contract enforced here:
 
 from __future__ import annotations
 
+import re
 import subprocess
 import sys
 import time
@@ -344,4 +345,51 @@ class TestAdvisoryWaiverSurfaceLockstep:
             " waiver from the pre-push hook, ci.yml, security.yml and"
             " HC-11 in one sweep, then retire this test (ADR-0010"
             " removal trigger: nltk 3.11 published)"
+        )
+
+
+class TestBlackIsNotAFormatSurface:
+    """No formatter may be configurable but unenforced (2026-09-14 wave).
+
+    Root cause this file pins: pyproject.toml carried an orphan
+    ``[tool.black]`` block while EVERY enforced surface (the ci.yml
+    ``ruff-format`` job and the pre-commit ``ruff-format`` hook) formats
+    with ruff only -- black was never installed in the project venv and
+    appears in no workflow. The orphan config made a globally installed
+    black look authoritative: ``black --check src/ tests/`` flagged 35 of
+    141 files (a style-generation mismatch on assert-message wrapping)
+    on a tree that was green against the real contract
+    (``ruff format --check``: 190/190 formatted). Enforced here, per the
+    gate-pinning rule that a ``[tool.x]`` block does not make x the gate:
+
+      1. No ``[tool.<formatter>]`` block may exist for a formatter that
+         no enforced surface invokes (ruff format IS the formatter).
+      2. Both enforcement surfaces must keep ``ruff format`` wired, so
+         removing either one cannot silently strand the contract.
+    """
+
+    FORMATTERS_WITH_TOOL_BLOCKS = ("black",)
+
+    def test_no_orphan_formatter_config_blocks(self) -> None:
+        text = _repo_relative(PYPROJECT_TOML)
+        for tool in self.FORMATTERS_WITH_TOOL_BLOCKS:
+            block = f"[tool.{tool}]"
+            assert block not in text, (
+                f"orphan {block} block found: {tool} is not installed in"
+                " the project venv, not pinned, and not invoked by any"
+                " enforced surface (ci.yml and pre-commit both format"
+                " with ruff); its config endorses a foreign formatter"
+                " and produces false reformat demands -- remove the"
+                " block or wire the tool into every surface, never"
+                " config-only"
+            )
+
+    def test_ruff_format_remains_enforced_on_both_surfaces(self) -> None:
+        ci = _repo_relative(CI_YML)
+        precommit = _repo_relative(PRECOMMIT_YML)
+        assert "ruff format --check" in ci, (
+            "ci.yml must keep the ruff-format job (ruff format --check)"
+        )
+        assert re.search(r"^\s*- id: ruff-format$", precommit, re.M), (
+            "pre-commit config must keep the ruff-format hook"
         )
