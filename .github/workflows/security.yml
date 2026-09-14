@@ -220,7 +220,12 @@ jobs:
         with:
           name: sbom-github
           path: sbom.json
-          retention-days: 365
+          # 90 == the repository's max artifact retention: GitHub clamps
+          # anything larger and warns on every run (SBOM check-run
+          # annotation noise). Keep this line <= 90; the pin test
+          # test_security_yml_retention_days_within_repository_cap
+          # fails the wave otherwise.
+          retention-days: 90
 
   # ============================================================
   # Summary Report
