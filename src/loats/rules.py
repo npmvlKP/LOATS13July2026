@@ -342,7 +342,7 @@ class CMPRulesEngine:
 
         Rules:
         - IV-rank > 40 / ADX < 25 / VIX > 15 for SELL
-        - IV-rank < 60 / ADX > 25 / VIX < 15 for BUY
+        - IV-rank < 30 / ADX > 25 / VIX < 15 for BUY
         - Session must be REGULAR
         - Signal strength must be sufficient
         """
