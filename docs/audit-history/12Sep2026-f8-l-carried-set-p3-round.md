@@ -169,3 +169,37 @@ ceiling. Root-cause fix in `.gitignore` (root-anchored `/pip_audit_*.json`
 and `/pip-audit_*.json`, both spellings, matching the 09Sep
 `gitleaks_session.json` precedent); the staged copies were unstaged and
 removed. Net tracked delta of this addendum: 0 (409 = ceiling).
+
+## Monday 14Sep addendum — Finding 1 CLOSED (live-session confirmation, 09:15 IST)
+
+The confirmation run scheduled by the disposition above executed on
+Monday 2026-09-14 ~09:15 IST. Preflight: `127.0.0.1:5000` LISTENING,
+`GET /` → HTTP 200 — and the listener is a THIRD instance process
+(`python.exe` PID 23912; the 12Sep post-restart PID 30492 is gone), so
+the gate below passed against a freshly restarted instance, further
+narrowing the 12Sep disposition (degradation was process-lifecycle-bound,
+not environmental).
+
+| Run | Symbol | Samples ok | Mean | Median | P95 | Gate pass |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| 6 | TCS | 100/100 | 73.49 ms | 68.54 ms | 88.59 ms | **97% — PASS** |
+
+`scripts/collect_p1_phase_gate_evidence.py --live-endpoint --samples 100
+--symbol TCS` (repo venv) → exit 0, "P1 PHASE-GATE: PASSED
+(live-endpoint evidence)". All 100 raw `live_duration_ms` values were
+recomputed independently of the stored summary — mean, median and the
+97.00% <100 ms share match exactly (P95 differs only by percentile
+convention); distribution min 64.68 ms, max 218.25 ms (3 samples
+>100 ms). Mean is +9% vs run 5 — inside restart-to-restart noise — and
+two full trading days away from the degraded 235–399 ms / 20–22%
+profile. Evidence `reports/p1_analyze_latency_20260914_034656.json`
+(gitignored run artifact; the tracked 04Sep evidence-of-record is
+unchanged).
+
+Disposition final: Finding 1's standing risk is CLOSED. The
+reclassification criterion set on 12Sep (Monday confirmation with mean
+well under the 100 ms gate and pass ≥80%) is met on the second
+independent session and across a fresh instance process. No latency
+risk remains attached to this carried set. Recorded as an in-tree edit
+to this file: the tracked-file ceiling sits at 417 (zero headroom), so
+the closure consumes no new file slot.
