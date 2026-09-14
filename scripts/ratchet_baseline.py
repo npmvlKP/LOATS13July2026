@@ -271,8 +271,14 @@ History (most recent last):
        docs/audit-history/14Sep2026-fr7-todo-disposition-reverification.md
        (live re-grade of the 01Sep disposition table at HEAD e648f91;
        the +1 is this record. Ceiling 417->418.)
+  419  Appendix C disclosures resolution (2026-09-14): +1
+       (docs/audit-history/14Sep2026-appendix-c-disclosures-resolution.md
+       - live re-verification of the six 01Sep Appendix C "not enough
+       evidence" disclosures: 4 resolved with execution evidence, 2
+       carried by design. Ceiling 418->419; the record is the +1 this
+       entry accounts for.)
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 418
+TRACKED_FILE_CEILING = 419
