@@ -380,7 +380,6 @@ Run these commands to validate the deployment:
 # Quality Gates
 ruff check src/ tests/ --config pyproject.toml
 ruff format --check src/ tests/ --config pyproject.toml
-black --check src/ tests/ --config pyproject.toml
 isort --check-only src/ tests/ --settings-path pyproject.toml
 mypy src/ --strict --config-file pyproject.toml
 bandit -r src/ -c pyproject.toml
