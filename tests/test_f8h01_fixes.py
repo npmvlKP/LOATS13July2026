@@ -200,6 +200,129 @@ class TestRunnerLogDirOverride:
         )
 
 
+class TestManualDryRunQuarantine:
+    """A manual ``--dry-run`` (no P5_RUN_LOG_DIR) must write its stub into
+    the repo's sanctioned quarantine dir, never the live evidence stream.
+
+    Live defect (2026-09-15): the smoke command defaulted into ``reports/``
+    — the F8-H-01 hygiene guard condemned the stub and both live-tree
+    gates went red. Root cause: P5_RUN_LOG_DIR isolation was pinned for
+    test/CI callers only; the human CLI path had no safe default. Fix:
+    dry-run smokes default to ``reports/health/p5-verify-stubs``
+    (gitignored — the verifier's own quarantine since the 2026-09-08
+    wave); P5_RUN_LOG_DIR still wins wherever a caller pins it; live
+    supervised runs are untouched.
+    """
+
+    def test_manual_dry_run_writes_quarantine_not_reports(self) -> None:
+        """End-to-end: bare ``--dry-run`` leaves reports/ byte-identical."""
+        import subprocess
+
+        env = {k: v for k, v in os.environ.items() if k != "P5_RUN_LOG_DIR"}
+        reports = REPO_ROOT / "reports"
+        before = set(reports.glob("p5_forward_test_*.json"))
+        proc = subprocess.run(
+            [
+                sys.executable,
+                str(REPO_ROOT / "scripts" / "run_p5_forward_test.py"),
+                "--dry-run",
+            ],
+            capture_output=True,
+            text=True,
+            cwd=REPO_ROOT,
+            timeout=180,
+            env=env,
+        )
+        assert proc.returncode == 0, proc.stderr
+        after = set(reports.glob("p5_forward_test_*.json"))
+        assert after == before, (
+            "manual dry-run dropped a stub into reports/: "
+            f"{sorted(p.name for p in after - before)}"
+        )
+        quarantine = reports / "health" / "p5-verify-stubs"
+        assert list(quarantine.glob("p5_forward_test_*.json")), (
+            "dry-run stub must land in the sanctioned quarantine dir"
+        )
+
+    def test_dry_run_log_dir_default_is_quarantine(self) -> None:
+        import runpy
+
+        mod_path = REPO_ROOT / "scripts" / "run_p5_forward_test.py"
+        old = os.environ.pop("P5_RUN_LOG_DIR", None)
+        try:
+            mod = runpy.run_path(str(mod_path), run_name="p5_runner_probe3")
+            assert mod["DRY_RUN_LOG_DIR"] == (
+                REPO_ROOT / "reports" / "health" / "p5-verify-stubs"
+            )
+        finally:
+            if old is not None:
+                os.environ["P5_RUN_LOG_DIR"] = old
+
+    def test_dry_run_log_dir_env_override_wins(self, tmp_path: Path) -> None:
+        import runpy
+
+        mod_path = REPO_ROOT / "scripts" / "run_p5_forward_test.py"
+        old = os.environ.get("P5_RUN_LOG_DIR")
+        try:
+            os.environ["P5_RUN_LOG_DIR"] = str(tmp_path)
+            mod = runpy.run_path(str(mod_path), run_name="p5_runner_probe4")
+            assert str(mod["DRY_RUN_LOG_DIR"]) == str(tmp_path)
+        finally:
+            if old is None:
+                os.environ.pop("P5_RUN_LOG_DIR", None)
+            else:
+                os.environ["P5_RUN_LOG_DIR"] = old
+
+    def test_live_run_log_dir_default_unchanged(self) -> None:
+        """Live supervised runs still default to the evidence stream — the
+        quarantine is a dry-run-only redirect, never a live-run one."""
+        import runpy
+
+        mod_path = REPO_ROOT / "scripts" / "run_p5_forward_test.py"
+        old = os.environ.pop("P5_RUN_LOG_DIR", None)
+        try:
+            mod = runpy.run_path(str(mod_path), run_name="p5_runner_probe5")
+            assert mod["RUN_LOG_DIR"] == REPO_ROOT / "reports"
+        finally:
+            if old is not None:
+                os.environ["P5_RUN_LOG_DIR"] = old
+
+    def test_guard_never_scans_the_quarantine(self, tmp_path, monkeypatch) -> None:
+        """Self-proof: stubs parked in the sanctioned quarantine dir can
+        never trip the hygiene guard — the guard scans ``reports/`` top
+        level only, and the quarantine lives one level deeper."""
+        import importlib.util
+        import json
+
+        guard_path = REPO_ROOT / "scripts" / "check_repo_hygiene.py"
+        spec = importlib.util.spec_from_file_location(
+            "check_repo_hygiene_probe_q", guard_path
+        )
+        assert spec is not None and spec.loader is not None
+        guard = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(guard)
+
+        reports = tmp_path / "reports"
+        quarantine = reports / "health" / "p5-verify-stubs"
+        quarantine.mkdir(parents=True)
+        stub = quarantine / "p5_forward_test_20260915_020551.json"
+        stub.write_text(
+            json.dumps(
+                {
+                    "metadata": {
+                        "phase_gate": "P5",
+                        "script": "scripts/run_p5_forward_test.py",
+                        "dry_run": True,
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        monkeypatch.setattr(guard, "REPO_ROOT", tmp_path)
+        assert guard._p5_dry_run_stubs() == []
+
+
 class TestTestDataIsolation:
     """The pytest process must never bind production data files."""
 
