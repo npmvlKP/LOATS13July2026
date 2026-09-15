@@ -10,6 +10,7 @@ Implements TradeDecision creation and routing to Analyzer:
 
 import asyncio
 import datetime
+import os
 from enum import StrEnum
 from typing import Any
 
@@ -74,6 +75,17 @@ class TradeDecisionEngine:
             "disabled": 0,
             "error": 0,
         }
+        # F9-C-02 (2026-09-15): provenance state for the routing flag.
+        # ``_routing_claimed_enabled`` records what the operator/supervisor
+        # CLAIMED via enable/disable_analyzer_routing(); the divergence
+        # guard compares it against the effective flag at route time so a
+        # claimed-enabled engine can never silently route ``disabled``
+        # (the signature that voided the 15Sep P5 evidence).
+        self._routing_claimed_enabled: bool = False
+        self._divergence_silence_s: float = float(
+            os.environ.get("LOATS_ROUTING_DIVERGENCE_SILENCE_S", "900")
+        )
+        self._last_divergence_alarm_at: datetime.datetime | None = None
 
     async def _audit_rejection(
         self,
@@ -458,6 +470,23 @@ class TradeDecisionEngine:
         fabricate a successful Analyzer response.
         """
         if not self.analyzer_routing_enabled:
+            # F9-C-02 (2026-09-15): provenance guard. A ``disabled``
+            # outcome on an engine whose routing was explicitly CLAIMED
+            # enabled (P5 supervisor path) is the divergence signature
+            # that voided the 15Sep evidence stream. Alarm + audit +
+            # hard-fail instead of silently counting a legitimate
+            # ``disabled`` outcome; the poisoned ROUTE row is never
+            # written because the disabled response is never returned.
+            if self._routing_claimed_enabled:
+                await self._alarm_routing_divergence(trade_decision.decision_id)
+                await self._audit_divergence(trade_decision.decision_id)
+                raise RuntimeError(
+                    f"F9-C-02 routing divergence: decision "
+                    f"{trade_decision.decision_id} hit a claimed-enabled "
+                    "engine with analyzer_routing_enabled=False -- P5 "
+                    "evidence would be VOID; inspect for a second LOATS "
+                    "process sharing the database."
+                )
             response = {
                 "status": "disabled",
                 "reason": "analyzer_routing_disabled",
@@ -676,14 +705,87 @@ class TradeDecisionEngine:
             logger.info("Stopped TradeDecision processor")
 
     def enable_analyzer_routing(self) -> None:
-        """Enable Analyzer routing."""
+        """Enable Analyzer routing.
+
+        F9-C-02 (2026-09-15): this is a CLAIMED state. Every subsequent
+        route decision is provenance-checked against the actual flag at
+        route time -- a ``disabled`` outcome on a claimed-enabled engine
+        is the divergence signature that voided the 15Sep P5 evidence and
+        now alarms + hard-fails instead of silently counting.
+        """
+        self._routing_claimed_enabled = True
         self.analyzer_routing_enabled = True
         logger.info("Enabled Analyzer routing")
 
     def disable_analyzer_routing(self) -> None:
         """Disable Analyzer routing."""
+        self._routing_claimed_enabled = False
         self.analyzer_routing_enabled = False
         logger.info("Disabled Analyzer routing")
+
+    async def _alarm_routing_divergence(self, decision_id: str) -> None:
+        """Fire the F9-C-02 divergence CRITICAL alert once per silence window.
+
+        Alert flood control: the same engine raises at most one alert per
+        ``LOATS_ROUTING_DIVERGENCE_SILENCE_S`` seconds (default 900);
+        every divergence is still audited by the caller regardless.
+        """
+        now = datetime.datetime.now(datetime.UTC)
+        if (
+            self._last_divergence_alarm_at is not None
+            and (now - self._last_divergence_alarm_at).total_seconds()
+            < self._divergence_silence_s
+        ):
+            return
+        self._last_divergence_alarm_at = now
+        logger.critical(
+            f"F9-C-02 routing divergence on decision {decision_id}: engine "
+            "was claimed ENABLED for analyzer routing but routed with the "
+            "flag disabled -- evidence for the P5 span is VOID; a second "
+            "process or a stray disable path is writing to this system."
+        )
+        try:
+            from .alerts import alerts
+
+            await alerts.send_alert(
+                f"F9-C-02 CRITICAL: ROUTING DIVERGENCE (routing divergence) "
+                f"at decision {decision_id} -- claimed ENABLED, routed "
+                "DISABLED. P5 evidence for this span is VOID. Inspect for a "
+                "second LOATS process sharing the DB.",
+                alert_type="critical",
+            )
+        except Exception as e:
+            # The RuntimeError below already fails the run loudly; alert
+            # transport failure must not mask it.
+            logger.error(f"F9-C-02 divergence alert delivery failed: {e}")
+
+    async def _audit_divergence(self, decision_id: str) -> None:
+        """Best-effort dual-write REJECT row for a routing divergence.
+
+        Always attempts the canonical ``db.async_log_audit`` (SQLite +
+        JSONL, SHA-256-chained). Under the suite's test environment the
+        ``db`` singleton binds conftest's private temp paths, so the row
+        is hermetic; a store failure is logged but never masks the
+        RuntimeError raised by the caller (the enforcement contract).
+        """
+        try:
+            await db.async_log_audit(
+                action="REJECT",
+                entity_type="routing_divergence",
+                entity_id=decision_id,
+                user="trade_decision_engine",
+                metadata={
+                    "reason": "f9c02_routing_divergence",
+                    "finding": "F9-C-02",
+                    "routing_claim": self._routing_claimed_enabled,
+                    "flag_at_route": self.analyzer_routing_enabled,
+                },
+            )
+        except Exception as e:
+            logger.error(
+                f"Failed to write F9-C-02 divergence audit row for decision "
+                f"{decision_id}: {e}"
+            )
 
     async def create_and_route_decision(
         self,
