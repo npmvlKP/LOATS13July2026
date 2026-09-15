@@ -431,6 +431,18 @@ class Database:
                 updated_at TEXT NOT NULL
             )
         """)
+        # F9-C-01 (TODO-1): persisted option-chain ATM IV series, keyed
+        # symbol + as_of_date (one upserted row per trading day, 252-day
+        # read window) so the CMP true IV-rank survives process restarts.
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS iv_history (
+                symbol TEXT NOT NULL,
+                as_of_date TEXT NOT NULL,
+                atm_iv REAL NOT NULL,
+                created_at TEXT NOT NULL,
+                PRIMARY KEY (symbol, as_of_date)
+            )
+        """)
 
     def _create_indexes(self, cursor: sqlite3.Cursor) -> None:
         """Create performance indexes on core tables."""
@@ -1307,6 +1319,50 @@ class Database:
             )
             conn.commit()
         return True
+
+    def store_chain_iv(self, symbol: str, atm_iv: float, as_of_date: date) -> bool:
+        """Persist one option-chain ATM IV observation (F9-C-01, TODO-1).
+
+        Upserts the (symbol, as_of_date) row so intraday cycles refresh
+        today's IV in place and the table holds exactly one IV per
+        trading day -- a 252-row window is one trading year, matching
+        the CMP IV-rank series definition.
+        """
+        now = datetime.now(UTC)
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            INSERT OR REPLACE INTO iv_history
+            (symbol, as_of_date, atm_iv, created_at)
+            VALUES (?, ?, ?, ?)
+            """,
+            (symbol, as_of_date.isoformat(), float(atm_iv), now.isoformat()),
+        )
+        conn.commit()
+        return True
+
+    def get_chain_iv_series(
+        self, symbol: str, limit: int = 252
+    ) -> list[tuple[str, float]]:
+        """Read the persisted ATM IV series for a symbol (F9-C-01).
+
+        Returns up to ``limit`` (symbol, iv) pairs ordered by as_of_date
+        ascending (oldest first) -- the warm-start input for the rules
+        engine's bounded IV deque.
+        """
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT as_of_date, atm_iv FROM iv_history
+            WHERE symbol = ?
+            ORDER BY as_of_date DESC LIMIT ?
+            """,
+            (symbol, int(limit)),
+        )
+        rows = cursor.fetchall()
+        return [(str(row[0]), float(row[1])) for row in reversed(rows)]
 
     def get_historical_data(
         self, symbol: str, interval: str, start_date: datetime, end_date: datetime
@@ -2409,6 +2465,18 @@ class Database:
             except Exception as e:  # pragma: no cover - fallback safety
                 logger.warning(f"aiosqlite store_funds failed, falling back: {e}")
         return await asyncio.to_thread(self.store_funds, funds)
+
+    async def async_store_chain_iv(
+        self, symbol: str, atm_iv: float, as_of_date: date
+    ) -> bool:
+        """Async store_chain_iv(); avoids blocking the event loop."""
+        return await asyncio.to_thread(self.store_chain_iv, symbol, atm_iv, as_of_date)
+
+    async def async_get_chain_iv_series(
+        self, symbol: str, limit: int = 252
+    ) -> list[tuple[str, float]]:
+        """Async get_chain_iv_series(); avoids blocking the event loop."""
+        return await asyncio.to_thread(self.get_chain_iv_series, symbol, limit)
 
     async def async_get_latest_signals(
         self, symbol: str, limit: int = 10, scan_type: str | None = None

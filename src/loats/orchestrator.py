@@ -221,6 +221,9 @@ class TradingOrchestrator:
         self._insufficient_signals_warning_interval = 60.0  # Log every 60 seconds
         # F8-L-05: detached live-drift task (see _validate_rss_startup_gate)
         self._rss_drift_task: asyncio.Task[None] | None = None
+        # F9-C-01 (TODO-1): resolved lazily in initialize() -- module-level
+        # settings is None until first lazy resolution (TODO-18 contract).
+        self._iv_symbol: str | None = None
 
     @staticmethod
     async def _guarded_source_call(
@@ -365,6 +368,25 @@ class TradingOrchestrator:
         self.max_cycle_time = 0.0
         self.avg_cycle_time = 0.0
         self.total_cycle_time = 0.0
+        # F9-C-01 (TODO-1): warm-start the CMP IV-rank series from the
+        # persisted iv_history table so the first post-restart cycle has
+        # full history depth. Best-effort: a cold/failed store leaves
+        # the empty deque and the HV-percentile fallback stays honest.
+        global settings
+        if settings is None:
+            settings = get_settings()
+        self._iv_symbol = settings.default_symbol
+        try:
+            iv_series = await db.async_get_chain_iv_series(
+                self._iv_symbol,
+                limit=252,
+            )
+        except Exception as exc:
+            logger.warning("IV history warm-start skipped: %s", exc)
+        else:
+            if iv_series:
+                rules_engine.load_chain_iv_history([iv for _d, iv in iv_series])
+                logger.info("IV history warm-started: %d day(s) loaded", len(iv_series))
 
     async def start(self) -> None:
         """Start the trading cycle orchestrator."""
@@ -530,7 +552,7 @@ class TradingOrchestrator:
 
             # Execute CMP strategy (only if trading is allowed in current session)
             if rules_engine.is_trading_allowed():
-                await self._execute_cmp_strategy()
+                await self._execute_cmp_strategy(as_of_date=None)
             else:
                 logger.debug(
                     f"CMP strategy skipped - session: {rules_engine.session_state}"
@@ -1050,7 +1072,9 @@ class TradingOrchestrator:
                     f"Price-action analysis exceeded budget: {duration * 1000:.2f}ms"
                 )
 
-    async def _execute_options_flow_analysis(self) -> None:
+    async def _execute_options_flow_analysis(
+        self, as_of_date: datetime.date | None = None
+    ) -> None:
         """Execute options-flow analysis -- 5th signal producer.
 
         Reads option-market positioning the equity/sentiment producers
@@ -1060,6 +1084,13 @@ class TradingOrchestrator:
         breaker (``_source_guarded_option_chain``), degrade to no-signal
         on any empty/malformed/illiquid payload (never a fabricated
         Signal), persist via ``db.async_create_signal``.
+
+        Args:
+            as_of_date: F9-C-01 (TODO-1) caller-supplied snapshot date
+                keying the persisted option-chain ATM IV row; None (the
+                live default) keys the UTC date under the IST offset --
+                the same wall-clock-free semantic as F8-L-02 decision
+                pinning (zero wall-clock-date invariant preserved).
 
         Signal model (flow-imbalance positioning):
         - put/call volume ratio (PCR) >= 1.2 -> put-side dominance ->
@@ -1130,6 +1161,28 @@ class TradingOrchestrator:
             if call_ivs and put_ivs:
                 iv_skew = float(np.mean(put_ivs) - np.mean(call_ivs))
 
+            # F9-C-01 (TODO-1): persist the option-chain ATM IV once per
+            # cycle, keyed symbol + as_of_date. The caller-supplied
+            # snapshot date keeps the CMP true IV-rank series honest (a
+            # backtest with an explicit as_of_date must not contaminate
+            # the live series). F9-M-04-companion: this is the preferred
+            # iv_rank source the rules engine consumes before its HV
+            # percentile fallback.
+            atm_iv = self._extract_atm_iv(rows)
+
+            if atm_iv is not None:
+                as_of = as_of_date or self._derive_chain_snapshot_date(rows)
+                if as_of is not None:
+                    await db.async_store_chain_iv(
+                        settings.default_symbol, atm_iv, as_of
+                    )
+                else:
+                    logger.debug(
+                        "Option-chain payload has no parseable expiry; "
+                        "ATM IV fed in-memory without persistence"
+                    )
+                rules_engine.set_chain_iv_history(atm_iv)
+
             signal = Signal(
                 symbol=symbol,
                 signal_type=SignalType(signal_type),
@@ -1166,6 +1219,68 @@ class TradingOrchestrator:
                 logger.warning(
                     f"Options-flow analysis exceeded budget: {duration * 1000:.2f}ms"
                 )
+
+    @staticmethod
+    def _extract_atm_iv(rows: list[dict[str, Any]]) -> float | None:
+        """Parse the nearest-the-money IV from chain rows (F9-C-01, TODO-1).
+
+        Requires a positive underlying spot in the payload and IV-bearing
+        rows; selects the minimum-|strike-spot| row within a 1% band and
+        normalizes fraction-scale IVs (0.13 -> 13.0) so the persisted
+        row and the in-memory series share one unit.
+        """
+        underlying = 0.0
+        for row in rows:
+            spot = TradingOrchestrator._chain_float(
+                row, ("underlying_price", "spot_price", "last_price")
+            )
+            if spot is not None and spot > 0:
+                underlying = spot
+                break
+        if underlying <= 0:
+            return None
+        atm_pairs: list[tuple[float, float]] = []
+        for row in rows:
+            strike = TradingOrchestrator._chain_float(row, ("strike_price", "strike"))
+            iv = TradingOrchestrator._chain_float(row, ("implied_volatility", "iv"))
+            if strike is None or iv is None or strike <= 0 or iv <= 0:
+                continue
+            distance = abs(strike - underlying) / underlying
+            if distance <= 1.0:
+                atm_pairs.append((distance, iv))
+        if not atm_pairs:
+            return None
+        atm_iv = float(min(atm_pairs)[1])
+        # Normalize fraction-scale IVs (0.13 -> 13.0) at the ingestion
+        # boundary so persisted rows and the in-memory series share one
+        # unit; the engine-side guard stays as defense-in-depth.
+        if atm_iv <= 1.5:
+            atm_iv *= 100.0
+        return atm_iv
+
+    @staticmethod
+    def _derive_chain_snapshot_date(rows: list[dict[str, Any]]) -> datetime.date | None:
+        """Snapshot date for the persisted ATM IV row (F9-C-01).
+
+        Zero wall-clock-date invariant (F8-L-02 semantic): derive the
+        date from the chain payload itself -- the furthest parseable
+        expiry in the nearest-expiry window is the latest snapshot the
+        payload attests to. None -> the caller feeds the engine
+        in-memory and skips persistence (honest degradation; never a
+        fabricated date).
+        """
+        latest_expiry: datetime.datetime | None = None
+        for row in rows:
+            raw_expiry = row.get("expiry")
+            if raw_expiry is None:
+                continue
+            try:
+                parsed = datetime.datetime.fromisoformat(str(raw_expiry))
+            except ValueError:
+                continue
+            if latest_expiry is None or parsed > latest_expiry:
+                latest_expiry = parsed
+        return latest_expiry.date() if latest_expiry is not None else None
 
     @staticmethod
     def _extract_chain_rows(payload: dict[str, Any] | None) -> list[dict[str, Any]]:
