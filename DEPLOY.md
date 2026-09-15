@@ -377,11 +377,10 @@ Configure your monitoring to watch:
 Run these commands to validate the deployment:
 
 ```bash
-# Quality Gates
-ruff check src/ tests/ --config pyproject.toml
-ruff format --check src/ tests/ --config pyproject.toml
-black --check src/ tests/ --config pyproject.toml
-isort --check-only src/ tests/ --settings-path pyproject.toml
+# Quality Gates (CI-exact scopes; ruff format is the formatter of record)
+ruff check src/ tests/ scripts/ --config pyproject.toml
+ruff format --check src/ tests/ scripts/ --config pyproject.toml
+isort --check-only src/ tests/ scripts/ --settings-path pyproject.toml
 mypy src/ --strict --config-file pyproject.toml
 bandit -r src/ -c pyproject.toml
 

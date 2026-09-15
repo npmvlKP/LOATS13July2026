@@ -229,3 +229,14 @@ skips = ["B101"]
 profile = "black"
 line_length = 88
 known_first_party = ["loats"]
+# Scope-immunity (2026-09-15 live defect): isort does NOT read .gitignore
+# (respect_gitignore defaults to False, unlike ruff), so a muscle-memory
+# repo-root sweep (`isort --check-only .`) descends into the in-tree venv
+# and false-fails on 4,000+ vendored imports (plus charmap parse warnings
+# under a cp1252 console) while the CI-exact scope stays rc=0. Pin
+# skip_gitignored and name the venv so ANY invocation scope is immune.
+# CI keeps its pinned src/ tests/ scripts/ scope (fresh runners never
+# contain the venv; pinned by
+# tests/test_repo_hygiene.py::TestIsortScopeImmunity).
+skip_gitignore = true
+extend_skip = ["loatsNEW"]
