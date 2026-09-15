@@ -128,6 +128,47 @@ def grade_run_log(run_log: dict[str, Any]) -> Grade:
         ended_or_now = ended if ended is not None else _now_utc()
         data_freshness = f"{(ended_or_now - last_sampled).total_seconds():.0f}s"
 
+    # F9-C-02 (2026-09-15): self-verifying evidence. The supervisor folds
+    # ``disabled_routes_during_enabled_window`` (DB-derived, see
+    # collect_disabled_route_rows) into the run log; ROUTE rows with
+    # ``routing_enabled:false`` INSIDE the claimed-enabled span are the
+    # exact divergence that voided the 15Sep P5 evidence. Trust-but-verify:
+    # the claimed divergence window must actually intersect the run span
+    # -- a window entirely outside the span is an upstream artifact, not
+    # contamination of THIS run. An intersecting divergence hard-FAILs the
+    # run regardless of every other criterion: the span is contaminated
+    # and must never be cited as P5 evidence.
+    divergence = run_log.get("disabled_routes_during_enabled_window")
+    divergence_effective = 0
+    divergence_window: dict[str, Any] = {}
+    if isinstance(divergence, dict):
+        try:
+            divergence_effective = int(divergence.get("count") or 0)
+        except (TypeError, ValueError):
+            divergence_effective = 0
+        raw_window = divergence.get("window")
+        divergence_window = raw_window if isinstance(raw_window, dict) else {}
+        first_at = _parse_ts(divergence_window.get("first_disabled_route_at"))
+        last_at = _parse_ts(divergence_window.get("last_disabled_route_at"))
+        if divergence_effective > 0 and (first_at is not None or last_at is not None):
+            span_end = ended if ended is not None else _now_utc()
+            # Partial stamps: fall back to whichever bound exists -- a
+            # missing stamp must not whitelist the window.
+            lower = first_at if first_at is not None else last_at
+            upper = last_at if last_at is not None else first_at
+            assert lower is not None and upper is not None
+            intersects = lower <= span_end and upper >= started
+            if not intersects:
+                divergence_effective = 0
+        if divergence_effective > 0:
+            reasons.append(
+                f"ROUTING DIVERGENCE (F9-C-02): {divergence_effective} ROUTE "
+                f"row(s) with routing_enabled:false inside the claimed-enabled "
+                f"span ({divergence_window.get('first_disabled_route_at', '?')} .. "
+                f"{divergence_window.get('last_disabled_route_at', '?')}) -- "
+                "evidence for this run is VOID"
+            )
+
     # Hard criterion: routing must have been enabled for the run.
     routing = run_log.get("routing") or {}
     if not routing.get("enabled_at_start"):
@@ -157,6 +198,9 @@ def grade_run_log(run_log: dict[str, Any]) -> Grade:
         # genuinely produced nothing yet. Legacy logs without
         # ``counters`` keep None here and grade unchanged.
         or (counters_decisional == 0 and ended is not None)
+        # F9-C-02 (2026-09-15): DB-proven divergence hard-fails even an
+        # otherwise-clean span.
+        or divergence_effective > 0
     )
     if hard_violation:
         return Grade("FAIL", reasons, activity_recorded, data_freshness)
@@ -171,6 +215,51 @@ def grade_run_log(run_log: dict[str, Any]) -> Grade:
 
 
 RUN_LOG_GLOB = "p5_forward_test_*.json"
+
+
+def collect_disabled_route_rows(
+    database: Any,
+    since: datetime.datetime,
+    until: datetime.datetime,
+) -> list[tuple[str, datetime.datetime]]:
+    """Reconcile routing evidence from DB ROUTE rows (source of record).
+
+    F9-C-02 remediation 5: the supervisor's in-process counters never
+    moved while the shared DB accumulated routing outcomes that
+    contradicted the claimed state, because a SECOND default-OFF LOATS
+    process was writing ROUTE rows. The DB is the source of record: this
+    helper returns every ROUTE audit row with ``routing_enabled:false``
+    whose timestamp falls inside ``[since, until]`` as
+    ``(entity_id, timestamp)`` tuples.
+
+    ``database`` is any object exposing ``get_audit_log(entity_type=...)``
+    (the loats ``Database`` singleton in production, a real temp
+    ``Database`` in tests). Rows with unparseable metadata are skipped
+    (they cannot prove either state); rows missing a parseable timestamp
+    are skipped for the same reason.
+    """
+    try:
+        entries = database.get_audit_log(entity_type="trade_decision", limit=10000)
+    except Exception:
+        return []
+    rows: list[tuple[str, datetime.datetime]] = []
+    for entry in entries:
+        if entry.action != "ROUTE":
+            continue
+        ts = entry.timestamp
+        if ts is None:
+            continue
+        if ts.tzinfo is None:
+            ts = ts.replace(tzinfo=datetime.UTC)
+        if not (since <= ts <= until):
+            continue
+        metadata = entry.metadata
+        if not isinstance(metadata, dict):
+            continue
+        if metadata.get("routing_enabled") is False:
+            rows.append((entry.entity_id, ts))
+    return rows
+
 
 # A supervised run folds live counters into its run log every
 # run_p5_forward_test._SAMPLE_INTERVAL_S (60 s). A live-shape log whose

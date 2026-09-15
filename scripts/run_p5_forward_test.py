@@ -187,6 +187,12 @@ def _init_run_log(reason: str, dry_run: bool) -> Path:
         "cycles_completed_baseline": None,
         "counters": {"success": 0, "disabled": 0, "error": 0},
         "counters_baseline": None,
+        # F9-C-02 (2026-09-15): evidence provenance -- the in-process
+        # identity of the engine whose flag decides routing, and this
+        # log's own path. A second LOATS process writing the same DB
+        # carries a different identity; the log is attributable.
+        "trade_decision_engine_identity": _engine_identity(),
+        "run_log_path": str(path),
         "events": [],
     }
     path.write_text(json.dumps(record, indent=2), encoding="utf-8")
@@ -219,6 +225,11 @@ def _capture_live_baseline(system: Any) -> dict[str, Any]:
 
     Deltas against these baselines measure only THIS run's activity; the
     process may have been importing/initializing long before started_at.
+
+    F9-C-02 (2026-09-15): the deciding engine's in-process identity and
+    this run log's own path are recorded with every baseline so the
+    evidence stream is attributable: a second LOATS process sampling or
+    writing the same log/DB shows up as a different engine identity.
     """
     from loats.orchestrator import orchestrator
     from loats.trade_decision import trade_decision_engine
@@ -226,7 +237,24 @@ def _capture_live_baseline(system: Any) -> dict[str, Any]:
     return {
         "cycles_completed": orchestrator.cycle_count,
         "counters": trade_decision_engine.get_routing_stats(),
+        "trade_decision_engine_identity": _engine_identity(),
+        "run_log_path": None,
     }
+
+
+def _engine_identity() -> str:
+    """In-process identity of the routing-deciding engine singleton.
+
+    F9-C-02 provenance: every accessor in this process resolves the same
+    lazy proxy (single binding in loats.trade_decision), so the binding's
+    ``id()`` identifies exactly the engine whose flag decides routing
+    here. A different id in a foreign log line means a different process.
+    Read via the module attribute (not a from-import) so test patches of
+    ``loats.trade_decision.trade_decision_engine`` are reflected.
+    """
+    import loats.trade_decision
+
+    return hex(id(loats.trade_decision.trade_decision_engine))
 
 
 def _effective_resume_baseline(
@@ -756,6 +784,64 @@ def _resolve_resume_target(path: Path | None) -> Path | None:
     return None
 
 
+def _db_divergence_snapshot(run_log: Path) -> dict[str, Any]:
+    """Probe the shared DB for routing evidence contradicting this run.
+
+    F9-C-02 remediation 4: ROUTE audit rows with
+    ``routing_enabled:false`` written INSIDE this run's span are the
+    poisoned-evidence signature (a second, default-OFF LOATS process
+    sharing the database). The count and first/last stamps are folded
+    into the run log every sample so the official grader
+    (verify_p5_forward_test.grade_run_log) hard-FAILs a contaminated
+    span. A clean DB records an explicit zero-count (self-verifying
+    evidence, positive record); a probe failure records an ``error`` key
+    rather than a false clean bill.
+    """
+    zero: dict[str, Any] = {
+        "count": 0,
+        "window": {"first_disabled_route_at": None, "last_disabled_route_at": None},
+    }
+    try:
+        data = json.loads(run_log.read_text(encoding="utf-8"))
+        started_raw = data.get("started_at")
+        started = (
+            datetime.datetime.fromisoformat(started_raw)
+            if isinstance(started_raw, str)
+            else None
+        )
+        if started is not None and started.tzinfo is None:
+            started = started.replace(tzinfo=datetime.UTC)
+        if started is None:
+            return zero
+        from loats.database import db
+
+        # Resolve the reconciliation helper from the official validator
+        # module (single source of policy); cache it in globals() so
+        # tests can patch it on this module by name.
+        collect = globals().get("collect_disabled_route_rows")
+        if collect is None:
+            validator = _load_validator()
+            if validator is None or not hasattr(
+                validator, "collect_disabled_route_rows"
+            ):
+                return {"error": "reconciliation helper unavailable"}
+            collect = validator.collect_disabled_route_rows
+            globals()["collect_disabled_route_rows"] = collect
+        rows = collect(db, started, datetime.datetime.now(datetime.UTC))
+    except Exception as e:  # probe failure must not kill the sampling loop
+        return {"error": f"{type(e).__name__}: {e}"}
+    if not rows:
+        return zero
+    stamps = [ts for _, ts in rows]
+    return {
+        "count": len(rows),
+        "window": {
+            "first_disabled_route_at": min(stamps).isoformat(),
+            "last_disabled_route_at": max(stamps).isoformat(),
+        },
+    }
+
+
 def _sample_live_activity(system: Any, run_log: Path, baseline: dict[str, Any]) -> None:
     """Fold live system counters into the run log (deltas over baseline).
 
@@ -780,6 +866,12 @@ def _sample_live_activity(system: Any, run_log: Path, baseline: dict[str, Any]) 
         {
             "cycles_completed": live_cycles,
             "counters": deltas,
+            # F9-C-02: every sample re-stamps WHO decided routing in this
+            # process and WHICH log file is the evidence carrier, so a
+            # contaminated or resumed log is attributable after the fact.
+            "routing_engine_identity": _engine_identity(),
+            "run_log_path": str(run_log),
+            "disabled_routes_during_enabled_window": _db_divergence_snapshot(run_log),
             "last_sampled_at": _utcnow_iso(),
             "system_healthy": {
                 "system_running": bool(system.running),
