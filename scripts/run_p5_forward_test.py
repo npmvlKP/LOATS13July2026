@@ -42,9 +42,17 @@ sys.path.insert(0, str(REPO_ROOT / "src"))
 # F8-H-01 (2026-09-07): run logs must be writable OUTSIDE the repo tree so
 # test/CI invocations of this supervisor never drop smoke stubs into the
 # production evidence directory (≈200 stub logs accumulated there from
-# suite runs). The default stays the real reports/ for operator runs;
-# tests set P5_RUN_LOG_DIR to a private temp dir.
+# suite runs). Tests set P5_RUN_LOG_DIR to a private temp dir; live
+# supervised runs still default to the real reports/ evidence stream.
+# 2026-09-15: a manual --dry-run smoke (no P5_RUN_LOG_DIR) wrote its stub
+# into reports/, where the F8-H-01 hygiene guard condemns it — the human
+# CLI path had no safe default. Dry-run smokes now default to the
+# sanctioned quarantine dir below (gitignored, the F8-H-01 verifier's own
+# stub landing zone since the 2026-09-08 wave); P5_RUN_LOG_DIR still wins
+# for every caller that pins it.
+_P5_QUARANTINE_DIR = REPO_ROOT / "reports" / "health" / "p5-verify-stubs"
 RUN_LOG_DIR = Path(os.environ.get("P5_RUN_LOG_DIR") or (REPO_ROOT / "reports"))
+DRY_RUN_LOG_DIR = Path(os.environ.get("P5_RUN_LOG_DIR") or _P5_QUARANTINE_DIR)
 RUN_LOG_GLOB = "p5_forward_test_*.json"
 MIN_SPAN_DAYS = 14
 # Live-activity sampling cadence for supervised runs: fold real system
@@ -131,10 +139,16 @@ def _find_run_log(path: Path | None) -> Path | None:
 
 
 def _init_run_log(reason: str, dry_run: bool) -> Path:
-    """Create a fresh run-log file with the run's initial state."""
-    RUN_LOG_DIR.mkdir(parents=True, exist_ok=True)
+    """Create a fresh run-log file with the run's initial state.
+
+    Live runs write into RUN_LOG_DIR (the evidence stream); dry-run
+    smokes write into DRY_RUN_LOG_DIR (the sanctioned quarantine) so a
+    manual smoke can never contaminate reports/ (F8-H-01, 2026-09-15).
+    """
+    log_dir = DRY_RUN_LOG_DIR if dry_run else RUN_LOG_DIR
+    log_dir.mkdir(parents=True, exist_ok=True)
     stamp = datetime.datetime.now(datetime.UTC).strftime("%Y%m%d_%H%M%S")
-    path = RUN_LOG_DIR / f"p5_forward_test_{stamp}.json"
+    path = log_dir / f"p5_forward_test_{stamp}.json"
     record: dict[str, Any] = {
         "metadata": {
             "phase_gate": "P5",
