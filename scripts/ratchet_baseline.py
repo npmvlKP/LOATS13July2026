@@ -277,8 +277,14 @@ History (most recent last):
        evidence" disclosures: 4 resolved with execution evidence, 2
        carried by design. Ceiling 418->419; the record is the +1 this
        entry accounts for.)
+  421  F9-C-01 iv_rank correctness wave (2026-09-15): +2
+       (tests/test_iv_rank_f9c01.py - 21-test regression net for the
+       iv_rank saturation fix, RED-first proven; and
+       docs/audit-history/15Sep2026-F9C01-TODO1-resolution.md - the
+       resolution record. Ceiling 419->421; both files are the +2 this
+       entry accounts for.)
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 419
+TRACKED_FILE_CEILING = 421
