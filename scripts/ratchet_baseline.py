@@ -277,8 +277,22 @@ History (most recent last):
        evidence" disclosures: 4 resolved with execution evidence, 2
        carried by design. Ceiling 418->419; the record is the +1 this
        entry accounts for.)
+  421  F9-C-01 iv_rank correctness wave (2026-09-15): +2
+       (tests/test_iv_rank_f9c01.py - 21-test regression net for the
+       iv_rank saturation fix, RED-first proven; and
+       docs/audit-history/15Sep2026-F9C01-TODO1-resolution.md - the
+       resolution record. Ceiling 419->421; both files are the +2 this
+       entry accounts for.)
+  422  FR9 forensic-review record wave (2026-09-15): +1
+       (docs/audit-history/15Sep2026-FR9-forensic-review-report.md -
+       the 15Sep2026 FR9 forensic engineering review report, relocated
+       from the staged root copy "15Sep2026-FR-ToDo List.md" per its
+       own Appendix disposition note; the root-staged file was the
+       422nd tracked file that breached this ceiling and failed the
+       repo-hygiene gate. Ceiling 421->422; the record is the +1 this
+       entry accounts for.)
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 419
+TRACKED_FILE_CEILING = 422

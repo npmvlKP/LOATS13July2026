@@ -166,7 +166,10 @@ def test_update_session_and_trading_allowed(monkeypatch: pytest.MonkeyPatch) -> 
 def test_iv_rank_and_adx() -> None:
     eng = CMPRulesEngine()
     short = _hist(5)
-    assert eng.calculate_iv_rank(short) == 0.5
+    # F9-C-01 / F9-M-04: insufficient history is LOUD (float("-inf")),
+    # never the legacy silent 0.5 -- that value passed the CMP BUY gate
+    # (< 30) on no data and fabricated 1,542 BUY/PENDING decisions.
+    assert eng.calculate_iv_rank(short) == float("-inf")
     assert eng.calculate_adx(short) == 25.0
 
     long_h = _hist(50)
