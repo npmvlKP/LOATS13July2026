@@ -340,21 +340,123 @@ def test_iv_source_flag_reports_hv_fallback() -> None:
 def test_chain_iv_history_takes_precedence_over_hv() -> None:
     """Persisted chain ATM IV at window min -> rank 0 regardless of HV."""
     eng = CMPRulesEngine()
-    for iv in (12.0, 18.0, 15.0):
-        eng.set_chain_iv_history(iv)
-    eng.set_chain_iv_history(12.0)  # current == min -> rank 0.0
+    eng.set_chain_iv_history(12.0, as_of_date="2026-01-01")
+    eng.set_chain_iv_history(18.0, as_of_date="2026-01-02")
+    eng.set_chain_iv_history(15.0, as_of_date="2026-01-03")
     hist = _grind_then_quiet()
+    eng.set_chain_iv_history(12.0, as_of_date="2026-01-04")  # current == min
     assert eng.calculate_iv_rank(hist) == 0.0
-    eng.set_chain_iv_history(18.0)  # current == max -> rank 100.0
+    eng.set_chain_iv_history(18.0, as_of_date="2026-01-05")  # current == max
     assert eng.calculate_iv_rank(hist) == 100.0
+
+
+def test_chain_iv_series_mid_range_hand_computed() -> None:
+    """Chain-IV rank vs hand computation mid-range: [12,18] current 15 -> 50."""
+    eng = CMPRulesEngine()
+    eng.set_chain_iv_history(12.0, as_of_date="2026-01-01")
+    eng.set_chain_iv_history(18.0, as_of_date="2026-01-02")
+    hist = _grind_then_quiet()
+    eng.set_chain_iv_history(15.0, as_of_date="2026-01-03")  # current == mid
+    assert eng.calculate_iv_rank(hist) == pytest.approx(50.0)
 
 
 def test_chain_iv_history_window_is_bounded() -> None:
     eng = CMPRulesEngine()
     for i in range(400):
-        eng.set_chain_iv_history(float(i))
+        eng.set_chain_iv_history(
+            float(i), as_of_date=f"2026-{(i // 28) + 1:02d}-{(i % 28) + 1:02d}"
+        )
     assert len(eng._chain_iv_history) == 252
-    assert eng._chain_iv_history[-1] == pytest.approx(399.0)
+    values = list(eng._chain_iv_history.values())
+    assert values[-1] == pytest.approx(399.0)  # newest kept, oldest evicted
+
+
+def test_non_finite_iv_rejected_at_every_boundary() -> None:
+    """inf/NaN IVs are rejected live, persisted-side, AND on warm-start.
+
+    Adversarial-probe regression: an inf persisted then warm-started
+    unvalidated pins rank to a permanent degenerate 0.0 that PASSES the
+    BUY gate -- exactly the degenerate-gate class F9-C-01 targets.
+    """
+    eng = CMPRulesEngine()
+    eng.set_chain_iv_history(float("inf"))
+    eng.set_chain_iv_history(float("nan"))
+    eng.set_chain_iv_history(-5.0)
+    assert eng._chain_iv_history == {}
+
+    # Poisoned persistence: only the finite row survives the warm-start.
+    eng.load_chain_iv_history([("2026-01-01", float("inf")), ("2026-01-02", 13.0)])
+    assert list(eng._chain_iv_history.values()) == [13.0]
+
+
+def test_dated_feed_upserts_by_day_not_observation() -> None:
+    """One entry per as_of_date; undated feeds refresh the newest entry.
+
+    In-memory series must mirror the (symbol, as_of_date) persistence:
+    a 5-minute cycle must not evict a year of history in ~3.4 days.
+    """
+    eng = CMPRulesEngine()
+    for i in range(75):  # one trading day of 5-min cycles
+        eng.set_chain_iv_history(12.0 + i / 100.0, as_of_date="2026-09-15")
+    assert list(eng._chain_iv_history.values()) == [pytest.approx(12.74)]
+
+    eng.set_chain_iv_history(13.0, as_of_date="2026-09-16")
+    eng.set_chain_iv_history(14.0, as_of_date="2026-09-17")
+    assert list(eng._chain_iv_history.values()) == [
+        pytest.approx(12.74),
+        13.0,
+        14.0,
+    ]
+
+    eng.set_chain_iv_history(14.5)  # undated -> refreshes newest, no append
+    assert list(eng._chain_iv_history.values()) == [
+        pytest.approx(12.74),
+        13.0,
+        14.5,
+    ]
+
+
+def test_replay_no_single_value_dominates() -> None:
+    """FR9 recommended test (2): replay sliding windows over stored bars.
+
+    Fewer than 90% of replayed cycles may land on any single value --
+    the legacy saturated code pinned 100% at 100.0.
+    """
+    from collections import Counter
+
+    eng = CMPRulesEngine()
+    data = _regime(0.01, 5, n=40)
+    ranks = [eng.calculate_iv_rank(data[:start], window=30) for start in range(30, 41)]
+    assert len(ranks) == 11
+    most_common_count = Counter(ranks).most_common(1)[0][1]
+    assert most_common_count < 0.9 * len(ranks), f"degenerate replay: {ranks}"
+
+
+def test_exact_gate_boundary_30_and_40_consistent() -> None:
+    """Gate outcome at the 30/40 boundaries follows the computed float rank.
+
+    Ranks are constructed to land exactly on the boundaries; the pass/
+    fail outcome must equal (rank < 30) / (rank > 40) for the computed
+    value -- no hidden epsilon in the pinned comparison lines.
+    """
+    eng = CMPRulesEngine()
+    eng.set_vix_level(10.0)
+    eng.is_trading_allowed = lambda: True  # type: ignore[method-assign]
+    # Chain-IV series [10, 20] current 13 -> rank (13-10)/(20-10)*100 = 30.
+    eng.set_chain_iv_history(10.0, as_of_date="2026-01-01")
+    eng.set_chain_iv_history(20.0, as_of_date="2026-01-02")
+    eng.set_chain_iv_history(13.0, as_of_date="2026-01-03")
+    hist = _grind_then_quiet()
+    ok_b, info_b = eng.apply_gating_rules(_buy_signal(), hist, 100.0)
+    assert info_b["iv_rank"] == pytest.approx(30.0)
+    assert ok_b is (info_b["iv_rank"] < 30)
+
+    # [10, 20] current 14 -> rank 40 -> SELL gate (rank > 40) is False.
+    eng.set_vix_level(20.0)
+    eng.set_chain_iv_history(14.0, as_of_date="2026-01-04")
+    ok_s, info_s = eng.apply_gating_rules(_sell_signal(), hist, 100.0)
+    assert info_s["iv_rank"] == pytest.approx(40.0)
+    assert ok_s is (info_s["iv_rank"] > 40)
 
 
 # --------------------------------------------------------------------------
@@ -398,8 +500,13 @@ async def test_insufficient_history_audited_in_decision_pipeline() -> None:
             msettings.environment = "production"
             msettings.composite_strength_threshold = 0.5
             msettings.default_symbol = "NIFTY"
-            # REAL rules engine computes the gate; only identity mocked away
-            mr.apply_gating_rules = CMPRulesEngine().apply_gating_rules
+            # REAL rules engine computes the gate; only identity mocked
+            # away. Pin the session gate ON so the test never depends on
+            # the wall-clock IST bucket (POST_CLOSE would otherwise
+            # short-circuit with trading_not_allowed before history).
+            real_engine = CMPRulesEngine()
+            real_engine.is_trading_allowed = lambda: True  # type: ignore[method-assign]
+            mr.apply_gating_rules = real_engine.apply_gating_rules
             decision, result = await engine.create_trade_decision(
                 signals=_sigs(4),
                 historical_data=hist29,
@@ -527,7 +634,7 @@ class TestOptionsFlowIVIntegration:
         """0.13 stored as 13.0 so mixed-unit series cannot fold rank."""
         eng = CMPRulesEngine()
         eng.set_chain_iv_history(0.13)
-        assert eng._chain_iv_history[-1] == pytest.approx(13.0)
+        assert list(eng._chain_iv_history.values())[-1] == pytest.approx(13.0)
 
 
 class TestIVWarmStart:
@@ -538,11 +645,14 @@ class TestIVWarmStart:
         from loats.orchestrator import TradingOrchestrator
         from loats.rules import rules_engine
 
-        saved = list(rules_engine._chain_iv_history)
+        saved = dict(rules_engine._chain_iv_history)
         rules_engine._chain_iv_history.clear()
         try:
             orch = TradingOrchestrator()
             mdb = MagicMock()
+            # Real db.async_get_chain_iv_series returns (as_of_date, iv)
+            # tuples; the mock must honor that contract (a bare float
+            # list crashed load_chain_iv_history's pair unpacking).
             mdb.async_get_chain_iv_series = AsyncMock(
                 return_value=[("2026-09-01", 12.0), ("2026-09-02", 18.0)]
             )
@@ -552,12 +662,12 @@ class TestIVWarmStart:
             ):
                 msettings.default_symbol = "NIFTY"
                 await orch.initialize()
-            assert list(rules_engine._chain_iv_history) == [12.0, 18.0]
+            assert list(rules_engine._chain_iv_history.values()) == [12.0, 18.0]
             # Rank computed from the loaded series: current==max -> 100.
             short = _bars([100.0 + (0.2 if i % 2 == 0 else -0.1) for i in range(40)])
             assert rules_engine.calculate_iv_rank(short) == pytest.approx(100.0)
         finally:
-            rules_engine.load_chain_iv_history(saved)
+            rules_engine.load_chain_iv_history(list(saved.items()))
 
     @pytest.mark.asyncio
     async def test_initialize_survives_store_failure(self):
@@ -565,7 +675,7 @@ class TestIVWarmStart:
         from loats.orchestrator import TradingOrchestrator
         from loats.rules import rules_engine
 
-        saved = list(rules_engine._chain_iv_history)
+        saved = dict(rules_engine._chain_iv_history)
         rules_engine._chain_iv_history.clear()
         try:
             orch = TradingOrchestrator()
@@ -579,6 +689,6 @@ class TestIVWarmStart:
             ):
                 msettings.default_symbol = "NIFTY"
                 await orch.initialize()
-            assert list(rules_engine._chain_iv_history) == []
+            assert list(rules_engine._chain_iv_history.values()) == []
         finally:
-            rules_engine.load_chain_iv_history(saved)
+            rules_engine.load_chain_iv_history(list(saved.items()))

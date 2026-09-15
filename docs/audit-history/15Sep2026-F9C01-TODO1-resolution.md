@@ -3,6 +3,9 @@
 **Date:** 2026-09-15 · **Finding:** FR9 F9-C-01 (Critical, P0 — execute FIRST) with F9-M-04 merged
 **Branch:** `main` @ `57b77a0` (base) · **Protocol:** STRICT LOATSEV (BUILD → ... → CONFIRMED & VERIFIED)
 **CMP basis:** Section 4 gating rules — BUY at `IV rank < 30`, SELL at `IV rank > 40`.
+**Hardening:** 2026-09-15 second wave — independent adversarial grading (PASS-with-notes, 9 holes)
+closed: day-keyed series semantics, finite-value guards at all three boundaries, real 1% ATM band,
+exact-boundary + replay + mid-range chain-IV tests, `"none"` audit provenance. Suite now 26 tests.
 
 ## Root cause (verified, not assumed)
 
