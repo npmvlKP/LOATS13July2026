@@ -3,11 +3,18 @@ CMP Strategy Rules Engine for LOATS13July2026.
 
 Implements the core gating rules for the CMP trading strategy:
 - IV-rank > 40 / ADX < 25 / VIX > 15 for SELL signals
-- Inverse conditions for BUY signals
+- IV-rank < 30 / ADX > 25 / VIX < 15 for BUY signals
 - Additional risk filters and circuit breakers
+
+F9-C-01 note: iv_rank is the rank of the option-chain ATM implied
+volatility in its own 252-day range when chain IVs are available; the
+HV fallback is a units-consistent percentile of the current bar's
+absolute return (never the legacy annualized-over-daily saturation).
+Insufficient history fails both directions closed (F9-M-04).
 """
 
 import datetime
+from collections import deque
 from enum import StrEnum
 from typing import Any
 
@@ -68,6 +75,12 @@ class CMPRulesEngine:
         self._vix_level: float | None = None  # None = unknown/failed
         self._vix_timestamp: datetime.datetime | None = None  # Last update time
         self._vix_initialized = False  # Whether VIX has been set at least once
+
+        # F9-C-01: persisted per-symbol option-chain ATM IV series (CMP
+        # true IV-rank input). Fed once per cycle by the options-flow
+        # producer from the real broker chain; bounded to a 252-day
+        # (1 trading year) window so rank() stays O(1) in memory.
+        self._chain_iv_history: deque[float] = deque(maxlen=252)
 
     def get_current_session(
         self, current_time: datetime.datetime | None = None
@@ -140,32 +153,93 @@ class CMPRulesEngine:
         """
         return self.get_current_session(current_time) == TradingSession.REGULAR
 
+    def set_chain_iv_history(self, atm_iv: float) -> None:
+        """Record one option-chain ATM IV observation (F9-C-01).
+
+        Called by the options-flow producer once per cycle with the ATM
+        IV parsed from the real broker chain. IVs in raw fraction (0.12
+        == 12%) and percent points (12.0) both accepted: values <= 1.5
+        are normalized x100 so a mixed-unit series cannot fold rank into
+        two clusters.
+        """
+        value = float(atm_iv)
+        if value <= 1.5:
+            value *= 100.0
+        if value <= 0 or not np.isfinite(value):
+            logger.warning(f"Ignoring invalid chain ATM IV: {atm_iv!r}")
+            return
+        self._chain_iv_history.append(value)
+
+    def load_chain_iv_history(self, series: list[float]) -> None:
+        """Warm-start the IV series from persisted storage (F9-C-01).
+
+        Called once at orchestrator initialize() with the 252-day
+        iv_history rows so the CMP IV-rank has full history depth on the
+        first cycle after a restart (persisted today's-row upserts keep
+        the series honest; in-memory set_chain_iv_history duplicates of
+        the latest day are harmless for min/max rank).
+        """
+        self._chain_iv_history.clear()
+        for value in series:
+            self._chain_iv_history.append(float(value))
+
     def calculate_iv_rank(
         self, historical_data: list[HistoricalData], window: int = 30
     ) -> float:
         """
-        Calculate IV Rank (Implied Volatility Rank).
+        Calculate IV Rank (Implied Volatility Rank), CMP-conformant (Section 4).
 
-        IV Rank = (Current IV - Min IV) / (Max IV - Min IV)
+        Rank = (current - min) / (max - min) x 100 over the instrument's
+        volatility series.
+
+        Units contract (F9-C-01 root-cause correction): the legacy body
+        divided an ANNUALIZED stdev by the DAILY min/max return spread
+        and clipped, saturating every result to 100.0 (527/527 live
+        gating rejects) and leaving the CMP BUY gate (rank < 30)
+        unreachable. The corrected computation is units-consistent:
+
+        1. Preferred source -- option-chain ATM IV series (the CMP
+           "rank of implied volatility in its own historical IV range"):
+           rank = (current ATM IV - min series) / (max - min) x 100 over
+           the persisted, bounded (252-entry) series. Requires >= 2
+           distinct observations.
+        2. Fallback -- HV percentile: percentile rank of the CURRENT
+           bar's absolute return within the same window's absolute
+           returns (daily vs daily). Reported via ``iv_source`` in the
+           gating payload so the rank's provenance is auditable.
+        3. Insufficient history (< window bars AND no IV series) is
+           LOUD: returns float("-inf") -- the gating layer fails BOTH
+           directions closed instead of the legacy silent 0.5, which
+           passed the BUY gate on no data (F9-M-04).
         """
-        if len(historical_data) < window:
-            return 0.5  # Default neutral value
+        # Preferred input: persisted option-chain ATM IV (true IV rank).
+        iv_series = self._chain_iv_history
+        if len(iv_series) >= 2:
+            lo, hi = min(iv_series), max(iv_series)
+            current = iv_series[-1]
+            if hi > lo:
+                return float((current - lo) / (hi - lo) * 100.0)
+            return 50.0  # flat series: genuinely neutral, never fallback
 
-        # Extract closing prices and calculate returns
+        if len(historical_data) < window:
+            # F9-M-04: LOUD insufficiency -- never a silent neutral 0.5
+            # (0.5 < 30 passed the CMP BUY gate on no data).
+            return float("-inf")
+
+        # Units-consistent fallback: HV percentile of the CURRENT bar's
+        # absolute return within this window's absolute returns.
         closes = [h.close for h in historical_data[-window:]]
         returns = [
-            (closes[i] - closes[i - 1]) / closes[i - 1] for i in range(1, len(closes))
+            abs((closes[i] - closes[i - 1]) / closes[i - 1])
+            for i in range(1, len(closes))
         ]
-
-        # Calculate historical volatility (annualized)
-        std_dev = np.std(returns) * np.sqrt(252)
-        iv_rank = (
-            (std_dev - min(returns)) / (max(returns) - min(returns))
-            if (max(returns) - min(returns)) != 0
-            else 0.5
-        )
-
-        return float(np.clip(iv_rank * 100, 0, 100))  # Scale to 0-100
+        lo, hi = min(returns), max(returns)
+        if hi <= lo:
+            # Zero |return| spread (flat window): min of a degenerate
+            # range is the honest value; legacy returned 0.5 here too.
+            return 0.0
+        current = returns[-1]
+        return float((current - lo) / (hi - lo) * 100.0)
 
     def calculate_adx(
         self, historical_data: list[HistoricalData], period: int = 14
@@ -356,6 +430,29 @@ class CMPRulesEngine:
         iv_rank = self.calculate_iv_rank(historical_data)
         adx = self.calculate_adx(historical_data)
 
+        # F9-C-01 rank provenance: "iv_series" = true option-chain IV rank
+        # (CMP-conformant source), "hv_percentile" = consistent-unit HV
+        # fallback. Recorded in every gating outcome for audit.
+        iv_source = "iv_series" if len(self._chain_iv_history) >= 2 else "hv_percentile"
+
+        # F9-M-04 (merged into F9-C-01): insufficient history is LOUD --
+        # fail BOTH directions closed instead of the legacy silent 0.5
+        # that passed the BUY gate on no data.
+        if iv_rank == float("-inf"):
+            iv_pass = False
+            adx_pass = False
+            vix_pass = False
+            return False, {
+                "iv_rank": iv_rank,
+                "adx": adx,
+                "vix": self.get_vix_level(),
+                "iv_source": iv_source,
+                "reason": "insufficient_history",
+                "iv_pass": iv_pass,
+                "adx_pass": adx_pass,
+                "vix_pass": vix_pass,
+            }
+
         # Apply gating rules based on signal type
         if signal.signal_type == SignalType.SELL:
             # SELL rules: IV-rank > 40 / ADX < 25 / VIX > 15
@@ -368,6 +465,7 @@ class CMPRulesEngine:
                     "iv_rank": iv_rank,
                     "adx": adx,
                     "vix": self.get_vix_level(),
+                    "iv_source": iv_source,
                     "reason": "gating_passed",
                 }
             else:
@@ -375,6 +473,7 @@ class CMPRulesEngine:
                     "iv_rank": iv_rank,
                     "adx": adx,
                     "vix": self.get_vix_level(),
+                    "iv_source": iv_source,
                     "reason": "gating_failed",
                     "iv_pass": iv_pass,
                     "adx_pass": adx_pass,
@@ -392,6 +491,7 @@ class CMPRulesEngine:
                     "iv_rank": iv_rank,
                     "adx": adx,
                     "vix": self.get_vix_level(),
+                    "iv_source": iv_source,
                     "reason": "gating_passed",
                 }
             else:
@@ -399,6 +499,7 @@ class CMPRulesEngine:
                     "iv_rank": iv_rank,
                     "adx": adx,
                     "vix": self.get_vix_level(),
+                    "iv_source": iv_source,
                     "reason": "gating_failed",
                     "iv_pass": iv_pass,
                     "adx_pass": adx_pass,
@@ -411,6 +512,7 @@ class CMPRulesEngine:
                 "iv_rank": iv_rank,
                 "adx": adx,
                 "vix": self.get_vix_level(),
+                "iv_source": iv_source,
                 "reason": "neutral_signal",
             }
 
