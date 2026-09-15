@@ -14,7 +14,6 @@ Insufficient history fails both directions closed (F9-M-04).
 """
 
 import datetime
-from collections import deque
 from enum import StrEnum
 from typing import Any
 
@@ -77,10 +76,82 @@ class CMPRulesEngine:
         self._vix_initialized = False  # Whether VIX has been set at least once
 
         # F9-C-01: persisted per-symbol option-chain ATM IV series (CMP
-        # true IV-rank input). Fed once per cycle by the options-flow
-        # producer from the real broker chain; bounded to a 252-day
-        # (1 trading year) window so rank() stays O(1) in memory.
-        self._chain_iv_history: deque[float] = deque(maxlen=252)
+        # true IV-rank input). Keyed by as_of_date (ISO string) so the
+        # in-memory series has the same one-row-per-trading-day
+        # semantics as the iv_history table -- intraday cycles REFRESH
+        # today's entry instead of consuming window slots (a flat
+        # observation deque would evict a full year of history within
+        # ~3.4 trading days at a 5-minute cycle). Bounded to 252 days
+        # (1 trading year).
+        self._chain_iv_history: dict[str, float] = {}
+
+    def _normalize_chain_iv(self, atm_iv: float) -> float | None:
+        """Validate/normalize one ATM IV observation (shared boundary guard).
+
+        Rejects non-finite and non-positive values -- an inf that
+        reached persistence (malformed broker payload) and got
+        warm-started unvalidated would pin rank to a degenerate constant
+        forever; normalizes fraction-scale IVs (0.13 -> 13.0).
+        """
+        value = float(atm_iv)
+        if not np.isfinite(value) or value <= 0:
+            logger.warning(f"Ignoring invalid chain ATM IV: {atm_iv!r}")
+            return None
+        if value <= 1.5:
+            value *= 100.0
+        return value
+
+    def set_chain_iv_history(
+        self, atm_iv: float, as_of_date: str | None = None
+    ) -> None:
+        """Record one option-chain ATM IV observation (F9-C-01).
+
+        Called by the options-flow producer once per cycle with the ATM
+        IV parsed from the real broker chain. IVs in raw fraction (0.12
+        == 12%) and percent points (12.0) both accepted: values <= 1.5
+        are normalized x100 so a mixed-unit series cannot fold rank into
+        two clusters.
+
+        Upsert-by-day semantics: with ``as_of_date`` (the producer
+        passes the snapshot date it also persists under) that day's
+        entry is refreshed in place; undated feeds refresh the newest
+        entry so a year of history is never evicted by intraday
+        duplicates. Bounded to the latest 252 days.
+        """
+        value = self._normalize_chain_iv(atm_iv)
+        if value is None:
+            return
+        if as_of_date is not None:
+            self._chain_iv_history[str(as_of_date)] = value
+        elif self._chain_iv_history:
+            newest = next(reversed(self._chain_iv_history))
+            self._chain_iv_history[newest] = value
+        else:
+            self._chain_iv_history["undated"] = value
+        while len(self._chain_iv_history) > 252:
+            oldest = next(iter(self._chain_iv_history))
+            del self._chain_iv_history[oldest]
+
+    def load_chain_iv_history(self, series: list[tuple[str, float]]) -> None:
+        """Warm-start the IV series from persisted storage (F9-C-01).
+
+        Called once at orchestrator initialize() with the 252-day
+        iv_history rows (as_of_date, atm_iv). Every row passes the same
+        boundary validation as live feeds -- a poisoned persisted value
+        (e.g. inf from a malformed broker payload) is skipped with a
+        warning instead of pinning rank to a degenerate constant after
+        every restart.
+        """
+        self._chain_iv_history.clear()
+        for key, value in series:
+            normalized = self._normalize_chain_iv(value)
+            if normalized is None:
+                continue
+            self._chain_iv_history[str(key)] = normalized
+
+    def _iv_series_active(self) -> bool:
+        """True when >= 2 distinct day-entries make an IV-series rank possible."""
+        return len(self._chain_iv_history) >= 2
 
     def get_current_session(
         self, current_time: datetime.datetime | None = None
@@ -153,36 +224,6 @@ class CMPRulesEngine:
         """
         return self.get_current_session(current_time) == TradingSession.REGULAR
 
-    def set_chain_iv_history(self, atm_iv: float) -> None:
-        """Record one option-chain ATM IV observation (F9-C-01).
-
-        Called by the options-flow producer once per cycle with the ATM
-        IV parsed from the real broker chain. IVs in raw fraction (0.12
-        == 12%) and percent points (12.0) both accepted: values <= 1.5
-        are normalized x100 so a mixed-unit series cannot fold rank into
-        two clusters.
-        """
-        value = float(atm_iv)
-        if value <= 1.5:
-            value *= 100.0
-        if value <= 0 or not np.isfinite(value):
-            logger.warning(f"Ignoring invalid chain ATM IV: {atm_iv!r}")
-            return
-        self._chain_iv_history.append(value)
-
-    def load_chain_iv_history(self, series: list[float]) -> None:
-        """Warm-start the IV series from persisted storage (F9-C-01).
-
-        Called once at orchestrator initialize() with the 252-day
-        iv_history rows so the CMP IV-rank has full history depth on the
-        first cycle after a restart (persisted today's-row upserts keep
-        the series honest; in-memory set_chain_iv_history duplicates of
-        the latest day are harmless for min/max rank).
-        """
-        self._chain_iv_history.clear()
-        for value in series:
-            self._chain_iv_history.append(float(value))
-
     def calculate_iv_rank(
         self, historical_data: list[HistoricalData], window: int = 30
     ) -> float:
@@ -201,8 +242,8 @@ class CMPRulesEngine:
         1. Preferred source -- option-chain ATM IV series (the CMP
            "rank of implied volatility in its own historical IV range"):
            rank = (current ATM IV - min series) / (max - min) x 100 over
-           the persisted, bounded (252-entry) series. Requires >= 2
-           distinct observations.
+           the persisted, day-keyed series bounded to 252 days (one
+           trading year). Requires >= 2 distinct day-entries.
         2. Fallback -- HV percentile: percentile rank of the CURRENT
            bar's absolute return within the same window's absolute
            returns (daily vs daily). Reported via ``iv_source`` in the
@@ -214,9 +255,10 @@ class CMPRulesEngine:
         """
         # Preferred input: persisted option-chain ATM IV (true IV rank).
         iv_series = self._chain_iv_history
-        if len(iv_series) >= 2:
-            lo, hi = min(iv_series), max(iv_series)
-            current = iv_series[-1]
+        if self._iv_series_active():
+            values = list(iv_series.values())
+            lo, hi = min(values), max(values)
+            current = values[-1]  # dict preserves insertion order
             if hi > lo:
                 return float((current - lo) / (hi - lo) * 100.0)
             return 50.0  # flat series: genuinely neutral, never fallback
@@ -432,8 +474,10 @@ class CMPRulesEngine:
 
         # F9-C-01 rank provenance: "iv_series" = true option-chain IV rank
         # (CMP-conformant source), "hv_percentile" = consistent-unit HV
-        # fallback. Recorded in every gating outcome for audit.
-        iv_source = "iv_series" if len(self._chain_iv_history) >= 2 else "hv_percentile"
+        # fallback. The insufficient_history row below emits "none" --
+        # neither source produced a rank, so audit provenance never
+        # mislabels an unusable series as the rank source.
+        iv_source = "iv_series" if self._iv_series_active() else "hv_percentile"
 
         # F9-M-04 (merged into F9-C-01): insufficient history is LOUD --
         # fail BOTH directions closed instead of the legacy silent 0.5
@@ -446,7 +490,7 @@ class CMPRulesEngine:
                 "iv_rank": iv_rank,
                 "adx": adx,
                 "vix": self.get_vix_level(),
-                "iv_source": iv_source,
+                "iv_source": "none",
                 "reason": "insufficient_history",
                 "iv_pass": iv_pass,
                 "adx_pass": adx_pass,

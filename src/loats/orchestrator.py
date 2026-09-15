@@ -6,6 +6,7 @@ Coordinates all trading operations with strict latency guarantees.
 
 import asyncio
 import datetime
+import math
 from typing import Any
 from urllib.parse import urlparse
 
@@ -385,7 +386,7 @@ class TradingOrchestrator:
             logger.warning("IV history warm-start skipped: %s", exc)
         else:
             if iv_series:
-                rules_engine.load_chain_iv_history([iv for _d, iv in iv_series])
+                rules_engine.load_chain_iv_history(iv_series)
                 logger.info("IV history warm-started: %d day(s) loaded", len(iv_series))
 
     async def start(self) -> None:
@@ -1181,7 +1182,11 @@ class TradingOrchestrator:
                         "Option-chain payload has no parseable expiry; "
                         "ATM IV fed in-memory without persistence"
                     )
-                rules_engine.set_chain_iv_history(atm_iv)
+                # Upsert-by-day: dated feeds refresh that day's entry so
+                # intraday cycles never evict the loaded year of history.
+                rules_engine.set_chain_iv_history(
+                    atm_iv, as_of_date=as_of.isoformat() if as_of else None
+                )
 
             signal = Signal(
                 symbol=symbol,
@@ -1227,7 +1232,11 @@ class TradingOrchestrator:
         Requires a positive underlying spot in the payload and IV-bearing
         rows; selects the minimum-|strike-spot| row within a 1% band and
         normalizes fraction-scale IVs (0.13 -> 13.0) so the persisted
-        row and the in-memory series share one unit.
+        row and the in-memory series share one unit. Non-finite IVs
+        (inf/NaN from malformed broker payloads) are rejected here so
+        they can never reach persistence and poison the warm-started
+        series (adversarial-probe hole: an inf max pins rank to a
+        degenerate constant).
         """
         underlying = 0.0
         for row in rows:
@@ -1245,8 +1254,13 @@ class TradingOrchestrator:
             iv = TradingOrchestrator._chain_float(row, ("implied_volatility", "iv"))
             if strike is None or iv is None or strike <= 0 or iv <= 0:
                 continue
+            if not math.isfinite(iv):
+                logger.warning(
+                    "Ignoring non-finite chain IV %r for strike %s", iv, strike
+                )
+                continue
             distance = abs(strike - underlying) / underlying
-            if distance <= 1.0:
+            if distance <= 0.01:  # documented ATM band: +/-1% of spot
                 atm_pairs.append((distance, iv))
         if not atm_pairs:
             return None

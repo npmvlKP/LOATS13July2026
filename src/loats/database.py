@@ -7,6 +7,7 @@ import asyncio
 import contextlib
 import hashlib
 import json
+import math
 import sqlite3
 import threading
 import time
@@ -1329,6 +1330,13 @@ class Database:
         the CMP IV-rank series definition.
         """
         now = datetime.now(UTC)
+        iv_value = float(atm_iv)
+        if not math.isfinite(iv_value) or iv_value <= 0:
+            # Same boundary guard as the rules engine: a non-finite IV
+            # persisted here would pin the warm-started rank to a
+            # degenerate constant after every restart.
+            logger.warning(f"Refusing to persist invalid chain ATM IV: {atm_iv!r}")
+            return False
         conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute(
