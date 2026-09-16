@@ -680,6 +680,19 @@ class TestSupervisorLiveSampling:
             "counters": {"success": 5, "disabled": 0, "error": 0},
             "counters_baseline": {"success": 0, "disabled": 0, "error": 0},
             "events": [],
+            # F9-C-02 date-proofing (2026-09-16): _supervise_live grades
+            # the live log every sample with pretend_ended and this test
+            # runs it with duration=None/task=None, so the ONLY exit is a
+            # grader PASS. Without self-carrying divergence evidence the
+            # F9-C-02 legacy check voids any span reaching past a
+            # documented contamination window -- live from 2026-09-15
+            # onward -- so the gate loop never exited and full-suite runs
+            # wedged at this test (16Sep: three consecutive pushes, each
+            # killed at ~15+ min; stack-proven via py-spy). A pinned start
+            # date cannot fix it (pretend_ended stamps ended_at=now), only
+            # {"count": 0} -- the grader's verifiably-clean contract --
+            # is date-proof. Proven: grade_run_log(FIXED) == PASS.
+            "disabled_routes_during_enabled_window": {"count": 0},
         }
         run_log.write_text(json.dumps(record), encoding="utf-8")
         system = _FakeSystem()
@@ -707,9 +720,22 @@ class TestSupervisorLiveSampling:
                 SimpleNamespace(is_kill_switch_active=lambda: False),
             ),
         ):
-            unhandled = await runner._supervise_live(
-                system, run_log, baseline, None, None
-            )
+            # DB-probe isolation (2026-09-16): this test pins the gate-STOP
+            # logic, not the F9-C-02 DB reconciliation (it has its own net).
+            # Without this patch the loop's live DB probe counts
+            # routing_enabled:false ROUTE rows that OTHER tests wrote into
+            # the conftest-pinned shared test DB within the record's 15-day
+            # span -- divergence count 3 observed live (pytest-937
+            # forensics) -- grade_run_log hard-FAILs every 60s sample and
+            # the PASS-only loop never exits. A pinned start date cannot
+            # prevent this: the probe's lower bound IS started_at.
+            with patch(
+                "p5_runner_mod._db_divergence_snapshot",
+                lambda run_log: {"count": 0},
+            ):
+                unhandled = await runner._supervise_live(
+                    system, run_log, baseline, None, None
+                )
 
         assert unhandled == 0
         data = json.loads(run_log.read_text(encoding="utf-8"))
