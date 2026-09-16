@@ -305,9 +305,15 @@ History (most recent last):
        record docs/audit-history/15Sep2026-F9C02-TODO2-resolution.md
        (root cause, remediations, adversarial-grading hardening wave,
        live verification evidence). Ceiling 423->424; the record is
-       the +1 this entry accounts for.
+       the +1 this entry accounts for.)
+
+  425. 16Sep2026 (P5 drought re-check, separate wave): decisional
+       re-check record docs/audit-history/16Sep2026-p5-wednesday-
+       recheck.md (GO/NO-GO verdict + provenance-locked evidence
+       addendum). Ceiling 424->425; the record is the +1 this entry
+       accounts for.
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 424
+TRACKED_FILE_CEILING = 425
