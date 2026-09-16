@@ -307,13 +307,20 @@ History (most recent last):
        live verification evidence). Ceiling 423->424; the record is
        the +1 this entry accounts for.)
 
-  425. 16Sep2026 (P5 drought re-check, separate wave): decisional
-       re-check record docs/audit-history/16Sep2026-p5-wednesday-
-       recheck.md (GO/NO-GO verdict + provenance-locked evidence
-       addendum). Ceiling 424->425; the record is the +1 this entry
-       accounts for.
+  425. 16Sep2026 (P5 drought re-check, separate wave): re-check record
+      docs/audit-history/16Sep2026-p5-wednesday-recheck.md (GO/NO-GO
+      verdict + provenance-locked evidence addendum). Ceiling 424->425;
+      the record is the +1 this entry accounts for.
+
+  426. 16Sep2026 (P5 restart execution, FR9 condition closed):
+      docs/audit-history/16Sep2026-p5-restart-execution.md - honest
+      CTRL_C end of void span 150243 (official FAIL: 15 divergent
+      ROUTE rows + 3.96d span), autonomous watchdog fresh fork of
+      140341 with routing enabled, route-watch repointed, grading
+      cron re-armed 26->30Sep 21:00 IST. Ceiling 425->426; the
+      record is the +1 this entry accounts for.
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 425
+TRACKED_FILE_CEILING = 426
