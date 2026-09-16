@@ -123,7 +123,16 @@ class StrengthEngine:
         }
 
         self.min_sources = 3
-        self.opposition_threshold = 0.6
+
+    @property
+    def opposition_threshold(self) -> float:
+        # TODO-13/F9-H-01: opposition gate lives in Settings (CMP section 4:
+        # no opposition > 0.4). Resolved per-access through the LazySettings
+        # proxy: importing this module (and constructing the engine
+        # singleton) never builds Settings, so bare-env imports stay clean
+        # (TODO-18/HC-21), and a running process picks up env overrides
+        # without reimport.
+        return float(settings.opposition_threshold)
 
     def normalize_strength(self, strength: float) -> float:
         """Normalize strength value to 0-1 range."""
@@ -278,9 +287,16 @@ class StrengthEngine:
                 primary_direction == "SELL"
                 and strongest_signal.signal_type == SignalType.BUY
             ):
+                # TODO-13/F9-H-01: strong tier IS the CMP section 4 bar
+                # (no opposition > 0.4). The legacy moderate tier (>0.5
+                # hardcode) was dead-by-construction under the old 0.6
+                # strong gate and never aligned with CMP; it is derived
+                # from the configured bar (threshold/2) so the two-tier
+                # ladder keeps a defined total ordering for any Settings
+                # value.
                 if strongest_signal.strength > self.opposition_threshold:
                     strong_opposition += 1
-                elif strongest_signal.strength > 0.5:
+                elif strongest_signal.strength > self.opposition_threshold / 2:
                     moderate_opposition += 1
 
         # Apply opposition rules

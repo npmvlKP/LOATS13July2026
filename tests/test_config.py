@@ -133,3 +133,27 @@ class TestConfig:
             str_str = str(test_settings)
             assert "environment=" in str_str
             assert "openalgo_api_key=SecretStr('**********')" in str_str
+
+
+# ---------------------------------------------------------------------------
+# TODO-13 / F9-H-01: CMP section 4 gate thresholds are Settings-conformant
+# (composite bar 0.6, opposition bar 0.4; domain 0..1 shared with the
+# sentiment/composite thresholds).
+# ---------------------------------------------------------------------------
+
+
+class TestCMPGateThresholdsTODO13:
+    def test_cmp_gate_thresholds(self) -> None:
+        """CMP section 4: composite bar 0.6, opposition bar 0.4."""
+        with patch.dict(os.environ, {"OPENALGO_API_KEY": "test_key"}):
+            s = Settings()
+            assert s.composite_strength_threshold == 0.6
+            assert s.opposition_threshold == 0.4
+
+    def test_opposition_threshold_domain(self) -> None:
+        """The opposition bar shares the 0..1 threshold domain."""
+        with patch.dict(os.environ, {"OPENALGO_API_KEY": "test_key"}):
+            with pytest.raises(ValidationError):
+                Settings(opposition_threshold=-0.1)
+            with pytest.raises(ValidationError):
+                Settings(opposition_threshold=1.1)

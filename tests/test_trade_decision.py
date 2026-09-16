@@ -788,3 +788,149 @@ class TestRejectionAuditRows:
                 current_positions=[],
             )
         assert result["reason"] == "insufficient_strength"
+
+
+# ---------------------------------------------------------------------------
+# TODO-13 / F9-H-01: CMP section 4 gate conformance (2026-09-16).
+# |score| > 0.6 proceeds; a counter-directional signal stronger than 0.4
+# blocks. The pre-fix build ran 0.5 composite / 0.6 opposition (both
+# looser, swapped relative to CMP): composite 0.55 wrongly proceeded and
+# an opposing 0.45 wrongly passed. These pins assert the corrected
+# boundary end to end through the real composite math (weighted mean
+# over per-source contributions: TA x0.4x1.1, sentiment x0.3x0.9,
+# price-action x0.2x1.2 -- weights 0.9 => composite = sum(contrib)/0.9).
+# ---------------------------------------------------------------------------
+
+
+def _cmp_boundary_sigs(opposition=None):
+    """Four BUY sources whose composite is 0.55: above the WRONG 0.5
+    gate, below the CMP 0.6 gate (0.55 is the FR9-H-01 spec number).
+    Optional counter-directional SELL. Four distinct sources: the Step-1
+    validator requires >3 for source diversity (empirical workflow rule)."""
+    srcs = [
+        (StrengthSource.TECHNICAL_ANALYSIS, 0.75),
+        (StrengthSource.SENTIMENT, 0.50),
+        (StrengthSource.PRICE_ACTION, 0.25),
+        (StrengthSource.VOLATILITY, 0.25),
+    ]
+    now = datetime.now(UTC)
+    sigs = [
+        Signal(
+            symbol="NIFTY",
+            signal_type=SignalType.BUY,
+            strength=strength,
+            timestamp=now - timedelta(seconds=i * 30),
+            indicators={"v": 0.5},
+            confidence=0.8,
+            metadata={"source": src.value},
+        )
+        for i, (src, strength) in enumerate(srcs)
+    ]
+    if opposition is not None:
+        sigs.append(
+            Signal(
+                symbol="NIFTY",
+                signal_type=SignalType.SELL,
+                strength=opposition,
+                timestamp=now,
+                indicators={"v": 0.5},
+                confidence=0.8,
+                metadata={"source": StrengthSource.VOLATILITY.value},
+            )
+        )
+    return sigs
+
+
+class TestCMPGateConformanceTODO13:
+    @pytest.mark.asyncio
+    async def test_composite_below_cmp_bar_is_rejected(self, td_engine, hist, funds):
+        # TA .75 -> .330, SA .50 -> .135, PA .25 -> .060, VOL .25 -> .025;
+        # weights 1.0 => composite 0.55: passed the WRONG 0.5 gate, must
+        # be rejected under the CMP 0.6 bar.
+        with patch("loats.trade_decision.settings") as msettings:
+            msettings.environment = "production"
+            msettings.composite_strength_threshold = 0.6
+            msettings.opposition_threshold = 0.4
+            _, result = await td_engine.create_trade_decision(
+                signals=_cmp_boundary_sigs(),
+                historical_data=hist,
+                current_price=24500.0,
+                funds=funds,
+                current_positions=[],
+            )
+        assert result["reason"] == "insufficient_strength"
+        assert result["composite_strength"] == pytest.approx(0.55)
+
+    @pytest.mark.asyncio
+    async def test_composite_above_cmp_bar_proceeds(self, td_engine, hist, funds):
+        # Scale the sources by 1.2 => composite 0.70 (> 0.6): proceeds
+        # past the strength gate (failures, if any, must NOT be
+        # insufficient_strength).
+        srcs = _cmp_boundary_sigs()
+        for s in srcs:
+            s.strength = round(s.strength * 1.2, 10)
+        with (
+            patch("loats.trade_decision.settings") as msettings,
+            patch("loats.trade_decision.rules_engine") as mrules,
+            patch("loats.trade_decision.sizing_engine") as msizing,
+            patch("loats.trade_decision.db") as mdb,
+        ):
+            msettings.environment = "production"
+            msettings.composite_strength_threshold = 0.6
+            msettings.opposition_threshold = 0.4
+            mrules.apply_gating_rules = lambda *a, **k: (
+                True,
+                {"reason": "cmp_boundary_conformance"},
+            )
+            mrules.check_position_limits.return_value = (True, {"reason": "ok"})
+            mrules.session_state = "REGULAR"
+            msizing.calculate_fixed_fraction_size.return_value = (
+                0,
+                {"reason": "invalid_prices"},
+            )
+            mdb.async_log_audit = AsyncMock()
+            _, result = await td_engine.create_trade_decision(
+                signals=srcs,
+                historical_data=hist,
+                current_price=24500.0,
+                funds=funds,
+                current_positions=[],
+            )
+        assert result.get("reason") != "insufficient_strength"
+
+    @pytest.mark.asyncio
+    async def test_opposition_above_04_blocks_decision(self, td_engine, hist, funds):
+        # A 0.45 SELL against a BUY primary: wrongly passed under the old
+        # 0.6 bar; the CMP 0.4 bar blocks. Probe-proven path: Step 1
+        # passes, the composite calculator's internal opposition gate
+        # zeroes the composite (reason opposition_gate_failed), and the
+        # workflow labels it insufficient_strength with the true reason
+        # in strength_details.
+        with patch("loats.trade_decision.settings") as msettings:
+            msettings.environment = "production"
+            msettings.composite_strength_threshold = 0.6
+            msettings.opposition_threshold = 0.4
+            _, result = await td_engine.create_trade_decision(
+                signals=_cmp_boundary_sigs(opposition=0.45),
+                historical_data=hist,
+                current_price=24500.0,
+                funds=funds,
+                current_positions=[],
+            )
+        assert result["reason"] == "insufficient_strength"
+        assert result["strength_details"]["reason"] == "opposition_gate_failed"
+
+    def test_opposition_below_04_does_not_block(self):
+        # 0.35 opposition: below the CMP bar, the gate passes (a single
+        # sub-bar source never blocks on its own under CMP section 4).
+        # Lands in the moderate tier (> threshold/2) only.
+        engine = StrengthEngine()
+        result = engine.check_opposition_gate(
+            {
+                "ta": _cmp_boundary_sigs()[:1],
+                "volatility": _cmp_boundary_sigs(opposition=0.35)[3:],
+            }
+        )
+        assert result["passed"] is True
+        assert result["moderate_opposition"] == 1
+        assert result["strong_opposition"] == 0
