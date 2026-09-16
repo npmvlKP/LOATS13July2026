@@ -46,6 +46,16 @@ class DecisionStatus(StrEnum):
     EXPIRED = "EXPIRED"
 
 
+class RoutingDivergenceError(RuntimeError):
+    """F9-C-02: a claimed-enabled engine routed with the flag disabled.
+
+    Raised by the route-time provenance guard. Callers that swallow
+    generic exceptions (orchestrator cycle loop, decision-queue loop)
+    must treat this class as a KILL event, not a log-and-continue: the
+    divergence signature voids the P5 evidence span.
+    """
+
+
 class TradeDecisionEngine:
     """CMP Trade Decision Engine with Analyzer routing."""
 
@@ -74,6 +84,12 @@ class TradeDecisionEngine:
             "success": 0,
             "disabled": 0,
             "error": 0,
+            # F9-C-02 (adversarial hardening): grader-visible divergence
+            # evidence. The orchestrator cycle loop catches Exception and
+            # continues, so the RuntimeError alone cannot fail a span --
+            # this counter is sampled by the P5 supervisor into the run
+            # log and hard-FAILs the run in the official grader.
+            "routing_divergence_detected": 0,
         }
         # F9-C-02 (2026-09-15): provenance state for the routing flag.
         # ``_routing_claimed_enabled`` records what the operator/supervisor
@@ -82,9 +98,6 @@ class TradeDecisionEngine:
         # claimed-enabled engine can never silently route ``disabled``
         # (the signature that voided the 15Sep P5 evidence).
         self._routing_claimed_enabled: bool = False
-        self._divergence_silence_s: float = float(
-            os.environ.get("LOATS_ROUTING_DIVERGENCE_SILENCE_S", "900")
-        )
         self._last_divergence_alarm_at: datetime.datetime | None = None
 
     async def _audit_rejection(
@@ -480,7 +493,13 @@ class TradeDecisionEngine:
             if self._routing_claimed_enabled:
                 await self._alarm_routing_divergence(trade_decision.decision_id)
                 await self._audit_divergence(trade_decision.decision_id)
-                raise RuntimeError(
+                # Adversarial hardening: grader-visible evidence. The
+                # orchestrator cycle loop catches Exception and
+                # continues, so this counter (sampled by the P5
+                # supervisor into the run log, hard-FAILed by the
+                # grader) is the enforcement that survives the loop.
+                self.routing_counters["routing_divergence_detected"] += 1
+                raise RoutingDivergenceError(
                     f"F9-C-02 routing divergence: decision "
                     f"{trade_decision.decision_id} hit a claimed-enabled "
                     "engine with analyzer_routing_enabled=False -- P5 "
@@ -597,7 +616,14 @@ class TradeDecisionEngine:
         return response
 
     async def process_decision_queue(self) -> None:
-        """Process decisions from the queue and route to Analyzer."""
+        """Process decisions from the queue and route to Analyzer.
+
+        F9-C-02 (adversarial hardening): a ``RoutingDivergenceError`` is
+        a KILL event, never a log-and-continue -- routing is disabled
+        first (the kill path), then remaining completed decisions are
+        drained and the exception re-raises so the supervisor's task
+        watcher records it as an unhandled system exception.
+        """
         while True:
             try:
                 decision = await self.decision_queue.get()
@@ -617,6 +643,17 @@ class TradeDecisionEngine:
                 self.decision_queue.task_done()
 
             except asyncio.CancelledError:
+                raise
+            except RoutingDivergenceError as e:
+                # Kill path: claimed-enabled engine routed disabled.
+                # Disable routing FIRST so no further decision can be
+                # routed while the loop unwinds, then drain whatever has
+                # already completed and surface the divergence.
+                logger.critical(
+                    f"F9-C-02 divergence in decision queue: {e} -- "
+                    "disabling routing and stopping the processor"
+                )
+                self.disable_analyzer_routing()
                 raise
             except Exception as e:
                 logger.error(f"Error processing decision queue: {e}")
@@ -723,21 +760,56 @@ class TradeDecisionEngine:
         self.analyzer_routing_enabled = False
         logger.info("Disabled Analyzer routing")
 
+    @staticmethod
+    def _within_divergence_silence_window(
+        last_alarm_at: datetime.datetime | None,
+        now: datetime.datetime,
+        silence_seconds: float,
+    ) -> bool:
+        """Pure silence-window predicate (adversarial hardening).
+
+        Factored so the exact ``<`` vs ``>=`` boundary is unit-testable:
+        at ``elapsed == silence_seconds`` the window is EXPIRED (an
+        elapsed window never suppresses; only strictly-younger alarms
+        do).
+        """
+        if last_alarm_at is None:
+            return False
+        elapsed = (now - last_alarm_at).total_seconds()
+        return elapsed < silence_seconds
+
+    def _current_divergence_silence_s(self) -> float:
+        """The divergence alert silence window in seconds.
+
+        Read at ALARM time (adversarial hardening): a construction-time
+        snapshot would ignore later operator changes to
+        ``LOATS_ROUTING_DIVERGENCE_SILENCE_S``. Invalid values fall back
+        to the 900 s default.
+        """
+        raw = os.environ.get("LOATS_ROUTING_DIVERGENCE_SILENCE_S", "900")
+        try:
+            return max(0.0, float(raw))
+        except ValueError:
+            return 900.0
+
     async def _alarm_routing_divergence(self, decision_id: str) -> None:
         """Fire the F9-C-02 divergence CRITICAL alert once per silence window.
 
         Alert flood control: the same engine raises at most one alert per
-        ``LOATS_ROUTING_DIVERGENCE_SILENCE_S`` seconds (default 900);
-        every divergence is still audited by the caller regardless.
+        ``LOATS_ROUTING_DIVERGENCE_SILENCE_S`` seconds (default 900;
+        read at alarm time); every divergence is still audited by the
+        caller regardless. The window timestamp advances ONLY on a
+        successful send (adversarial hardening): a failed or
+        cooldown-consumed Telegram delivery must not suppress the next
+        alarm.
         """
         now = datetime.datetime.now(datetime.UTC)
-        if (
-            self._last_divergence_alarm_at is not None
-            and (now - self._last_divergence_alarm_at).total_seconds()
-            < self._divergence_silence_s
+        if self._within_divergence_silence_window(
+            self._last_divergence_alarm_at,
+            now,
+            self._current_divergence_silence_s(),
         ):
             return
-        self._last_divergence_alarm_at = now
         logger.critical(
             f"F9-C-02 routing divergence on decision {decision_id}: engine "
             "was claimed ENABLED for analyzer routing but routed with the "
@@ -747,7 +819,7 @@ class TradeDecisionEngine:
         try:
             from .alerts import alerts
 
-            await alerts.send_alert(
+            delivered = await alerts.send_alert(
                 f"F9-C-02 CRITICAL: ROUTING DIVERGENCE (routing divergence) "
                 f"at decision {decision_id} -- claimed ENABLED, routed "
                 "DISABLED. P5 evidence for this span is VOID. Inspect for a "
@@ -756,8 +828,12 @@ class TradeDecisionEngine:
             )
         except Exception as e:
             # The RuntimeError below already fails the run loudly; alert
-            # transport failure must not mask it.
+            # transport failure must not mask it. The window timestamp is
+            # NOT advanced, so the next divergence re-attempts delivery.
             logger.error(f"F9-C-02 divergence alert delivery failed: {e}")
+            return
+        if delivered:
+            self._last_divergence_alarm_at = now
 
     async def _audit_divergence(self, decision_id: str) -> None:
         """Best-effort dual-write REJECT row for a routing divergence.
@@ -878,4 +954,9 @@ class TradeDecisionEngine:
 # credential-free. Test patches keep working via proxy __dict__.
 trade_decision_engine: TradeDecisionEngine = lazy_singleton(TradeDecisionEngine)
 
-__all__ = ["TradeDecisionEngine", "DecisionStatus", "trade_decision_engine"]
+__all__ = [
+    "TradeDecisionEngine",
+    "DecisionStatus",
+    "RoutingDivergenceError",
+    "trade_decision_engine",
+]

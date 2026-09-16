@@ -177,15 +177,23 @@ class TestMetricsServer:
             # (This would be verified by checking logs in a real test)
 
     def test_start_metrics_server_exception_handling(self) -> None:
-        """Test metrics server exception handling."""
+        """Metrics server failures PROPAGATE (F9-C-02, 2026-09-15).
+
+        The previous contract swallowed the exception (which let a
+        second LOATS process boot invisibly against the shared DB -- the
+        evidence-divergence poison mechanism); the guard contract is
+        fail-closed: the caller (TradingSystem.initialize) refuses the
+        boot.
+        """
         manager = MetricsManager()
 
         # Mock the start_http_server function to raise exception
         with patch(
             "loats.metrics.start_http_server", side_effect=Exception("Port in use")
         ):
-            # Should not raise exception
-            manager.start_server()
+            # Must re-raise for the boot guard to see the failure
+            with pytest.raises(Exception, match="Port in use"):
+                manager.start_server()
 
             # Server should not be marked as started
             assert manager._server_started is False

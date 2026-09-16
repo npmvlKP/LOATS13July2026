@@ -37,7 +37,12 @@ import verify_p5_forward_test as validator  # noqa: E402
 
 
 def _base_log(**overrides: Any) -> dict[str, Any]:
-    """Structurally complete 15-day completed live run log."""
+    """Structurally complete 15-day completed live run log.
+
+    Span pinned entirely BEFORE the grader's documented contamination
+    windows (F9-C-02 hardening): these fixtures grade the
+    decisional-activity criterion, not contamination.
+    """
     log: dict[str, Any] = {
         "metadata": {
             "phase_gate": "P5",
@@ -47,13 +52,13 @@ def _base_log(**overrides: Any) -> dict[str, Any]:
             "script": "scripts/run_p5_forward_test.py",
         },
         "routing": {"enabled_at_start": True},
-        "started_at": "2026-09-01T00:00:00+00:00",
-        "ended_at": "2026-09-16T00:00:00+00:00",
+        "started_at": "2026-08-01T00:00:00+00:00",
+        "ended_at": "2026-08-16T00:00:00+00:00",
         "unhandled_exceptions": 0,
         "restarts": 1,
         "cycles_completed": 1000,
         "counters": {"success": 5, "disabled": 0, "error": 0},
-        "last_sampled_at": "2026-09-16T00:00:00+00:00",
+        "last_sampled_at": "2026-08-16T00:00:00+00:00",
         "events": [],
     }
     log.update(overrides)

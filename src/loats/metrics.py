@@ -292,12 +292,16 @@ class MetricsManager:
 
         try:
             # LITE edition: start lightweight HTTP server (stdlib only).
+            # F9-C-02 (2026-09-15): failures PROPAGATE -- a swallowed
+            # port conflict let a second LOATS process boot invisibly
+            # against the shared DB (the evidence-divergence poison
+            # mechanism). TradingSystem.initialize() refuses the boot.
             start_http_server(port)
             self._server_started = True
             logger.info(f"Lightweight metrics server started on port {port}")
-        except Exception as e:
-            logger.error(f"Failed to start metrics server: {e}")
+        except Exception:
             self._server_started = False
+            raise
 
 
 # Initialize the singleton
@@ -442,7 +446,24 @@ def start_http_server(port: int) -> None:
         def log_message(self, msg: str, *args: Any) -> None:
             logger.debug("Metrics HTTP: %s", msg % args)
 
-    server = ThreadingHTTPServer(("127.0.0.1", port), _MetricsHandler)
+    class _ExclusiveMetricsServer(ThreadingHTTPServer):
+        # F9-C-02 (2026-09-15): refuse to share the port. The class
+        # attribute must be False BEFORE construction -- the constructor
+        # itself binds. The ThreadingHTTPServer default
+        # (allow_reuse_address=True => SO_REUSEADDR) lets a SECOND
+        # process bind the SAME port silently on Windows -- the exact
+        # mechanism that hid the second LOATS system during the P5
+        # evidence divergence.
+        allow_reuse_address = False
+
+    try:
+        server = _ExclusiveMetricsServer(("127.0.0.1", port), _MetricsHandler)
+    except OSError as e:
+        raise OSError(
+            f"F9-C-02: metrics port {port} unavailable "
+            "(another LOATS process is likely live): "
+            f"{e}"
+        ) from e
     thread = threading.Thread(
         target=server.serve_forever,
         daemon=True,

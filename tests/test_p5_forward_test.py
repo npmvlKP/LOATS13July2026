@@ -357,7 +357,10 @@ class TestP5ActivityGate:
     def _fixture(
         cycles: int | None = 5, success: int = 5, legacy: bool = False
     ) -> dict[str, Any]:
-        start = datetime.datetime(2026, 9, 1, tzinfo=datetime.UTC)
+        # Span pinned entirely BEFORE the grader's documented
+        # contamination windows (F9-C-02 hardening): these fixtures
+        # grade the activity/freshness criteria, not contamination.
+        start = datetime.datetime(2026, 8, 1, tzinfo=datetime.UTC)
         record: dict[str, Any] = {
             "routing": {"enabled_at_start": True},
             "started_at": start.isoformat(),
@@ -504,10 +507,13 @@ class TestRoutingCounters:
             resp = await engine.route_to_analyzer(make_decision())
 
         assert resp["status"] == "success"
+        # F9-C-02: the stats dict carries the grader-visible divergence
+        # flag (0 after a clean run); exact-dict pins must include it.
         assert engine.get_routing_stats() == {
             "success": 1,
             "disabled": 0,
             "error": 0,
+            "routing_divergence_detected": 0,
         }
 
     @pytest.mark.asyncio

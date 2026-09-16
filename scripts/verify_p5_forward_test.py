@@ -72,6 +72,81 @@ def _now_utc() -> datetime.datetime:
     return datetime.datetime.now(datetime.UTC)
 
 
+def _grade_divergence_evidence(
+    run_log: dict[str, Any],
+    reasons: list[str],
+    started: datetime.datetime,
+    ended: datetime.datetime | None,
+) -> int:
+    """Grade the DB-derived divergence evidence field (F9-C-02).
+
+    Returns the effective divergence count: > 0 = proven divergence
+    inside the span (hard FAIL), 0 = verifiably clean or absent,
+    < 0 = present but unverifiable (can never grade PASS).
+    Appends the corresponding reasons.
+    """
+    divergence = run_log.get("disabled_routes_during_enabled_window")
+    effective = 0
+    window: dict[str, Any] = {}
+    if "disabled_routes_during_enabled_window" in run_log and not isinstance(
+        divergence, dict
+    ):
+        reasons.append(
+            "divergence evidence could not be verified (malformed "
+            "disabled_routes_during_enabled_window) -- run cannot grade "
+            "PASS on unverified evidence"
+        )
+        return -1
+    if not isinstance(divergence, dict):
+        return 0
+    raw_count = divergence.get("count")
+    if isinstance(raw_count, bool) or not isinstance(raw_count, (int, float)):
+        reasons.append(
+            "divergence evidence could not be verified (missing or "
+            "non-numeric count) -- run cannot grade PASS on unverified "
+            "evidence"
+        )
+        effective = -1
+    else:
+        effective = int(raw_count)
+    raw_window = divergence.get("window")
+    window = raw_window if isinstance(raw_window, dict) else {}
+    if effective > 0:
+        first_at = _parse_ts(window.get("first_disabled_route_at"))
+        last_at = _parse_ts(window.get("last_disabled_route_at"))
+        if first_at is None and last_at is None:
+            # A claimed divergence with NO verifiable window bounds
+            # cannot be dismissed as out-of-span.
+            reasons.append(
+                "divergence evidence could not be verified (count without "
+                "parseable window stamps)"
+            )
+            effective = -1
+        else:
+            span_end = ended if ended is not None else _now_utc()
+            # Partial stamps: fall back to whichever bound exists -- a
+            # missing stamp must not whitelist the window.
+            lower = first_at if first_at is not None else last_at
+            upper = last_at if last_at is not None else first_at
+            assert lower is not None and upper is not None
+            if not (lower <= span_end and upper >= started):
+                effective = 0
+    if effective > 0:
+        reasons.append(
+            f"ROUTING DIVERGENCE (F9-C-02): {effective} ROUTE row(s) with "
+            f"routing_enabled:false inside the claimed-enabled span "
+            f"({window.get('first_disabled_route_at', '?')} .. "
+            f"{window.get('last_disabled_route_at', '?')}) -- evidence for "
+            "this run is VOID"
+        )
+    if effective < 0 and not any("could not be verified" in r for r in reasons):
+        reasons.append(
+            "divergence evidence could not be verified -- run cannot grade "
+            "PASS on unverified evidence"
+        )
+    return effective
+
+
 def grade_run_log(run_log: dict[str, Any]) -> Grade:
     """Grade one P5 run-log dict against the phase-gate criteria."""
     reasons: list[str] = []
@@ -132,42 +207,24 @@ def grade_run_log(run_log: dict[str, Any]) -> Grade:
     # ``disabled_routes_during_enabled_window`` (DB-derived, see
     # collect_disabled_route_rows) into the run log; ROUTE rows with
     # ``routing_enabled:false`` INSIDE the claimed-enabled span are the
-    # exact divergence that voided the 15Sep P5 evidence. Trust-but-verify:
-    # the claimed divergence window must actually intersect the run span
-    # -- a window entirely outside the span is an upstream artifact, not
-    # contamination of THIS run. An intersecting divergence hard-FAILs the
-    # run regardless of every other criterion: the span is contaminated
-    # and must never be cited as P5 evidence.
-    divergence = run_log.get("disabled_routes_during_enabled_window")
-    divergence_effective = 0
-    divergence_window: dict[str, Any] = {}
-    if isinstance(divergence, dict):
-        try:
-            divergence_effective = int(divergence.get("count") or 0)
-        except (TypeError, ValueError):
-            divergence_effective = 0
-        raw_window = divergence.get("window")
-        divergence_window = raw_window if isinstance(raw_window, dict) else {}
-        first_at = _parse_ts(divergence_window.get("first_disabled_route_at"))
-        last_at = _parse_ts(divergence_window.get("last_disabled_route_at"))
-        if divergence_effective > 0 and (first_at is not None or last_at is not None):
-            span_end = ended if ended is not None else _now_utc()
-            # Partial stamps: fall back to whichever bound exists -- a
-            # missing stamp must not whitelist the window.
-            lower = first_at if first_at is not None else last_at
-            upper = last_at if last_at is not None else first_at
-            assert lower is not None and upper is not None
-            intersects = lower <= span_end and upper >= started
-            if not intersects:
-                divergence_effective = 0
-        if divergence_effective > 0:
-            reasons.append(
-                f"ROUTING DIVERGENCE (F9-C-02): {divergence_effective} ROUTE "
-                f"row(s) with routing_enabled:false inside the claimed-enabled "
-                f"span ({divergence_window.get('first_disabled_route_at', '?')} .. "
-                f"{divergence_window.get('last_disabled_route_at', '?')}) -- "
-                "evidence for this run is VOID"
-            )
+    # exact divergence that voided the 15Sep P5 evidence. Graded by
+    # _grade_divergence_evidence: > 0 proven divergence (hard FAIL),
+    # < 0 present-but-unverifiable (can never grade PASS), 0 clean/absent.
+    divergence_effective = _grade_divergence_evidence(run_log, reasons, started, ended)
+
+    # F9-C-02 (adversarial hardening): engine-carried divergence flag.
+    # The orchestrator cycle loop swallows exceptions, so a divergence
+    # that fired mid-cycle survives only in this counter; any positive
+    # count voids the run.
+    engine_divergences = int(
+        (run_log.get("counters") or {}).get("routing_divergence_detected", 0) or 0
+    )
+    if engine_divergences > 0:
+        reasons.append(
+            f"ROUTING DIVERGENCE (F9-C-02): routing engine reported "
+            f"{engine_divergences} divergence(s) during the run -- evidence "
+            "for this run is VOID"
+        )
 
     # Hard criterion: routing must have been enabled for the run.
     routing = run_log.get("routing") or {}
@@ -187,6 +244,25 @@ def grade_run_log(run_log: dict[str, Any]) -> Grade:
         if span_days < MIN_SPAN_DAYS:
             reasons.append(f"span {span_days:.2f}d < required {MIN_SPAN_DAYS}d")
 
+    # F9-C-02 (adversarial hardening): legacy logs carry no divergence
+    # evidence field, so they cannot prove their own cleanliness. If
+    # their span overlaps a documented contamination window, VOID them.
+    legacy_contaminated = False
+    if "disabled_routes_during_enabled_window" not in run_log and ended is not None:
+        for win_start_raw, win_end_raw in CONTAMINATION_WINDOWS:
+            win_start = _parse_ts(win_start_raw)
+            win_end = _parse_ts(win_end_raw)
+            if win_start is None or win_end is None:
+                continue
+            if win_start <= ended and win_end >= started:
+                legacy_contaminated = True
+                reasons.append(
+                    f"legacy run span overlaps a documented contamination "
+                    f"window ({win_start_raw} .. {win_end_raw}) -- evidence "
+                    "for this run is VOID (cannot prove its own cleanliness)"
+                )
+                break
+
     hard_violation = bool(reasons) and (
         exceptions > 0
         or not routing.get("enabled_at_start")
@@ -201,6 +277,12 @@ def grade_run_log(run_log: dict[str, Any]) -> Grade:
         # F9-C-02 (2026-09-15): DB-proven divergence hard-fails even an
         # otherwise-clean span.
         or divergence_effective > 0
+        # Adversarial hardening: an engine-reported divergence voids the
+        # run even when the DB probe missed it.
+        or engine_divergences > 0
+        # Adversarial hardening: legacy logs (no divergence field) that
+        # overlap a documented contamination window are VOID.
+        or legacy_contaminated
     )
     if hard_violation:
         return Grade("FAIL", reasons, activity_recorded, data_freshness)
@@ -215,6 +297,18 @@ def grade_run_log(run_log: dict[str, Any]) -> Grade:
 
 
 RUN_LOG_GLOB = "p5_forward_test_*.json"
+
+# F9-C-02 (adversarial hardening): documented evidence-contamination
+# windows. Legacy run logs (those carrying no divergence-evidence field)
+# whose span overlaps a window are VOID -- they cannot prove their own
+# cleanliness and must never be cited as P5 evidence. Extend this tuple
+# when a new contamination window is documented in docs/audit-history/.
+CONTAMINATION_WINDOWS: tuple[tuple[str, str], ...] = (
+    # 15Sep2026 F9-C-02 poisoning (second default-OFF process writing
+    # routing_enabled:false ROUTE rows; see
+    # docs/audit-history/15Sep2026-F9C02-TODO2-resolution.md).
+    ("2026-09-15T01:00:00+00:00", "2026-09-15T05:00:00+00:00"),
+)
 
 
 def collect_disabled_route_rows(
@@ -237,11 +331,14 @@ def collect_disabled_route_rows(
     ``Database`` in tests). Rows with unparseable metadata are skipped
     (they cannot prove either state); rows missing a parseable timestamp
     are skipped for the same reason.
+
+    Adversarial hardening: a STORE FAILURE propagates -- swallowing it
+    into ``[]`` would be indistinguishable from a clean DB and fold a
+    false zero into the run log. The caller (the supervisor's snapshot
+    probe) converts the failure into an unverified-evidence record the
+    grader treats as INCOMPLETE, never PASS.
     """
-    try:
-        entries = database.get_audit_log(entity_type="trade_decision", limit=10000)
-    except Exception:
-        return []
+    entries = database.get_audit_log(entity_type="trade_decision", limit=10000)
     rows: list[tuple[str, datetime.datetime]] = []
     for entry in entries:
         if entry.action != "ROUTE":
