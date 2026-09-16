@@ -55,7 +55,21 @@ class Settings(BaseSettings):
         0.05, description="Sentiment threshold for signal generation"
     )
     composite_strength_threshold: float = Field(
-        0.5, description="Minimum composite strength threshold for trade decisions"
+        0.6,
+        description=(
+            "Minimum composite strength threshold for trade decisions "
+            "(CMP section 4: |score| > 0.6; TODO-13/F9-H-01)"
+        ),
+    )
+    # CMP section 4 opposition gate: a counter-directional signal stronger
+    # than 0.4 blocks the decision. TODO-13/F9-H-01 lifted the hard-coded
+    # strength.py 0.6 into Settings at the CMP-specified 0.4.
+    opposition_threshold: float = Field(
+        0.4,
+        description=(
+            "Counter-directional strength that blocks a decision via the "
+            "opposition gate (CMP section 4: no opposition > 0.4)"
+        ),
     )
     request_timeout: float = Field(30.0, description="Request timeout in seconds")
 
@@ -273,7 +287,11 @@ class Settings(BaseSettings):
             raise ValueError("Scan intervals must be positive")
         return v
 
-    @field_validator("sentiment_threshold", "composite_strength_threshold")
+    @field_validator(
+        "sentiment_threshold",
+        "composite_strength_threshold",
+        "opposition_threshold",
+    )
     @classmethod
     def validate_threshold(cls, v: float) -> float:
         """Validate threshold values."""
