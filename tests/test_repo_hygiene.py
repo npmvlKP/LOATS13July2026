@@ -2649,3 +2649,138 @@ class TestSecuritySummaryGateSelectorParity:
         rc, rendered = self._run_gate(script, results, tmp_path)
         assert rc == 1, "SBOM failure did not fail the summary on a full run"
         assert "❌" in rendered
+
+
+class TestIsortScopeImmunity:
+    """isort must stay green under a repo-root sweep on the dev host.
+
+    Live defect (2026-09-15): an operator muscle-memory sweep
+    (``isort --check-only .`` from the repo root) reported 4,768 false
+    "Imports are incorrectly sorted" findings plus a wall of charmap
+    parse warnings -- 100% under ``loatsNEW/`` (the in-tree venv, which
+    .gitignore excludes and nothing tracks), while the CI-exact scope
+    (`isort --check-only src/ tests/ scripts/`) was rc=0 at the same
+    HEAD. Unlike ruff, isort defaults to ``respect_gitignore = False``
+    and does not read .gitignore, so its root walk descends straight
+    into site-packages; under a cp1252 console the vendor files'
+    non-ASCII literals additionally surface as charmap warnings. Root
+    cause is config scope-immunity, not any tracked file.
+
+    Fix contract: the isort config itself is immune to scope mistakes
+    (skip_gitignored + explicit venv skip), the CI surface stays pinned
+    to the CI-exact scope (fresh runners never contain the venv; a root
+    scope would slow every run for zero coverage gain), and the DEPLOY
+    command blocks carry CI-parity scopes with no phantom formatter
+    (the orphaned ``black --check`` line cited a tool no enforced
+    surface invokes -- black is not installed; ruff format is the
+    formatter of record per TestBlackIsNotAFormatSurface).
+    """
+
+    CI_ISORT_COMMAND = (
+        "isort --check-only src/ tests/ scripts/ --settings-path pyproject.toml"
+    )
+
+    @staticmethod
+    def _isort_config_block() -> str:
+        text = _repo_relative(PYPROJECT_TOML)
+        match = re.search(r"(?ms)^\[tool\.isort\]\s*$(.*?)(?=^\[|\Z)", text)
+        assert match, "[tool.isort] section missing from pyproject.toml"
+        return match.group(1)
+
+    def test_isort_config_ignores_gitignored_trees(self) -> None:
+        """skip_gitignored must be ON: the root sweep's 4,768 findings all
+        lived under the gitignored venv -- the one class the config can
+        immunize against without widening any gate."""
+        block = self._isort_config_block()
+        assert re.search(r"(?m)^skip_gitignore\s*=\s*true\b", block), (
+            "isort config must pin skip_gitignore = true: isort does not "
+            "read .gitignore by default, so any root-scope invocation "
+            "descends into the gitignored in-tree venv and false-fails on "
+            "vendor imports"
+        )
+
+    def test_isort_config_skips_the_venv_by_name(self) -> None:
+        """Belt-and-suspenders: even a checkout where the venv directory is
+        temporarily visible to git (ignore rule edited) stays immune --
+        the skip names the machine-local tree itself."""
+        block = self._isort_config_block()
+        skip_line = re.search(r"(?m)^extend_skip\s*=\s*\[(.*?)\]", block)
+        assert skip_line, "isort config must carry an extend_skip list"
+        assert "loatsNEW" in skip_line.group(1), (
+            "extend_skip must name the in-tree venv directory (loatsNEW) "
+            "explicitly: skip_gitignored alone breaks the day the ignore "
+            "rule is edited"
+        )
+
+    @pytest.mark.skipif(
+        not IS_WINDOWS,
+        reason="behavioral leg: the in-tree venv (loatsNEW) exists only on "
+        "the Windows dev host; ubuntu runners never contain it",
+    )
+    def test_root_scope_isort_sweep_stays_green(self) -> None:
+        """Behavioral contract: the muscle-memory root sweep exits 0.
+
+        This is the exact invocation that false-failed 4,768 times at a
+        green HEAD. Runs through the suite's own interpreter (which has
+        the pinned isort on every surface: repo venv locally, the CI
+        install on runners), output devnull'd -- only the rc is graded.
+        """
+        proc = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "isort",
+                "--check-only",
+                ".",
+                "--settings-path",
+                "pyproject.toml",
+            ],
+            cwd=REPO_ROOT,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False,
+            timeout=300,
+        )
+        assert proc.returncode == 0, (
+            "root-scope isort sweep failed: the config must make a repo-"
+            "root sweep immune to the gitignored in-tree venv (see "
+            "TestIsortScopeImmunity class docstring for the live defect)"
+        )
+
+    def test_ci_isort_surface_unchanged(self) -> None:
+        """Positive surface: the CI job keeps the CI-exact scope.
+
+        Guards against 'fixing' the defect by widening CI to ``.`` --
+        fresh runners never contain the venv, so a root scope there is
+        pure added runtime with zero coverage gain.
+        """
+        text = _repo_relative(CI_YML)
+        assert self.CI_ISORT_COMMAND in text, (
+            f"ci.yml isort job must keep the pinned scope ({self.CI_ISORT_COMMAND!r})"
+        )
+
+    def test_deploy_docs_carry_ci_parity_isort_commands(self) -> None:
+        """Both DEPLOY command blocks match the enforced gates.
+
+        The drifted copies scoped ruff/isort to src/ tests/ (scripts/ is
+        gated by CI), and the root copy carried an orphan ``black
+        --check`` line for a formatter no enforced surface invokes --
+        the exact phantom-tool repeater class the format-surface
+        contract net exists for. A doc block that demands a check CI
+        never runs sends the next operator chasing tree debt that does
+        not exist (or worse, 'fixing' vendored imports to satisfy it).
+        """
+        for rel in ("DEPLOY.md", "docs/DEPLOY.md"):
+            doc = (REPO_ROOT / rel).read_text(encoding="utf-8")
+            assert self.CI_ISORT_COMMAND in doc, (
+                f"{rel}: isort validation command must match the CI-exact "
+                "scope (src/ tests/ scripts/)"
+            )
+            assert "black --check" not in doc, (
+                f"{rel}: phantom 'black --check' line invokes a formatter "
+                "no enforced surface runs (ruff format is the formatter "
+                "of record)"
+            )
+            assert "ruff check src/ tests/ --config pyproject.toml" not in doc, (
+                f"{rel}: ruff check scope must match CI (src/ tests/ scripts/)"
+            )

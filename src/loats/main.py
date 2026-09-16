@@ -52,13 +52,25 @@ class TradingSystem:
                 logger.warning("Audit log integrity check failed during initialization")
             await alerts.initialize()
             await scheduler.initialize()
-            # Start metrics server after cache initialization (R5-2 fix)
+            # Start metrics server after cache initialization (R5-2 fix).
+            # F9-C-02 (2026-09-15): a metrics-port conflict used to be
+            # swallowed ("Continue without metrics server"), which let a
+            # SECOND LOATS process boot invisibly against the same SQLite
+            # DB -- the mechanism that poisoned the P5 evidence stream
+            # with default-OFF ROUTE rows while the supervisor claimed
+            # enabled. The conflict is now a hard boot refusal with
+            # compensating teardown of everything initialized above.
             try:
                 metrics.start_server(settings.metrics_port)
                 logger.info(f"Metrics server started on port {settings.metrics_port}")
-            except Exception as e:
-                logger.error(f"Failed to start metrics server: {e}")
-                # Continue without metrics server in LITE mode
+            except Exception as exc:
+                await alerts.shutdown()
+                raise RuntimeError(
+                    f"F9-C-02: metrics port {settings.metrics_port} is already "
+                    "bound -- another LOATS process is almost certainly live "
+                    "and sharing this database. Refusing to start a second "
+                    "system instance (evidence-integrity guard)."
+                ) from exc
             # Start high-performance orchestrator
             await start_orchestrator()
             logger.info("All system components initialized successfully")

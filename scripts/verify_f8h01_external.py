@@ -160,7 +160,10 @@ def check_e_runner_validator() -> None:
     spec.loader.exec_module(mod)
 
     def fixture(span_days: int, exc: int, routing: bool = True) -> dict:
-        start = datetime.datetime(2026, 9, 1, tzinfo=datetime.UTC)
+        # Span pinned entirely BEFORE the grader's documented
+        # contamination windows (F9-C-02 hardening): these fixtures
+        # grade the structural criteria, not contamination.
+        start = datetime.datetime(2026, 8, 1, tzinfo=datetime.UTC)
         end = start + datetime.timedelta(days=span_days)
         return {
             "routing": {"enabled_at_start": routing},

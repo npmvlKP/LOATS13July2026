@@ -68,6 +68,11 @@ _STALE_WARN_S = 600.0
 
 PASS_SYM, FAIL_SYM = "[PASS]", "[FAIL]"
 
+# Process-start marker singleton for _engine_identity (adversarial
+# hardening): a module-level function attribute cached on first use, so
+# every identity stamped by this process shares one start marker.
+_process_start_marker = type("_Marker", (), {"_value": None})()
+
 
 def _load_validator() -> Any | None:
     """Import ``scripts/verify_p5_forward_test.py`` as a module.
@@ -187,6 +192,12 @@ def _init_run_log(reason: str, dry_run: bool) -> Path:
         "cycles_completed_baseline": None,
         "counters": {"success": 0, "disabled": 0, "error": 0},
         "counters_baseline": None,
+        # F9-C-02 (2026-09-15): evidence provenance -- the in-process
+        # identity of the engine whose flag decides routing, and this
+        # log's own path. A second LOATS process writing the same DB
+        # carries a different identity; the log is attributable.
+        "trade_decision_engine_identity": _engine_identity(),
+        "run_log_path": str(path),
         "events": [],
     }
     path.write_text(json.dumps(record, indent=2), encoding="utf-8")
@@ -219,6 +230,14 @@ def _capture_live_baseline(system: Any) -> dict[str, Any]:
 
     Deltas against these baselines measure only THIS run's activity; the
     process may have been importing/initializing long before started_at.
+
+    F9-C-02 (2026-09-15): the deciding engine's in-process identity and
+    the run-log path are recorded with the baseline so the evidence
+    stream is attributable: a second LOATS process sampling or writing
+    the same log/DB shows up as a different engine identity. The
+    baseline cannot know the log path yet (the log is created around
+    it); ``run_log_path`` stays None here and is stamped by the first
+    sample.
     """
     from loats.orchestrator import orchestrator
     from loats.trade_decision import trade_decision_engine
@@ -226,7 +245,41 @@ def _capture_live_baseline(system: Any) -> dict[str, Any]:
     return {
         "cycles_completed": orchestrator.cycle_count,
         "counters": trade_decision_engine.get_routing_stats(),
+        "trade_decision_engine_identity": _engine_identity(),
+        "run_log_path": None,
     }
+
+
+def _engine_identity() -> str:
+    """In-process identity of the routing-deciding engine singleton.
+
+    F9-C-02 provenance: every accessor in this process resolves the same
+    lazy proxy (single binding in loats.trade_decision), so the binding's
+    ``id()`` identifies exactly the engine whose flag decides routing
+    here. A different id in a foreign log line means a different process.
+    Read via the module attribute (not a from-import) so test patches of
+    ``loats.trade_decision.trade_decision_engine`` are reflected.
+
+    Adversarial hardening: ``id()`` alone is ambiguous -- Windows
+    recycles addresses across process restarts (two runs can stamp
+    identical identities) and a proxy keeps its id even if its
+    ``_instance`` were rebuilt. The identity therefore binds
+    ``pid=<os.getpid()>`` + this process's start marker + the binding
+    address, and resolves the underlying engine instance through the
+    proxy's ``_instance`` when constructed.
+    """
+    import datetime as _dt
+
+    import loats.trade_decision
+
+    proxy = loats.trade_decision.trade_decision_engine
+    engine = getattr(proxy, "_instance", None)
+    target = engine if engine is not None else proxy
+    marker = getattr(_process_start_marker, "_value", None)
+    if marker is None:
+        marker = f"{_dt.datetime.now(datetime.UTC).isoformat()}:{os.getpid()}"
+        _process_start_marker._value = marker  # type: ignore[attr-defined]
+    return f"pid={os.getpid()};start={marker};engine={hex(id(target))}"
 
 
 def _effective_resume_baseline(
@@ -242,6 +295,15 @@ def _effective_resume_baseline(
     the log, never inflation.
     """
     live_counters = raw["counters"]
+    # Merge over the known keys PLUS any engine-carried keys (the F9-C-02
+    # divergence flag) so resume baselines stay delta-correct per key.
+    merged_keys = tuple(
+        dict.fromkeys(
+            ("success", "disabled", "error")
+            + tuple(live_counters.keys())
+            + tuple(logged_counters.keys())
+        )
+    )
     return {
         "cycles_completed": max(int(raw["cycles_completed"]) - int(logged_cycles), 0),
         "counters": {
@@ -249,7 +311,7 @@ def _effective_resume_baseline(
                 int(live_counters.get(key, 0)) - int(logged_counters.get(key, 0)),
                 0,
             )
-            for key in ("success", "disabled", "error")
+            for key in merged_keys
         },
     }
 
@@ -756,6 +818,67 @@ def _resolve_resume_target(path: Path | None) -> Path | None:
     return None
 
 
+def _db_divergence_snapshot(run_log: Path) -> dict[str, Any]:
+    """Probe the shared DB for routing evidence contradicting this run.
+
+    F9-C-02 remediation 4: ROUTE audit rows with
+    ``routing_enabled:false`` written INSIDE this run's span are the
+    poisoned-evidence signature (a second, default-OFF LOATS process
+    sharing the database). The count and first/last stamps are folded
+    into the run log every sample so the official grader
+    (verify_p5_forward_test.grade_run_log) hard-FAILs a contaminated
+    span. A clean DB records an explicit zero-count (self-verifying
+    evidence, positive record); a probe failure records an ``error`` key
+    rather than a false clean bill.
+    """
+    zero: dict[str, Any] = {
+        "count": 0,
+        "window": {"first_disabled_route_at": None, "last_disabled_route_at": None},
+    }
+    try:
+        data = json.loads(run_log.read_text(encoding="utf-8"))
+        started_raw = data.get("started_at")
+        started = (
+            datetime.datetime.fromisoformat(started_raw)
+            if isinstance(started_raw, str)
+            else None
+        )
+        if started is not None and started.tzinfo is None:
+            started = started.replace(tzinfo=datetime.UTC)
+        if started is None:
+            return zero
+        from loats.database import db
+
+        # Resolve the reconciliation helper from the official validator
+        # module (single source of policy); cache it in globals() so
+        # tests can patch it on this module by name.
+        collect = globals().get("collect_disabled_route_rows")
+        if collect is None:
+            validator = _load_validator()
+            if validator is None or not hasattr(
+                validator, "collect_disabled_route_rows"
+            ):
+                return {"error": "reconciliation helper unavailable"}
+            collect = validator.collect_disabled_route_rows
+            globals()["collect_disabled_route_rows"] = collect
+        rows = collect(db, started, datetime.datetime.now(datetime.UTC))
+    except Exception as e:  # probe failure must not kill the sampling loop
+        # Fail-closed (adversarial hardening): ``count`` is absent/None
+        # so the grader treats this run's divergence state as UNVERIFIED
+        # (INCOMPLETE), never as a clean zero.
+        return {"error": f"{type(e).__name__}: {e}", "count": None}
+    if not rows:
+        return zero
+    stamps = [ts for _, ts in rows]
+    return {
+        "count": len(rows),
+        "window": {
+            "first_disabled_route_at": min(stamps).isoformat(),
+            "last_disabled_route_at": max(stamps).isoformat(),
+        },
+    }
+
+
 def _sample_live_activity(system: Any, run_log: Path, baseline: dict[str, Any]) -> None:
     """Fold live system counters into the run log (deltas over baseline).
 
@@ -771,15 +894,31 @@ def _sample_live_activity(system: Any, run_log: Path, baseline: dict[str, Any]) 
     live_cycles = max(0, orchestrator.cycle_count - baseline["cycles_completed"])
     live_counters = trade_decision_engine.get_routing_stats()
     base_counters = baseline["counters"]
+    # The engine may carry the F9-C-02 divergence flag as a fourth key;
+    # it folds through the same delta arithmetic (baseline carries 0 or
+    # its own count) so the run log and the grader see it.
+    counter_keys = tuple(
+        dict.fromkeys(
+            ("success", "disabled", "error")
+            + tuple(base_counters.keys())
+            + tuple(live_counters.keys())
+        )
+    )
     deltas = {
         key: max(0, int(live_counters.get(key, 0)) - int(base_counters.get(key, 0)))
-        for key in ("success", "disabled", "error")
+        for key in counter_keys
     }
     _update_run_log(
         run_log,
         {
             "cycles_completed": live_cycles,
             "counters": deltas,
+            # F9-C-02: every sample re-stamps WHO decided routing in this
+            # process and WHICH log file is the evidence carrier, so a
+            # contaminated or resumed log is attributable after the fact.
+            "routing_engine_identity": _engine_identity(),
+            "run_log_path": str(run_log),
+            "disabled_routes_during_enabled_window": _db_divergence_snapshot(run_log),
             "last_sampled_at": _utcnow_iso(),
             "system_healthy": {
                 "system_running": bool(system.running),
@@ -916,9 +1055,12 @@ async def _run(
                 prior = json.loads(run_log.read_text(encoding="utf-8"))
                 logged_cycles = int(prior.get("cycles_completed") or 0)
                 logged_counters_raw = prior.get("counters") or {}
+                # Carry EVERY logged key (including the F9-C-02
+                # divergence flag) so resumed deltas stay correct per
+                # key; unknown keys default to 0.
                 logged_counters = {
                     key: int(logged_counters_raw.get(key) or 0)
-                    for key in ("success", "disabled", "error")
+                    for key in logged_counters_raw
                 }
                 prior_restarts = int(prior.get("restarts") or 0)
                 baseline = _effective_resume_baseline(

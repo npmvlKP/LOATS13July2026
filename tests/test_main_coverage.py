@@ -27,6 +27,10 @@ async def test_trading_system_initialization_success(trading_system):
         patch(
             "loats.main.scheduler.initialize", new_callable=AsyncMock
         ) as mock_scheduler_init,
+        # F9-C-02: the metrics server start PROPAGATES failures now, so
+        # unit tests must not bind the real port (a live system on this
+        # host owns 8001) -- patch the manager like any collaborator.
+        patch("loats.main.metrics.start_server"),
     ):
         await trading_system.initialize()
         mock_cache_init.assert_called_once()
@@ -46,6 +50,7 @@ async def test_trading_system_initialization_failed_audit_log(trading_system):
         patch("loats.main.db.async_verify_audit_log_integrity", return_value=False),
         patch("loats.main.alerts.initialize", new_callable=AsyncMock),
         patch("loats.main.scheduler.initialize", new_callable=AsyncMock),
+        patch("loats.main.metrics.start_server"),
     ):
         await trading_system.initialize()
         # Should still complete initialization even with audit log warning
