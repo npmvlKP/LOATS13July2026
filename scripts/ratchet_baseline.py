@@ -291,8 +291,23 @@ History (most recent last):
        422nd tracked file that breached this ceiling and failed the
        repo-hygiene gate. Ceiling 421->422; the record is the +1 this
        entry accounts for.)
+
+  423. 15Sep2026 (F9-C-02 / TODO-2 wave, commit 4 of 5): regression
+       suite tests/test_p5_f9c02_routing_guard.py (33 tests pinning the
+       routing provenance guard + grader-visible divergence counter,
+       the exclusive-bind metrics port + boot refusal, the supervisor
+       identity/DB-reconciliation evidence stamps, the grader's
+       divergence hard-FAIL + fail-closed evidence shapes + legacy
+       contamination windows, and the reconciliation helper's DB
+       contract). Ceiling 422->423.
+
+  424. 15Sep2026 (F9-C-02 / TODO-2 wave, commit 5 of 5): resolution
+       record docs/audit-history/15Sep2026-F9C02-TODO2-resolution.md
+       (root cause, remediations, adversarial-grading hardening wave,
+       live verification evidence). Ceiling 423->424; the record is
+       the +1 this entry accounts for.
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 422
+TRACKED_FILE_CEILING = 424
