@@ -92,3 +92,22 @@ against this addendum; the rule itself (reject-any-at-open) may merit
 re-scoping to sustained rather than transitory open-window droughts.
 Recorded in-tree as this untracked file's addendum pending the wave
 that commits it; ceiling at write time is 424/424 (zero headroom).
+
+Close-of-day confirmation (16:00 IST digest): the day ENDED as it ran —
+70/70 ROUTE rows attributed (unattributed 0), counters 70/0/0,
+`routing_divergence_detected: 0`, 0 in-session breaker opens, 40
+pre-open transients, rejections flat at 29 (open-window only), writer
+fresh (72 s), restarts steady at 5, `disabled_routes_during_enabled_
+window` unchanged at 15 (no new disables). Full provenance-locked
+trading day; the drought signature did not return. This completes the
+evidence base for the operator's early-END decision and favors HOLD to
+the 26 Sep 20:32 IST gate.
+
+Supersession note (21:10 IST, same day): the HOLD recommendation above
+predates the operator action it advised on. Run 20260912_150243 was
+ended honestly at 14:01:53Z (19:31:53 IST) on this evidence, and a
+fresh span, p5_forward_test_20260916_140341, started 14:03:41Z
+(19:33 IST) via the Amendment-6 watchdog chain — restart record:
+16Sep2026-p5-restart-execution.md (PR #47). The 26 Sep 20:32 IST gate
+died with 150243; the fresh span's earliest legitimate PASS is
+2026-09-30 20:33 IST (grading checkpoint 21:00 IST same day).
