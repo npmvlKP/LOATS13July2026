@@ -117,6 +117,14 @@ class Database:
         # handed to the OS on each write) while removing the per-call open.
         self._audit_fh: IO[str] | None = None
         self._audit_lock = threading.RLock()
+        # F9-M-01: per-instance chain-head cache. Scanning the whole JSONL
+        # per append is O(N) per write (benchmark regression: 33 vs >50
+        # inserts/sec). Scan ONCE per Database instance, then advance the
+        # cached head on every successful append -- the same visibility
+        # model as the persistent file handle. External tampering between
+        # restarts is the verifier's CRITICAL finding, not the writer's.
+        self._chain_head: str | None = None
+        self._chain_head_loaded = False
         # Ensure directories exist
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self.audit_log_path.parent.mkdir(parents=True, exist_ok=True)
@@ -272,7 +280,12 @@ class Database:
                 previous_state TEXT,
                 new_state TEXT,
                 sha256_hash TEXT NOT NULL,
-                timestamp_ms INTEGER NOT NULL DEFAULT 0
+                timestamp_ms INTEGER NOT NULL DEFAULT 0,
+                -- F9-M-01 (TODO-6): appended LAST on purpose -- the audit
+                -- row reader maps columns positionally, so fresh and
+                -- migrated schemas must agree on index 11 (F8-L-02
+                -- convention, see trade_decisions.as_of_date).
+                previous_hash TEXT
             )
         """)
 
@@ -512,6 +525,9 @@ class Database:
             ],
             "audit_log": [
                 ("timestamp_ms", "INTEGER NOT NULL DEFAULT 0"),
+                # F9-M-01 (TODO-6): hash-chain link column, appended LAST
+                # (positional-index contract with the fresh schema, index 11).
+                ("previous_hash", "TEXT"),
             ],
             # F8-L-02 (CMP Rule 8): nullable as-of date on legacy
             # trade_decisions tables; fresh CREATE TABLE includes the
@@ -730,7 +746,81 @@ class Database:
             except Exception as e:
                 logger.debug(f"Ignoring error closing audit log handle: {e}")
 
+    def _read_chain_head(self) -> str | None:
+        """F9-M-01: current hash-chain head.
+
+        Per-instance CACHE: the first call scans the JSONL tail-to-head
+        cost once (in file order); every later call returns the cached
+        head, which the append path advances after each successful write.
+        This keeps audit writes O(1) (benchmark gate >50 inserts/sec).
+        None when the file is empty/missing or its tail is unreadable (a
+        corrupt tail is the verifier's CRITICAL finding, not the writer's
+        to guess at).
+        """
+        if self._chain_head_loaded:
+            return self._chain_head
+        try:
+            path = Path(self.audit_log_path)
+            if not path.exists():
+                self._chain_head = None
+                self._chain_head_loaded = True
+                return None
+            head: str | None = None
+            with path.open(encoding="utf-8") as fh:
+                for line in fh:
+                    stripped = line.strip()
+                    if not stripped:
+                        continue
+                    try:
+                        data = json.loads(stripped)
+                    except json.JSONDecodeError:
+                        continue  # verifier flags corrupt lines; skip here
+                    stored = data.get("sha256_hash")
+                    if isinstance(stored, str):
+                        head = stored
+            self._chain_head = head
+            self._chain_head_loaded = True
+            return head
+        except OSError:
+            return None
+
+    def _advance_chain_head(self, new_hash: str) -> None:
+        """Advance the cached chain head after a successful append."""
+        self._chain_head = new_hash
+        self._chain_head_loaded = True
+
     def _log_audit(
+        self,
+        action: str,
+        entity_type: str,
+        entity_id: str,
+        user: str = "system",
+        metadata: dict[str, Any] | None = None,
+        previous_state: dict[str, Any] | None = None,
+        new_state: dict[str, Any] | None = None,
+    ) -> None:
+        """F9-M-01: serialize the ENTIRE audit write under _audit_lock.
+
+        The chain read -> hash -> JSONL append -> head-advance sequence
+        must be atomic: two threads reading the same cached head would
+        both link against it and the verifier would raise a false
+        CRITICAL on the second append. RLock is re-entrant, so the
+        inner body's existing lock blocks nest harmlessly. The DB commit
+        rides inside the lock on purpose (fast local insert; keeps the
+        cached head honest when a caller interleaves log_audit calls).
+        """
+        with self._audit_lock:
+            self._log_audit_inner(
+                action,
+                entity_type,
+                entity_id,
+                user,
+                metadata,
+                previous_state,
+                new_state,
+            )
+
+    def _log_audit_inner(
         self,
         action: str,
         entity_type: str,
@@ -777,6 +867,13 @@ class Database:
             previous_state=previous_state or {},
             new_state=new_state or {},
         )
+        # F9-M-01 (TODO-6): hash-chain link. The chain head is the cached
+        # sha256_hash of the last appended entry (scanned once from the
+        # file at first use); the first entry of a fresh file seeds with
+        # None. Legacy files (entries without previous_hash) extend the
+        # chain at the legacy head, preserving the legacy prefix verbatim.
+        # Atomicity is provided by the _log_audit wrapper's _audit_lock.
+        entry.previous_hash = self._read_chain_head()
         # Calculate hash over entry data WITHOUT sha256_hash field
         hash_data = self._model_to_dict(entry)
         # Remove sha256_hash (which is currently None) hashing
@@ -845,8 +942,9 @@ class Database:
             """
             INSERT INTO audit_log
             (entry_id, timestamp, action, entity_type, entity_id, user,
-             metadata, previous_state, new_state, sha256_hash, timestamp_ms)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             metadata, previous_state, new_state, sha256_hash, timestamp_ms,
+             previous_hash)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 entry.entry_id,
@@ -860,12 +958,16 @@ class Database:
                 json.dumps(entry.new_state) if entry.new_state else None,
                 entry.sha256_hash,
                 int(now.timestamp() * 1000),
+                entry.previous_hash,
             ),
         )
         # Dual-write completion: JSONL already flushed; commit the SQLite row
         # so the IMMEDIATE transaction does not hold a writer lock for the
         # lifetime of this thread-local connection (database is locked).
         conn.commit()
+        # F9-M-01: the chain head advances only after BOTH trails are
+        # durable (JSONL flushed above, DB committed here).
+        self._advance_chain_head(entry.sha256_hash)
 
     def log_audit(
         self,
@@ -2286,15 +2388,35 @@ class Database:
             previous_state=json.loads(row[7]) if row[7] else None,
             new_state=json.loads(row[8]) if row[8] else None,
             sha256_hash=row[9],
+            # F9-M-01: previous_hash lives at appended index 11 in BOTH the
+            # fresh and migrated schemas (guarded by row length so rows
+            # produced before the column existed keep reading back None,
+            # mirroring the F8-L-02 as_of_date guard).
+            previous_hash=(row[11] if len(row) > 11 else None),
         )
 
     def verify_audit_log_integrity(self) -> bool:
         """
-        Verify integrity audit log checking SHA-256 hashes.
-        Returns:
-            True all entries valid, False corruption detected
+        Verify integrity of the audit log.
+
+        F9-M-01 (TODO-6): two-layer verification walking the JSONL file in
+        FILE ORDER:
+        1. Self-hash: every entry's ``sha256_hash`` must re-compute exactly
+           over its own fields (pre-existing check, unchanged).
+        2. Hash-chain link: an entry carrying a ``previous_hash`` key must
+           link to the PREVIOUS LINE's ``sha256_hash``. Legacy entries
+           (written before the chain existed, without the key) are
+           grandfathered under the self-hash rule only; the first
+           post-migration entry seeds at the legacy head, so the link
+           check extends seamlessly across the migration boundary.
+
+        A deletion or reordering leaves every self-hash intact -- ONLY the
+        link walk exposes it (the tamper-evidence class the CMP
+        "SHA-256 chained" requirement demands). Any failure logs a
+        CRITICAL alert and returns False.
         """
         try:
+            previous_line_hash: str | None = None
             with Path(self.audit_log_path).open(encoding="utf-8") as f:
                 for line in f:
                     line = line.strip()
@@ -2303,14 +2425,46 @@ class Database:
                     data = json.loads(line)
                     stored_hash = data.get("sha256_hash")
                     if stored_hash is None:
+                        logger.critical(
+                            "Audit integrity CRITICAL: entry %s has no "
+                            "sha256_hash -- audit trail compromised.",
+                            data.get("entry_id", "<unknown>"),
+                        )
                         return False
-                    # Recalculate hash excluding hash field itself
+                    # Layer 1: self-hash excluding the hash field itself
                     check_data = {k: v for k, v in data.items() if k != "sha256_hash"}
                     calculated_hash = self._calculate_sha256(check_data)
                     if calculated_hash != stored_hash:
+                        logger.critical(
+                            "Audit integrity CRITICAL: self-hash mismatch on "
+                            "entry %s -- audit trail compromised.",
+                            data.get("entry_id", "<unknown>"),
+                        )
                         return False
+                    # Layer 2: chain link (entries WITH the key only; the
+                    # head advances on every line in file order so a chain
+                    # extension across a legacy tail is verified exactly as
+                    # the writer computed it).
+                    if "previous_hash" in data:
+                        if data["previous_hash"] != previous_line_hash:
+                            logger.critical(
+                                "Audit integrity CRITICAL: broken hash-chain "
+                                "link on entry %s (expected %r, found %r) -- "
+                                "entries were deleted, reordered, or "
+                                "retroactively modified.",
+                                data.get("entry_id", "<unknown>"),
+                                previous_line_hash,
+                                data["previous_hash"],
+                            )
+                            return False
+                    previous_line_hash = stored_hash
             return True
-        except (json.JSONDecodeError, KeyError, FileNotFoundError):
+        except (json.JSONDecodeError, KeyError, FileNotFoundError, OSError) as e:
+            logger.critical(
+                "Audit integrity CRITICAL: verification aborted (%s) -- "
+                "audit trail may be truncated or corrupt.",
+                e,
+            )
             return False
 
     def _release_connection(self, conn: sqlite3.Connection) -> None:

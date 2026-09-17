@@ -316,6 +316,11 @@ class AuditLogEntry(BaseModel):
     previous_state: dict[str, Any] | None = None
     new_state: dict[str, Any] | None = None
     sha256_hash: str | None = None
+    # F9-M-01 (TODO-6): hash-chain link to the previous entry's sha256_hash
+    # (None on the first entry of a chain, or for grandfathered legacy rows
+    # written before the chain existed). The verifier walks these links in
+    # file order; a broken link is tamper evidence self-hashing cannot see.
+    previous_hash: str | None = None
 
 
 class TAIndicator(BaseModel):

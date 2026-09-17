@@ -443,6 +443,10 @@ async def _async_log_audit(
         "timestamp_ms": int(now.timestamp() * 1000),
     }
 
+    # F9-M-01 (TODO-6): hash-chain link, same semantics as the canonical
+    # sync writer -- link to the last line's sha256_hash, seeded at the
+    # legacy head for grandfathered files.
+    entry_data["previous_hash"] = self._read_chain_head()
     # Calculate SHA-256 hash over data excluding the hash field itself
     hash_data = dict(entry_data)
     hash_data.pop("sha256_hash", None)
@@ -466,8 +470,9 @@ async def _async_log_audit(
                 await cursor.execute(
                     """INSERT INTO audit_log
                     (entry_id, timestamp, action, entity_type, entity_id, user,
-                     metadata, previous_state, new_state, sha256_hash, timestamp_ms)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                     metadata, previous_state, new_state, sha256_hash, timestamp_ms,
+                     previous_hash)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                     (
                         entry_data["entry_id"],
                         entry_data["timestamp"],
@@ -480,6 +485,7 @@ async def _async_log_audit(
                         json.dumps(entry_data["new_state"]),
                         entry_data["sha256_hash"],
                         entry_data["timestamp_ms"],
+                        entry_data["previous_hash"],
                     ),
                 )
             await conn.commit()
