@@ -2784,3 +2784,71 @@ class TestIsortScopeImmunity:
             assert "ruff check src/ tests/ --config pyproject.toml" not in doc, (
                 f"{rel}: ruff check scope must match CI (src/ tests/ scripts/)"
             )
+
+
+@pytest.mark.skipif(not CI_YML.exists(), reason="CI workflow absent")
+class TestBenchmarkGateWired:
+    """ci.yml must carry the fail-closed performance benchmark job.
+
+    F9-H-02 prerequisite (2026-09-17, ADR-0016): FR9 mandates wiring
+    scripts/benchmark_performance.py into CI "either way" of the deferred
+    latency-budget decision. The script's verdict is its EXIT CODE
+    (fail-closed contract), so the job must run it unsuppressed; a job
+    that loses the exit code (continue-on-error / output-only) is the
+    silent-decay shape this net exists for.
+    """
+
+    @staticmethod
+    def _benchmark_job_block(text: str) -> str | None:
+        match = re.search(r"^  benchmark-perf:\n(?:^ {4,}.*\n?)*", text, re.M)
+        return match.group(0) if match else None
+
+    @staticmethod
+    def _assert_gate_wired(block: str) -> None:
+        assert "python scripts/benchmark_performance.py" in block, (
+            "benchmark-perf job lost the benchmark run step; the gate "
+            "would scan nothing (ADR-0016)"
+        )
+        assert re.search(r"^          pip install \.\s*$", block, re.M), (
+            "benchmark-perf job must install the project (the script "
+            "imports src.loats); a tool-only env fails at import"
+        )
+        assert "continue-on-error" not in block, (
+            "benchmark-perf must gate on the script's exit code"
+        )
+
+    def test_benchmark_job_is_wired_in_ci(self) -> None:
+        block = self._benchmark_job_block(CI_YML.read_text(encoding="utf-8"))
+        assert block is not None, (
+            "ci.yml lost the benchmark-perf job; the F9-H-02 CI benchmark "
+            "gate (ADR-0016) requires it -- restore the job or amend the "
+            "ADR first"
+        )
+        self._assert_gate_wired(block)
+
+    def test_net_flags_a_job_that_lost_the_run_step(self) -> None:
+        """RED-snapshot leg: mutate the live copy; the net must flip red."""
+        block = self._benchmark_job_block(CI_YML.read_text(encoding="utf-8"))
+        assert block is not None
+        mutated = block.replace(
+            "run: python scripts/benchmark_performance.py", "run: 'true'"
+        )
+        with pytest.raises(AssertionError, match="lost the benchmark run step"):
+            self._assert_gate_wired(mutated)
+
+    def test_net_flags_a_job_that_swallows_the_exit_code(self) -> None:
+        block = self._benchmark_job_block(CI_YML.read_text(encoding="utf-8"))
+        assert block is not None
+        mutated = block.replace(
+            "    runs-on: ubuntu-latest",
+            "    runs-on: ubuntu-latest\n    continue-on-error: true",
+        )
+        with pytest.raises(AssertionError, match="exit code"):
+            self._assert_gate_wired(mutated)
+
+    def test_net_flags_a_job_without_a_project_install(self) -> None:
+        block = self._benchmark_job_block(CI_YML.read_text(encoding="utf-8"))
+        assert block is not None
+        mutated = re.sub(r"^          pip install \.\s*\n", "", block, flags=re.M)
+        with pytest.raises(AssertionError, match="install the project"):
+            self._assert_gate_wired(mutated)

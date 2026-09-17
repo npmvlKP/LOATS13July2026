@@ -29,6 +29,19 @@ _BENCHMARK_DATA_DIR_IS_EPHEMERAL = "LOATS_BENCHMARK_DATA_DIR" not in os.environ
 os.environ["SQLITE_DB_PATH"] = str(_BENCHMARK_DATA_DIR / "benchmark.db")
 os.environ["AUDIT_LOG_PATH"] = str(_BENCHMARK_DATA_DIR / "benchmark_audit.jsonl")
 
+# Settings requires openalgo_api_key (no default, by design: no silent
+# defaults for secrets). A fresh CI checkout has no .env and no key, so
+# the 2026-09-17 CI run died at Settings construction before measuring
+# anything (environment-revealing defect: dev hosts hid it behind their
+# real key). Self-inject an EXPLICIT probe key when -- and only when --
+# the operator provided none (fr7_health_check HC-21 pattern): the value
+# can never authenticate anywhere, is reported in the log for honesty,
+# and never overwrites a real deployment's key.
+_BENCHMARK_API_KEY_INJECTED = False
+if not os.environ.get("OPENALGO_API_KEY"):
+    os.environ["OPENALGO_API_KEY"] = "benchmark-performance-probe-no-auth-value"
+    _BENCHMARK_API_KEY_INJECTED = True
+
 from src.loats.loats_logging import logger
 from src.loats.main import db
 from src.loats.performance_analyzer import (
@@ -42,6 +55,12 @@ async def main() -> None:
     print("LOATS13July2026 Performance Benchmark")
     print("=" * 60)
     logger.info(f"Benchmark data directory: {_BENCHMARK_DATA_DIR}")
+    if _BENCHMARK_API_KEY_INJECTED:
+        logger.info(
+            "OPENALGO_API_KEY absent: injected an explicit no-auth probe key "
+            "(the benchmark measures local latency only; the probe value "
+            "never authenticates anywhere)"
+        )
 
     verdict_error: Exception | None = None
     try:

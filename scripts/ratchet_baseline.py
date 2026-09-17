@@ -319,8 +319,15 @@ History (most recent last):
       140341 with routing enabled, route-watch repointed, grading
       cron re-armed 26->30Sep 21:00 IST. Ceiling 425->426; the
       record is the +1 this entry accounts for.
+
+  427. 17Sep2026 (F9-H-02 prerequisite wave): decision record
+      docs/adr/0016-defer-cycle-latency-budget-wire-benchmark-gate.md
+      (cycle-latency budget decision deferred past the 30Sep P5
+      checkpoint; CI benchmark-perf gate wired advisory; born-red
+      stage-budget defect root-caused and fixed). Ceiling 426->427;
+      the ADR is the +1 this entry accounts for.
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 426
+TRACKED_FILE_CEILING = 427

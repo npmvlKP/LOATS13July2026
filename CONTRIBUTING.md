@@ -98,9 +98,12 @@ All commits must pass the following quality gates:
   `enforce_admins=true`, `allow_force_pushes=false`,
   `allow_deletions=false`. Direct pushes are rejected (GH006); PRs and
   required status checks are mandatory. The repo-hygiene, rss-feeds,
-  ruff-repo-scope, gitleaks and docker jobs run on every push/PR but are
-  intentionally NOT in the required-context list — they remain advisory
-  signals on main; add a context there only when a job must gate merges.
+  ruff-repo-scope, gitleaks, docker and benchmark-perf jobs run on
+  every push/PR but are intentionally NOT in the required-context list
+  — they remain advisory signals on main; add a context there only when
+  a job must gate merges. benchmark-perf (ADR-0016) is promoted to a
+  required context in the same wave as the deferred F9-H-02
+  latency-budget decision.
 
 ### Manual GitHub Gates (TODO-5 / TODO-6)
 
