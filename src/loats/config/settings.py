@@ -54,6 +54,17 @@ class Settings(BaseSettings):
     sentiment_threshold: float = Field(
         0.05, description="Sentiment threshold for signal generation"
     )
+    # F9-H-03 (TODO-4): per-source liveness -- the sentiment producer must
+    # persist a signal at least this often during the REGULAR session or the
+    # orchestrator raises a WARNING naming the source (FR9: the diversity
+    # gate alone cannot see a dead producer).
+    sentiment_liveness_max_age_minutes: float = Field(
+        15.0,
+        description=(
+            "Max age (minutes) of the latest sentiment signal during the "
+            "REGULAR session before the liveness alert fires"
+        ),
+    )
     composite_strength_threshold: float = Field(
         0.6,
         description=(

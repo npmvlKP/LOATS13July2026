@@ -433,3 +433,9 @@ class SentimentAnalysisResult(BaseModel):
     negative_count: int
     neutral_count: int
     top_news: list[NewsItem]
+    # F9-H-03 (TODO-4): True when this result is served from the
+    # last-known-good store past its freshness window -- a stale signal
+    # beats no signal for the diversity gate, but the audit trail must
+    # show the provenance. Legacy cached payloads without this key
+    # deserialize to False (backward compatible).
+    degraded: bool = False

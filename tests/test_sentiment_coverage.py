@@ -111,7 +111,11 @@ async def test_analyze_symbol_sentiment_cache_hit():
 
 @pytest.mark.asyncio
 async def test_analyze_symbol_sentiment_cache_miss():
-    """Test cache miss in analyze_symbol_sentiment (lines 122-181)."""
+    """Test cache miss in analyze_symbol_sentiment (lines 122-181).
+
+    F9-H-03 contract update: a cold-start miss now seeds BOTH the 5-minute
+    result entry AND the longer-TTL LKG entry (two cache_manager.set calls).
+    """
     analyzer = SentimentAnalyzer()
     with (
         unittest.mock.patch("loats.sentiment.cache_manager.get", return_value=None),
@@ -127,7 +131,10 @@ async def test_analyze_symbol_sentiment_cache_miss():
         assert result.sentiment_score == 0.0
         assert result.sentiment_label == "neutral"
         mock_parse.assert_called_once()
-        mock_cache_set.assert_called_once()
+        assert mock_cache_set.call_count == 2
+        set_keys = [c.args[0] for c in mock_cache_set.call_args_list]
+        assert any("lkg" in k for k in set_keys)
+        assert any("lkg" not in k for k in set_keys)
 
 
 @pytest.mark.asyncio

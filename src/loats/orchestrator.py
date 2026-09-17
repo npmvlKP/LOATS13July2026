@@ -551,6 +551,10 @@ class TradingOrchestrator:
             # Execute sequential operations
             await self._execute_risk_management()
 
+            # F9-H-03: per-source liveness check. Cheap DB read, logging-only
+            # alert path -- it must never break the trading cycle.
+            await self._check_sentiment_liveness()
+
             # Execute CMP strategy (only if trading is allowed in current session)
             if rules_engine.is_trading_allowed():
                 await self._execute_cmp_strategy(as_of_date=None)
@@ -669,6 +673,58 @@ class TradingOrchestrator:
             if duration > 0.03:  # 30ms budget for TA analysis
                 logger.warning(f"TA analysis exceeded budget: {duration * 1000:.2f}ms")
 
+    @property
+    def rules_engine(self) -> Any:
+        """Rules-engine accessor (module-level singleton).
+
+        A property rather than a bound attribute so a test patch of
+        ``loats.orchestrator.rules_engine`` is observed at call time.
+        """
+        return rules_engine
+
+    async def _check_sentiment_liveness(self) -> bool:
+        """Per-source liveness check (F9-H-03 / TODO-4).
+
+        During the REGULAR session the sentiment source must persist a
+        signal at least every
+        ``settings.sentiment_liveness_max_age_minutes`` (default 15).
+        Returns True when healthy (or outside REGULAR, where the check
+        does not apply); False when stale, after logging a WARNING that
+        names the source. FR9: the diversity gate stays green on the
+        other four sources, so a dead sentiment producer was invisible --
+        this makes it loud.
+        """
+        try:
+            if self.rules_engine.session_state.value != "REGULAR":
+                return True
+            cfg = get_settings()
+            max_age_s = cfg.sentiment_liveness_max_age_minutes * 60
+            symbol = cfg.default_symbol
+            latest = await db.async_get_latest_signals(
+                symbol, limit=1, scan_type="sentiment"
+            )
+            now = datetime.datetime.now(datetime.UTC)
+            if latest:
+                age_s = (now - latest[0].timestamp).total_seconds()
+                if age_s <= max_age_s:
+                    return True
+                age_text = f"{age_s / 60:.0f} min old"
+            else:
+                age_text = "no signal persisted"
+            logger.warning(
+                "Sentiment source liveness ALERT: %s (%s) exceeds the %s min "
+                "freshness threshold during REGULAR session -- check RSS "
+                "feeds and the broker login.",
+                StrengthSource.SENTIMENT.value,
+                age_text,
+                cfg.sentiment_liveness_max_age_minutes,
+            )
+            return False
+        except Exception as e:
+            # The liveness check must never break the trading cycle.
+            logger.warning(f"Sentiment liveness check failed: {e}")
+            return True
+
     async def _execute_sentiment_analysis(self) -> None:
         """Execute sentiment analysis with performance monitoring."""
         start_time = datetime.datetime.now(datetime.UTC)
@@ -738,6 +794,9 @@ class TradingOrchestrator:
                         "scan_type": "sentiment",
                         "source": StrengthSource.SENTIMENT.value,
                         "news_count": result.news_count,
+                        # F9-H-03: provenance tag -- True when this result
+                        # came from the stale last-known-good store.
+                        "degraded": bool(getattr(result, "degraded", False)),
                     },
                 )
                 await db.async_create_signal(signal)
