@@ -90,15 +90,16 @@ class TestDocumentedOutageWindowRegistry:
         match = [
             entry
             for entry in windows
-            if entry[0] == "2026-09-16T23:31:21+00:00" and entry[1] is None
+            if entry[0] == "2026-09-16T23:31:21+00:00"
+            and entry[1] == "2026-09-17T13:18:32+00:00"
         ]
         assert match, (
             "the documented 17Sep OpenAlgo auth-outage window (start "
             "2026-09-16T23:31:21Z = 05:01 IST first observed auth failure) "
-            "must be registered OPEN-ENDED (end None): the outage was "
-            "still live at record time (last observed auth failure "
-            "09:31:23Z) -- the closing addendum pins the end after the "
-            "operator re-auth is verified"
+            "must be PINNED at its verified end 2026-09-17T13:18:32Z "
+            "(18:48:32 IST: openalgo breaker HALF_OPEN -> CLOSED after "
+            "the operator re-auth; see the closing entry in "
+            "docs/audit-history/17Sep2026-p5-openalgo-auth-outage.md)"
         )
         assert all(isinstance(entry[2], str) and entry[2] for entry in windows)
 
@@ -108,7 +109,7 @@ class TestDocumentedOutageWindowRegistry:
             start = validator._parse_ts(start_raw)
             assert start is not None, f"unparseable window start {start_raw!r}"
             if end_raw is None:
-                continue  # open-ended: live outage pending its closing addendum
+                continue  # open-ended: future outages documented while live
             end = validator._parse_ts(end_raw)
             assert end is not None, f"unparseable window end {end_raw!r}"
             assert start < end
@@ -127,10 +128,11 @@ class TestDocumentedOutageWindowRegistry:
 class TestOutageAnnotationSemantics:
     """Annotations disclose; they never flip a verdict."""
 
-    def test_open_ended_window_annotates_ongoing_and_future_runs(self) -> None:
-        """While the outage is unresolved (end None), any run whose span
-        started before 'now' and is still ongoing after the window start
-        is annotated -- the hole keeps growing until re-auth lands."""
+    def test_closed_window_annotates_overlapping_ongoing_runs(self) -> None:
+        """The 17Sep outage is PINNED (closing addendum, 18:48 IST
+        recovery); any run overlapping the closed [start..end] window --
+        including a run still ongoing past the end -- stays annotated,
+        and the annotation still never enters reasons."""
         validator = _load_validator()
         log = {
             "routing": {"enabled_at_start": True},
@@ -155,7 +157,8 @@ class TestOutageAnnotationSemantics:
         grade = validator.grade_run_log(log)
         assert grade.verdict == "INCOMPLETE"
         assert any(
-            "documented outage window (open)" in note for note in grade.annotations
+            "documented outage window" in note and "2026-09-17T13:18:32+00:00" in note
+            for note in grade.annotations
         )
 
     def test_eligible_run_spanning_outage_grades_pass_with_annotation(
