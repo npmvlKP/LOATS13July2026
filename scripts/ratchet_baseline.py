@@ -332,8 +332,18 @@ History (most recent last):
       derivation pins) and the resolution record docs/audit-history/
       17Sep2026-F9H04-TODO5-resolution.md (root cause, remediation,
       RED/GREEN evidence). Ceiling 427->429.
+  431. 17Sep2026 (F9-C-02 outage-reflection wave): +2 -- the outage
+      registry net tests/test_p5_f9c02_outage_window.py (13 pins:
+      DOCUMENTED_OUTAGE_WINDOWS shape, annotation-only semantics,
+      contamination VOID unchanged, CLI NOTE surfacing) and the dated
+      outage record docs/audit-history/
+      17Sep2026-p5-openalgo-auth-outage.md (relocated from the
+      untracked reports/p5_auth_outage_20260917.md, which had zero
+      ignore coverage -- the 430-vs-429 re-arm vector; addendum
+      documents the open-ended window + closing-entry template).
+      Ceiling 429->431.
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 429
+TRACKED_FILE_CEILING = 431

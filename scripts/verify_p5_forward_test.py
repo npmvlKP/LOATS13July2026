@@ -52,6 +52,12 @@ class Grade:
     # carries them — legacy logs grade unchanged).
     activity_recorded: bool | None = None
     data_freshness: str | None = None
+    # F9-C-02 follow-up (2026-09-17): documented-outage disclosures.
+    # Annotations are NON-GRADING: they never enter ``reasons``, so they
+    # cannot flip a verdict -- an otherwise eligible run still PASSes
+    # (with disclosure), a contaminated run still FAILs. The 30Sep
+    # grading checkpoint reads these via the validator CLI's NOTE lines.
+    annotations: tuple[str, ...] = ()
 
 
 def _parse_ts(value: Any) -> datetime.datetime | None:
@@ -147,9 +153,50 @@ def _grade_divergence_evidence(
     return effective
 
 
+def _collect_outage_annotations(
+    started: datetime.datetime, span_end: datetime.datetime
+) -> list[str]:
+    """Return documented-outage disclosures for a run span (F9-C-02).
+
+    Factored out of grade_run_log (C901). Closed windows overlap by the
+    standard interval test; open-ended windows (end None = outage still
+    live at record time) overlap whenever the window's start precedes
+    the span end -- the hole keeps growing until the closing addendum
+    pins the end stamp. Never mutates grading state: callers append the
+    result to Grade.annotations, NOT reasons.
+    """
+    notes: list[str] = []
+    for out_start_raw, out_end_raw, out_why in DOCUMENTED_OUTAGE_WINDOWS:
+        out_start = _parse_ts(out_start_raw)
+        if out_start is None:
+            continue
+        if out_end_raw is None:
+            # Open-ended: the outage had no verified end at record time.
+            if out_start <= span_end:
+                notes.append(
+                    f"run span overlaps a documented outage window (open) "
+                    f"(from {out_start_raw}, end not yet pinned): {out_why}"
+                )
+            continue
+        out_end = _parse_ts(out_end_raw)
+        if out_end is None:
+            continue
+        if out_start <= span_end and out_end >= started:
+            notes.append(
+                f"run span overlaps a documented outage window "
+                f"({out_start_raw} .. {out_end_raw}): {out_why}"
+            )
+    return notes
+
+
 def grade_run_log(run_log: dict[str, Any]) -> Grade:
     """Grade one P5 run-log dict against the phase-gate criteria."""
     reasons: list[str] = []
+    # F9-C-02 follow-up (2026-09-17): documented-outage disclosures ride
+    # here (NOT in ``reasons``) -- see the DOCUMENTED_OUTAGE_WINDOWS block.
+    # Distinct local name: the module-level ``annotations`` is the
+    # __future__ feature import, not a list.
+    outage_notes: list[str] = []
 
     # Structural minimums: a run log without these is not gradeable.
     started = _parse_ts(run_log.get("started_at"))
@@ -231,6 +278,16 @@ def grade_run_log(run_log: dict[str, Any]) -> Grade:
     if not routing.get("enabled_at_start"):
         reasons.append("routing was NOT enabled at run start (measures nothing)")
 
+    # F9-C-02 follow-up (2026-09-17): documented-outage disclosure. A run
+    # whose span overlaps a documented outage window carries an
+    # annotation (never a reason): the outage degraded DECISIONAL
+    # EVIDENCE DENSITY, not routing provenance, so the span is not voided
+    # -- but the gate grader must see the hole. This deliberately runs
+    # before verdict construction so the note rides on every verdict.
+    # See _collect_outage_annotations for the overlap semantics.
+    span_end_for_outage = ended if ended is not None else _now_utc()
+    outage_notes = _collect_outage_annotations(started, span_end_for_outage)
+
     # Hard criterion: zero unhandled exceptions.
     exceptions = int(run_log.get("unhandled_exceptions", 0) or 0)
     if exceptions > 0:
@@ -285,14 +342,23 @@ def grade_run_log(run_log: dict[str, Any]) -> Grade:
         or legacy_contaminated
     )
     if hard_violation:
-        return Grade("FAIL", reasons, activity_recorded, data_freshness)
+        return Grade(
+            "FAIL", reasons, activity_recorded, data_freshness, tuple(outage_notes)
+        )
     if reasons:
-        return Grade("INCOMPLETE", reasons, activity_recorded, data_freshness)
+        return Grade(
+            "INCOMPLETE",
+            reasons,
+            activity_recorded,
+            data_freshness,
+            tuple(outage_notes),
+        )
     return Grade(
         "PASS",
         [f"span {span_days:.2f}d, 0 exceptions, routing enabled"],
         activity_recorded,
         data_freshness,
+        tuple(outage_notes),
     )
 
 
@@ -308,6 +374,34 @@ CONTAMINATION_WINDOWS: tuple[tuple[str, str], ...] = (
     # routing_enabled:false ROUTE rows; see
     # docs/audit-history/15Sep2026-F9C02-TODO2-resolution.md).
     ("2026-09-15T01:00:00+00:00", "2026-09-15T05:00:00+00:00"),
+)
+
+# F9-C-02 follow-up (2026-09-17): documented OUTAGE windows. Unlike the
+# contamination registry, a documented outage is NOT evidence poisoning:
+# during the 17Sep OpenAlgo re-auth outage the breaker-protected degraded
+# fetch kept routing provenance clean (zero routing_enabled:false ROUTE
+# rows, routing_divergence_detected: 0) -- the hole is DECISIONAL
+# EVIDENCE DENSITY, not divergence. A run whose span overlaps a window
+# here is annotated (Grade.annotations, NOTE lines in the CLI output) so
+# the gate grader sees the hole, but the annotation never enters
+# ``reasons``: it cannot flip PASS/INCOMPLETE/FAIL. Extend this tuple
+# when a new outage is documented in docs/audit-history/, citing the
+# dated record in the ``why`` field. An OPEN-ENDED window (end None)
+# marks an outage that was still live when documented -- a closing
+# addendum to the cited record pins the end stamp once resolved.
+DOCUMENTED_OUTAGE_WINDOWS: tuple[tuple[str, str | None, str], ...] = (
+    # 17Sep2026 OpenAlgo broker-session loss (operator-side re-auth
+    # outage; first observed auth failure 23:31:21Z = 05:01 IST). Still
+    # LIVE at record time (last observed auth failure 09:31:23Z = 14:31
+    # IST, breaker still open-cycling) -- registered open-ended; the
+    # closing addendum pins the end after operator re-auth is verified.
+    (
+        "2026-09-16T23:31:21+00:00",
+        None,
+        "17Sep OpenAlgo broker-session loss: breaker-protected degraded "
+        "fetch, zero decisional evidence (routing provenance clean); "
+        "see docs/audit-history/17Sep2026-p5-openalgo-auth-outage.md",
+    ),
 )
 
 
@@ -469,6 +563,11 @@ def main() -> int:
         print(f"{sym} {path.name}: {grade.verdict}")
         if grade.activity_recorded is False:
             print("    - WARN: no measured activity (cycles/counters all zero)")
+        # F9-C-02 follow-up (2026-09-17): documented-outage disclosures.
+        # NOTE lines never affect the exit code; the 30Sep grading
+        # checkpoint reads them from exactly this output.
+        for note in grade.annotations:
+            print(f"    - NOTE: {note}")
         if grade.data_freshness is not None:
             print(
                 f"    - data freshness: last sample {grade.data_freshness} before end"
