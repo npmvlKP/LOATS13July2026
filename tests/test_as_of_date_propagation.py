@@ -9,17 +9,25 @@ Acceptance (registered):
     Records carry ``as_of_date`` equal to the input snapshot date.
 
 Invariants pinned here:
-    - The as-of date is CALLER-SUPPLIED ONLY. No module under src/loats
-      may call ``date.today()`` (zero-occurrence invariant, previously
-      verifier-pinned, now also test-pinned); omission leaves the field
-      None so live-cycle behaviour is unchanged.
+    - The as-of date is CALLER-SUPPLIED ONLY at the engine API. No
+      module under src/loats may call ``date.today()`` (zero-occurrence
+      invariant, previously verifier-pinned, now also test-pinned).
     - A stamped decision survives the SQLite round trip (new nullable
       ``as_of_date`` TEXT column, ISO-8601) and pre-existing rows read
       back as None.
     - CREATE trade-decision audit rows (new_state) and ROUTE audit rows
       (metadata) carry the same ISO as-of value.
-    - The orchestrator CMP step accepts the snapshot date and stamps
-      every produced record (end-to-end acceptance path).
+    - The orchestrator CMP step stamps every produced record: an
+      explicit caller date wins (backtest path), and F9-H-04 (TODO-5)
+      closed the live-cycle gap by deriving the date from the input
+      batch itself (max bar timestamp -- never the wall clock). An
+      empty input batch leaves records unpinned (honest degradation).
+
+F9-H-04 supersession note: the pre-F9-H-04 live-default contract
+("cycle omission leaves records NULL") pinned the FR9 defect -- the
+parameter existed but the production caller never supplied a date. It
+is superseded by the derived-date contract below; the caller-wins and
+engine-level-None contracts are unchanged.
 """
 
 from __future__ import annotations
@@ -180,8 +188,11 @@ class TestEnginePropagation:
     async def test_engine_omitted_as_of_date_leaves_none(
         self, engine: TradeDecisionEngine
     ) -> None:
-        """Default path is unchanged: no caller date -> None, live cycle
-        behaviour identical (acceptance is additive, not mandatory)."""
+        """Engine API default is unchanged: no caller date -> None.
+
+        F9-H-04 note: this pins the ENGINE-level contract only. The
+        production cycle no longer relies on it -- it derives the date
+        from the input batch (see TestOrchestratorPropagation)."""
         with patch("loats.trade_decision.rules_engine") as mock_rules:
             mock_rules.apply_gating_rules.return_value = (
                 True,
@@ -318,17 +329,9 @@ class TestOrchestratorPropagation:
             ]
         }
 
-    @pytest.mark.asyncio
-    async def test_cycle_stamps_caller_as_of_date_into_records(
-        self, tmp_path: Path
-    ) -> None:
-        db = Database(
-            db_path=tmp_path / "cycle.db",
-            audit_log_path=tmp_path / "cycle_audit.jsonl",
-        )
-        db._initialize_database()
-        orch = TradingOrchestrator()
-
+    @staticmethod
+    async def _seed_signals(db: Database) -> None:
+        """Persist the canonical 4-source signal batch."""
         now = datetime.datetime.now(UTC)
         sources = [
             StrengthSource.TECHNICAL_ANALYSIS,
@@ -349,6 +352,8 @@ class TestOrchestratorPropagation:
                 )
             )
 
+    @staticmethod
+    def _cycle_patches(orch: TradingOrchestrator, db: Database, history: dict):
         mock_rules = MagicMock()
         mock_rules.apply_gating_rules.return_value = (
             True,
@@ -361,7 +366,7 @@ class TestOrchestratorPropagation:
         mock_settings.default_symbol = "NIFTY"
         mock_settings.enable_trailing_stops = False
 
-        with (
+        return (
             patch("loats.orchestrator.db", db),
             patch("loats.trade_decision.db", db),
             patch("loats.orchestrator.rules_engine", new=mock_rules),
@@ -371,7 +376,7 @@ class TestOrchestratorPropagation:
                 orch,
                 "_safe_get_history",
                 new_callable=AsyncMock,
-                return_value=self._hist_payload(),
+                return_value=history,
             ),
             patch.object(
                 orch,
@@ -392,7 +397,26 @@ class TestOrchestratorPropagation:
                     }
                 },
             ),
-        ):
+        )
+
+    @pytest.mark.asyncio
+    async def test_cycle_stamps_caller_as_of_date_into_records(
+        self, tmp_path: Path
+    ) -> None:
+        """Backtest path: an explicit caller date wins and stamps every
+        record (decision + CREATE row + ROUTE row)."""
+        db = Database(
+            db_path=tmp_path / "cycle.db",
+            audit_log_path=tmp_path / "cycle_audit.jsonl",
+        )
+        db._initialize_database()
+        orch = TradingOrchestrator()
+        await self._seed_signals(db)
+
+        with_exit = self._cycle_patches(orch, db, self._hist_payload())
+        with __import__("contextlib").ExitStack() as stack:
+            for ctx in with_exit:
+                stack.enter_context(ctx)
             await orch._execute_cmp_strategy(as_of_date=AS_OF)
 
         try:
@@ -423,87 +447,48 @@ class TestOrchestratorPropagation:
             db.close_all()
 
     @pytest.mark.asyncio
-    async def test_cycle_without_as_of_date_keeps_records_null(
+    async def test_cycle_without_as_of_date_derives_from_data(
         self, tmp_path: Path
     ) -> None:
-        """Live default is unchanged: omitted date -> records carry None."""
+        """F9-H-04: the live cycle (no caller date) derives the snapshot
+        date from the input batch itself (max bar timestamp). The
+        pre-F9-H-04 contract (omitted date -> records NULL) pinned the
+        FR9 defect and is superseded; NULL now occurs only when the
+        batch attests no date -- honest degradation, not the production
+        path (see tests/test_f9h04_as_of_date_wiring.py)."""
         db = Database(
-            db_path=tmp_path / "cycle_default.db",
-            audit_log_path=tmp_path / "cycle_default_audit.jsonl",
+            db_path=tmp_path / "cycle_derived.db",
+            audit_log_path=tmp_path / "cycle_derived_audit.jsonl",
         )
         db._initialize_database()
         orch = TradingOrchestrator()
+        await self._seed_signals(db)
 
-        now = datetime.datetime.now(UTC)
-        sources = [
-            StrengthSource.TECHNICAL_ANALYSIS,
-            StrengthSource.SENTIMENT,
-            StrengthSource.PRICE_ACTION,
-            StrengthSource.VOLATILITY,
-        ]
-        for i, source in enumerate(sources):
-            await db.async_create_signal(
-                Signal(
-                    symbol="NIFTY",
-                    signal_type=SignalType.BUY,
-                    strength=0.8 - i * 0.02,
-                    timestamp=now - timedelta(seconds=10 * i),
-                    indicators={"v": 0.5},
-                    confidence=0.8,
-                    metadata={"source": source.value},
-                )
-            )
+        history = {
+            "data": [
+                {
+                    "timestamp": datetime.datetime(
+                        2026, 9, 16, 9, 50, tzinfo=UTC
+                    ).isoformat(),
+                    "open": 24500.0,
+                    "high": 24550.0,
+                    "low": 24470.0,
+                    "close": 24510.0,
+                    "volume": 1000000,
+                }
+            ]
+        }
 
-        mock_rules = MagicMock()
-        mock_rules.apply_gating_rules.return_value = (
-            True,
-            {"reason": "passed", "iv_rank": 50.0, "adx": 30.0, "vix": 14.0},
-        )
-        mock_rules.check_position_limits.return_value = (True, {"reason": "ok"})
-        mock_rules.session_state = "REGULAR"
-
-        mock_settings = MagicMock()
-        mock_settings.default_symbol = "NIFTY"
-        mock_settings.enable_trailing_stops = False
-
-        with (
-            patch("loats.orchestrator.db", db),
-            patch("loats.trade_decision.db", db),
-            patch("loats.orchestrator.rules_engine", new=mock_rules),
-            patch("loats.trade_decision.rules_engine", new=mock_rules),
-            patch("loats.orchestrator.settings", mock_settings),
-            patch.object(
-                orch,
-                "_safe_get_history",
-                new_callable=AsyncMock,
-                return_value=self._hist_payload(),
-            ),
-            patch.object(
-                orch,
-                "_safe_get_quotes",
-                new_callable=AsyncMock,
-                return_value={"data": {"NIFTY": {"last_price": 24500.0}}},
-            ),
-            patch.object(
-                orch,
-                "_safe_get_funds",
-                new_callable=AsyncMock,
-                return_value={
-                    "data": {
-                        "available_cash": 100000.0,
-                        "utilized_margin": 20000.0,
-                        "available_margin": 80000.0,
-                        "total_equity": 120000.0,
-                    }
-                },
-            ),
-        ):
+        patches = self._cycle_patches(orch, db, history)
+        with __import__("contextlib").ExitStack() as stack:
+            for ctx in patches:
+                stack.enter_context(ctx)
             await orch._execute_cmp_strategy()
 
         try:
             decisions = await asyncio_to_thread(db.get_trade_decisions, "NIFTY")
             assert len(decisions) == 1
-            assert decisions[0].as_of_date is None
+            assert decisions[0].as_of_date == datetime.date(2026, 9, 16)
         finally:
             db.close_all()
 
