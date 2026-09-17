@@ -326,8 +326,14 @@ History (most recent last):
       checkpoint; CI benchmark-perf gate wired advisory; born-red
       stage-budget defect root-caused and fixed). Ceiling 426->427;
       the ADR is the +1 this entry accounts for.
+
+  429. 17Sep2026 (F9-H-04 / TODO-5 wave): +2 -- the acceptance net
+      tests/test_f9h04_as_of_date_wiring.py (live-cycle snapshot-date
+      derivation pins) and the resolution record docs/audit-history/
+      17Sep2026-F9H04-TODO5-resolution.md (root cause, remediation,
+      RED/GREEN evidence). Ceiling 427->429.
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 427
+TRACKED_FILE_CEILING = 429
