@@ -2,6 +2,8 @@
 
 **Severity:** HIGH (operator action required) — first morning of the
 fresh 14-day evidence run is collecting no decisional evidence.
+**RESOLVED 17Sep 18:48 IST** — see the closing entry at the end of this
+record.
 
 ## Timeline (IST, UTC+5:30)
 
@@ -104,16 +106,25 @@ open-ended-window disclosure — added mid-wave with the live-outage
 re-probe; full set green after the validator change, legacy grader
 suites green).
 
-### Closing entry (append after operator re-auth is verified)
+### Outage closed (17 Sep 2026 18:48 IST)
 
-Template — replace the placeholders, do not alter the window start:
-
-    ### Outage closed (YYYY-MM-DD HH:MM IST)
-    - Last auth failure stamp (UTC): <grep 'Incorrect .api_key'
-      logs/loats.log* | tail -1>
-    - Breaker recovery: HALF_OPEN -> CLOSED at <UTC stamp>
-    - First post-re-auth decisional evidence: <first success counter
-      increment / first ROUTE success row stamp>
-    - Grader end stamp pinned: <"2026-09-17T..+00:00"> in
-      DOCUMENTED_OUTAGE_WINDOWS + this record's date stamp updated in
-      the same commit.
+- Operator re-auth: Zerodha broker session re-established 18:47:50 IST
+  (OpenAlgo `auth_utils`: "User kpperumalla logged in successfully with
+  broker zerodha"; session login time 18:47:50.414616+05:30).
+- Last auth failure stamp (UTC): `2026-09-17T13:17:29.614205Z`
+  (18:47:29 IST — 21 s before the re-auth).
+- Breaker recovery: `openalgo` HALF_OPEN -> CLOSED at
+  `2026-09-17T13:18:32.842597Z` (18:48:32 IST) — first CLOSED since the
+  07:49 IST trip, closing 3 successes inside one 60 s recovery window;
+  zero OPENED events after recovery (verified through 18:55 IST).
+- First post-re-auth decisional evidence: deferred to the next market
+  session — the breaker closed at 18:48 IST, 3 h 18 m after the 15:30 IST
+  close, so no quotes/decision cycle could run (DB probe: run 140341 has
+  zero in-span ROUTE rows; counters remain 0/0/0, supervisor unharmed).
+  First counter increments expected 18Sep ~09:15 IST; note that Zerodha
+  access tokens expire daily, so each morning needs a fresh broker login
+  in the OpenAlgo UI before session open.
+- Grader end stamp pinned: `2026-09-17T13:18:32+00:00` in
+  `DOCUMENTED_OUTAGE_WINDOWS` (scripts/verify_p5_forward_test.py) with
+  the registry pin updated in the same commit
+  (tests/test_p5_f9c02_outage_window.py) — window start untouched.

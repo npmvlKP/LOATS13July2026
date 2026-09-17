@@ -391,16 +391,18 @@ CONTAMINATION_WINDOWS: tuple[tuple[str, str], ...] = (
 # addendum to the cited record pins the end stamp once resolved.
 DOCUMENTED_OUTAGE_WINDOWS: tuple[tuple[str, str | None, str], ...] = (
     # 17Sep2026 OpenAlgo broker-session loss (operator-side re-auth
-    # outage; first observed auth failure 23:31:21Z = 05:01 IST). Still
-    # LIVE at record time (last observed auth failure 09:31:23Z = 14:31
-    # IST, breaker still open-cycling) -- registered open-ended; the
-    # closing addendum pins the end after operator re-auth is verified.
+    # outage; first observed auth failure 23:31:21Z = 05:01 IST). Pinned
+    # at its verified end 13:18:32Z = 18:48:32 IST (openalgo breaker
+    # HALF_OPEN -> CLOSED after the operator re-auth; zero OPENED events
+    # since) -- see the closing entry in the cited record.
     (
         "2026-09-16T23:31:21+00:00",
-        None,
+        "2026-09-17T13:18:32+00:00",
         "17Sep OpenAlgo broker-session loss: breaker-protected degraded "
         "fetch, zero decisional evidence (routing provenance clean); "
-        "see docs/audit-history/17Sep2026-p5-openalgo-auth-outage.md",
+        "closed by the operator re-auth (breaker HALF_OPEN -> CLOSED "
+        "2026-09-17T13:18:32Z); see docs/audit-history/"
+        "17Sep2026-p5-openalgo-auth-outage.md",
     ),
 )
 
