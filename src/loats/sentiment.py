@@ -8,6 +8,7 @@ import hashlib
 import json
 import os
 import re
+import threading
 import warnings
 from datetime import UTC, datetime
 from typing import Any, cast
@@ -31,6 +32,7 @@ if os.environ.get("LOATS_SUPPRESS_NLTK_WARNING") == "1":
     )
 
 import feedparser
+from cachetools import TTLCache
 from newspaper import Article
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 
@@ -47,6 +49,36 @@ from .utils.lazy_singleton import lazy_singleton
 settings: Any = LazySettings()  # LazySettings.__getattr__ proxies to Settings()
 
 logger = get_logger(__name__)
+
+# F9-H-03 (TODO-4): article-content cache + last-known-good (LKG) serving.
+# Per-article newspaper4k downloads are the cold-analysis cost that overran
+# the producer window (root cause in
+# tests/test_sentiment_f9h03_producer.py's module docstring). Caching
+# completed extractions per URL makes every cycle strictly cheaper than the
+# last -- finished downloads survive producer cancellation, unfinished ones
+# retry next cycle against whatever has already accumulated. The legacy
+# 5-minute RESULT cache is unchanged; a longer-TTL LKG entry lets the
+# producer serve the previous good result immediately and refresh it
+# cache-only in a detached task (the F8-M-02 invariant -- no signal outlives
+# the producer window -- is untouched because the detached task writes
+# caches, never signals).
+ARTICLE_CACHE_TTL_SECONDS = 300
+LKG_TTL_SECONDS = 900
+
+# Module-level (not CacheManager): _extract_article_content runs on worker
+# threads via asyncio.to_thread, so the cache needs a synchronous,
+# thread-safe surface. cachetools TTLCache + an RLock gives exactly that,
+# with per-entry TTL equal to the legacy result-cache TTL.
+_article_cache: TTLCache[str, str] = TTLCache(
+    maxsize=512, ttl=ARTICLE_CACHE_TTL_SECONDS
+)
+_article_cache_lock = threading.RLock()
+
+
+def _article_cache_key(url: str) -> str:
+    """Stable, URL-bound cache key for one article's extracted content."""
+    digest = hashlib.sha256(url.encode("utf-8")).hexdigest()[:16]
+    return f"sentiment:article:{digest}:{url}"
 
 
 class SentimentAnalyzer:
@@ -112,15 +144,29 @@ class SentimentAnalyzer:
             return []
 
     def _extract_article_content(self, url: str) -> str:
-        """Extract article content URL using newspaper4k."""
+        """Extract article content URL using newspaper4k.
+
+        F9-H-03: downloads are cached per URL (thread-safe TTLCache, TTL
+        5 min). A completed download survives producer cancellation, so
+        every cycle re-downloads strictly less and cold analysis converges
+        inside the producer window instead of timing out forever.
+        """
+        key = _article_cache_key(url)
+        with _article_cache_lock:
+            cached: str | None = _article_cache.get(key)
+        if cached is not None:
+            return cached
         try:
             article = Article(url)
             article.download()
             article.parse()
-            return self.preprocess_text(article.text)
+            content = self.preprocess_text(article.text)
         except Exception:
             logger.warning("Failed extract article content %s", url)
             return ""
+        with _article_cache_lock:
+            _article_cache[key] = content
+        return content
 
     async def analyze_symbol_sentiment(
         self,
@@ -135,6 +181,7 @@ class SentimentAnalyzer:
             "\n".join(sorted(rss_urls)).encode("utf-8")
         ).hexdigest()
         cache_key = f"sentiment:{symbol}:{urls_digest}:{max_items}"
+        lkg_key = f"sentiment:lkg:{symbol}:{urls_digest}:{max_items}"
 
         # Try to get cached result first
         cached_result = await cache_manager.get(cache_key)
@@ -145,7 +192,34 @@ class SentimentAnalyzer:
             except Exception as e:
                 logger.warning(f"Failed to parse cached sentiment result: {e}")
 
-        # Cache miss - perform full analysis
+        # F9-H-03: result-cache miss -- serve last-known-good immediately and
+        # refresh cache-only in a DETACHED task. The producer window must not
+        # pay network cost; the detached task persists caches (never signals),
+        # so the F8-M-02 invariant (no signal outlives the window) is intact.
+        lkg_raw = await cache_manager.get(lkg_key)
+        if lkg_raw:
+            try:
+                lkg_result = SentimentAnalysisResult(**json.loads(lkg_raw))
+                age_s = (datetime.now(UTC) - lkg_result.timestamp).total_seconds()
+                lkg_result.degraded = age_s > LKG_TTL_SECONDS
+                asyncio.create_task(
+                    self._refresh_caches_only(
+                        cache_key, lkg_key, symbol, rss_urls, max_items
+                    )
+                )
+                logger.debug(
+                    "Sentiment LKG served for %s (age=%.0fs, degraded=%s)",
+                    symbol,
+                    age_s,
+                    lkg_result.degraded,
+                )
+                return lkg_result
+            except Exception as e:
+                logger.warning(f"Failed to serve sentiment LKG for {symbol}: {e}")
+
+        # True cold start: run the analysis inline (seeding the URL cache
+        # through per-article extraction) and store BOTH the 5-minute
+        # result entry and the longer-TTL LKG entry.
         all_news: list[NewsItem] = []
         positive_count = 0
         negative_count = 0
@@ -195,16 +269,104 @@ class SentimentAnalyzer:
             top_news=sorted_news[:5],
         )
 
-        # Cache the result for 5 minutes (300 seconds)
+        # Cache the result for 5 minutes (300 seconds), and seed the
+        # longer-TTL LKG entry (F9-H-03) so future cache misses serve
+        # immediately with the detached refresh.
         try:
             await cache_manager.set(
                 cache_key, sentiment_result.model_dump_json(), ttl=300
+            )
+            await cache_manager.set(
+                lkg_key, sentiment_result.model_dump_json(), ttl=LKG_TTL_SECONDS
             )
             logger.debug(f"Cached sentiment result for {symbol}")
         except Exception as e:
             logger.warning(f"Failed to cache sentiment result: {e}")
 
         return sentiment_result
+
+    async def _refresh_caches_only(
+        self,
+        cache_key: str,
+        lkg_key: str,
+        symbol: str,
+        rss_urls: list[str],
+        max_items: int,
+    ) -> None:
+        """Detached cache-only refresh (F9-H-03).
+
+        Runs OUTSIDE the producer window: re-runs the feed analysis with the
+        SAME feed list the served LKG was built from (passed in explicitly --
+        the composite key's digest is one-way and cannot be reversed) and
+        overwrites the result + LKG entries. Never touches signals or the
+        database -- the F8-M-02 invariant (producers never outlive the
+        window; no late signal) is structurally preserved because this
+        task cannot produce one.
+        """
+        try:
+            fresh = await self._compute_and_count(symbol, rss_urls, max_items)
+            if fresh is not None:
+                await cache_manager.set(cache_key, fresh.model_dump_json(), ttl=300)
+                await cache_manager.set(
+                    lkg_key, fresh.model_dump_json(), ttl=LKG_TTL_SECONDS
+                )
+        except Exception as e:
+            logger.warning(f"Sentiment background refresh failed: {e}")
+
+    async def _compute_and_count(
+        self,
+        symbol: str,
+        rss_urls: list[str],
+        max_items: int,
+    ) -> SentimentAnalysisResult | None:
+        """Shared aggregation core: gather feeds, score, count, label.
+
+        Neither caches nor persists -- callers own the cache keys (the
+        inline cold-start path and the detached refresh use different
+        storage flows but identical aggregation semantics).
+        """
+        tasks = [self.parse_rss_feed(url, max_items) for url in rss_urls]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        all_news: list[NewsItem] = []
+        positive_count = 0
+        negative_count = 0
+        neutral_count = 0
+        for result in results:
+            if isinstance(result, Exception):
+                logger.warning("Sentiment analysis: feed failed: %s", result)
+                continue
+            news_items = cast(list[NewsItem], result)
+            all_news.extend(news_items)
+            for item in news_items:
+                if item.sentiment_label == "positive":
+                    positive_count += 1
+                elif item.sentiment_label == "negative":
+                    negative_count += 1
+                else:
+                    neutral_count += 1
+        avg_score = 0.0
+        if all_news:
+            avg_score = sum(item.sentiment_score for item in all_news) / len(all_news)
+        if avg_score >= self.threshold:
+            label = "positive"
+        elif avg_score <= -self.threshold:
+            label = "negative"
+        else:
+            label = "neutral"
+        sorted_news = sorted(
+            all_news, key=lambda x: abs(x.sentiment_score), reverse=True
+        )
+        return SentimentAnalysisResult(
+            symbol=symbol,
+            timestamp=datetime.now(UTC),
+            sentiment_score=avg_score,
+            sentiment_label=label,
+            news_count=len(all_news),
+            positive_count=positive_count,
+            negative_count=negative_count,
+            neutral_count=neutral_count,
+            top_news=sorted_news[:5],
+        )
 
     def filter_significant_news(self, news_items: list[NewsItem]) -> list[NewsItem]:
         """Filter news items significant sentiment."""

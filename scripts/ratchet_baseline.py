@@ -342,8 +342,17 @@ History (most recent last):
       ignore coverage -- the 430-vs-429 re-arm vector; addendum
       documents the open-ended window + closing-entry template).
       Ceiling 429->431.
+  433. 17Sep2026 (F9-H-03 / TODO-4 remediation wave): +2 -- the
+      remediation net tests/test_sentiment_f9h03_producer.py (15 pins:
+      article-content cache, LKG serving + detached cache-only refresh,
+      degraded provenance tagging, per-source liveness alert) and the
+      resolution record docs/audit-history/
+      17Sep2026-F9H03-sentiment-producer-resolution.md (root cause:
+      per-article downloads overrun the producer window so cancellation
+      lands before every persist; remediation + span-safety statement).
+      Ceiling 431->433.
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 431
+TRACKED_FILE_CEILING = 433
