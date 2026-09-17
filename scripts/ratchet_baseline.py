@@ -351,8 +351,17 @@ History (most recent last):
       per-article downloads overrun the producer window so cancellation
       lands before every persist; remediation + span-safety statement).
       Ceiling 431->433.
+  435. 17Sep2026 (F9-M-01 / TODO-6 remediation wave): +2 -- the chain
+      net tests/test_audit_chain_f9m01.py (15 pins: link-walking
+      verifier vs delete/reorder/mutate, grandfathered legacy prefix,
+      head-seed extension, schema-index parity fresh-vs-migrated,
+      positional row reader, migration idempotence, 1k chain) and the
+      resolution record docs/audit-history/
+      17Sep2026-F9M01-audit-chain-resolution.md (self-hashing cannot see
+      deletion/reorder; genuine sha256(entry||prev) chain on both
+      writers; CRITICAL alerts). Ceiling 433->435.
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 433
+TRACKED_FILE_CEILING = 435
