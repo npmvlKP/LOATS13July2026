@@ -1297,6 +1297,23 @@ class TradingOrchestrator:
         return latest_expiry.date() if latest_expiry is not None else None
 
     @staticmethod
+    def _derive_history_snapshot_date(
+        bars: list[HistoricalData],
+    ) -> datetime.date | None:
+        """Snapshot date for the CMP decision batch (F9-H-04 / TODO-5).
+
+        Sibling of ``_derive_chain_snapshot_date`` under the same F8-L-02
+        semantic: the zero wall-clock-date invariant. The date is the max
+        bar timestamp in the already-parsed input batch -- the latest
+        snapshot the data itself attests to -- so T-1 data records T-1.
+        An empty batch yields None: records stay unpinned (honest
+        degradation), never a fabricated date.
+        """
+        if not bars:
+            return None
+        return max(bar.timestamp for bar in bars).date()
+
+    @staticmethod
     def _extract_chain_rows(payload: dict[str, Any] | None) -> list[dict[str, Any]]:
         """Best-effort extraction of contract rows from the chain payload.
 
@@ -1684,10 +1701,15 @@ class TradingOrchestrator:
                 current_price=current_price,
                 funds=funds,
                 current_positions=current_trades,
-                # F8-L-02: caller-supplied snapshot date flows into the
-                # decision and every downstream audit record; None (the
-                # live default) leaves records unpinned.
-                as_of_date=as_of_date,
+                # F8-L-02/F9-H-04: the snapshot date flows into the
+                # decision and every downstream audit record. Backtests
+                # supply it explicitly (caller wins); the live cycle
+                # derives it from the input batch itself (max bar
+                # timestamp -- never the wall clock), so records pin to
+                # the data snapshot they were computed from. An empty
+                # batch degrades honestly to None.
+                as_of_date=as_of_date
+                or self._derive_history_snapshot_date(historical_data_objs),
             )
 
             if decision is None:
