@@ -119,6 +119,19 @@ failures):
   wiring assertion plus three mutated-copy legs (run step removed,
   continue-on-error injected, project install removed) each proven to
   flip the net red.
+- CI first run (2026-09-17, advisory job): the job FAILED in 32 s with
+  `1 validation error for Settings: openalgo_api_key` -- an
+  environment-revealing defect. A fresh checkout has no `.env` and no
+  key; Settings requires `openalgo_api_key` by design (no silent
+  secret defaults), so the benchmark died at Settings construction
+  before measuring anything. Dev hosts hid the defect behind their real
+  key. Fix (same wave): the script self-injects an EXPLICIT no-auth
+  probe key pre-import when -- and only when -- the operator provided
+  none (the `fr7_health_check` HC-21 pattern), logs the injected state,
+  and never touches a real deployment's key; the subprocess regression
+  probe now strips the host key and constructs Settings exactly the way
+  `main()` does. Re-run of the job on this branch carries the green
+  evidence; run ids are recorded in the merge PR description.
 - CI: the `benchmark-perf` job's first runs on the wave branch and on
   main after merge carry the green evidence (run ids recorded in the
   merge PR description and the session record).

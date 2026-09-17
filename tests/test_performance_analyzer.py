@@ -554,7 +554,15 @@ def test_benchmark_script_isolates_data_from_production() -> None:
     repo = Path(__file__).resolve().parents[1]
     env = dict(os.environ)
     env.setdefault("ENVIRONMENT", "test")
-    env.setdefault("OPENALGO_API_KEY", "test_api_key")
+    # Bare-environment proof: strip any host key so the probe exercises
+    # exactly the CI shape (fresh checkout, no .env, no OPENALGO_API_KEY).
+    # 2026-09-17 live failure: Settings REQUIRES openalgo_api_key, so the
+    # CI benchmark run died at Settings construction before measuring
+    # anything; the script must self-inject an explicit probe key when
+    # the operator provided none (fr7_health_check pattern), never touch
+    # a real deployment's key, and the probe must construct Settings the
+    # way main() does.
+    env.pop("OPENALGO_API_KEY", None)
     env.setdefault("OPENALGO_BASE_URL", "https://test.openalgo.com")
     env.setdefault("TELEGRAM_BOT_TOKEN", "test_bot_token")
     env.setdefault("TELEGRAM_CHAT_ID", "123456789")
@@ -563,6 +571,10 @@ def test_benchmark_script_isolates_data_from_production() -> None:
         "import os, sys;"
         "sys.path.insert(0, r'" + str(repo) + "');"
         "import scripts.benchmark_performance as bp;"
+        "from src.loats.config import get_settings;"
+        "get_settings();"
+        "print(bp._BENCHMARK_API_KEY_INJECTED);"
+        "print(bp.os.environ['OPENALGO_API_KEY']);"
         "print(bp.os.environ['SQLITE_DB_PATH']);"
         "print(bp.os.environ['AUDIT_LOG_PATH'])"
     )
@@ -575,6 +587,11 @@ def test_benchmark_script_isolates_data_from_production() -> None:
         timeout=120,
     )
     assert proc.returncode == 0, proc.stderr[-500:]
-    db_path, audit_path = proc.stdout.strip().splitlines()[-2:]
+    injected_raw, key_raw, db_path, audit_path = proc.stdout.strip().splitlines()[-4:]
+    assert injected_raw == "True", (
+        "benchmark script did not self-inject a probe key in a bare "
+        "environment; a fresh CI checkout dies at Settings construction"
+    )
+    assert key_raw.startswith("benchmark-performance-probe"), key_raw
     assert "loats_benchmark_" in db_path, db_path
     assert "loats_benchmark_" in audit_path, audit_path
