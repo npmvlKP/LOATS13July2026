@@ -316,11 +316,22 @@ async def test_run_latency_benchmark_short_path(
 
 
 def test_phase_gate_budgets_match_authoritative_collector() -> None:
-    """The validator defaults must mirror the authoritative P1/P5 gates.
+    """The validator budgets must mirror the authoritative P1/P5 gates.
 
-    Regression net: the original 1ms/5ms defaults were impossible for full
-    round-trip operations; the authoritative budgets live in
-    scripts/collect_p1_phase_gate_evidence.py (DB_GATE_MS, ROUND_TRIP_GATE_MS).
+    Regression nets:
+    - the original 1ms/5ms defaults were impossible for full round-trip
+      operations; the authoritative budgets live in
+      scripts/collect_p1_phase_gate_evidence.py (TA_GATE_MS, DB_GATE_MS,
+      ROUND_TRIP_GATE_MS).
+    - 2026-09-17 (born-red gate exposed): the collector pins a THIRD
+      budget (TA_GATE_MS=80) for the TA stage; collapsing the map to
+      DB/RT and grading every operation against BOTH the 20ms DB and
+      100ms RT budgets made ``ta_calculation`` (CPU TA, ~68ms on 500
+      bars) fail a 20ms DB budget it was never meant to satisfy --
+      unreachable-green on any host whose TA stage costs more than
+      20ms (it passed on Sep 13-14 only because TA measured 6-11ms by
+      luck). The parity net originally omitted TA_GATE_MS, which is
+      exactly why the class survived.
     """
     import re
     from pathlib import Path
@@ -334,10 +345,58 @@ def test_phase_gate_budgets_match_authoritative_collector() -> None:
     )
     src = collector.read_text(encoding="utf-8")
     db_match = re.search(r"DB_GATE_MS\s*=\s*([0-9.]+)", src)
+    ta_match = re.search(r"TA_GATE_MS\s*=\s*([0-9.]+)", src)
     rt_match = re.search(r"ROUND_TRIP_GATE_MS\s*=\s*([0-9.]+)", src)
-    assert db_match is not None and rt_match is not None
+    assert db_match is not None and rt_match is not None and ta_match is not None, (
+        "authoritative collector lost a gate constant"
+    )
     assert pamod.P1_GATE_S * 1000 == pytest.approx(float(db_match.group(1)))
     assert pamod.P5_GATE_S * 1000 == pytest.approx(float(rt_match.group(1)))
+    assert pamod.TA_GATE_S * 1000 == pytest.approx(float(ta_match.group(1)))
+    # Each ANALYZE round-trip stage must be graded on ITS OWN budget.
+    assert pamod.STAGE_BUDGET_S["ta_calculation"] == ("ta", pamod.TA_GATE_S)
+    assert pamod.STAGE_BUDGET_S["db_operations"] == ("db", pamod.P1_GATE_S)
+
+
+class TestStageBudgetGrading:
+    """overall_pass must grade each operation on its CMP stage budget.
+
+    Regression net for the born-red gate exposed 2026-09-17:
+    ``ta_calculation`` was graded against the 20ms DB budget, so the
+    benchmark verdict could only be PASS on a host whose TA stage
+    happened to cost under 20ms.
+    """
+
+    @staticmethod
+    def _analyzer_with(op: str, durations: list[float]) -> PerformanceAnalyzer:
+        pa = PerformanceAnalyzer()
+        pa.operation_stats[op] = list(durations)
+        return pa
+
+    def test_ta_calculation_graded_on_ta_stage_budget(self) -> None:
+        import loats.performance_analyzer as pamod
+
+        pa = self._analyzer_with("ta_calculation", [0.068] * 20)
+        v = pa.validate_cmp_latency_gates()["ta_calculation"]
+        # 68ms: fails the 20ms DB budget (informational), passes the
+        # 80ms TA stage budget -- overall must grade the stage budget.
+        assert bool(v["p1_pass"]) is False
+        assert v["stage_gate"] == "ta"
+        assert v["stage_budget"] == pytest.approx(pamod.TA_GATE_S)
+        assert bool(v["stage_pass"]) is True
+        assert bool(v["overall_pass"]) is True
+
+    def test_db_operation_keeps_generic_p1_grading(self) -> None:
+        pa = self._analyzer_with("async_create_signal", [0.005] * 20)
+        v = pa.validate_cmp_latency_gates()["async_create_signal"]
+        assert "stage_gate" not in v
+        assert bool(v["overall_pass"]) is True
+
+    def test_slow_ta_operation_fails_on_stage_budget(self) -> None:
+        pa = self._analyzer_with("ta_calculation", [0.200] * 20)
+        v = pa.validate_cmp_latency_gates()["ta_calculation"]
+        assert bool(v["stage_pass"]) is False
+        assert bool(v["overall_pass"]) is False
 
 
 def _load_benchmark_script_module() -> Any:

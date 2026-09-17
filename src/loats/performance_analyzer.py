@@ -21,11 +21,26 @@ from .ta import TechnicalAnalysis
 logger = get_logger(__name__)
 
 # P1/P5 phase-gate latency budgets, mirroring the authoritative collector
-# (scripts/collect_p1_phase_gate_evidence.py: DB_GATE_MS=20,
+# (scripts/collect_p1_phase_gate_evidence.py: TA_GATE_MS=80, DB_GATE_MS=20,
 # ROUND_TRIP_GATE_MS=100). The previous defaults (1ms/5ms) were impossible
 # for full round-trip operations and made the gate false-green.
 P1_GATE_S = 0.020
 P5_GATE_S = 0.100
+TA_GATE_S = 0.080
+
+# CMP stage budgets for the ANALYZE round-trip stages. Each stage is
+# graded on its OWN authoritative budget (TA 80ms / DB 20ms); the 100ms
+# round-trip budget applies to the round trip as a whole. Grading every
+# operation against the DB budget made ``ta_calculation`` (CPU-bound TA,
+# tens of ms on realistic bar counts) fail a 20ms DB budget it was never
+# meant to satisfy -- a born-red verdict on any host whose TA stage
+# costs more than 20ms, hidden until 2026-09-17 by lucky 6-11ms
+# measurements. Operations absent from this map keep the generic P1/P5
+# grading (fail if EITHER budget is missed).
+STAGE_BUDGET_S: dict[str, tuple[str, float]] = {
+    "ta_calculation": ("ta", TA_GATE_S),
+    "db_operations": ("db", P1_GATE_S),
+}
 
 # Iterations for the focused latency benchmark (tests shrink this to keep
 # the real code path fast).
@@ -199,6 +214,11 @@ class PerformanceAnalyzer:
         defaults were impossible for full round-trip operations, and the
         resulting empty-registry verdict (``0 == 0``) graded as PASS.
 
+        ANALYZE round-trip stages listed in STAGE_BUDGET_S are graded on
+        their OWN authoritative budget (TA stage: 80ms; DB stage: 20ms);
+        the generic rule (fail if EITHER budget is missed at <80% sample
+        pass-rate) applies to every other operation.
+
         Gate rule mirrors the authoritative collector: an operation passes
         a budget when at least ``min_sample_pass_rate`` of its samples are
         within that budget (the collector grades per-sample compliance and
@@ -222,7 +242,7 @@ class PerformanceAnalyzer:
             p1_pass = p1_rate >= min_sample_pass_rate
             p5_pass = p5_rate >= min_sample_pass_rate
 
-            validation_results[operation] = {
+            result: dict[str, Any] = {
                 "samples": len(durations),
                 "p1_threshold": p1_threshold,
                 "p1_actual_p95": metrics["p95"],
@@ -234,6 +254,24 @@ class PerformanceAnalyzer:
                 "p5_pass": p5_pass,
                 "overall_pass": p1_pass and p5_pass,
             }
+
+            # ANALYZE round-trip stages carry their own CMP budget: grade
+            # overall_pass on the stage budget, keep the generic p1 fields
+            # as informational context.
+            stage = STAGE_BUDGET_S.get(operation)
+            if stage is not None:
+                stage_name, stage_budget = stage
+                stage_rate = sum(1 for d in durations if d <= stage_budget) / len(
+                    durations
+                )
+                stage_pass = stage_rate >= min_sample_pass_rate
+                result["stage_gate"] = stage_name
+                result["stage_budget"] = stage_budget
+                result["stage_pass_rate"] = stage_rate
+                result["stage_pass"] = stage_pass
+                result["overall_pass"] = stage_pass
+
+            validation_results[operation] = result
 
         if not validation_results:
             logger.warning(
