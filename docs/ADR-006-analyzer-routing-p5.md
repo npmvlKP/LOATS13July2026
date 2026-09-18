@@ -87,6 +87,67 @@ the ten observable behaviors from the finding (before: 4/10 → after:
 10/10), and the external verifier `scripts/verify_f8h01_external.py`
 re-checks the same facts from a clean process without the test suite.
 
+## Amendment 7 (2026-09-18, F9-M-03 resolved: audited-attempt semantics for P5 decisional evidence)
+
+Operator decision 2026-09-18: **option (a), audited-attempt semantics.**
+The gateway-side decision-telemetry intake (Amendment 4's deferred
+follow-up, option (b) of the F9-M-03 decision) is NOT built now; P5
+decisional acceptance is redefined so the deferred intake stops being a
+gate blocker.
+
+1. **Decisional acceptance semantic (the decision).** For P5 grading, a
+   TradeDecision counts as decisional evidence when the engine ROUTED
+   it — one real HTTP attempt through
+   ``AsyncOpenAlgoClient.place_analyzer_request`` that resolved in any
+   honest outcome: ``success``, ``disabled``, or ``error`` (the designed
+   gateway 404 under the read-only semantic INCLUDED — it is genuine,
+   attributable evidence that the mandate "route ALL TradeDecisions to
+   Analyzer Mode" was exercised, not a routing gap). Fabricated outcomes
+   never existed and still count nothing; ``routing_divergence_detected
+   > 0`` still voids the run (F9-C-02, untouched).
+2. **Machine-readable semantic (single source).**
+   ``TradeDecisionEngine.analyzer_intake_semantic`` exposes the accepted
+   semantic as data: ``{"intake_semantic": "audited_attempt",
+   "audited_attempt_outcomes": ["success", "disabled", "error"],
+   "adr": "ADR-006 Amendment 7", "decision": "F9-M-03 option (a)"}``.
+   The grader reads it via ``_analyzer_intake_semantic()`` (the
+   verifier keeps zero hard ``loats`` imports; when the package is
+   unavailable the semantic is unknown and logs grade unchanged); the
+   outcome list and the classifier must not diverge.
+3. **Grader upgrades (``scripts/verify_p5_forward_test.py``).**
+   ``counters["routed_decisions"]`` — the audited-attempt total — is the
+   decisional-activity metric. A post-semantic log (the key present)
+   whose attempt total is zero while success/disabled/error record
+   outcomes cannot prove audited routing: an ENDED run FAILs, an ONGOING
+   run stays INCOMPLETE with the reason surfaced. Logs lacking the key
+   (legacy, including the accruing pre-semantic span) keep grading
+   unchanged. ``routed_decisions`` never feeds the exception or
+   divergence criteria.
+4. **Not a fabrication class.** Amendment 4's rejection of real orders
+   via ``/placeorder`` stands; this amendment redefines what the grader
+   ACCEPTS as evidence, not what the engine DOES. The engine's behavior
+   is unchanged: every routed decision still makes the real HTTP call,
+   resolves honestly, and leaves its trade_decisions row + ROUTE audit
+   row (F8-H-01).
+5. **Option (b) stays open by config alone.** The day the gateway
+   ships the intake, ``ANALYZER_INTAKE_PATH`` flips the route
+   (Amendment 5, no deploy/restart); successes then accrue under the
+   same counters and the audited-attempt total remains a strict
+   superset of genuine successes. Until then the 404 class is
+   accepted evidence, closing F9-M-03.
+
+### Consequences
+
+- P5 "route ALL" grading no longer blocks on the deferred intake: a
+  14-day span of honestly-resolved routed attempts satisfies the
+  decisional criterion, with each attempt audited end-to-end.
+- ``tests/test_analyzer_intake_contract.py`` gains the semantic-source
+  pin (exact-dict, RED-first); ``tests/test_f9m03_audited_attempt.py``
+  (new) pins the engine counter on all three paths and every grader
+  branch; ``scripts/ratchet_baseline.py`` re-pins the ceiling.
+- The P5 supervisor needs no change: it already samples
+  ``get_routing_stats()`` and delta-folds new keys into run logs.
+
 ## Amendment 6 (2026-09-12, P5 span restart: zero-decisional run terminated; continuity machinery hardened)
 
 The P5 restart decision recorded in the 2026-09-12 handoff ("4299 cycles /

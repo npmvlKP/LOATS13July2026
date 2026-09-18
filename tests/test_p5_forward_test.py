@@ -509,10 +509,13 @@ class TestRoutingCounters:
         assert resp["status"] == "success"
         # F9-C-02: the stats dict carries the grader-visible divergence
         # flag (0 after a clean run); exact-dict pins must include it.
+        # F9-M-03 (ADR-006 Am.7): the audited-attempt total rides the
+        # same surface (0 on a clean run) -- same exact-dict convention.
         assert engine.get_routing_stats() == {
             "success": 1,
             "disabled": 0,
             "error": 0,
+            "routed_decisions": 1,
             "routing_divergence_detected": 0,
         }
 

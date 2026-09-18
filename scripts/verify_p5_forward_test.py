@@ -12,6 +12,12 @@ acceptance criteria from the F8-H-01 finding:
   ``cycles_completed``/``counters`` (live supervisor samples), zero total
   activity is a hard FAIL — an idle run measures nothing. Logs without
   those fields (legacy) are graded unchanged.
+- audited-attempt semantic (ADR-006 Am.7, F9-M-03, 2026-09-18): a
+  post-semantic log (``counters.routed_decisions`` present) grades
+  decisional evidence by ROUTED ATTEMPTS; success/disabled/error
+  classify them. Outcomes with a zero attempt total cannot prove
+  audited routing (ended run: FAIL, ongoing: INCOMPLETE). Logs without
+  the key keep grading unchanged.
 
 Verdicts:
 - PASS        — all criteria met
@@ -76,6 +82,25 @@ def _parse_ts(value: Any) -> datetime.datetime | None:
 def _now_utc() -> datetime.datetime:
     """Current UTC time (factored for testability)."""
     return datetime.datetime.now(datetime.UTC)
+
+
+def _analyzer_intake_semantic() -> dict[str, Any] | None:
+    """ADR-006 Amendment 7 (F9-M-03): read the accepted intake semantic.
+
+    The verifier deliberately keeps zero hard ``loats`` imports (it must
+    grade run logs in any environment), so the semantic is read from its
+    single source — ``TradeDecisionEngine.analyzer_intake_semantic`` —
+    only when the package is importable, keeping the grader's outcome
+    classification and the engine's counting contractually locked.
+    Returns None when unavailable: logs then grade unchanged (legacy).
+    """
+    try:
+        from loats.trade_decision import TradeDecisionEngine
+
+        semantic = getattr(TradeDecisionEngine, "analyzer_intake_semantic", None)
+    except Exception:
+        return None
+    return dict(semantic) if isinstance(semantic, dict) else None
 
 
 def _grade_divergence_evidence(
@@ -211,6 +236,15 @@ def grade_run_log(run_log: dict[str, Any]) -> Grade:
     total_activity = 0
     counters_decisional: int | None = None
     activity_recorded: bool | None = None
+    # ADR-006 Amendment 7 (F9-M-03): audited-attempt semantic. The routed
+    # ATTEMPT (``counters.routed_decisions``, incremented once per enabled
+    # route before any outcome exists) is the decisional metric;
+    # success/disabled/error classify the attempts. ``semantic_recorded``
+    # marks a post-semantic log (key present AND the accepted semantic is
+    # importable from its single source); without the key the log is
+    # legacy and keeps grading unchanged.
+    routed_attempts = 0
+    semantic_recorded = False
     if has_activity_fields:
         try:
             total_activity = int(run_log.get("cycles_completed", 0) or 0) + sum(
@@ -222,6 +256,11 @@ def grade_run_log(run_log: dict[str, Any]) -> Grade:
         except (TypeError, ValueError):
             total_activity = 0
             counters_decisional = 0
+        counters = run_log.get("counters") or {}
+        routed_attempts = int(counters.get("routed_decisions", 0) or 0)
+        semantic_recorded = (
+            _analyzer_intake_semantic() is not None and "routed_decisions" in counters
+        )
         activity_recorded = total_activity > 0
         if not activity_recorded:
             reasons.append(
@@ -242,6 +281,18 @@ def grade_run_log(run_log: dict[str, Any]) -> Grade:
                 "no decisional activity recorded "
                 "(routing counters all zero — no TradeDecision was ever "
                 "routed to the Analyzer; cycles alone do not satisfy P5)"
+            )
+        elif semantic_recorded and routed_attempts == 0:
+            # F9-M-03 (ADR-006 Am.7): outcomes recorded with a zero
+            # audited-attempt total cannot prove the routing was audited
+            # — a real attempt is counted BEFORE its outcome, so this
+            # shape means mixed semantic eras or writers that bypassed
+            # the counting. ENDED run: hard-FAIL below. ONGOING: stays
+            # INCOMPLETE with the reason surfaced.
+            reasons.append(
+                f"routed_decisions is 0 while outcome counters record "
+                f"{counters_decisional} decisional outcome(s) — "
+                "audited-attempt evidence UNVERIFIED (ADR-006 Am.7)"
             )
 
     data_freshness: str | None = None
@@ -331,6 +382,11 @@ def grade_run_log(run_log: dict[str, Any]) -> Grade:
         # genuinely produced nothing yet. Legacy logs without
         # ``counters`` keep None here and grade unchanged.
         or (counters_decisional == 0 and ended is not None)
+        # F9-M-03 (ADR-006 Am.7): a post-semantic ENDED run whose
+        # audited-attempt total is zero while outcomes exist cannot
+        # prove audited routing (see the activity gate above); an
+        # ONGOING run stays INCOMPLETE.
+        or (semantic_recorded and routed_attempts == 0 and ended is not None)
         # F9-C-02 (2026-09-15): DB-proven divergence hard-fails even an
         # otherwise-clean span.
         or divergence_effective > 0
