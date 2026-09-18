@@ -84,6 +84,14 @@ class TradeDecisionEngine:
             "success": 0,
             "disabled": 0,
             "error": 0,
+            # ADR-006 Amendment 7 (F9-M-03): audited-attempt total. Every
+            # ENABLED route increments exactly once -- before any outcome
+            # exists -- regardless of how the attempt resolves (success,
+            # or the designed gateway 404 error under the read-only
+            # semantic). The attempt itself is the P5 decisional evidence.
+            # Sampled by the P5 supervisor like every other counter (the
+            # delta-fold unions counter keys, so resumed runs carry it).
+            "routed_decisions": 0,
             # F9-C-02 (adversarial hardening): grader-visible divergence
             # evidence. The orchestrator cycle loop catches Exception and
             # continues, so the RuntimeError alone cannot fail a span --
@@ -521,6 +529,12 @@ class TradeDecisionEngine:
         # Routing enabled - make real HTTP call to Analyzer (no simulation).
         logger.info(f"Routing TradeDecision to Analyzer: {trade_decision.decision_id}")
         logger.debug(f"Analyzer payload: {payload}")
+        # ADR-006 Amendment 7 (F9-M-03): the audited attempt is counted
+        # HERE -- once, before any outcome exists. The success and error
+        # resolutions below are mutually exclusive, so this increments
+        # exactly once per enabled route; the disabled return above fires
+        # only on a non-claimed engine and never reaches this line.
+        self.routing_counters["routed_decisions"] += 1
         try:
             async with AsyncOpenAlgoClient() as client:
                 analyzer_response = await client.place_analyzer_request(payload)
@@ -716,12 +730,31 @@ class TradeDecisionEngine:
             "queue_empty": self.decision_queue.empty(),
         }
 
+    # ADR-006 Amendment 7 (F9-M-03): the accepted P5 decisional semantic
+    # as machine-readable data -- the single source the official grader
+    # (verify_p5_forward_test._analyzer_intake_semantic) reads, so the
+    # semantic and its classification cannot silently diverge. Keep in
+    # lockstep with the ``routed_decisions`` increments above; the
+    # contract net (tests/test_analyzer_intake_contract.py) pins this
+    # exact dict. A class attribute resolves on the class without
+    # constructing the engine singleton.
+    analyzer_intake_semantic: dict[str, Any] = {
+        "intake_semantic": "audited_attempt",
+        "audited_attempt_outcomes": ["success", "disabled", "error"],
+        "adr": "ADR-006 Amendment 7",
+        "decision": "F9-M-03 option (a)",
+    }
+
     def get_routing_stats(self) -> dict[str, Any]:
         """Return lifetime Analyzer-routing outcome counters (P5/F8-H-01).
 
         The P5 forward-test supervisor aggregates these into the run log so
         graded activity reflects real routing outcomes (success / disabled
         / error), never estimates.
+
+        ADR-006 Amendment 7 (F9-M-03): ``routed_decisions`` is the
+        audited-attempt total -- every enabled route counts once regardless
+        of outcome; it is the grader's decisional-activity metric.
         """
         return dict(self.routing_counters)
 

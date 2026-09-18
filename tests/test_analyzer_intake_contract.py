@@ -21,6 +21,10 @@ The contract pinned here (Amendment 5):
    future intake must accept stays pinned.
 6. The tracked-file ceiling stays single-source (adding this test file
    consumes ratchet headroom; the re-pin is the canonical module's).
+7. Amendment 7 (F9-M-03, 2026-09-18): the accepted decisional semantic
+   is machine-readable data on the engine — ``audited_attempt`` with
+   outcomes ``["success", "disabled", "error"]`` — the single source
+   the official grader reads.
 """
 
 from __future__ import annotations
@@ -115,6 +119,20 @@ class TestPayloadUnchanged:
         assert '"decision_id": self.decision_id' in src
         assert '"as_of_date"' in src
         assert re.search(r"def to_analyzer_payload\(self\)", src)
+
+
+class TestIntakeSemanticSource:
+    """Contract 7 (Amendment 7, F9-M-03): the accepted semantic as data."""
+
+    def test_semantic_pinned_exact(self) -> None:
+        from loats.trade_decision import TradeDecisionEngine
+
+        assert TradeDecisionEngine.analyzer_intake_semantic == {
+            "intake_semantic": "audited_attempt",
+            "audited_attempt_outcomes": ["success", "disabled", "error"],
+            "adr": "ADR-006 Amendment 7",
+            "decision": "F9-M-03 option (a)",
+        }
 
 
 class TestRatchetSingleSource:

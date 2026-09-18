@@ -26,6 +26,10 @@ verify_coverage_full.py / fr7_health_check.py HC-12 / verify_hc_all.py):
    documented single-writer-certain situations.
 4. The acquisition site is ``pytest_configure`` and nothing else —
    session scope, never per-test.
+5. Worktree-safe lock placement (2026-09-18): ``_cov_lock_path``
+   resolves a gitdir pointer-file ``.git`` to the real admin dir, so
+   the guard works unchanged in linked worktrees (A/B-proven
+   ``FileExistsError`` on pristine 7014186 before the fix).
 """
 
 from __future__ import annotations
@@ -142,6 +146,62 @@ class TestCovLockKillSwitch:
             conftest_mod._release_coverage_lock(holder)
         assert proc.returncode == 0, proc.stdout[-2000:] + proc.stderr[-2000:]
         assert "1 passed" in proc.stdout
+
+
+class TestCovLockWorktreeShape:
+    """Contract 5 (2026-09-18): worktree-safe admin-dir resolution.
+
+    In a linked worktree ``.git`` is a FILE (``gitdir: ...`` pointer);
+    the historical ``repo_root/.git`` lock path raised
+    ``FileExistsError`` from ``mkdir(exist_ok=True)`` before any lock
+    could be taken. A/B-proven pre-existing (identical failure on the
+    pristine 7014186 worktree); fixed by resolving the pointer file
+    directly (no subprocess), mirroring the 2026-09-11
+    ``git rev-parse --absolute-git-dir`` precedent in the hygiene net.
+    """
+
+    def test_plain_layout_unchanged(self, tmp_path, conftest_mod) -> None:
+        (tmp_path / ".git").mkdir()
+        lock = conftest_mod._cov_lock_path(tmp_path)
+        assert lock == tmp_path / ".git" / "coverage_gate.lock"
+
+    def test_worktree_pointer_resolves_to_real_admin_dir(
+        self, tmp_path, conftest_mod
+    ) -> None:
+        admin_dir = tmp_path / "main" / ".git" / "worktrees" / "wt"
+        admin_dir.mkdir(parents=True)
+        worktree_root = tmp_path / "wt"
+        worktree_root.mkdir()
+        (worktree_root / ".git").write_text(f"gitdir: {admin_dir}\n", encoding="utf-8")
+        lock = conftest_mod._cov_lock_path(worktree_root)
+        assert lock == admin_dir / "coverage_gate.lock"
+
+    def test_relative_gitdir_resolves_against_worktree_root(
+        self, tmp_path, conftest_mod
+    ) -> None:
+        (tmp_path / ".git").write_text(
+            "gitdir: ../main/.git/worktrees/wt\n", encoding="utf-8"
+        )
+        lock = conftest_mod._cov_lock_path(tmp_path)
+        expected = (tmp_path / "../main/.git/worktrees/wt").resolve()
+        assert lock.parent.resolve() == expected
+
+    def test_worktree_lock_acquires_and_releases(self, tmp_path, conftest_mod) -> None:
+        admin_dir = tmp_path / "main" / ".git" / "worktrees" / "wt"
+        admin_dir.mkdir(parents=True)
+        worktree_root = tmp_path / "wt"
+        worktree_root.mkdir()
+        (worktree_root / ".git").write_text(f"gitdir: {admin_dir}\n", encoding="utf-8")
+        handle = conftest_mod._acquire_coverage_lock(
+            conftest_mod._cov_lock_path(worktree_root)
+        )
+        assert handle is not None, "lock must acquire through the pointer resolution"
+        conftest_mod._release_coverage_lock(handle)
+
+    def test_live_checkout_lock_parent_is_real_dir(self, conftest_mod) -> None:
+        """Whatever this checkout's .git shape, the lock lands in a real dir."""
+        lock = conftest_mod._cov_lock_path(REPO_ROOT)
+        assert lock.parent.is_dir(), f"lock parent must exist: {lock.parent}"
 
 
 class TestCovGuardWiring:
