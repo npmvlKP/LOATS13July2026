@@ -60,6 +60,10 @@ def _base_log(**overrides: Any) -> dict[str, Any]:
         "counters": {"success": 5, "disabled": 0, "error": 0},
         "last_sampled_at": "2026-08-16T00:00:00+00:00",
         "events": [],
+        # F9-C-02 closure (2026-09-18): kill-switch verification proof
+        # (CMP P5 gate) -- present and disengaged on eligible fixtures.
+        "kill_switch_verified": True,
+        "kill_switch_active_at_start": False,
     }
     log.update(overrides)
     return log

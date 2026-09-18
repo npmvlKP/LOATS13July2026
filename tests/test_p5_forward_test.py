@@ -309,6 +309,10 @@ class TestP5ValidatorGrading:
             "restarts": 0,
             "cycles_completed": 5,
             "counters": {"success": 5, "disabled": 0, "error": 0},
+            # F9-C-02 closure (2026-09-18): kill-switch verification proof
+            # (CMP P5 gate) -- present and disengaged on eligible fixtures.
+            "kill_switch_verified": True,
+            "kill_switch_active_at_start": False,
         }
         return record
 
@@ -367,6 +371,10 @@ class TestP5ActivityGate:
             "ended_at": (start + datetime.timedelta(days=15)).isoformat(),
             "unhandled_exceptions": 0,
             "restarts": 0,
+            # F9-C-02 closure (2026-09-18): kill-switch verification proof
+            # (CMP P5 gate) -- present and disengaged on eligible fixtures.
+            "kill_switch_verified": True,
+            "kill_switch_active_at_start": False,
         }
         if not legacy:
             record["cycles_completed"] = cycles
@@ -696,6 +704,12 @@ class TestSupervisorLiveSampling:
             # {"count": 0} -- the grader's verifiably-clean contract --
             # is date-proof. Proven: grade_run_log(FIXED) == PASS.
             "disabled_routes_during_enabled_window": {"count": 0},
+            # F9-C-02 closure (2026-09-18): the CMP P5 gate's kill-switch
+            # verification proof is part of gate eligibility -- without it
+            # the in-loop grade never returns PASS and this duration=None
+            # loop never exits (same wedge mechanism as the 16Sep note).
+            "kill_switch_verified": True,
+            "kill_switch_active_at_start": False,
         }
         run_log.write_text(json.dumps(record), encoding="utf-8")
         system = _FakeSystem()
