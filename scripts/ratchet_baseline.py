@@ -384,8 +384,17 @@ History (most recent last):
       (ADR-006 Amendment 7 option (a): routed ATTEMPTS are the P5
       decisional evidence; same-wave root-cause fix: coverage-lock
       guard worktree-safe in tests/conftest.py). Ceiling 437->439.
+
+    2026-09-18 (F9-C-01-R1 taint-exporter wave): +2 tracked files --
+      scripts/export_infinity_taint.py (read-only forensic exporter:
+      inventories pre-fix -Infinity audit rows into a sidecar RFC 8259
+      manifest; SQLite opened mode=ro, JSONL read-only, inventory-not-
+      error exit semantics) and tests/test_infinity_taint_exporter.py
+      (12 contract tests, RED-first proven). Live-store scan 18Sep:
+      17,289 JSONL lines + both SQLite surfaces, 0 tainted rows,
+      store SHA-256 identical before/after. Ceiling 439->441.
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 439
+TRACKED_FILE_CEILING = 441
