@@ -172,3 +172,24 @@ Please report any issues or bugs through the project's issue tracker with detail
 ### pip-audit Time Sensitivity
 
 The `pip-audit` security gate reports **zero vulnerabilities against production dependencies as of today**. Because the vulnerability database is updated continuously, a clean audit today does not guarantee a clean audit tomorrow. Re-run `pip-audit -r requirements-core.txt` before every release and in CI at least daily. Any newly disclosed advisory must be triaged and either remediated or documented as an accepted risk.
+
+#### Which environment does pip-audit audit? (dual-venv pinning)
+
+`pip-audit` environment mode audits the interpreter **embedded in the launcher that was executed**, not the prompt's active environment. With two local venvs (`.venv/`, `loatsNEW/`) a prompt activated on `loatsNEW` can silently execute `.venv\Scripts\pip-audit.exe`; the tool then warns:
+
+```text
+WARNING:pip_audit._dependency_source.pip:pip-audit will run pip against <repo>\.venv\Scripts\python.exe,
+but you have a virtual environment loaded at <repo>\loatsNEW. This may result in unintuitive audits,
+since your local environment will not be audited. You can forcefully override this behavior by
+setting PIPAPI_PYTHON_LOCATION to the location of your virtual environment's Python interpreter.
+```
+
+Treat that WARNING as a hard stop, not noise: the verdict belongs to the first path, never to the activated prompt. Pin the audited interpreter explicitly (PowerShell 5.1; require exit code 0):
+
+```powershell
+$env:PIPAPI_PYTHON_LOCATION = "G:\.OA\LOATS-13July2026\LOATS13July2026\.venv\Scripts\python.exe"
+& "G:\.OA\LOATS-13July2026\LOATS13July2026\.venv\Scripts\pip-audit.exe" --ignore-vuln PYSEC-2026-3740 --progress-spinner off
+Remove-Item Env:PIPAPI_PYTHON_LOCATION
+```
+
+Environment roles (verified 2026-09-18): `.venv/` is uv-managed from `uv.lock` and mirrors the CI `pip install .` audit job — it is the **canonical audit target**. `loatsNEW/` is the `python -m venv` environment hosting the pre-commit hooks; it is not authoritative for dependency state (dev residue such as the pre-ADR-0003/0004 `ta`/`vollib` cluster may persist there) and is scheduled for rebuild.
