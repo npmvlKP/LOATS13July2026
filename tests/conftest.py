@@ -69,9 +69,11 @@ os.environ.pop("GIT_WORK_TREE", None)
 # lost run's single real failure became unidentifiable). A --cov run
 # therefore takes an exclusive cross-process lock for the whole session
 # or is refused fail-closed (exit code 4) BEFORE any test runs.
-# The lock file lives in .git/: invisible to status by construction
-# (the tracked-file ceiling sits at zero headroom; no slot is spent),
-# and on the same drive as the data it guards.
+# The lock file lives in the git admin dir: invisible to status by
+# construction (the tracked-file ceiling sits at zero headroom; no slot
+# is spent), and on the same drive as the data it guards. In a linked
+# worktree ``.git`` is a pointer FILE -- _cov_lock_path resolves the
+# real admin dir so the lock still lands in an existing directory.
 COV_LOCK_ENABLED = os.environ.get("LOATS_COV_LOCK_DISABLED") != "1"
 import sys  # conftest env-first layout; E402 granted per-file in pyproject
 
@@ -88,8 +90,32 @@ _COV_LOCK_HANDLE = None
 
 
 def _cov_lock_path(repo_root: Path) -> Path:
-    """Exclusive-lock file for coverage writers (inside .git/: untracked)."""
-    return repo_root / ".git" / "coverage_gate.lock"
+    """Exclusive-lock file for coverage writers (inside the git admin dir).
+
+    Worktree-safe (2026-09-18, found running the F9-M-03 wave in a linked
+    worktree): in a worktree ``.git`` is a FILE (``gitdir: <main>/.git/
+    worktrees/<name>``), so the historical ``repo_root/.git`` return made
+    ``_acquire_coverage_lock``'s ``mkdir(parents=True, exist_ok=True)``
+    raise ``FileExistsError`` before any lock could be taken -- the same
+    worktree-shape hazard the 2026-09-11 wave fixed in the hygiene net
+    (there via ``git rev-parse --absolute-git-dir``). Resolved here
+    WITHOUT a subprocess by reading the pointer file directly; the plain
+    layout keeps ``repo_root/.git``. The resolved directory is a real
+    directory on the repo drive in both shapes and untracked by
+    construction. Arguments without any ``.git`` (the unit tests'
+    disposable ``tmp_path`` roots) still return ``<root>/.git/...`` --
+    the acquire site creates the directory.
+    """
+    dot_git = repo_root / ".git"
+    if dot_git.is_file():
+        gitdir = dot_git.read_text(encoding="utf-8").strip()
+        if gitdir.lower().startswith("gitdir:"):
+            gitdir = gitdir.split(":", 1)[1].strip()
+        if gitdir:
+            if not Path(gitdir).is_absolute():
+                gitdir = str((repo_root / gitdir).resolve())
+            return Path(gitdir) / "coverage_gate.lock"
+    return dot_git / "coverage_gate.lock"
 
 
 def _cov_requested(argv: list[str]) -> bool:
