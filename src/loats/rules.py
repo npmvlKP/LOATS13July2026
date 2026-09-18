@@ -124,12 +124,17 @@ class CMPRulesEngine:
         if as_of_date is not None:
             self._chain_iv_history[str(as_of_date)] = value
         elif self._chain_iv_history:
-            newest = next(reversed(self._chain_iv_history))
+            # Refresh the NEWEST DAY key, not the last-inserted entry:
+            # the upsert-by-day contract must not depend on feed order
+            # (mirrors calculate_iv_rank's newest-day current-selection).
+            newest = max(self._chain_iv_history)
             self._chain_iv_history[newest] = value
         else:
             self._chain_iv_history["undated"] = value
         while len(self._chain_iv_history) > 252:
-            oldest = next(iter(self._chain_iv_history))
+            # Evict the OLDEST DAY key (day-key contract, not insertion
+            # order -- see the newest-day refresh above).
+            oldest = min(self._chain_iv_history)
             del self._chain_iv_history[oldest]
 
     def load_chain_iv_history(self, series: list[tuple[str, float]]) -> None:
@@ -258,7 +263,14 @@ class CMPRulesEngine:
         if self._iv_series_active():
             values = list(iv_series.values())
             lo, hi = min(values), max(values)
-            current = values[-1]  # dict preserves insertion order
+            # The "current" observation is the NEWEST day key (ISO date
+            # strings sort chronologically), not the last-inserted value:
+            # the upsert-by-day contract must not silently depend on feed
+            # order. An "undated" key can only coexist with dated keys in
+            # a hand-built series and sorts newest -- acceptable, since
+            # set_chain_iv_history never creates that mix (undated feeds
+            # refresh the newest dated entry).
+            current = iv_series[max(iv_series)]
             if hi > lo:
                 return float((current - lo) / (hi - lo) * 100.0)
             return 50.0  # flat series: genuinely neutral, never fallback
@@ -487,7 +499,14 @@ class CMPRulesEngine:
             adx_pass = False
             vix_pass = False
             return False, {
-                "iv_rank": iv_rank,
+                # F9-C-01 hardening (18Sep2026): the loud float("-inf")
+                # sentinel stays inside the calculator (its contract is
+                # pinned) but never reaches this decision-facing payload:
+                # raw -inf serializes to the non-RFC-8259 token
+                # -Infinity via json.dumps (audit JSONL dual-write,
+                # SQLite gating_rules_result TEXT, TradeDecision.to_dict).
+                # Report JSON null at the boundary instead.
+                "iv_rank": None,
                 "adx": adx,
                 "vix": self.get_vix_level(),
                 "iv_source": "none",

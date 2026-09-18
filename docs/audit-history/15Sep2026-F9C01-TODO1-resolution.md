@@ -73,3 +73,34 @@ remain green by construction.
   pinned-source check PASS.
 - Full suite + coverage: see session summary (1858 collected;
   coverage floor 80 enforced).
+
+## 2026-09-18 adversarial re-verification (third hardening)
+
+Re-verification at HEAD `fc9bfa0` (live interpreter) closed two residual
+holes the 15Sep wave left in the boundary layer; both RED-proven before
+the fix:
+
+1. **Feed-order dependence (day-key contract):** `calculate_iv_rank`
+   read the "current" IV as `values[-1]` -- insertion order, not the
+   newest `as_of_date` key; the undated refresh (`next(reversed(...))`)
+   and the 252-day eviction (`next(iter(...))`) carried the same
+   insertion-order assumption. All three now resolve by day key
+   (max/min of the ISO-date keys). RED evidence: an out-of-order series
+   reported rank 50.0 where the honest newest-day rank is 100.0.
+2. **-Infinity JSON leak:** the `insufficient_history` gating payload
+   carried the raw `float("-inf")` sentinel into `json.dumps` -- emitting
+   the non-RFC-8259 token `-Infinity` into the audit JSONL (SHA-256
+   chain), SQLite `gating_rules_result` TEXT and
+   `TradeDecision.to_dict()`. The decision-facing payload now reports
+   `null` at the boundary; the calculator keeps its loud `-inf` sentinel
+   (pinned contract, unchanged).
+
+Verification (this host, real runs): F9-C-01 suite 26 -> 31 tests
+(RED-first: 4 failures for the documented defects, GREEN after the
+fix); full suite 2022 passed / 2 skipped, coverage 89.36% (floor 80);
+ruff check + format, isort, flake8, mypy `src/` strict (38 files),
+bandit `src/` 0 findings; pip-audit 0 vulnerabilities (1 waived
+PYSEC-2026-3740); gitleaks 626 commits no leaks; HC-24 PASS; HC
+registry 27/27 PASS; CMP benchmark Overall PASS (10/10 validation
+ops). HC-24 pinned threshold lines `iv_pass = iv_rank < 30` /
+`iv_pass = iv_rank > 40` preserved verbatim.
