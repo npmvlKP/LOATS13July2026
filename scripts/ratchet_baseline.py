@@ -370,8 +370,22 @@ History (most recent last):
       18Sep2026-F9M05-strike-band-resolution.md (open-band heuristic
       rejected 0.60 exactly; zero sell-side logic; ATM pair produced
       [K, K]). Ceiling 435->437.
+  439. 18Sep2026 (F9-M-03 / TODO-8 resolution wave): +2 -- the
+      audited-attempt semantics net tests/test_f9m03_audited_attempt.py
+      (17 pins: the machine-readable semantic source, per-path attempt
+      counting -- success, designed-404 error, disabled -- the
+      attempts>=outcomes invariant, the grader attempt-gate branches
+      (PASS / legacy-unchanged / ended-FAIL / ongoing-INCOMPLETE),
+      divergence non-whitewash, supervisor baseline+delta fold; plus 2
+      pins carried in tests/test_analyzer_intake_contract.py for the
+      Am.7 semantic source and the worktree-shape coverage-lock pins in
+      tests/test_coverage_lock_guard.py) and the resolution record
+      docs/audit-history/18Sep2026-f9m03-audited-attempt-semantics.md
+      (ADR-006 Amendment 7 option (a): routed ATTEMPTS are the P5
+      decisional evidence; same-wave root-cause fix: coverage-lock
+      guard worktree-safe in tests/conftest.py). Ceiling 437->439.
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 437
+TRACKED_FILE_CEILING = 439
