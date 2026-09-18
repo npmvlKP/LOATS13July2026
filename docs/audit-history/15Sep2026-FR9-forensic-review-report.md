@@ -132,9 +132,9 @@
 - **Issue ID:** F9-M-03 (→ TODO-8) · **Category:** CMP P5 completeness · **Severity:** Medium · **Confidence:** Certain
 - **Evidence:** `analyzer_intake_path="analyze"` 404s by design (ADR-006 Am.5); no intake handler in-repo; OpenAlgo core may not be modified (adapter rule) so intake must live in OpenAlgo extension points or a documented gateway sidecar.
 - **Risk Assessment:** Medium — P5 "route ALL" cannot fully close without a decision here.
-- **Suggested Resolution:** USER DECISION: (a) audited-attempt semantics (ADR-amend P5 acceptance, 2 h) or (b) stand up the intake endpoint (1–2 days). Update `verify_p5_forward_test.py` to grade under the chosen semantic.
-- **Recommended Tests:** verifier PASS only under chosen semantic; routed decision reaches intake (b) or is audited 404 (a).
-- **Estimated Complexity:** 2 h / 1–2 d · **Dependencies:** F9-C-02 · **Priority: P2.**
+- **Suggested Resolution:** USER DECISION: (a) audited-attempt semantics (ADR-amend P5 acceptance, 2 h) or (b) stand up the intake endpoint (1–2 days). Update `verify_p5_forward_test.py` to grade under the chosen semantic. **RESOLVED (a) 2026-09-18:** audited-attempt semantics — ADR-006 Amendment 7 (`routed_decisions` counter, `analyzer_intake_semantic` machine-readable single source, grader attempt-gate); PR #56.
+- **Recommended Tests:** verifier PASS only under chosen semantic; routed decision reaches intake (b) or is audited 404 (a). Pinned: `tests/test_f9m03_audited_attempt.py` (per-path attempt counting, grader attempt-gate branches) and the Am.7 semantic-source pin in `tests/test_analyzer_intake_contract.py`; legacy logs grade unchanged.
+- **Estimated Complexity:** 2 h / 1–2 d · **Dependencies:** F9-C-02 · **Priority: P2.** · **Status: ✅ CLOSED 18Sep2026 (PR #56).**
 
 ### 🟡 F9-M-04 — Silent `0.5` fallback in `calculate_iv_rank` lets insufficient data pass the BUY gate (TODO-9; folds into F9-C-01)
 - **Issue ID:** F9-M-04 (→ TODO-9) · **Category:** Edge-case correctness · **Severity:** Medium · **Confidence:** Certain
@@ -323,7 +323,7 @@ CI (`ci.yml`): fail-fast chain incl. repo-hygiene (venv/env/junk rejection), RSS
 **STEP 3 — WAVE 3 · P2:**
 1. **TODO-15 (F9-M-05):** delta band [0.50, 0.60] + sell-side 2σ (consistent units) + OI confirmation filter + boundary tests.
 2. **TODO-6 (F9-M-01):** `previous_hash` column + `sha256(entry||prev)` + link-walking verifier + tamper tests + grandfathered migration.
-3. **TODO-8 (F9-M-03):** USER DECISION — audited-attempt semantics (ADR) vs intake endpoint; update the P5 verifier accordingly.
+3. **TODO-8 (F9-M-03):** USER DECISION — audited-attempt semantics (ADR) vs intake endpoint; update the P5 verifier accordingly. **RESOLVED 18Sep2026:** option (a) — ADR-006 Am.7, PR #56.
 4. TODO-9 acceptance check inside TODO-1's RE-VERIFY record.
 
 **STEP 4 — WAVE 4 · P3:** TODO-10 (warning thresholds), TODO-11 (trailing enable for supervised runs), TODO-12 (store hygiene + insert-time source guard), TODO-16 (kill-switch states or ADR), TODO-17 (CMP supersession register ADR).
