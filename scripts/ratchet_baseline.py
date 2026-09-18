@@ -360,8 +360,18 @@ History (most recent last):
       17Sep2026-F9M01-audit-chain-resolution.md (self-hashing cannot see
       deletion/reorder; genuine sha256(entry||prev) chain on both
       writers; CRITICAL alerts). Ceiling 433->435.
+  437. 18Sep2026 (F9-M-05 / TODO-15 remediation wave): +2 -- the CMP S4
+      conformance net tests/test_strike_selection_f9m05.py (28 pins:
+      closed delta band 0.49/0.50/0.60/0.61 boundaries, put-magnitude
+      symmetry, OI confirmation fail-closed, hand-computed sigma and
+      2-sigma band, mixed/unparseable-interval fail-closed, insufficient
+      -history fail-closed, max_strikes cap, empty chain, ATM-pair dedup
+      root-cause pins) and the resolution record docs/audit-history/
+      18Sep2026-F9M05-strike-band-resolution.md (open-band heuristic
+      rejected 0.60 exactly; zero sell-side logic; ATM pair produced
+      [K, K]). Ceiling 435->437.
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 435
+TRACKED_FILE_CEILING = 437

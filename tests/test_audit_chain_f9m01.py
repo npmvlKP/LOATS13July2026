@@ -80,9 +80,17 @@ class TestChainWritePath:
     def test_db_rows_carry_previous_hash(self, db: Database) -> None:
         _write_entries(db, 2)
         rows = db.get_audit_log()
-        by_ts = sorted(rows, key=lambda r: r.timestamp)
-        assert by_ts[0].previous_hash is None
-        assert by_ts[1].previous_hash == by_ts[0].sha256_hash
+        # Root cause of a CI-only flake: get_audit_log() returns rows
+        # timestamp-DESC, and timestamps round-trip at millisecond
+        # precision -- same-millisecond writes are a DESC tie that the
+        # stable ascending sort below preserves as insertion-REVERSED.
+        # Identify entries by the unique entity_id each write carries
+        # (wall-clock ordering is not the invariant under test); first
+        # entry = no head seed, second links at the first's self-hash.
+        by_entity = {r.entity_id: r for r in rows}
+        assert set(by_entity) == {"t0", "t1"}
+        assert by_entity["t0"].previous_hash is None
+        assert by_entity["t1"].previous_hash == by_entity["t0"].sha256_hash
 
     def test_entry_hash_includes_previous_hash(
         self, db: Database, tmp_path: Path

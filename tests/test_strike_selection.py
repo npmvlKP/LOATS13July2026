@@ -352,15 +352,16 @@ class TestStrikeSelectionEngine(unittest.IsolatedAsyncioTestCase):
             ),
         ]
 
-        # Test delta neutral selection (target delta = 0)
+        # Test delta neutral selection (CMP S4 delta band, F9-M-05)
         selected = await self.engine._select_delta_neutral_strikes(
             100.0, option_chain, 1, 2
         )
 
-        # Should select strikes that create a delta-neutral position
-        # For example, 100CE (delta=0.5) + 100PE (delta=-0.5) = net delta 0
-        assert len(selected) == 2
-        assert 100.0 in selected  # ATM strike should be included
+        # F9-M-05: eligibility is the closed band |delta| in [0.50, 0.60].
+        # The 0.65/-0.65 and 0.35/-0.35 legs are OUT of band, so only the
+        # ATM pair qualifies -- and the dedup fix collapses the ATM
+        # call+put pair (same strike 100) to a single strike entry.
+        assert selected == [100.0]
 
     async def test_select_strikes_oi_based(self):
         """Test open interest based strike selection."""
@@ -666,8 +667,11 @@ class TestStrikeSelectionEngine(unittest.IsolatedAsyncioTestCase):
         selected = await self.engine._select_delta_neutral_strikes(
             100.0, option_chain, 1, 2
         )
-        assert len(selected) == 2  # Should select both ATM call and put
-        assert 100.0 in selected
+        # F9-M-05 dedup root-cause fix: the ATM call and put share strike
+        # 100, which previously produced [100.0, 100.0]; selections are
+        # deduplicated now, so the pair yields the single strike once.
+        assert selected == [100.0]
+        assert selected.count(100.0) == 1
 
     async def test_oi_based_edge_cases(self):
         """Test open interest based selection edge cases."""
