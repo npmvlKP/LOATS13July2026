@@ -104,3 +104,29 @@ PYSEC-2026-3740); gitleaks 626 commits no leaks; HC-24 PASS; HC
 registry 27/27 PASS; CMP benchmark Overall PASS (10/10 validation
 ops). HC-24 pinned threshold lines `iv_pass = iv_rank < 30` /
 `iv_pass = iv_rank > 40` preserved verbatim.
+
+## 2026-09-18 historical-taint disposition (F9-C-01-R1)
+
+Residual exposure after the 18Sep fix: audit rows written BEFORE the
+boundary fix still carry the non-RFC-8259 token `-Infinity` in the
+SHA-256-chained JSONL and SQLite TEXT columns. The chain makes those
+rows immutable by design (rewrite = chain break), so remediation is a
+READ-ONLY forensic exporter, not a data migration:
+`scripts/export_infinity_taint.py` inventories tainted rows across all
+three surfaces (audit JSONL raw lines, `trade_decisions.gating_rules_result`,
+`audit_log` new_state/previous_state/metadata) into a sidecar RFC 8259
+manifest. Guarantees, all test-pinned (12 tests, RED-first: missing
+script, GREEN after): SQLite opened `mode=ro` (the tool cannot write or
+create the store); inventory-not-error semantics (taint presence still
+exits 0); the manifest itself is strict RFC 8259 (`allow_nan=False`).
+
+Live-store disposition (this host, 2026-09-18): scan of the full audit
+trail -- 17,289 JSONL lines plus both SQLite surfaces -- reported ZERO
+tainted rows; store SHA-256 verified identical before/after the scan
+(`loats.db` 8b0b5ae29888edfe..., `audit.log` 2351792e0bb34140...).
+Consistent with lifecycle: P5 gating never persisted an
+`insufficient_history` payload, so no pre-fix taint exists to remediate.
+The manifest (`reports/infinity-taint-manifest-20260918.json`,
+git-ignored run artifact) documents the clean state; re-run the
+exporter after any audit-trail-affecting incident. Ratchet ceiling
+439->441 for the +2 tracked files.
