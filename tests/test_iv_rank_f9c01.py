@@ -21,6 +21,7 @@ Fixed contract (CMP conformance; TODO-1 resolution):
 
 from __future__ import annotations
 
+import json
 import random
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -692,3 +693,87 @@ class TestIVWarmStart:
             assert list(rules_engine._chain_iv_history.values()) == []
         finally:
             rules_engine.load_chain_iv_history(list(saved.items()))
+
+
+# --------------------------------------------------------------------------
+# (9) Adversarial round hardening (18Sep2026 F9-C-01 re-verification wave)
+# --------------------------------------------------------------------------
+class TestInsufficientHistoryPayloadIsRFCJson:
+    """The loud insufficiency sentinel must never leak -Infinity into JSON.
+
+    The gating payload flows into db.async_log_audit (dual-write JSONL +
+    SHA-256 chain), TradeDecision.gating_rules_result (SQLite TEXT via
+    json.dumps) and TradeDecision.to_dict(). A raw float("-inf") there
+    serializes to the non-RFC-8259 token ``-Infinity`` (proven live), so
+    downstream JSON parsers may reject rows that carry a mandatory CMP
+    audit event. The calculator keeps its loud float("-inf") sentinel
+    (pinned above); the decision-facing payload is sanitized at the
+    boundary to None (JSON null).
+    """
+
+    def test_calculator_sentinel_unchanged(self) -> None:
+        eng = CMPRulesEngine()
+        short = _bars([100.0 + (0.2 if i % 2 == 0 else -0.1) for i in range(29)])
+        assert eng.calculate_iv_rank(short) == float("-inf")
+
+    def test_insufficient_history_payload_carries_null_not_infinity(self) -> None:
+        eng = _gating_engine(vix=10.0)
+        short = _bars([100.0 + (0.2 if i % 2 == 0 else -0.1) for i in range(29)])
+        _, info_b = eng.apply_gating_rules(_buy_signal(), short, 100.0)
+        assert info_b["reason"] == "insufficient_history"
+        assert info_b["iv_rank"] is None
+        assert "Infinity" not in json.dumps(info_b)
+
+        eng.set_vix_level(20.0)
+        _, info_s = eng.apply_gating_rules(_sell_signal(), short, 100.0)
+        assert info_s["iv_rank"] is None
+        assert "Infinity" not in json.dumps(info_s)
+
+
+class TestIVRankUsesNewestDayNotFeedOrder:
+    """Rank reads the NEWEST as_of_date key, not insertion order.
+
+    set_chain_iv_history is an upsert-by-day; the day-keyed dict only
+    preserves insertion order when feeds arrive chronologically (which
+    the live producer and the warm-start both guarantee today, but the
+    day-key contract must not silently depend on feed order).
+    """
+
+    def test_out_of_order_feed_ranks_newest_day(self) -> None:
+        eng = CMPRulesEngine()
+        # Fed so the NEWEST day lands in the middle of the dict.
+        eng.set_chain_iv_history(10.0, as_of_date="2026-01-01")
+        eng.set_chain_iv_history(14.0, as_of_date="2026-01-03")  # newest day
+        eng.set_chain_iv_history(12.0, as_of_date="2026-01-02")
+        # Honest newest-day rank: (14 - 10) / (14 - 10) * 100 = 100.0
+        assert eng.calculate_iv_rank([]) == pytest.approx(100.0)
+
+    def test_oldest_day_last_ranks_newest_day(self) -> None:
+        eng = CMPRulesEngine()
+        eng.set_chain_iv_history(14.0, as_of_date="2026-01-03")  # newest day
+        eng.set_chain_iv_history(10.0, as_of_date="2026-01-01")
+        eng.set_chain_iv_history(12.0, as_of_date="2026-01-02")
+        assert eng.calculate_iv_rank([]) == pytest.approx(100.0)
+
+    def test_newest_day_is_min_ranks_zero(self) -> None:
+        eng = CMPRulesEngine()
+        eng.set_chain_iv_history(10.0, as_of_date="2026-01-01")
+        eng.set_chain_iv_history(18.0, as_of_date="2026-01-02")
+        eng.set_chain_iv_history(10.0, as_of_date="2026-01-03")  # newest == min
+        assert eng.calculate_iv_rank([]) == pytest.approx(0.0)
+
+    def test_undated_refresh_keeps_newest_day_semantics(self) -> None:
+        """Undated refresh targets the NEWEST DAY, rank reads that day.
+
+        The newest day (01-03) is inserted FIRST so both the refresh
+        target and the rank's current-selection are order-sensitive:
+        day-key semantics give (16-10)/(20-10)*100 = 60.0, while
+        insertion-order code would refresh/rank the last-inserted
+        01-02 entry and report 100.0/60.0 (RED proven).
+        """
+        eng = CMPRulesEngine()
+        eng.set_chain_iv_history(14.0, as_of_date="2026-01-03")  # newest day
+        eng.set_chain_iv_history(10.0, as_of_date="2026-01-01")
+        eng.set_chain_iv_history(20.0, as_of_date="2026-01-02")  # last inserted
+        eng.set_chain_iv_history(16.0)  # undated -> refreshes newest DAY (01-03)
+        assert eng.calculate_iv_rank([]) == pytest.approx(60.0)
