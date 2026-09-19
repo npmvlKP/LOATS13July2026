@@ -21,6 +21,13 @@ Hermeticity: the supervisor probe reads the real ``alerts`` singleton with
 no credentials required (construction is env-free; only Telegram SENDS need
 tokens), and a test-only env hook (``LOATS_KILL_SWITCH_ACTIVE_TEST=1``)
 simulates an engaged switch without touching the singleton.
+
+The poisoned run log itself is gitignored live-system residue
+(``reports/*.json`` is supervisor-host quarantine), so the evidence pins
+below grade a tracked verbatim snapshot of it
+(``tests/fixtures/p5_run_log_20260912_150243_snapshot.json``,
+programmatically projected from the artifact of record) instead of the
+machine-local file -- a fresh checkout carries the full evidence chain.
 """
 
 from __future__ import annotations
@@ -39,7 +46,12 @@ VALIDATOR = REPO_ROOT / "scripts" / "verify_p5_forward_test.py"
 ARCHIVE_RECORD = (
     REPO_ROOT / "docs" / "audit-history" / "18Sep2026-F9C02-invalid-evidence-archive.md"
 )
-POISONED_LOG = REPO_ROOT / "reports" / "p5_forward_test_20260912_150243.json"
+# Verbatim graded-field snapshot of the gitignored live artifact (written
+# programmatically from reports/p5_forward_test_20260912_150243.json on the
+# supervisor host); tracked so fresh checkouts can grade the same evidence.
+POISONED_LOG_SNAPSHOT = (
+    REPO_ROOT / "tests" / "fixtures" / "p5_run_log_20260912_150243_snapshot.json"
+)
 
 
 def _load_runner() -> Any:
@@ -295,13 +307,19 @@ class TestInvalidEvidenceArchive:
         assert "15" in text
 
     def test_official_grader_still_condemns_the_poisoned_log(self) -> None:
-        """Live proof, re-run in-suite: the real artifact grades FAIL rc=1."""
-        assert POISONED_LOG.exists(), (
-            "the poisoned run log must stay in place (evidence of record; "
-            "the archive record supplements it, it does not replace it)"
+        """Live proof, re-run in-suite: the graded evidence FAILs rc=1.
+
+        Grades the tracked verbatim snapshot of the artifact of record
+        (hermetic across fresh checkouts; the gitignored live file is
+        supervisor-host residue by contract).
+        """
+        assert POISONED_LOG_SNAPSHOT.is_file(), (
+            "the tracked snapshot of the poisoned run log must stay in the "
+            "tree (evidence of record projection; the archive record "
+            "supplements it, it does not replace it)"
         )
         proc = subprocess.run(
-            [sys.executable, str(VALIDATOR), str(POISONED_LOG)],
+            [sys.executable, str(VALIDATOR), str(POISONED_LOG_SNAPSHOT)],
             capture_output=True,
             text=True,
             cwd=REPO_ROOT,
@@ -313,7 +331,7 @@ class TestInvalidEvidenceArchive:
 
     def test_poisoned_log_grades_fail_with_its_embedded_evidence(self) -> None:
         validator = _load_validator()
-        data = json.loads(POISONED_LOG.read_text(encoding="utf-8"))
+        data = json.loads(POISONED_LOG_SNAPSHOT.read_text(encoding="utf-8"))
         grade = validator.grade_run_log(data)
         assert grade.verdict == "FAIL"
         divergence_field = data["disabled_routes_during_enabled_window"]
