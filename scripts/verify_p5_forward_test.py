@@ -214,6 +214,59 @@ def _collect_outage_annotations(
     return notes
 
 
+def _grade_kill_switch_evidence(
+    run_log: dict[str, Any],
+    reasons: list[str],
+    ended: datetime.datetime | None,
+) -> bool:
+    """Grade the kill-switch verification proof (F9-C-02 closure).
+
+    The CMP P5 gate requires the evidence stream to include a Telegram
+    kill-switch verification event: proof that the emergency-halt
+    primitive answered DISengaged at supervision start. Fail-closed by
+    design -- an unprovable kill switch is exactly what the finding
+    forbids citing. There is no legacy grace:
+    ``routing.enabled_at_start`` has none either; gate evidence standards
+    are current, not historical.
+
+    Appends reasons and returns True when the run is VOID:
+
+    - ``kill_switch_active_at_start is True`` -- the halt would have
+      stopped trading before the first decision; the span measured
+      nothing (always a hard violation);
+    - ``kill_switch_verified is False`` -- the primitive is silent or
+      errored (always a hard violation);
+    - field absent -- the emergency-halt path is unproven; hard
+      violation on an ENDED run, an operator-visible reason while the
+      run is still ongoing (INCOMPLETE anyway).
+    """
+    verified = run_log.get("kill_switch_verified")
+    engaged = run_log.get("kill_switch_active_at_start")
+    if engaged is True:
+        reasons.append(
+            "KILL SWITCH ACTIVE at supervision start "
+            "(kill_switch_active_at_start: true) -- the emergency halt "
+            "would have stopped trading before the first decision; this "
+            "span measures nothing and is VOID"
+        )
+        return True
+    if verified is False:
+        reasons.append(
+            "kill-switch verification FAILED -- the emergency-halt path "
+            "could not be proven operational at supervision start; "
+            "evidence for this run is unprovable"
+        )
+        return True
+    if verified is None:
+        reasons.append(
+            "no kill-switch verification event recorded (CMP P5 gate: the "
+            "evidence stream must include a Telegram kill-switch "
+            "verification event); the emergency-halt path is unproven"
+        )
+        return ended is not None
+    return False
+
+
 def grade_run_log(run_log: dict[str, Any]) -> Grade:
     """Grade one P5 run-log dict against the phase-gate criteria."""
     reasons: list[str] = []
@@ -324,6 +377,13 @@ def grade_run_log(run_log: dict[str, Any]) -> Grade:
             "for this run is VOID"
         )
 
+    # F9-C-02 closure (2026-09-18): the CMP P5 gate requires the evidence
+    # stream to include a Telegram kill-switch verification event. Graded
+    # by _grade_kill_switch_evidence (fail-closed): an ENDED run without
+    # disengagement proof hard-FAILs; an ongoing run carries the gap as a
+    # reason so the operator sees the unproven halt path.
+    kill_switch_violation = _grade_kill_switch_evidence(run_log, reasons, ended)
+
     # Hard criterion: routing must have been enabled for the run.
     routing = run_log.get("routing") or {}
     if not routing.get("enabled_at_start"):
@@ -396,6 +456,10 @@ def grade_run_log(run_log: dict[str, Any]) -> Grade:
         # Adversarial hardening: legacy logs (no divergence field) that
         # overlap a documented contamination window are VOID.
         or legacy_contaminated
+        # F9-C-02 closure (2026-09-18): an ended span without proof that
+        # the emergency-halt path answered DISengaged at supervision
+        # start is not citable P5 evidence (CMP P5 gate).
+        or kill_switch_violation
     )
     if hard_violation:
         return Grade(

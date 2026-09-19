@@ -393,8 +393,43 @@ History (most recent last):
       (12 contract tests, RED-first proven). Live-store scan 18Sep:
       17,289 JSONL lines + both SQLite surfaces, 0 tainted rows,
       store SHA-256 identical before/after. Ceiling 439->441.
+
+    2026-09-18 (F9-C-02 closure wave): +2 tracked files --
+      tests/test_p5_f9c02_kill_switch_and_archive.py (16 pins, RED-first
+      proven: the CMP P5 gate's kill-switch verification event --
+      supervisor probe `_probe_kill_switch` + `_record_kill_switch_
+      verification` stamps `kill_switch_verified` /
+      `kill_switch_active_at_start` and the verification/alarm event at
+      supervision start, fresh + resumed + dry-run; grader fail-closed
+      criterion `_grade_kill_switch_evidence` -- an ENDED run without
+      disengagement proof FAILs, an ongoing run carries the reason,
+      engaged switch FAILs even when verified; the deferred finding
+      item 1 discharged via the dated INVALID-EVIDENCE archive record
+      citing the official grader rc=1 verdict on the real poisoned
+      artifact, re-proven in-suite) and docs/audit-history/
+      18Sep2026-F9C02-invalid-evidence-archive.md (marks run
+      20260912_150243 INVALID-EVIDENCE, verbatim grader output, evidence
+      chain, citation rule; also documents this closure wave).
+      Production edits (scripts/run_p5_forward_test.py,
+      scripts/verify_p5_forward_test.py) land within the existing
+      ceiling; 5 legacy PASS-shaped fixtures healed in tests/
+      test_p5_forward_test.py, test_p5_f9c02_routing_guard.py,
+      test_p5_f9c02_outage_window.py, test_f9m03_audited_attempt.py,
+      test_f8h01_fixes.py and scripts/verify_f8h01_external.py.
+      Ceiling 441->443.
+    * 443->444 (2026-09-19, PR #60 follow-up): the two evidence pins in
+      tests/test_p5_f9c02_kill_switch_and_archive.py graded the
+      GITIGNORED live artifact reports/p5_forward_test_20260912_150243.json
+      (CI-leakage hermeticity failure: fresh checkouts lack the
+      machine-local file; live-verified 2026-09-19, pytest-coverage red on
+      PR #60). Fix: tracked verbatim fixture
+      tests/fixtures/p5_run_log_20260912_150243_snapshot.json (programmatic
+      projection of the artifact of record, graded signature identical),
+      pins re-pointed to it, both environments green 16/16. +1 tracked
+      fixture file within this headroom.
+      Ceiling 443->444.
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 441
+TRACKED_FILE_CEILING = 444

@@ -214,6 +214,91 @@ def _update_run_log(path: Path, mutate: dict[str, Any]) -> None:
     path.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
 
+_LOATS_KILL_SWITCH_TEST_ENV = "LOATS_KILL_SWITCH_ACTIVE_TEST"
+
+
+def _probe_kill_switch() -> tuple[bool, bool]:
+    """Verify the emergency-halt path reports a definitive state (F9-C-02).
+
+    CMP P5 gate: the supervised span must include a Telegram kill-switch
+    verification event, i.e. proof that the halt primitive is operational
+    (answers definitively) and DISengaged at span start (the run is only
+    cancellable if it is running). Returns ``(verified, engaged)``:
+
+    - ``verified`` False means the primitive is silent or errored — an
+      unprovable kill switch must never back a live span;
+    - ``engaged`` True means the switch is ACTIVE at span start — the run
+      would halt before the first decision, so the span proves nothing.
+
+    The real ``alerts`` singleton constructs env-free (only Telegram sends
+    need tokens); a test-only env hook simulates an engaged switch without
+    touching the singleton (the primitive "answers" engaged — verified is
+    still True; the ENGAGED state itself is what voids a span).
+    """
+    import os as _os
+
+    if _os.environ.get(_LOATS_KILL_SWITCH_TEST_ENV) == "1":
+        return True, True
+    try:
+        from loats.alerts import alerts
+
+        engaged = bool(alerts.is_kill_switch_active())
+    except Exception as exc:  # probe failure = unprovable halt path
+        print(
+            f"{FAIL_SYM} kill-switch verification probe failed: {exc}",
+            file=sys.stderr,
+        )
+        return False, False
+    return True, engaged
+
+
+def _record_kill_switch_verification(run_log: Path) -> tuple[bool, bool]:
+    """Probe once at supervision start and stamp the run log (F9-C-02).
+
+    Writes ``kill_switch_verified`` / ``kill_switch_active_at_start``
+    fields plus the ``kill_switch_verified`` (or ``kill_switch_alarm``)
+    run-log event the CMP P5 gate names. Failure to record is logged but
+    never raised: verification evidence must not kill the supervisor
+    before it starts; the grader fails the run instead (fail-closed).
+    """
+    try:
+        verified, engaged = _probe_kill_switch()
+        if verified and not engaged:
+            _append_event(
+                run_log,
+                "kill_switch_verified",
+                "emergency halt primitive answered: kill switch INACTIVE "
+                "at supervision start",
+            )
+        else:
+            detail = (
+                "kill switch ACTIVE at supervision start — span cannot "
+                "accrue decisional evidence"
+                if engaged
+                else "kill-switch probe FAILED — emergency halt path "
+                "unverifiable; span evidence is unprovable"
+            )
+            _append_event(run_log, "kill_switch_alarm", detail)
+            print(
+                f"{FAIL_SYM} F9-C-02 kill-switch verification: {detail}",
+                file=sys.stderr,
+            )
+        _update_run_log(
+            run_log,
+            {
+                "kill_switch_verified": verified,
+                "kill_switch_active_at_start": engaged,
+            },
+        )
+        return verified, engaged
+    except Exception as exc:
+        print(
+            f"{FAIL_SYM} failed to record kill-switch verification: {exc}",
+            file=sys.stderr,
+        )
+        return False, False
+
+
 def _append_event(path: Path, kind: str, detail: str) -> None:
     """Append a timestamped event to the run log."""
     try:
@@ -1036,6 +1121,10 @@ async def _run(
             trade_decision_engine.enable_analyzer_routing()
             assert trade_decision_engine.analyzer_routing_enabled is True
             _append_event(run_log, "routing_enabled", "dry-run smoke")
+            # F9-C-02: the CMP P5 gate requires a kill-switch verification
+            # event in every supervised run log; the smoke path records it
+            # too so the writer shape is identical across paths.
+            _record_kill_switch_verification(run_log)
             await asyncio.sleep(0)
             print(
                 "[P5] dry-run complete: routing enable path exercised, "
@@ -1048,6 +1137,10 @@ async def _run(
             await system.initialize()
             # Enable routing for the supervised run (default stays OFF).
             trade_decision_engine.enable_analyzer_routing()
+            # F9-C-02: verify the emergency-halt path ONCE at supervision
+            # start (fresh or resumed) and stamp the run log with the
+            # CMP P5 gate's kill-switch verification event.
+            _record_kill_switch_verification(run_log)
             if resumed:
                 _append_event(
                     run_log, "routing_enabled", "live supervised run (resumed)"

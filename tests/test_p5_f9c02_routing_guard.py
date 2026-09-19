@@ -557,6 +557,11 @@ def _base_run_log() -> dict[str, Any]:
         "unhandled_exceptions": 0,
         "cycles_completed": 120,
         "counters": {"success": 3, "disabled": 0, "error": 0},
+        # F9-C-02 closure (2026-09-18): PASS-shaped ended logs must carry
+        # the kill-switch verification proof (CMP P5 gate) -- present and
+        # disengaged, exactly as the supervisor records it.
+        "kill_switch_verified": True,
+        "kill_switch_active_at_start": False,
     }
 
 

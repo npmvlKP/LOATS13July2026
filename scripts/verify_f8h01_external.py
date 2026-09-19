@@ -173,6 +173,10 @@ def check_e_runner_validator() -> None:
             "restarts": 0,
             "cycles_completed": 10,
             "counters": {"success": 5, "disabled": 0, "error": 0},
+            # F9-C-02 closure (2026-09-18): kill-switch verification proof
+            # (CMP P5 gate) -- present and disengaged on eligible fixtures.
+            "kill_switch_verified": True,
+            "kill_switch_active_at_start": False,
         }
 
     verdicts = [

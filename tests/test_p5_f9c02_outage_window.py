@@ -77,6 +77,10 @@ def _outage_log() -> dict[str, Any]:
             "count": 0,
             "window": {"first_disabled_route_at": None, "last_disabled_route_at": None},
         },
+        # F9-C-02 closure (2026-09-18): kill-switch verification proof
+        # (CMP P5 gate) -- present and disengaged.
+        "kill_switch_verified": True,
+        "kill_switch_active_at_start": False,
     }
 
 
