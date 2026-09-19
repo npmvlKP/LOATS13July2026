@@ -157,3 +157,51 @@ class TestCMPGateThresholdsTODO13:
                 Settings(opposition_threshold=-0.1)
             with pytest.raises(ValidationError):
                 Settings(opposition_threshold=1.1)
+
+
+# ---------------------------------------------------------------------------
+# F9-H-01 residue: the deploy template must carry each CMP gate bar exactly
+# once, agreeing with the Settings default. PR #46 appended the corrected
+# pair but left the pre-fix COMPOSITE_STRENGTH_THRESHOLD=0.5 line (born
+# 4b94b932) lower in the template; python-dotenv resolves duplicate keys
+# last-wins, so a deploy copying .env.example resurrected the loosened 0.5
+# composite bar with every Settings-default test green (probe-proven:
+# composite 0.55 PROCEEDS under the 0.5 hybrid, REJECTED under CMP 0.6/0.4).
+# ---------------------------------------------------------------------------
+
+ENV_EXAMPLE = pathlib.Path(__file__).resolve().parent.parent / ".env.example"
+GATE_BARS = ("COMPOSITE_STRENGTH_THRESHOLD", "OPPOSITION_THRESHOLD")
+
+
+def _dotenv_bindings(text: str) -> list[tuple[str, str]]:
+    """(key, value-without-inline-comment) for every binding line."""
+    bindings = []
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        bindings.append((key.strip(), value.split("#", 1)[0].strip()))
+    return bindings
+
+
+class TestEnvExampleGateBarTemplateConformance:
+    def test_each_gate_bar_appears_exactly_once(self) -> None:
+        counts: dict[str, int] = {}
+        for key, _ in _dotenv_bindings(ENV_EXAMPLE.read_text(encoding="utf-8")):
+            counts[key] = counts.get(key, 0) + 1
+        for bar in GATE_BARS:
+            assert counts.get(bar, 0) == 1, (
+                f"{bar} must appear exactly once in .env.example "
+                f"(found {counts.get(bar, 0)}; last-wins dotenv resolution "
+                "resurrects stale values)"
+            )
+
+    def test_gate_bar_template_values_match_settings_defaults(self) -> None:
+        with patch.dict(os.environ, {"OPENALGO_API_KEY": "test_key"}):
+            s = Settings()
+        bindings = dict(_dotenv_bindings(ENV_EXAMPLE.read_text(encoding="utf-8")))
+        assert float(bindings["COMPOSITE_STRENGTH_THRESHOLD"]) == (
+            s.composite_strength_threshold
+        )
+        assert float(bindings["OPPOSITION_THRESHOLD"]) == s.opposition_threshold
