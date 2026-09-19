@@ -417,8 +417,19 @@ History (most recent last):
       test_p5_f9c02_outage_window.py, test_f9m03_audited_attempt.py,
       test_f8h01_fixes.py and scripts/verify_f8h01_external.py.
       Ceiling 441->443.
+    * 443->444 (2026-09-19, PR #60 follow-up): the two evidence pins in
+      tests/test_p5_f9c02_kill_switch_and_archive.py graded the
+      GITIGNORED live artifact reports/p5_forward_test_20260912_150243.json
+      (CI-leakage hermeticity failure: fresh checkouts lack the
+      machine-local file; live-verified 2026-09-19, pytest-coverage red on
+      PR #60). Fix: tracked verbatim fixture
+      tests/fixtures/p5_run_log_20260912_150243_snapshot.json (programmatic
+      projection of the artifact of record, graded signature identical),
+      pins re-pointed to it, both environments green 16/16. +1 tracked
+      fixture file within this headroom.
+      Ceiling 443->444.
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 443
+TRACKED_FILE_CEILING = 444
