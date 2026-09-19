@@ -428,8 +428,20 @@ History (most recent last):
       pins re-pointed to it, both environments green 16/16. +1 tracked
       fixture file within this headroom.
       Ceiling 443->444.
+    * 444->446 (2026-09-19, P5-OPS-01 span-invariants wave): +2 tracked
+      files -- tests/test_p5_f9c02_span_invariants.py (19 pins,
+      born-RED proven: grader kill-switch proof re-derived SPAN-attached
+      from writer generations, supervisor market-data availability fold,
+      PowerShell-safe verify_exit_code_battery) and docs/audit-history/
+      19Sep2026-p5-span-invariants.md (the wave record: generation
+      model -- every writer_claimed opens a generation, pre-claim events
+      form the fresh-start generation, kill_switch_alarm records
+      verified:false; ENDED runs FAIL-closed unless EVERY generation
+      proves the halt; availability fold unverified-on-probe-failure,
+      annotation-only in the grader; the 19Sep [bool]*[int] ledger
+      abort). Ceiling 444->446.
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 444
+TRACKED_FILE_CEILING = 446
