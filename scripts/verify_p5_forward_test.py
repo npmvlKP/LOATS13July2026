@@ -267,6 +267,157 @@ def _grade_kill_switch_evidence(
     return False
 
 
+# P5-OPS-01 (2026-09-19): writer generations and span-attached kill-switch
+# proof. The CMP P5 kill-switch criterion is SPAN-attached, not
+# resume-attached: a 14-day span resumed across host restarts must prove
+# the emergency-halt path in EVERY writer generation, not just the one that
+# happened to run after the verification probe landed (the live
+# 20260916_140341 run carried its only ``kill_switch_verified`` event in
+# the FOURTH generation, 2.46 d into the span -- the top-level field proved
+# only "clean under the current PID"). Generations are re-derived from the
+# event stream so existing logs grade without schema changes:
+#
+# - a ``writer_claimed`` event opens a new generation;
+# - the window BEFORE the first ``writer_claimed`` (the fresh-start writer,
+#   which records ``routing_enabled`` but no claim on the pre-guard code
+#   path) is generation 1;
+# - ``kill_switch_verified`` proves its generation (verified True);
+# - ``kill_switch_alarm`` is evidence the probe RAN but failed -- the
+#   generation stays unproven (verified False): an unverifiable halt
+#   proves nothing.
+#
+# These helpers are the single source of the model: the supervisor
+# (run_p5_forward_test.py) delegates to them so its live reporting can
+# never drift from what the official grader will conclude.
+def _span_kill_switch_generations(
+    run_log: dict[str, Any],
+) -> list[dict[str, Any]]:
+    """Re-derive every writer generation's kill-switch proof state."""
+    raw_events = run_log.get("events")
+    if not isinstance(raw_events, list):
+        return []
+    generations: list[dict[str, Any]] = []
+
+    def _open(trigger: str | None) -> dict[str, Any]:
+        generation: dict[str, Any] = {
+            "generation": len(generations) + 1,
+            "writer_claimed_at": trigger,
+            "verified": None,
+            "has_proof": False,
+        }
+        generations.append(generation)
+        return generation
+
+    # The fresh-start window is a generation whenever events actually
+    # PRECEDE the first ``writer_claimed`` (the live 20260916_140341 log's
+    # ``routing_enabled`` at 14:03:46 before the 23:24 claim) -- those
+    # pre-claim events are the fresh-start writer's activity and the
+    # window closes with no proof (the exact generation-1 hole). A log
+    # that STARTS with a claim has no fresh-start window.
+    events = [event for event in raw_events if isinstance(event, dict)]
+    first_claim = next(
+        (i for i, event in enumerate(events) if event.get("kind") == "writer_claimed"),
+        None,
+    )
+    current: dict[str, Any] | None = (
+        _open(None) if first_claim is not None and first_claim > 0 else None
+    )
+    for index, event in enumerate(events):
+        kind = event.get("kind")
+        if kind == "writer_claimed":
+            current = _open(str(event.get("timestamp") or ""))
+        elif kind == "kill_switch_verified":
+            if current is None:
+                current = _open(None)
+            current["verified"] = True
+            current["has_proof"] = True
+        elif kind == "kill_switch_alarm":
+            if current is None:
+                current = _open(None)
+            current["verified"] = False
+            current["has_proof"] = True
+    return generations
+
+
+def _unproven_kill_switch_generations(
+    generations: list[dict[str, Any]],
+) -> list[int]:
+    """Generation numbers lacking kill-switch verification proof."""
+    return [
+        generation["generation"]
+        for generation in generations
+        if generation.get("verified") is not True
+    ]
+
+
+def _collect_market_data_annotations(availability: Any) -> list[str]:
+    """P5-OPS-01: market-data availability disclosures (never graded).
+
+    The supervisor folds ``market_data_availability`` (cycle activity, the
+    orchestrator running state, per-source breaker fleet) into every
+    sample as SPAN-VISIBLE evidence of the operator-reported OpenAlgo
+    market-data service; the grader NEVER grades it -- a hole in
+    market-data density is a disclosure (like an outage window), not a
+    divergence. Shapes: the healthy-zero and observed shapes annotate
+    honestly, the explicit ``unverified`` probe failure carries its
+    reason verbatim, and an unknown shape fails closed to unverified
+    (no fabrication). Returns the NOTE lines (empty when nothing to
+    disclose, e.g. observed activity or a non-dict/absent field).
+    """
+    if not isinstance(availability, dict):
+        return []
+    status = availability.get("status")
+    if status == "unverified":
+        return [
+            "market-data availability: unverified - probe failed "
+            f"({availability.get('reason', 'no reason recorded')}); "
+            "never graded, surface in CLI/NOTE lines"
+        ]
+    if availability.get("cycle_activity_observed") is True:
+        return []  # observed activity: nothing to disclose
+    if "cycle_activity_observed" not in availability:
+        # Unknown/malformed shape: fail closed to unverified (never
+        # describe an unprovable shape as an honest zero).
+        return [
+            "market-data availability: unverified - malformed "
+            "availability shape; never graded, surface in CLI/NOTE lines"
+        ]
+    return [
+        "market-data availability: zero cycle activity observed; "
+        "never graded, surface in CLI/NOTE lines"
+    ]
+
+
+def _grade_span_kill_switch_proof(
+    run_log: dict[str, Any],
+    reasons: list[str],
+    ended: datetime.datetime | None,
+) -> bool:
+    """Grade the SPAN-attached kill-switch proof (P5-OPS-01).
+
+    Every writer generation the event stream exposes needs its own
+    verification event; a hole in ANY generation hard-fails an ENDED
+    run (the resumed artifact would otherwise cite a span whose earlier
+    generations ran under an unproven halt path). An ongoing run stays
+    INCOMPLETE with the hole named per generation, so the operator can
+    close it by resuming (each resume probes again) BEFORE 30Sep.
+    Returns True when the span hole is a hard violation.
+    """
+    span_generations = _span_kill_switch_generations(run_log)
+    span_unproven = _unproven_kill_switch_generations(span_generations)
+    if not span_unproven:
+        return False
+    first, last = span_unproven[0], span_unproven[-1]
+    hole_range = f"generation(s) {first}" + (f"..{last}" if last != first else "")
+    reasons.append(
+        f"KILL-SWITCH PROOF IS NOT SPAN-ATTACHED (CMP P5 gate): "
+        f"writer {hole_range} lack the verification event -- a resumed "
+        "artifact ends FAIL-closed unless EVERY generation proves the "
+        "emergency halt"
+    )
+    return ended is not None
+
+
 def grade_run_log(run_log: dict[str, Any]) -> Grade:
     """Grade one P5 run-log dict against the phase-gate criteria."""
     reasons: list[str] = []
@@ -384,6 +535,10 @@ def grade_run_log(run_log: dict[str, Any]) -> Grade:
     # reason so the operator sees the unproven halt path.
     kill_switch_violation = _grade_kill_switch_evidence(run_log, reasons, ended)
 
+    # P5-OPS-01 (2026-09-19): proof must cover EVERY writer generation
+    # (span-attached, not resume-attached) -- see _grade_span_kill_switch_proof.
+    span_kill_switch_hole = _grade_span_kill_switch_proof(run_log, reasons, ended)
+
     # Hard criterion: routing must have been enabled for the run.
     routing = run_log.get("routing") or {}
     if not routing.get("enabled_at_start"):
@@ -398,6 +553,12 @@ def grade_run_log(run_log: dict[str, Any]) -> Grade:
     # See _collect_outage_annotations for the overlap semantics.
     span_end_for_outage = ended if ended is not None else _now_utc()
     outage_notes = _collect_outage_annotations(started, span_end_for_outage)
+
+    # P5-OPS-01 (2026-09-19): market-data availability disclosures ride
+    # with the outage notes (annotation-only, never graded).
+    outage_notes.extend(
+        _collect_market_data_annotations(run_log.get("market_data_availability"))
+    )
 
     # Hard criterion: zero unhandled exceptions.
     exceptions = int(run_log.get("unhandled_exceptions", 0) or 0)
@@ -460,6 +621,9 @@ def grade_run_log(run_log: dict[str, Any]) -> Grade:
         # the emergency-halt path answered DISengaged at supervision
         # start is not citable P5 evidence (CMP P5 gate).
         or kill_switch_violation
+        # P5-OPS-01 (2026-09-19): proof must cover EVERY writer
+        # generation (span-attached, not resume-attached).
+        or span_kill_switch_hole
     )
     if hard_violation:
         return Grade(

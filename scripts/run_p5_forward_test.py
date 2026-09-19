@@ -95,6 +95,73 @@ def _load_validator() -> Any | None:
     return module
 
 
+# ---------------------------------------------------------------------------
+# P5-OPS-01 (2026-09-19): single-source delegation + PowerShell-safe
+# evidence battery.
+#
+# The generation model and the market-data availability annotation live in
+# the OFFICIAL VALIDATOR (scripts/verify_p5_forward_test.py); the supervisor
+# resolves them through this module's globals so tests can patch them by
+# name here, exactly like ``collect_disabled_route_rows`` below.
+# ---------------------------------------------------------------------------
+
+
+def _span_kill_switch_generations(run_log: dict[str, Any]) -> list[dict[str, Any]]:
+    """Delegate to the official validator's generation model.
+
+    Resolved from the validator module at call time (never from-imported)
+    so the gate definition stays in exactly one place: what ``--status``
+    reports here is, by construction, what the official grader concludes.
+    """
+    validator = _load_validator()
+    helper = getattr(validator, "_span_kill_switch_generations", None)
+    if helper is None:  # pragma: no cover - version-skew guard
+        return []
+    return helper(run_log)
+
+
+def _unproven_generations(generations: list[dict[str, Any]]) -> list[int]:
+    """Delegate: generation numbers lacking kill-switch verification."""
+    validator = _load_validator()
+    helper = getattr(validator, "_unproven_kill_switch_generations", None)
+    if helper is None:  # pragma: no cover - version-skew guard
+        return [g["generation"] for g in generations if g.get("verified") is not True]
+    return helper(generations)
+
+
+def verify_exit_code_battery(*legs: Any) -> int:
+    """PowerShell-safe composition of quality-gate exit codes (P5-OPS-01).
+
+    The 19Sep gate battery appended ``(($LASTEXITCODE -ne 1) * 2)`` to a
+    ledger: PowerShell 5.1 defines no ``[bool] * [int]`` operator, so the
+    session aborted mid-ledger (NotADefinedOperationForType) and the
+    ``QUALITY_GATES_FAILURES`` summary echoed its placeholder instead of a
+    count. This helper is the supported composition: pass each gate's
+    ``$LASTEXITCODE`` (int) or nothing, get the failure count back -- the
+    value is BOTH the count for the summary echo AND the process exit
+    code, with no boolean arithmetic anywhere.
+
+    Also operates as a static guard: passing a SESSION LINE STRING (the
+    pasted-text shape) raises immediately, naming the offending pattern --
+    the broken shape can never silently pass through this surface again.
+    """
+    if legs and all(isinstance(leg, str) for leg in legs):
+        joined = "\n".join(legs)
+        if "$LASTEXITCODE" in joined or "$fail" in joined:
+            raise RuntimeError(
+                "verify_exit_code_battery() composes INTEGER exit codes, not "
+                "PowerShell session lines. The 19Sep battery pattern "
+                "'$fail += (($LASTEXITCODE -ne 1) * 2)' aborts PowerShell 5.1 "
+                "([bool] * [int] is not defined). Record each gate's "
+                "$LASTEXITCODE into an int variable and pass the ints here: "
+                "$fail = verify-legs 0 1 2 ... ; or in Python, call "
+                "verify_exit_code_battery(rc1, rc2, ...) and use the return "
+                "value as both the count and the process exit code."
+            )
+    codes = [int(leg) for leg in legs]
+    return sum(1 for code in codes if code != 0)
+
+
 def _grade_current_run(run_log: Path, pretend_ended: bool = False) -> Any | None:
     """Grade the current run-log state; returns a Grade or None.
 
@@ -971,6 +1038,8 @@ def _sample_live_activity(system: Any, run_log: Path, baseline: dict[str, Any]) 
     - ``orchestrator.cycle_count``  → ``cycles_completed`` delta
     - ``trade_decision_engine.get_routing_stats()`` → ``counters`` delta
     - ``system.running`` / kill switch state → ``system_healthy`` sample
+    - P5-OPS-01: cycle/orchestrator/per-source-breaker state →
+      ``market_data_availability`` (span-visible market-data evidence)
     """
     from loats.alerts import alerts
     from loats.orchestrator import orchestrator
@@ -1004,6 +1073,8 @@ def _sample_live_activity(system: Any, run_log: Path, baseline: dict[str, Any]) 
             "routing_engine_identity": _engine_identity(),
             "run_log_path": str(run_log),
             "disabled_routes_during_enabled_window": _db_divergence_snapshot(run_log),
+            # P5-OPS-01: span-visible market-data evidence (never graded).
+            "market_data_availability": _market_data_availability(system, live_cycles),
             "last_sampled_at": _utcnow_iso(),
             "system_healthy": {
                 "system_running": bool(system.running),
@@ -1011,6 +1082,99 @@ def _sample_live_activity(system: Any, run_log: Path, baseline: dict[str, Any]) 
             },
         },
     )
+
+
+def _market_data_availability(system: Any, live_cycles: int) -> dict[str, Any]:
+    """Span-visible evidence of the market-data service (P5-OPS-01).
+
+    The operator's window into OpenAlgo (``127.0.0.1:5000``, Zerodha feeds
+    behind it) is a separate process on a separate surface; LOATS cannot
+    read its internal logs. What the supervised span CAN honestly attest
+    is recorded here, per sample, never fabricated:
+
+    - ``cycle_activity_observed``: this sample's orchestrator cycle delta
+      is > 0 (the cycle ran, therefore its chain fetches answered);
+    - ``orchestrator_running``: the orchestrator reports itself running;
+    - ``sources``: the per-source breaker fleet status keyed by source
+      (a source's breaker state is the span-visible health signal for its
+      signal producer's fetches).
+
+    Any probe failure degrades to the explicit ``unverified`` shape (the
+    grader's annotation reads it verbatim); a fold failure NEVER aborts
+    the sample (evidence must not kill the evidence carrier).
+    """
+    availability: dict[str, Any]
+    try:
+        from loats.utils.per_source_breakers import get_source_breaker_status
+
+        availability = {
+            "cycle_activity_observed": bool(live_cycles > 0),
+            "orchestrator_running": bool(system.running),
+            "sources": {
+                str(source): dict(status)
+                for source, status in get_source_breaker_status().items()
+            },
+        }
+    except Exception as exc:
+        return {
+            "status": "unverified",
+            "reason": f"{type(exc).__name__}: {exc}",
+        }
+    return availability
+
+
+def _announce_span_invariants(run_log: Path) -> None:
+    """Print the span-level invariants the official grader will apply.
+
+    P5-OPS-01: the operator must see, while the run is still live, exactly
+    what the 30Sep checkpoint will grade -- whether the kill-switch proof
+    covers every writer generation (P1/H2/H7: proof is span-attached) and
+    what the latest market-data availability sample disclosed. Delegates
+    to the official validator's helpers (single source of policy); this
+    reporting NEVER mutates the run log.
+    """
+    try:
+        data = json.loads(run_log.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return
+    if not isinstance(data, dict):
+        return
+    generations = _span_kill_switch_generations(data)
+    unproven = _unproven_generations(generations)
+    if unproven:
+        first, last = unproven[0], unproven[-1]
+        hole = f"generation(s) {first}" + (f"..{last}" if last != first else "")
+        print(
+            f"{FAIL_SYM} kill-switch span proof: writer {hole} lack the "
+            "verification event (CMP P5 gate); verdict will be INCOMPLETE "
+            "unless the current writer records a verification event, and "
+            "any resumed artifact will FAIL closed on the hole"
+        )
+    else:
+        print(
+            f"{PASS_SYM} kill-switch span proof: all writer generations "
+            f"verified ({len(generations)} generation(s))"
+        )
+    availability = data.get("market_data_availability")
+    if isinstance(availability, dict):
+        status = availability.get("status")
+        if status == "unverified":
+            print(
+                f"    market-data availability: unverified - "
+                f"{availability.get('reason', 'no reason recorded')}"
+            )
+        elif availability.get("cycle_activity_observed") is True:
+            print(
+                "    market-data availability: cycle activity observed; "
+                f"sources={availability.get('sources')}"
+            )
+        elif "cycle_activity_observed" in availability:
+            print("    market-data availability: zero cycle activity observed")
+        else:
+            print(
+                "    market-data availability: unverified - malformed "
+                "availability shape"
+            )
 
 
 async def _supervise_live(
@@ -1066,6 +1230,24 @@ async def _supervise_live(
             await asyncio.wait({task}, timeout=delay)
         else:
             await asyncio.sleep(delay)
+    # P5-OPS-01: the supervised window is over -- mark it closed on disk
+    # immediately, before anything else can fail. The recovery loop that
+    # reacts to ``ended_at`` (grading crons, watchdog) must see the window
+    # close even if this process dies before _run's finally completes;
+    # _run's finally still re-stamps authoritatively on the clean path.
+    try:
+        data = json.loads(run_log.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        data = None
+    if isinstance(data, dict) and data.get("ended_at") is None:
+        data["ended_at"] = _utcnow_iso()
+        try:
+            run_log.write_text(json.dumps(data, indent=2), encoding="utf-8")
+        except OSError:
+            pass  # _run's finally still owns the authoritative stamp
+    # P5-OPS-01: operator-visible span invariants, computed from the same
+    # official-validator helpers the grader uses (single source of policy).
+    _announce_span_invariants(run_log)
     return unhandled
 
 
@@ -1293,6 +1475,10 @@ def _status(path: Path | None) -> int:
         print("writer    : none (unclaimed or pre-guard log)")
     if data.get("resume_refusal"):
         print(f"refusal   : {data['resume_refusal']}")
+    # P5-OPS-01: announce the span-level invariants (kill-switch proof per
+    # writer generation, latest market-data availability) from the same
+    # official-validator helpers the 30Sep grading will apply.
+    _announce_span_invariants(run_log)
     if not ended:
         sampled = data.get("last_sampled_at")
         sampled_ts = datetime.datetime.fromisoformat(sampled) if sampled else None
