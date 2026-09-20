@@ -440,8 +440,19 @@ History (most recent last):
       proves the halt; availability fold unverified-on-probe-failure,
       annotation-only in the grader; the 19Sep [bool]*[int] ledger
       abort). Ceiling 444->446.
+    * 446->447 (2026-09-20, F8-V-01 verification-instrument wave): +1
+      tracked file -- scripts/verify_f8v01_basetemp.ps1 (the PS 5.1
+      companion recipe: unique-basetemp-per-session insulation with the
+      forward-slash sanitization, live-validated end-to-end 118 passed
+      rc=0; born from the 20Sep shared-explicit-basetemp poisoning wave
+      -- sibling session rm_rf deleted the hygiene probe's tmp_path
+      config mid-run, flake8 7.x banner-on-stdout silent death made the
+      reports/ai-generated grant class vanish, see F8-V-01 in
+      tests/test_repo_hygiene.py). The hygiene-module fix itself is a
+      test edit (+36/-7) within the existing tree.
+      Ceiling 446->447.
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 446
+TRACKED_FILE_CEILING = 447

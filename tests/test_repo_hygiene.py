@@ -1593,7 +1593,12 @@ class TestFlake8HookGateAgreement:
                 check=True,
             ).stdout.splitlines()
             if not tracked:
-                continue
+                pytest.fail(
+                    f"{tree} has no tracked *.py files — its .flake8 grant "
+                    "outlived the evidence it amnesties; prune the grant or "
+                    "restore the tree consciously (a silent skip here would "
+                    "pin an unmeasured contract)"
+                )
             proc = subprocess.run(
                 [sys.executable, "-m", "flake8", "--config", str(stripped), *tracked],
                 cwd=REPO_ROOT,
@@ -1601,12 +1606,37 @@ class TestFlake8HookGateAgreement:
                 text=True,
                 timeout=600,
             )
-            for line in proc.stdout.splitlines():
-                parts = line.split(":", 3)
-                if len(parts) == 4:
-                    emission_classes.setdefault(tree, set()).add(
-                        parts[3].strip().split(" ", 1)[0]
-                    )
+            # F8-V-01 (2026-09-20): the probe must fail LOUDLY when its
+            # instrument dies. flake8 exits 1 both for findings and for
+            # fatal startup errors, and the critical banner ("There was a
+            # critical error during execution of Flake8: The specified
+            # config file does not exist: ...") goes to STDOUT — the same
+            # stream the findings parser reads. Proven trigger: two pytest
+            # sessions sharing one --basetemp; the sibling's session-start
+            # rm_rf deleted this probe's config (it lives in tmp_path)
+            # mid-run, flake8 died banner-only, zero quadruplets parsed,
+            # and the tree silently vanished from emission_classes — an
+            # empty verdict presented as evidence. Every genuine finding
+            # carries a "<path>:<line>:<col>: " prefix, so rc=1 with zero
+            # quadruplets is always a dead instrument, never a clean tree
+            # (a clean probe exits 0).
+            quadruplets = [
+                p
+                for p in (line.split(":", 3) for line in proc.stdout.splitlines())
+                if len(p) == 4
+            ]
+            assert quadruplets or proc.returncode == 0, (
+                f"flake8 probe for {tree} died without findings "
+                f"(config={stripped}, rc={proc.returncode}, "
+                f"stdout={proc.stdout[:200]!r}, "
+                f"stderr={proc.stderr[:200]!r}) — instrument failure, not a "
+                "clean tree; a concurrent pytest session sharing this "
+                "--basetemp is the known trigger (rm_rf at session start)"
+            )
+            for p in quadruplets:
+                emission_classes.setdefault(tree, set()).add(
+                    p[3].strip().split(" ", 1)[0]
+                )
         assert emission_classes == {
             "docs/audit-history": {"E402", "E501"},
             "reports/ai-generated": {"E501"},
