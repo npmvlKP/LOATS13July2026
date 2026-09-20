@@ -140,8 +140,9 @@ failures):
 
 - FR9 forensic report, F9-H-02 (docs/audit-history/
   15Sep2026-FR9-forensic-review-report.md)
-- ADR-0006 (producer window cancellation) and the
-  `producer_window_seconds` rationale in settings
+- ADR-0007 (producer-window cancellation, F8-M-02) and the
+  `producer_window_seconds` rationale in settings (the 80 ms trail also
+  runs through docs/ADR-006-analyzer-routing-p5.md)
 - scripts/benchmark_performance.py (fail-closed contract)
 - scripts/collect_p1_phase_gate_evidence.py (authoritative budgets:
   TA_GATE_MS=80, DB_GATE_MS=20, ROUND_TRIP_GATE_MS=100)
