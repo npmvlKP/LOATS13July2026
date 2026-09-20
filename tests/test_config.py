@@ -197,6 +197,22 @@ class TestEnvExampleGateBarTemplateConformance:
                 "resurrects stale values)"
             )
 
+    def test_no_duplicate_keys_in_template(self) -> None:
+        """Dotenv last-wins: ANY duplicated key resurrects a stale value.
+
+        Extends the gate-bar guard to all 50 template bindings (F9-H-01
+        adversarial-grader hole): a future stale duplicate of an
+        unrelated key must fail here too.
+        """
+        counts: dict[str, int] = {}
+        for key, _ in _dotenv_bindings(ENV_EXAMPLE.read_text(encoding="utf-8")):
+            counts[key] = counts.get(key, 0) + 1
+        dupes = {k: n for k, n in counts.items() if n > 1}
+        assert dupes == {}, (
+            f"duplicate keys in .env.example (last-wins resolution "
+            f"silently picks the last): {sorted(dupes)}"
+        )
+
     def test_gate_bar_template_values_match_settings_defaults(self) -> None:
         with patch.dict(os.environ, {"OPENALGO_API_KEY": "test_key"}):
             s = Settings()
