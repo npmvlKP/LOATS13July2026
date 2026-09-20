@@ -52,6 +52,14 @@ class CacheManager:
         """Initialize cache manager with in-memory cache."""
         self.config = config
         self._cache: TTLCache[str, Any] | None = None
+        # BG-1 (F9-H-03 close-out): cachetools TTLCache applies a single
+        # TTL to every entry at insertion time, so the historical single
+        # store silently ignored CacheManager.set's per-call ``ttl``. Each
+        # distinct non-default TTL gets its own tier store here; the
+        # default-TTL store remains ``_cache`` (public contract -- the
+        # suite introspects it directly). All tier operations are guarded
+        # by the same _cache_lock.
+        self._tiers: dict[int, TTLCache[str, Any]] = {}
         self._cache_lock = (
             threading.RLock()
         )  # FIX-F-THREAD-1: Use threading.RLock for thread safety
@@ -93,14 +101,51 @@ class CacheManager:
 
     async def close(self) -> None:
         """Close and clear the in-memory cache."""
-        if self._cache:
-            self._cache.clear()
-            logger.info("Lightweight in-memory cache closed")
+        with self._cache_lock:
+            # BG-1: close spans every tier.
+            for store in self._iter_stores():
+                store.clear()
+            self._tiers.clear()
+        logger.info("Lightweight in-memory cache closed")
         self._initialized = False
 
     def _get_cache_key(self, key: str) -> str:
         """Generate cache key with prefix."""
         return f"{self.config.prefix}:{key}"
+
+    def _tier_for(self, ttl: int | None) -> TTLCache[str, Any]:
+        """Return the store holding entries for ``ttl`` seconds.
+
+        BG-1 (F9-H-03 close-out): cachetools TTLCache applies one TTL to
+        every entry at insertion, so per-call TTLs require per-TTL tier
+        stores. The cache-wide default maps to ``_cache`` (public
+        contract -- the suite introspects it directly); any other horizon
+        lazily creates a tier with the same maxsize. A non-positive TTL
+        clamps to the default: a zero/negative store would be a dead tier
+        whose entries expire before any reader can observe them.
+        Callers must hold ``_cache_lock`` (single-writer discipline).
+        """
+        effective_ttl = ttl if ttl is not None and ttl > 0 else self.config.ttl_seconds
+        if effective_ttl == self.config.ttl_seconds:
+            if self._cache is None:
+                # Defensive re-create; callers normally guarantee init.
+                self._cache = TTLCache[str, Any](
+                    maxsize=self.config.max_size, ttl=self.config.ttl_seconds
+                )
+            return self._cache
+        tier: TTLCache[str, Any] | None = self._tiers.get(effective_ttl)
+        if tier is None:
+            tier = TTLCache[str, Any](maxsize=self.config.max_size, ttl=effective_ttl)
+            self._tiers[effective_ttl] = tier
+        return tier
+
+    def _iter_stores(self) -> list[TTLCache[str, Any]]:
+        """All tier stores (default first). Callers hold ``_cache_lock``."""
+        stores: list[TTLCache[str, Any]] = []
+        if self._cache is not None:
+            stores.append(self._cache)
+        stores.extend(self._tiers.values())
+        return stores
 
     async def get(self, key: str) -> str | None:
         """Get value from in-memory cache."""
@@ -110,16 +155,18 @@ class CacheManager:
         cache_key = self._get_cache_key(key)
 
         try:
-            if self._cache:
+            if self._cache is not None or self._tiers:
                 # FIX-F-THREAD-2: Use threading.RLock for cross-thread safety
                 with self._cache_lock:
-                    result = self._cache.get(cache_key)
-                    if result is not None:
-                        self._cache_stats["hits"] += 1
-                        return str(result)
-                    else:
-                        self._cache_stats["misses"] += 1
-                        return None
+                    # BG-1: lookups span every TTL tier; the default tier
+                    # wins ties (a key lives in exactly one tier anyway).
+                    for store in self._iter_stores():
+                        result = store.get(cache_key)
+                        if result is not None:
+                            self._cache_stats["hits"] += 1
+                            return str(result)
+                self._cache_stats["misses"] += 1
+                return None
             else:
                 return None
         except Exception as e:
@@ -173,9 +220,17 @@ class CacheManager:
 
             # FIX-F-THREAD-3: Use threading.RLock for cross-thread safety
             with self._cache_lock:
-                self._cache[cache_key] = value_str
+                # BG-1: honor the per-call TTL. cachetools applies the TTL
+                # at insertion, so the entry lands in (or re-tiers to) the
+                # store for its horizon; any stale copy left in a
+                # different tier after a TTL change is evicted.
+                tier = self._tier_for(ttl)
+                for store in self._iter_stores():
+                    if store is not tier and cache_key in store:
+                        del store[cache_key]
+                tier[cache_key] = value_str
                 self._cache_stats["sets"] += 1
-                cache_size = len(self._cache)
+                cache_size = sum(len(s) for s in self._iter_stores())
             logger.debug(
                 f"In-memory cache set successful. Current cache size: {cache_size}"
             )
@@ -220,13 +275,16 @@ class CacheManager:
         cache_key = self._get_cache_key(key)
         cached_value = None
 
-        if self._cache is not None:
+        if self._cache is not None or self._tiers:
             # FIX-F-THREAD-4: Use threading.RLock for cross-thread safety
             with self._cache_lock:
-                result = self._cache.get(cache_key)
-                if result is not None:
-                    self._cache_stats["hits"] += 1
-                    cached_value = str(result)
+                # BG-1: lookups span every TTL tier.
+                for store in self._iter_stores():
+                    result = store.get(cache_key)
+                    if result is not None:
+                        self._cache_stats["hits"] += 1
+                        cached_value = str(result)
+                        break
                 else:
                     self._cache_stats["misses"] += 1
 
@@ -259,13 +317,15 @@ class CacheManager:
         cache_key = self._get_cache_key(key)
 
         try:
-            if self._cache:
+            if self._cache is not None or self._tiers:
                 # FIX-F-THREAD-5: Use threading.RLock for cross-thread safety
                 with self._cache_lock:
-                    if cache_key in self._cache:
-                        del self._cache[cache_key]
-                        self._cache_stats["deletes"] += 1
-                        return True
+                    # BG-1: the key may live in any tier.
+                    for store in self._iter_stores():
+                        if cache_key in store:
+                            del store[cache_key]
+                            self._cache_stats["deletes"] += 1
+                            return True
                     return False
             else:
                 return False
@@ -279,13 +339,14 @@ class CacheManager:
             return 0
 
         try:
-            if self._cache:
-                # FIX-F-THREAD-6: Use threading.RLock for cross-thread safety
+            if self._cache is not None or self._tiers:
                 with self._cache_lock:
                     if pattern == "*":
                         # Clear all cache
-                        count = len(self._cache)
-                        self._cache.clear()
+                        count = sum(len(s) for s in self._iter_stores())
+                        for store in self._iter_stores():
+                            store.clear()
+                        self._tiers.clear()
                         self._cache_stats["evictions"] += count
                         return count
                     else:
@@ -293,15 +354,17 @@ class CacheManager:
                         prefix_pattern = f"{self.config.prefix}:{pattern}"
                         keys_to_delete = [
                             k
-                            for k in self._cache.keys()
+                            for store in self._iter_stores()
+                            for k in store.keys()
                             if pattern in k or k.startswith(prefix_pattern)
                         ]
 
                         count = 0
                         for key in keys_to_delete:
-                            if key in self._cache:
-                                del self._cache[key]
-                                count += 1
+                            for store in self._iter_stores():
+                                if key in store:
+                                    del store[key]
+                                    count += 1
 
                         self._cache_stats["evictions"] += count
                         return count
@@ -319,10 +382,9 @@ class CacheManager:
 
         try:
             current_size = 0
-            if self._cache:
-                # FIX-F-THREAD-7: Use threading.RLock for cross-thread safety
-                with self._cache_lock:
-                    current_size = len(self._cache)
+            with self._cache_lock:
+                # BG-1: stats span every tier.
+                current_size = sum(len(s) for s in self._iter_stores())
 
             return {
                 "enabled": True,
