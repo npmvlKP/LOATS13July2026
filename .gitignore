@@ -235,4 +235,5 @@ reports/archived-audit/
 .clinerules/
 .clineignore
 .cline/
+.kilo/
 @workspace/
