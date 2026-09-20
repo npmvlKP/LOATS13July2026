@@ -935,3 +935,95 @@ class TestCMPGateConformanceTODO13:
         assert result["passed"] is True
         assert result["moderate_opposition"] == 1
         assert result["strong_opposition"] == 0
+
+    @pytest.mark.asyncio
+    async def test_composite_exactly_cmp_bar_is_rejected(self, td_engine, hist, funds):
+        # CMP |score| > 0.6 is STRICT: a composite landing bit-exactly on
+        # the bar must NOT proceed (<= rejects at trade_decision.py).
+        # The real per-source math (TA x1.1 x 0.4, SA x0.9 x 0.3,
+        # PA x1.2 x 0.2, VOL x1.0 x 0.1) puts the engine composite exactly
+        # on 0.6 at VOL strength 0.7499999999999968 (29 ULP below 0.75;
+        # probe-proven). The vector is graded through the real engine, so
+        # the pin tracks the actual gate arithmetic, not a hand constant.
+        srcs = _cmp_boundary_sigs()
+        srcs[3].strength = 0.7499999999999968
+        with patch("loats.trade_decision.settings") as msettings:
+            msettings.environment = "production"
+            msettings.composite_strength_threshold = 0.6
+            msettings.opposition_threshold = 0.4
+            _, result = await td_engine.create_trade_decision(
+                signals=srcs,
+                historical_data=hist,
+                current_price=24500.0,
+                funds=funds,
+                current_positions=[],
+            )
+        assert result["reason"] == "insufficient_strength"
+        assert result["composite_strength"] == 0.6
+
+    @pytest.mark.asyncio
+    async def test_composite_just_above_cmp_bar_proceeds(self, td_engine, hist, funds):
+        # One decimal-nudge above the exact-boundary vector: composite
+        # 0.6000001 > 0.6 proceeds past the strength gate (failures, if
+        # any, must NOT be insufficient_strength).
+        srcs = _cmp_boundary_sigs()
+        srcs[3].strength = 0.7509999999999968
+        with (
+            patch("loats.trade_decision.settings") as msettings,
+            patch("loats.trade_decision.rules_engine") as mrules,
+            patch("loats.trade_decision.sizing_engine") as msizing,
+            patch("loats.trade_decision.db") as mdb,
+        ):
+            msettings.environment = "production"
+            msettings.composite_strength_threshold = 0.6
+            msettings.opposition_threshold = 0.4
+            mrules.apply_gating_rules = lambda *a, **k: (
+                True,
+                {"reason": "cmp_boundary_conformance"},
+            )
+            mrules.check_position_limits.return_value = (True, {"reason": "ok"})
+            mrules.session_state = "REGULAR"
+            msizing.calculate_fixed_fraction_size.return_value = (
+                0,
+                {"reason": "invalid_prices"},
+            )
+            mdb.async_log_audit = AsyncMock()
+            _, result = await td_engine.create_trade_decision(
+                signals=srcs,
+                historical_data=hist,
+                current_price=24500.0,
+                funds=funds,
+                current_positions=[],
+            )
+        assert result.get("reason") != "insufficient_strength"
+
+    def test_opposition_exactly_04_does_not_block(self):
+        # CMP "no opposition > 0.4" is STRICT the other way: exactly 0.4
+        # is NOT above the bar, so the gate must pass; 0.4 > 0.4/2 keeps
+        # it in the moderate tier.
+        engine = StrengthEngine()
+        result = engine.check_opposition_gate(
+            {
+                "ta": _cmp_boundary_sigs()[:1],
+                "volatility": _cmp_boundary_sigs(opposition=0.4)[3:],
+            }
+        )
+        assert result["passed"] is True
+        assert result["strong_opposition"] == 0
+        assert result["moderate_opposition"] == 1
+
+
+class TestCompositeSkipGateRegression:
+    def test_skip_gate_records_skipped_check(self):
+        # Regression pin (20Sep2026, F9-H-01 reverification wave):
+        # calculate_composite_strength(require_opposition_gate=False)
+        # crashed with UnboundLocalError -- the success dict referenced
+        # the gate handle that the skipped branch never bound. The skipped
+        # gate must surface explicitly as opposition_check=None.
+        engine = StrengthEngine()
+        composite, details = engine.calculate_composite_strength(
+            _cmp_boundary_sigs(), require_opposition_gate=False
+        )
+        assert details["reason"] == "composite_calculated"
+        assert details["opposition_check"] is None
+        assert composite == pytest.approx(0.55)
