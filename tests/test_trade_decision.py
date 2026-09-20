@@ -863,9 +863,10 @@ class TestCMPGateConformanceTODO13:
 
     @pytest.mark.asyncio
     async def test_composite_above_cmp_bar_proceeds(self, td_engine, hist, funds):
-        # Scale the sources by 1.2 => composite 0.70 (> 0.6): proceeds
-        # past the strength gate (failures, if any, must NOT be
-        # insufficient_strength).
+        # Scale the sources by 1.2 => composite 0.66 (> 0.6; per-source
+        # adjustments TA x1.1 / SA x0.9 / PA x1.2 shift the naive
+        # 0.55 x 1.2): proceeds past the strength gate (failures, if any,
+        # must NOT be insufficient_strength).
         srcs = _cmp_boundary_sigs()
         for s in srcs:
             s.strength = round(s.strength * 1.2, 10)
