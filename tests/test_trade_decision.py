@@ -1011,3 +1011,19 @@ class TestCMPGateConformanceTODO13:
         assert result["passed"] is True
         assert result["strong_opposition"] == 0
         assert result["moderate_opposition"] == 1
+
+
+class TestCompositeSkipGateRegression:
+    def test_skip_gate_records_skipped_check(self):
+        # Regression pin (20Sep2026, F9-H-01 reverification wave):
+        # calculate_composite_strength(require_opposition_gate=False)
+        # crashed with UnboundLocalError -- the success dict referenced
+        # the gate handle that the skipped branch never bound. The skipped
+        # gate must surface explicitly as opposition_check=None.
+        engine = StrengthEngine()
+        composite, details = engine.calculate_composite_strength(
+            _cmp_boundary_sigs(), require_opposition_gate=False
+        )
+        assert details["reason"] == "composite_calculated"
+        assert details["opposition_check"] is None
+        assert composite == pytest.approx(0.55)

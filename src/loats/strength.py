@@ -210,7 +210,13 @@ class StrengthEngine:
                 source_signals[source] = []
             source_signals[source].append(signal)
 
-        # Check for opposition
+        # Check for opposition. The handle is ALWAYS bound so the success
+        # dict below can record the skipped gate explicitly: the parameter
+        # is public API, and the former unbound-local crashed with
+        # UnboundLocalError (probe-proven 20Sep2026, rc=1) for any
+        # require_opposition_gate=False caller instead of reporting the
+        # skipped gate in strength_details.
+        opposition_result: dict[str, Any] | None = None
         if require_opposition_gate:
             opposition_result = self.check_opposition_gate(source_signals)
             if not opposition_result["passed"]:
