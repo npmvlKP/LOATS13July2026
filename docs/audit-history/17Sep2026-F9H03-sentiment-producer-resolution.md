@@ -1,5 +1,14 @@
 # F9-H-03 (TODO-4) — Sentiment Producer Death: Root Cause & Resolution
 
+> **2026-09-20 correction (BG-1 close-out):** two claims below were false
+> under the then-real cache semantics and are superseded by
+> `20Sep2026-F9H03-verification-and-BG1-closeout.md`: (a) "LKG TTL
+> 900 s" — `CacheManager.set` ignored its per-call `ttl`, so the entry
+> actually expired with the cache-wide 300 s; (b) `degraded=True` was
+> unreachable dead code for the same reason (plus threshold ==
+> retention). Both are fixed in the BG-1 close-out (per-TTL tier stores;
+> threshold 600 s strictly inside the 900 s retention horizon).
+
 **Finding:** FR9 §2 F9-H-03 — "Sentiment producer effectively DEAD: last
 signal 13Sep 01:59 UTC; 8–10 s analysis vs 8.0 s window." Severity High,
 confidence Certain, remediation TODO-4.
