@@ -495,8 +495,23 @@ History (most recent last):
       RED-proven test change; no CI job named inf-runner exists at
       633daae, none introduced).
       Ceiling 453->456.
+    * 456->458 (2026-09-21, R-02 ADR-0018 wave): +2 tracked files --
+      docs/adr/0018-p5-preguard-killswitch-disclosure.md (the R-02
+      decision: generations that OPENED before P5_GUARD_CUTOFF
+      (2026-09-19T00:00:00+00:00, midnight before the first guarded
+      opening) disclose as NON-GRADING annotations; post-guard and
+      unknown-vintage holes stay FAIL-closed -- vintage is re-derived
+      from the event stream, never declared), and
+      docs/audit-history/21Sep2026-p5-preguard-killswitch-disclosure.md
+      (the wave record: live-artifact before/after grading, poisoned
+      snapshot FAIL preserved, RED/GREEN net evidence). Source changes
+      stayed within the existing tree (verify_p5_forward_test.py
+      opened_at/P5_GUARD_CUTOFF/_pre_guard_kill_switch_generations +
+      grader split; run_p5_forward_test.py delegation + --status
+      NOTE surface; frozen-infra/span-invariants/register pins
+      re-based). Ceiling 456->458.
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 456
+TRACKED_FILE_CEILING = 458
