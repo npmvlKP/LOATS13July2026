@@ -18,11 +18,15 @@ Maintenance rules:
 Snapshot: HEAD `633daae` (PR #66 merged 2026-09-21T07:06:06Z), post-merge
 Pipeline run `35571352961` = success (Docker Build skipped = path-filtered
 baseline, identical to run `35550487422`). Register landed 2026-09-21.
+Updated 2026-09-21 (same day) by the R-02 wave: R-02 CLOSED by ADR-0018
+(grader-disclosure amendment; live grader re-scrape 2026-09-21T09:20Z shows
+the KILL-SWITCH PROOF reason replaced by the NON-GRADING pre-guard NOTE;
+P5 nets 165 passed).
 
 | ID | Priority | Category | Status | Due | Next action |
 |----|----------|----------|--------|-----|-------------|
 | R-01 | P1 | CMP latency decision | OPEN — deferred by ADR-0016 | 2026-09-30 | Decide (a) vs (b) at the checkpoint with the accumulated advisory evidence |
-| R-02 | P1 | CMP P5 kill-switch span proof | OPEN — decision required | 2026-09-30 | Approve grader-disclosure amendment (recommended) or accept FAIL-closed |
+| R-02 | P1 | CMP P5 kill-switch span proof | CLOSED by ADR-0018 | — | See the R-02 section below |
 | R-03 | P2-watch | Benchmark flake | OPEN — watch | on recurrence | py-spy dump protocol on next hang |
 | R-04 | P3 | Accepted residual | ACCEPTED | — | Revisit with the post-checkpoint producer wave |
 | R-05 | Ops | Environment, dated | OPEN | 2026-10-01 | Shared-venv rebuild; fresh-venv pip-audit replication until then |
@@ -53,55 +57,26 @@ bounded 8 s producer window, strike < 5 ms, trail < 1 ms), then promote the
 `benchmark-perf` context in the same wave per the documented context-list
 rule.
 
-## R-02 [P1] CMP P5 kill-switch proof is not span-attached for pre-guard writer generations
+## R-02 [P1] CMP P5 kill-switch span proof — CLOSED by ADR-0018 (2026-09-21)
 
-Category: Compliance gate semantics. Severity: High (blocks a PASS verdict
-at the checkpoint). Confidence: Certain (verifier output, event-stream
-re-derivation).
+Category: Compliance gate semantics. CLOSED same day it was raised, via the
+commissioned option 1 (grader-disclosure amendment).
 
-Evidence (2026-09-21, `scripts/verify_p5_forward_test.py` on the live run
-`reports/p5_forward_test_20260916_140341.json`): verdict INCOMPLETE with
-`KILL-SWITCH PROOF IS NOT SPAN-ATTACHED ... writer generation(s) 1..3 lack
-the verification event`. Event stream: generation 1 is the pre-first-claim
-fresh-start window (16Sep 14:03:46 -> 23:24:02); generations 2 (16Sep 23:24
--> 17Sep 23:05) and 3 (17Sep 23:05 -> 19Sep 01:06) closed before the
-verification probe existed (P5-OPS-01 landed 2026-09-19). Generations 4..8
-each carry their own `kill_switch_verified` event (19Sep..21Sep, latest
-21Sep 04:38:09, PID 19836).
-
-Mechanics (from the verifier's re-derivation, the single grading source):
-`writer_claimed` opens a generation; only a `kill_switch_verified` event
-proves the generation it lands in; a resume probes and proves only the NEW
-generation. Generations 1..3 are therefore structurally unprovable in this
-artifact — their writers ran pre-guard code that could not emit the event —
-and `_grade_span_kill_switch_proof` hard-FAILs an ENDED run that carries any
-unproven generation.
-
-Consequence if unaddressed: when the 14-day span ends, the 30Sep grading
-checkpoint reads FAIL on the kill-switch criterion even though the halt
-primitive has been proven operational in every generation since the probe
-existed (and `kill_switch_verified=true` at top level). Demanding the event
-from a writer that could not emit it demands the logically impossible;
-"unprovable" is not "failed".
-
-Options:
-1. (Recommended) Grader-disclosure amendment, mirroring the documented-
-   outage annotation pattern (annotations are NON-GRADING; an otherwise
-   eligible run PASSes with disclosure) and the P5-OPS-01 introduction
-   pattern itself (re-derive from the event stream, no schema change):
-   generations whose `writer_claimed_at` (or fresh-start window) CLOSED
-   before the P5-OPS-01 date become a named disclosure instead of a hole;
-   generations open after that date remain strictly graded. Land as its own
-   ADR + verifier change + RED/GREEN parity legs (a pre-guard generation
-   discloses and stops flipping the verdict; a post-guard unproven
-   generation still hard-FAILs), via the standard PR + CI path.
-2. Accept FAIL-closed at the checkpoint and carry the disclosure in the
-   closure record — honest, but burns the span's otherwise-clean 14-day
-   evidence on a semantics artifact rather than a real halt-path failure.
-
-Decision owner: user (the CMP P5 gate contract). Sequencing: R-02 does NOT
-touch the measured producer path, so it does not conflict with ADR-0016's
-deferral — but it must land BEFORE the run ends.
+Resolution: ADR-0018
+(`docs/adr/0018-p5-preguard-killswitch-disclosure.md`) + the 21Sep audit
+record
+(`docs/audit-history/21Sep2026-p5-preguard-killswitch-disclosure.md`).
+Generations that OPENED before `P5_GUARD_CUTOFF`
+(`2026-09-19T00:00:00+00:00`, midnight before the first guarded opening)
+disclose as NON-GRADING annotations; post-guard and unknown-vintage holes
+stay FAIL-closed exactly as P5-OPS-01 pinned them. Live evidence:
+`verify_p5_forward_test.py reports/p5_forward_test_20260916_140341.json`
+now grades INCOMPLETE (run genuinely ongoing) with
+`NOTE: kill-switch span proof: pre-guard writer generation(s) 1..3 opened
+before the verification probe existed` replacing the KILL-SWITCH PROOF
+reason; the poisoned 12Sep snapshot keeps its FAIL verdict (divergence-void
++ top-level legs untouched). Nets: frozen-infra 20/20 (RED proven at
+7 failed first), span-invariants 21/21, full P5 suite 165 passed.
 
 ## R-03 [P2-watch] Benchmark intermittent hang
 
@@ -159,4 +134,5 @@ producer (per-day signal table showed the producer effectively dead; closed
 by PR #65 `07ab8ae` — per-TTL tier stores, `DEGRADED_THRESHOLD_SECONDS=600`,
 unconditional conftest clear; coverage 89.32% at close-out). F9-H-05 CMP P3
 ensemble semantics and hard score bounds closed by PR #66 `633daae` with
-ADR-0017.
+ADR-0017. R-02 CMP P5 kill-switch span proof closed 2026-09-21 by ADR-0018
+(pre-guard grader disclosure; post-guard holes still FAIL-closed).
