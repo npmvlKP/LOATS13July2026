@@ -78,6 +78,46 @@ LKG_TTL_SECONDS = 900
 # the degraded audit tag before a true cold start.
 DEGRADED_THRESHOLD_SECONDS = 600
 
+# F9-H-05 (TODO-14, ADR-0017): CMP P3 ensemble/decay/bounds delivery.
+# CMP P3: "RSS+VADER ensemble (news 70/social 30), decay. Gate: scores
+# always [-1,+1]".
+# - Bounds ship as a HARD model invariant (Field(ge=-1, le=1) on BOTH
+#   NewsItem.sentiment_score and SentimentAnalysisResult.sentiment_score
+#   in models.py), so every future producer and every deserialized
+#   payload crosses the gate -- not just this module's arithmetic.
+# - Decay: each article contributes its VADER score weighted by
+#   0.5 ** (age_hours / 4) (4-hour half-life, CMP P3 "decay"), applied
+#   BEFORE averaging. Ages are timezone-aware UTC; non-positive ages
+#   (future-dated items: clock skew, wrong feed tz) clamp to the fresh
+#   weight 1.0 so skewed feeds cannot earn above-full weight.
+# - Ensemble: ENSEMBLE_WEIGHTS is the DECLARATIVE leg-weight scaffold
+#   CMP P3 asks for -- the news leg at 1.0 on the CMP 70% scale. It is
+#   a machine-readable contract (imported and shape-pinned), NOT an
+#   aggregation input: the system produces exactly one leg today, so
+#   per-article weights are the recency factor alone. Wiring real 70/30
+#   math when a social producer exists means an ADR amendment PLUS leg
+#   tagging on items PLUS weighted-leg aggregation -- a code change,
+#   stated here so no one expects one-key activation (adversarial round
+#   2, AR-1: the earlier "falls out of the weights" phrasing
+#   overclaimed). Semantic note: the normalized weighted
+#   mean expresses RELATIVE recency -- mixed-age sets reweight toward
+#   the fresh side (hand-computed pins in
+#   tests/test_sentiment_p3_ensemble_f9h05.py), while a uniformly-aged
+#   set scores its plain mean; whole-set staleness is surfaced by the
+#   result timestamp and the F9-H-03 degraded chain, not the score.
+SENTIMENT_HALF_LIFE_HOURS = 4.0
+# Ages at or below this snap to the EXACT fresh weight 1.0. A just-parsed
+# article is 1-10 ms "old" (same-process construction -> aggregation
+# latency), which lands its weight at 1 - ~5e-11: one extra float
+# rounding that made `sentiment_score == 0.9`-style legacy pins flake
+# (caught by the pre-push gate's full-tree run, 21Sep). Real feed
+# published_date granularity is seconds-to-minutes, so nothing honest
+# is lost inside 100 ms; the discontinuity at the boundary is ~5e-9 of
+# relative weight. Below the snap the weighted path is bit-identical to
+# the legacy plain mean.
+FRESH_AGE_SNAP_HOURS = 0.1 / 3600.0
+ENSEMBLE_WEIGHTS: dict[str, float] = {"news": 1.0}
+
 # Module-level (not CacheManager): _extract_article_content runs on worker
 # threads via asyncio.to_thread, so the cache needs a synchronous,
 # thread-safe surface. cachetools TTLCache + an RLock gives exactly that,
@@ -230,57 +270,13 @@ class SentimentAnalyzer:
             except Exception as e:
                 logger.warning(f"Failed to serve sentiment LKG for {symbol}: {e}")
 
-        # True cold start: run the analysis inline (seeding the URL cache
-        # through per-article extraction) and store BOTH the 5-minute
-        # result entry and the longer-TTL LKG entry.
-        all_news: list[NewsItem] = []
-        positive_count = 0
-        negative_count = 0
-        neutral_count = 0
-
-        tasks = [self.parse_rss_feed(url, max_items) for url in rss_urls]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-
-        for result in results:
-            if isinstance(result, Exception):
-                logger.exception("Failed process RSS feed: %s", result)
-                continue
-
-            news_items = cast(list[NewsItem], result)
-            all_news.extend(news_items)
-            for item in news_items:
-                if item.sentiment_label == "positive":
-                    positive_count += 1
-                elif item.sentiment_label == "negative":
-                    negative_count += 1
-                else:
-                    neutral_count += 1
-
-        avg_score = 0.0
-        if all_news:
-            avg_score = sum(item.sentiment_score for item in all_news) / len(all_news)
-
-        if avg_score >= self.threshold:
-            label = "positive"
-        elif avg_score <= -self.threshold:
-            label = "negative"
-        else:
-            label = "neutral"
-
-        sorted_news = sorted(
-            all_news, key=lambda x: abs(x.sentiment_score), reverse=True
-        )
-        sentiment_result = SentimentAnalysisResult(
-            symbol=symbol,
-            timestamp=datetime.now(UTC),
-            sentiment_score=avg_score,
-            sentiment_label=label,
-            news_count=len(all_news),
-            positive_count=positive_count,
-            negative_count=negative_count,
-            neutral_count=neutral_count,
-            top_news=sorted_news[:5],
-        )
+        # True cold start: run the SHARED aggregation core (F9-H-05: the
+        # ensemble/decay semantics live in exactly one place; the inline
+        # duplicate that preceded the ensemble was drift-prone
+        # copy-paste) and store BOTH the 5-minute result entry and the
+        # longer-TTL LKG entry. Seeding the per-article URL cache still
+        # happens inside parse_rss_feed.
+        sentiment_result = await self._compute_and_count(symbol, rss_urls, max_items)
 
         # Cache the result for 5 minutes (300 seconds), and seed the
         # longer-TTL LKG entry (F9-H-03) so future cache misses serve
@@ -318,13 +314,12 @@ class SentimentAnalyzer:
         """
         try:
             fresh = await self._compute_and_count(symbol, rss_urls, max_items)
-            if fresh is not None:
-                await cache_manager.set(
-                    cache_key, fresh.model_dump_json(), ttl=RESULT_TTL_SECONDS
-                )
-                await cache_manager.set(
-                    lkg_key, fresh.model_dump_json(), ttl=LKG_TTL_SECONDS
-                )
+            await cache_manager.set(
+                cache_key, fresh.model_dump_json(), ttl=RESULT_TTL_SECONDS
+            )
+            await cache_manager.set(
+                lkg_key, fresh.model_dump_json(), ttl=LKG_TTL_SECONDS
+            )
         except Exception as e:
             logger.warning(f"Sentiment background refresh failed: {e}")
 
@@ -333,12 +328,13 @@ class SentimentAnalyzer:
         symbol: str,
         rss_urls: list[str],
         max_items: int,
-    ) -> SentimentAnalysisResult | None:
+    ) -> SentimentAnalysisResult:
         """Shared aggregation core: gather feeds, score, count, label.
 
-        Neither caches nor persists -- callers own the cache keys (the
-        inline cold-start path and the detached refresh use different
-        storage flows but identical aggregation semantics).
+        F9-H-05: this is the SINGLE ensemble implementation -- the
+        inline cold-start path delegates here so the semantics cannot
+        drift between the two callers. Neither caches nor persists --
+        callers own the cache keys.
         """
         tasks = [self.parse_rss_feed(url, max_items) for url in rss_urls]
         results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -348,7 +344,7 @@ class SentimentAnalyzer:
         neutral_count = 0
         for result in results:
             if isinstance(result, Exception):
-                logger.warning("Sentiment analysis: feed failed: %s", result)
+                logger.error("Sentiment analysis: feed failed: %s", result)
                 continue
             news_items = cast(list[NewsItem], result)
             all_news.extend(news_items)
@@ -359,9 +355,49 @@ class SentimentAnalyzer:
                     negative_count += 1
                 else:
                     neutral_count += 1
+        # F9-H-05 (ADR-0017): recency-weighted ensemble mean. Each
+        # article's VADER compound score is scaled by the 4-hour
+        # half-life decay BEFORE the weighted average (CMP P3
+        # "decay"); future-dated items clamp to the fresh weight 1.0
+        # so clock-skewed feeds cannot earn above-full weight. The
+        # final clamp enforces the CMP P3 gate at the aggregation
+        # boundary (belt-and-braces: VADER is bounded and weighted
+        # means of bounded values are bounded; the HARD gate is the
+        # model Field(ge=-1, le=1) invariant).
         avg_score = 0.0
         if all_news:
-            avg_score = sum(item.sentiment_score for item in all_news) / len(all_news)
+            now = datetime.now(UTC)
+            total_weight = 0.0
+            weighted_sum = 0.0
+            for item in all_news:
+                age_hours = (now - item.published_date).total_seconds() / 3600.0
+                if age_hours <= FRESH_AGE_SNAP_HOURS:
+                    # Just-parsed (sub-clock-noise): exact fresh weight,
+                    # no perturbation of the score's low bits.
+                    weight = 1.0
+                else:
+                    weight = 0.5 ** (age_hours / SENTIMENT_HALF_LIFE_HOURS)
+                weighted_sum += item.sentiment_score * weight
+                total_weight += weight
+            if total_weight > 0.0:
+                avg_score = max(-1.0, min(1.0, weighted_sum / total_weight))
+            else:
+                # Adversarial round 2 (AR-2): every weight underflowed to
+                # exactly 0.0 in binary64 -- all items older than ~179
+                # days (0.5**(age/4) underflows below the smallest
+                # subnormal). The deleted inline path returned the plain
+                # mean for the identical input; degrade identically
+                # instead of raising ZeroDivisionError out of the cold
+                # path. Pinned in
+                # tests/test_sentiment_p3_ensemble_f9h05.py::
+                # TestAdversarialRound2.
+                avg_score = max(
+                    -1.0,
+                    min(
+                        1.0,
+                        sum(i.sentiment_score for i in all_news) / len(all_news),
+                    ),
+                )
         if avg_score >= self.threshold:
             label = "positive"
         elif avg_score <= -self.threshold:

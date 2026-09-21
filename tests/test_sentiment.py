@@ -2,7 +2,7 @@ import importlib.util
 import os
 import subprocess
 import sys
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
@@ -96,7 +96,11 @@ async def test_analyze_symbol_sentiment(analyzer):
                 content="Profit",
                 source="test",
                 url="url",
-                published_date=datetime.now(),
+                # F9-H-05/ADR-0017: decay math is timezone-aware UTC; a
+                # naive now() would TypeError under the ensemble
+                # aggregation (legacy pin corrected with citation,
+                # BG-1 legacy-pin precedent).
+                published_date=datetime.now(UTC),
                 sentiment_score=0.8,
                 sentiment_label="positive",
             )

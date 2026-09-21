@@ -463,8 +463,23 @@ History (most recent last):
       freshness/threshold/retention chain). Source changes stayed within
       the existing tree (cache.py, sentiment.py, conftest.py, test_cache.py).
       Ceiling 447->450.
+    * 450->453 (2026-09-21, F9-H-05 CMP-P3 wave): +3 tracked files --
+      tests/test_sentiment_p3_ensemble_f9h05.py (the RED-first pins:
+      hard [-1,+1] model bounds, 4 h half-life decay arithmetic vs
+      hand-computed values, decay monotonicity, seeded-fuzz
+      aggregation bounds, news-only ensemble scaffold, cold-path
+      delegation onto the single aggregation core),
+      docs/adr/0017-p3-sentiment-ensemble-decay-bounds.md (the
+      decision: bounds as a model invariant; decay applied
+      pre-average; the social leg ADR-deferred -- never fabricated),
+      and docs/audit-history/21Sep2026-F9H05-p3-ensemble-decay-bounds.md
+      (the wave record). Source changes stayed within the existing
+      tree (sentiment.py ensemble core + cold-path dedup onto
+      _compute_and_count, models.py Field bounds,
+      test_sentiment.py naive-datetime correction).
+      Ceiling 450->453.
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 450
+TRACKED_FILE_CEILING = 453
