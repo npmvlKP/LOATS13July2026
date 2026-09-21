@@ -294,7 +294,11 @@ class NewsItem(BaseModel):
     source: str
     url: str
     published_date: datetime
-    sentiment_score: float
+    # CMP P3 gate (F9-H-05/ADR-0017): scores always [-1,+1] -- HARD
+    # model invariant. VADER compound scores are in range by
+    # construction; the gate fires on corrupt/foreign payloads instead
+    # of letting a silent out-of-range score reach the strength engine.
+    sentiment_score: float = Field(ge=-1.0, le=1.0)
     sentiment_label: str
 
 
@@ -431,7 +435,9 @@ class SentimentAnalysisResult(BaseModel):
 
     symbol: str
     timestamp: datetime
-    sentiment_score: float
+    # CMP P3 gate (F9-H-05/ADR-0017): scores always [-1,+1] -- HARD
+    # model invariant; see NewsItem.sentiment_score.
+    sentiment_score: float = Field(ge=-1.0, le=1.0)
     sentiment_label: str
     news_count: int
     positive_count: int
