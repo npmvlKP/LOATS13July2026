@@ -128,3 +128,47 @@ suites green).
   `DOCUMENTED_OUTAGE_WINDOWS` (scripts/verify_p5_forward_test.py) with
   the registry pin updated in the same commit
   (tests/test_p5_f9c02_outage_window.py) — window start untouched.
+
+## Continuation: 21 Sep OpenAlgo outage window (crash + restart churn)
+
+Same failure family (OpenAlgo availability, not LOATS), documented for
+the F9-C-02 window-registry owner. Digest-verified at 16:01 IST 21Sep:
+**180 in-session breaker OPENED events on run 140341's 21Sep record,
+uncovered** by the current registry. Facts for the extension:
+
+- **~07:15 IST**: OpenAlgo process died silently mid-session — no
+  python crash in Windows Event Log (only an unrelated
+  `MemfilesService.exe` RADAR telemetry event at 12:03), stdout of the
+  pre-death instance ends mid-traffic with no traceback; failure mode
+  was transport (`All connection attempts failed`, conn-refused, no
+  listener on 5000). LOATS auth was valid throughout (06:23:41 OAuth).
+- **Three uncoordinated restart actors**: automation 06:23 IST
+  (scheduled daily morning restart), manual 10:40 IST (restored the
+  listener in ~10 s), automation 12:23:28 IST (detected the manual
+  instance down at ~12:20 and replaced it). Every restart voided the
+  broker session (Zerodha access-token invalidation), requiring an
+  operator OAuth re-login each time (11:30 IST recovery → 12:23 restart
+  discarded it; third re-login landed ~15:4x IST).
+- **Breaker clusters on the LOATS side**: 120 opens 10:08–10:37 IST
+  (post-crash + restart churn), 60 opens 12:14–12:27 IST (restart
+  churn); recovery clean from 12:27 onward (options_flow: 1,285
+  consecutive successes by 16:00). Decisional evidence 21Sep: 53/53
+  provenance-locked (0 unattributed, divergence 0), restarts 8, zero
+  unhandled exceptions.
+- **Suggested registry tuple** (start = first post-06:23-login auth
+  error at the death, end = final recovery; verify against
+  `errors.jsonl`/breaker stamps before pinning — the morning death
+  window may already be partially covered by the pre-open policy):
+  `("2026-09-21T01:45:07+00:00", "2026-09-21T06:57:13+00:00", "21Sep
+  OpenAlgo process death + triple-restart churn: transport conn-refused
+  outage then per-restart session loss; zero decisional evidence
+  09:15-11:59 IST; see docs/audit-history/17Sep2026-p5-openalgo-auth-
+  outage.md continuation")`.
+
+**Deployment-defect standing item (needs a wave, not a doc)**: two
+OpenAlgo stability events in five days (17Sep token loss via scheduled
+restart; 21Sep unexplained process death + triple-restart churn).
+Requested remediations: single restart owner with pre-action liveness
+check, stdout capture on the automation-managed instance, single-instance
+enforcement that notifies instead of killing, and root-cause on the
+silent process death (no WER record exists).
