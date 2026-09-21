@@ -298,10 +298,16 @@ def _span_kill_switch_generations(
         return []
     generations: list[dict[str, Any]] = []
 
-    def _open(trigger: str | None) -> dict[str, Any]:
+    def _open(trigger: str | None, opened_at: str | None) -> dict[str, Any]:
         generation: dict[str, Any] = {
             "generation": len(generations) + 1,
             "writer_claimed_at": trigger,
+            # R-02 (ADR-0018): when this writer generation OPENED -- the
+            # fresh-start window opens at its first recorded event, a
+            # claimed generation at its writer_claimed stamp. Vintage
+            # feeds the pre-guard disclosure (never fabricated: an
+            # unusable stamp stays unusable and grades strictly).
+            "opened_at": opened_at,
             "verified": None,
             "has_proof": False,
         }
@@ -319,21 +325,33 @@ def _span_kill_switch_generations(
         (i for i, event in enumerate(events) if event.get("kind") == "writer_claimed"),
         None,
     )
+
+    def _stamp(value: Any) -> str | None:
+        # R-02 (ADR-0018): a generation's opening stamp. Missing stamps
+        # normalize to None for the fresh-start window (there is no
+        # trigger) and to "" for claims (mirroring writer_claimed_at);
+        # both are unusable, and unusable vintage grades strictly.
+        return str(value) if value else None
+
     current: dict[str, Any] | None = (
-        _open(None) if first_claim is not None and first_claim > 0 else None
+        _open(None, _stamp(events[0].get("timestamp")))
+        if first_claim is not None and first_claim > 0
+        else None
     )
     for index, event in enumerate(events):
         kind = event.get("kind")
         if kind == "writer_claimed":
-            current = _open(str(event.get("timestamp") or ""))
+            current = _open(
+                str(event.get("timestamp") or ""), str(event.get("timestamp") or "")
+            )
         elif kind == "kill_switch_verified":
             if current is None:
-                current = _open(None)
+                current = _open(None, _stamp(event.get("timestamp")))
             current["verified"] = True
             current["has_proof"] = True
         elif kind == "kill_switch_alarm":
             if current is None:
-                current = _open(None)
+                current = _open(None, _stamp(event.get("timestamp")))
             current["verified"] = False
             current["has_proof"] = True
     return generations
@@ -348,6 +366,43 @@ def _unproven_kill_switch_generations(
         for generation in generations
         if generation.get("verified") is not True
     ]
+
+
+# R-02 / ADR-0018 (2026-09-21): the P5-OPS-01 verification probe went live
+# with the 19Sep span-invariants wave; generations whose writers ran
+# BEFORE it existed could not emit ``kill_switch_verified`` -- the live
+# 20260916_140341 artifact shows generation 4 opening 2026-09-19T01:06:52Z
+# and carrying its verification event 11 s later, while generations 1..3
+# (16..17Sep openings) are structurally unprovable. The cutoff is the
+# midnight UTC instant BEFORE the first guarded opening: strictly earlier
+# openings disclose, at-or-after openings grade exactly as P5-OPS-01
+# pinned them. Extending the forward-test across a future probe change
+# pins a NEW cutoff here (tuple semantics) -- historical grading must
+# never silently re-mean an older span.
+P5_GUARD_CUTOFF = "2026-09-19T00:00:00+00:00"
+
+
+def _pre_guard_kill_switch_generations(
+    generations: list[dict[str, Any]],
+) -> list[int]:
+    """R-02 (ADR-0018): generations that OPENED before the probe existed.
+
+    A generation qualifies only when its ``opened_at`` stamp PARSES and
+    is strictly earlier than ``P5_GUARD_CUTOFF``: an unprovable hole
+    whose vintage is unknowable fails closed (unknown vintage grades
+    strictly), so this helper can never be stretched into an exemption.
+    """
+    cutoff = _parse_ts(P5_GUARD_CUTOFF)
+    if cutoff is None:  # pragma: no cover - pinned constant, guards drift
+        return []
+    pre_guard: list[int] = []
+    for generation in generations:
+        if generation.get("verified") is True:
+            continue
+        opened = _parse_ts(generation.get("opened_at"))
+        if opened is not None and opened < cutoff:
+            pre_guard.append(generation["generation"])
+    return pre_guard
 
 
 def _collect_market_data_annotations(availability: Any) -> list[str]:
@@ -392,23 +447,47 @@ def _grade_span_kill_switch_proof(
     run_log: dict[str, Any],
     reasons: list[str],
     ended: datetime.datetime | None,
+    annotations: list[str] | None = None,
 ) -> bool:
-    """Grade the SPAN-attached kill-switch proof (P5-OPS-01).
+    """Grade the SPAN-attached kill-switch proof (P5-OPS-01 + ADR-0018).
 
     Every writer generation the event stream exposes needs its own
-    verification event; a hole in ANY generation hard-fails an ENDED
-    run (the resumed artifact would otherwise cite a span whose earlier
-    generations ran under an unproven halt path). An ongoing run stays
-    INCOMPLETE with the hole named per generation, so the operator can
+    verification event -- EXCEPT generations that OPENED before the
+    P5-OPS-01 probe existed (R-02 / ADR-0018): their writers ran
+    pre-guard code that could not emit the event, so demanding it
+    demands the logically impossible and "unprovable" is not "failed".
+    Pre-guard holes ride as NON-GRADING disclosure annotations (the
+    documented-outage pattern; the 30Sep checkpoint reads them from the
+    CLI NOTE lines), while an ENDED run still hard-fails on every
+    post-guard or unknown-vintage hole. An ongoing run stays INCOMPLETE
+    with its post-guard hole named per generation, so the operator can
     close it by resuming (each resume probes again) BEFORE 30Sep.
-    Returns True when the span hole is a hard violation.
+    Returns True when a hard (grading) span hole remains.
     """
     span_generations = _span_kill_switch_generations(run_log)
     span_unproven = _unproven_kill_switch_generations(span_generations)
     if not span_unproven:
         return False
-    first, last = span_unproven[0], span_unproven[-1]
-    hole_range = f"generation(s) {first}" + (f"..{last}" if last != first else "")
+    pre_guard = _pre_guard_kill_switch_generations(span_generations)
+    hard_unproven = [n for n in span_unproven if n not in pre_guard]
+
+    def _range(numbers: list[int]) -> str:
+        first, last = numbers[0], numbers[-1]
+        return f"generation(s) {first}" + (f"..{last}" if last != first else "")
+
+    if pre_guard and annotations is not None:
+        cutoff = _parse_ts(P5_GUARD_CUTOFF)
+        cutoff_text = P5_GUARD_CUTOFF if cutoff is None else cutoff.isoformat()
+        annotations.append(
+            f"kill-switch span proof: pre-guard writer {_range(pre_guard)} "
+            f"opened before the verification probe existed (P5-OPS-01, "
+            f"cutoff {cutoff_text}) and could not emit the event -- "
+            "disclosed, NON-GRADING (R-02 / ADR-0018); every generation "
+            "open after the cutoff is strictly graded"
+        )
+    if not hard_unproven:
+        return False
+    hole_range = _range(hard_unproven)
     reasons.append(
         f"KILL-SWITCH PROOF IS NOT SPAN-ATTACHED (CMP P5 gate): "
         f"writer {hole_range} lack the verification event -- a resumed "
@@ -536,8 +615,14 @@ def grade_run_log(run_log: dict[str, Any]) -> Grade:
     kill_switch_violation = _grade_kill_switch_evidence(run_log, reasons, ended)
 
     # P5-OPS-01 (2026-09-19): proof must cover EVERY writer generation
-    # (span-attached, not resume-attached) -- see _grade_span_kill_switch_proof.
-    span_kill_switch_hole = _grade_span_kill_switch_proof(run_log, reasons, ended)
+    # (span-attached, not resume-attached); R-02 / ADR-0018 (2026-09-21):
+    # generations that opened before the probe existed disclose instead of
+    # failing -- the disclosure rides in ``span_disclosures`` and merges
+    # into the annotation stream AFTER the outage-notes rebind below.
+    span_disclosures: list[str] = []
+    span_kill_switch_hole = _grade_span_kill_switch_proof(
+        run_log, reasons, ended, span_disclosures
+    )
 
     # Hard criterion: routing must have been enabled for the run.
     routing = run_log.get("routing") or {}
@@ -553,7 +638,10 @@ def grade_run_log(run_log: dict[str, Any]) -> Grade:
     # See _collect_outage_annotations for the overlap semantics.
     span_end_for_outage = ended if ended is not None else _now_utc()
     outage_notes = _collect_outage_annotations(started, span_end_for_outage)
-
+    # R-02 / ADR-0018: the pre-guard span disclosures merge here too --
+    # after the rebind, before Grade construction, so they surface on
+    # every verdict's NOTE lines (annotation-only, never graded).
+    outage_notes.extend(span_disclosures)
     # P5-OPS-01 (2026-09-19): market-data availability disclosures ride
     # with the outage notes (annotation-only, never graded).
     outage_notes.extend(

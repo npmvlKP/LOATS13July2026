@@ -129,6 +129,21 @@ def _unproven_generations(generations: list[dict[str, Any]]) -> list[int]:
     return helper(generations)
 
 
+def _pre_guard_generations(generations: list[dict[str, Any]]) -> list[int]:
+    """Delegate: generations that opened before the probe existed (R-02).
+
+    Single-source policy, like the generation model itself: what
+    ``--status`` discloses here is what the official grader discloses.
+    Version-skew fallback returns [] (matching the generation-model
+    guard above): a missing helper can never FABRICATE a disclosure.
+    """
+    validator = _load_validator()
+    helper = getattr(validator, "_pre_guard_kill_switch_generations", None)
+    if helper is None:  # pragma: no cover - version-skew guard
+        return []
+    return helper(generations)
+
+
 def verify_exit_code_battery(*legs: Any) -> int:
     """PowerShell-safe composition of quality-gate exit codes (P5-OPS-01).
 
@@ -1141,8 +1156,21 @@ def _announce_span_invariants(run_log: Path) -> None:
         return
     generations = _span_kill_switch_generations(data)
     unproven = _unproven_generations(generations)
-    if unproven:
-        first, last = unproven[0], unproven[-1]
+    # R-02 / ADR-0018: pre-guard generations disclose (NON-GRADING);
+    # only post-guard / unknown-vintage holes stay hard.
+    pre_guard = _pre_guard_generations(generations)
+    hard_hole = [n for n in unproven if n not in pre_guard]
+    if pre_guard:
+        first, last = pre_guard[0], pre_guard[-1]
+        disclosed = f"generation(s) {first}" + (f"..{last}" if last != first else "")
+        print(
+            f"    NOTE: kill-switch span proof: pre-guard writer "
+            f"{disclosed} opened before the verification probe existed "
+            "(P5-OPS-01) and could not emit the event -- disclosed, "
+            "NON-GRADING (R-02 / ADR-0018)"
+        )
+    if hard_hole:
+        first, last = hard_hole[0], hard_hole[-1]
         hole = f"generation(s) {first}" + (f"..{last}" if last != first else "")
         print(
             f"{FAIL_SYM} kill-switch span proof: writer {hole} lack the "
@@ -1150,10 +1178,17 @@ def _announce_span_invariants(run_log: Path) -> None:
             "unless the current writer records a verification event, and "
             "any resumed artifact will FAIL closed on the hole"
         )
-    else:
+    elif not pre_guard:
         print(
             f"{PASS_SYM} kill-switch span proof: all writer generations "
             f"verified ({len(generations)} generation(s))"
+        )
+    else:
+        verified_count = len(generations) - len(pre_guard)
+        print(
+            f"{PASS_SYM} kill-switch span proof: every post-guard writer "
+            f"generation verified ({verified_count} guarded generation(s), "
+            f"{len(pre_guard)} pre-guard disclosed above)"
         )
     availability = data.get("market_data_availability")
     if isinstance(availability, dict):
