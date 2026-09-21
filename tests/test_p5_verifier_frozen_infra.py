@@ -15,6 +15,9 @@ Pinned behaviors (P5-OPS-01 and the disclosure contract):
 - span-attached grading (an ENDED run with any unproven generation
   hard-fails; an ongoing run stays INCOMPLETE with the hole named;
   a fully proven span produces no reason);
+- R-02 amendment (ADR-0018, 2026-09-21): generations that OPENED before
+  P5-OPS-01 went live disclose via a NON-GRADING annotation instead of
+  failing the span; post-guard and unknown-vintage holes still hard-fail;
 - documented-outage / market-data availability annotations are
   NON-GRADING and fail closed to honest disclosure on unknown shapes.
 """
@@ -173,6 +176,178 @@ class TestGateWeakeningMutations:
         }
         generations = verifier._span_kill_switch_generations(run_log)
         assert verifier._unproven_kill_switch_generations(generations) == [1]
+
+
+class TestGenerationOpeningStamp:
+    """R-02 amendment (ADR-0018): every generation carries its opening stamp."""
+
+    def test_fresh_start_window_opens_at_first_event(self, verifier: Any) -> None:
+        # The fresh-start writer's window opens with the FIRST event it
+        # recorded (the live 20260916_140341 log: routing_enabled at
+        # 14:03:46Z, 9.3 h before the first claim).
+        run_log = {
+            "events": [
+                {"timestamp": "2026-09-16T14:03:46+00:00", "kind": "routing_enabled"},
+                {"timestamp": "2026-09-16T23:24:02+00:00", "kind": "writer_claimed"},
+                {
+                    "timestamp": "2026-09-19T01:07:03+00:00",
+                    "kind": "kill_switch_verified",
+                },
+            ]
+        }
+        generations = verifier._span_kill_switch_generations(run_log)
+        assert generations[0]["opened_at"] == "2026-09-16T14:03:46+00:00"
+        assert generations[1]["opened_at"] == "2026-09-16T23:24:02+00:00"
+
+    def test_stampless_events_keep_opened_at_unknown(self, verifier: Any) -> None:
+        # A generation whose opening stamp is absent/malformed must NOT
+        # look discloseable: unknown vintage grades strictly.
+        run_log = {
+            "events": [
+                {"kind": "routing_enabled"},
+                {"kind": "writer_claimed"},
+                {"kind": "kill_switch_verified"},
+            ]
+        }
+        generations = verifier._span_kill_switch_generations(run_log)
+        assert generations[0]["opened_at"] is None
+        assert generations[1]["opened_at"] == ""
+
+
+class TestPreGuardDisclosureAmendment:
+    """R-02 amendment (ADR-0018): pre-guard holes disclose, post-guard fail.
+
+    Parity contract from the register: a generation whose writer ran
+    BEFORE the P5-OPS-01 probe existed cannot emit the verification
+    event -- demanding it demands the logically impossible. Those
+    generations become a named NON-GRADING disclosure; every generation
+    that opened at-or-after the guard cutoff is graded exactly as
+    before (unknown vintage included).
+    """
+
+    def test_pre_guard_generations_disclose_not_fail(self, verifier: Any) -> None:
+        # The live 20260916_140341 shape: fresh-start window plus two
+        # pre-guard claims, all unproven; the post-guard generation proves.
+        run_log = {
+            "events": [
+                {"timestamp": "2026-09-16T14:03:46+00:00", "kind": "routing_enabled"},
+                {"timestamp": "2026-09-16T23:24:02+00:00", "kind": "writer_claimed"},
+                {"timestamp": "2026-09-17T23:05:08+00:00", "kind": "writer_claimed"},
+                {"timestamp": "2026-09-19T01:06:52+00:00", "kind": "writer_claimed"},
+                {
+                    "timestamp": "2026-09-19T01:07:03+00:00",
+                    "kind": "kill_switch_verified",
+                },
+            ]
+        }
+        generations = verifier._span_kill_switch_generations(run_log)
+        assert verifier._pre_guard_kill_switch_generations(generations) == [1, 2, 3]
+        reasons: list[str] = []
+        annotations: list[str] = []
+        hard = verifier._grade_span_kill_switch_proof(
+            run_log, reasons, _ended(), annotations
+        )
+        assert hard is False  # was True before the amendment
+        assert reasons == []  # the disclosed hole never enters grading reasons
+        assert len(annotations) == 1
+        assert "generation(s) 1..3" in annotations[0]
+        assert "before the verification probe existed" in annotations[0]
+        assert "2026-09-19T00:00:00+00:00" in annotations[0]
+
+    def test_mixed_holes_disclose_preguard_and_fail_postguard(
+        self, verifier: Any
+    ) -> None:
+        run_log = {
+            "events": [
+                {"timestamp": "2026-09-16T14:03:46+00:00", "kind": "routing_enabled"},
+                {"timestamp": "2026-09-16T23:24:02+00:00", "kind": "writer_claimed"},
+                {"timestamp": "2026-09-19T01:06:52+00:00", "kind": "writer_claimed"},
+            ]
+        }
+        generations = verifier._span_kill_switch_generations(run_log)
+        # Generations 1 (fresh-start window) and 2 (16Sep claim) opened
+        # before the cutoff; generation 3 (19Sep claim) opened after it.
+        assert verifier._pre_guard_kill_switch_generations(generations) == [1, 2]
+        reasons: list[str] = []
+        annotations: list[str] = []
+        hard = verifier._grade_span_kill_switch_proof(
+            run_log, reasons, _ended(), annotations
+        )
+        assert hard is True
+        assert any("generation(s) 3" in r for r in reasons)  # post-guard only
+        assert any("generation(s) 1..2" in a for a in annotations)  # disclosure rides
+
+    def test_cutoff_boundary_generation_is_strictly_graded(self, verifier: Any) -> None:
+        # A writer that opened EXACTLY at the cutoff is post-guard (the
+        # probe was live from that instant): no disclosure, hole hard-fails.
+        run_log = {
+            "events": [
+                {"timestamp": "2026-09-19T00:00:00+00:00", "kind": "writer_claimed"},
+            ]
+        }
+        generations = verifier._span_kill_switch_generations(run_log)
+        assert verifier._pre_guard_kill_switch_generations(generations) == []
+        reasons: list[str] = []
+        hard = verifier._grade_span_kill_switch_proof(run_log, reasons, _ended(), [])
+        assert hard is True
+        assert any("generation(s) 1" in r for r in reasons)
+
+    def test_unknown_vintage_stays_strictly_graded(self, verifier: Any) -> None:
+        # Synthetic/unparseable stamps cannot earn the disclosure: the
+        # gate-weakening mutation net keeps its exact meaning.
+        run_log = {
+            "events": [
+                {"timestamp": "t1", "kind": "writer_claimed"},
+            ]
+        }
+        generations = verifier._span_kill_switch_generations(run_log)
+        assert verifier._pre_guard_kill_switch_generations(generations) == []
+        reasons: list[str] = []
+        hard = verifier._grade_span_kill_switch_proof(run_log, reasons, _ended(), [])
+        assert hard is True
+
+    def test_ended_pre_guard_run_grades_pass_with_disclosure(
+        self, verifier: Any
+    ) -> None:
+        # End-to-end: an otherwise fully eligible ENDED run carrying ONLY
+        # pre-guard holes grades PASS with the disclosure riding as a
+        # NOTE -- the 30Sep checkpoint reads disclosures from the CLI.
+        run_log = {
+            "routing": {"enabled_at_start": True},
+            "started_at": "2026-09-05T14:03:41+00:00",
+            "ended_at": "2026-09-21T04:38:09+00:00",
+            "unhandled_exceptions": 0,
+            "cycles_completed": 5000,
+            "counters": {
+                "success": 400,
+                "disabled": 0,
+                "error": 0,
+                "routed_decisions": 400,
+                "routing_divergence_detected": 0,
+            },
+            "disabled_routes_during_enabled_window": {
+                "count": 0,
+                "window": {
+                    "first_disabled_route_at": None,
+                    "last_disabled_route_at": None,
+                },
+            },
+            "kill_switch_verified": True,
+            "kill_switch_active_at_start": False,
+            "events": [
+                {"timestamp": "2026-09-16T14:03:46+00:00", "kind": "routing_enabled"},
+                {"timestamp": "2026-09-16T23:24:02+00:00", "kind": "writer_claimed"},
+                {"timestamp": "2026-09-17T23:05:08+00:00", "kind": "writer_claimed"},
+                {"timestamp": "2026-09-19T01:06:52+00:00", "kind": "writer_claimed"},
+                {
+                    "timestamp": "2026-09-19T01:07:03+00:00",
+                    "kind": "kill_switch_verified",
+                },
+            ],
+        }
+        grade = verifier.grade_run_log(run_log)
+        assert grade.verdict == "PASS", grade.reasons
+        assert any("pre-guard" in note for note in grade.annotations)
 
 
 class TestDisclosureAnnotationsNeverGrade:

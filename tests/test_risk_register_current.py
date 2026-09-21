@@ -26,16 +26,21 @@ def register_text() -> str:
 
 
 def test_p1_items_carry_the_checkpoint_due_date(register_text: str) -> None:
-    # R-01 (ADR-0016 cycle decision) and R-02 (kill-switch span proof)
-    # are both due at the 2026-09-30 checkpoint and nowhere else.
+    # R-01 (ADR-0016 cycle decision) is the only P1 still OPEN at the
+    # 2026-09-30 checkpoint. R-02 (kill-switch span proof) carried the
+    # same due date until it closed same-day (ADR-0018, 2026-09-21 --
+    # the disclosure amendment landed BEFORE the span ended, per the
+    # register's sequencing rule), so its row now pins the closure.
     p1_rows = [
         line
         for line in register_text.splitlines()
         if line.startswith("| R-") and "| P1 |" in line
     ]
     assert len(p1_rows) == 2, p1_rows
-    for row in p1_rows:
-        assert "2026-09-30" in row, row
+    r01 = next(row for row in p1_rows if row.startswith("| R-01 "))
+    r02 = next(row for row in p1_rows if row.startswith("| R-02 "))
+    assert "2026-09-30" in r01 and "OPEN" in r01, r01
+    assert "CLOSED by ADR-0018" in r02, r02
 
 
 def test_r01_cites_the_measured_cycle_population(register_text: str) -> None:
@@ -44,12 +49,15 @@ def test_r01_cites_the_measured_cycle_population(register_text: str) -> None:
     assert "target_compliance_count=0" in register_text
 
 
-def test_r02_names_the_unproven_generations_and_both_options(
+def test_r02_closure_names_the_disclosure_and_its_bound(
     register_text: str,
 ) -> None:
-    # The verifier's exact hole naming plus both closure options.
+    # Closed by ADR-0018 (2026-09-21): the register still names the
+    # verifier's exact pre-guard hole naming ("generation(s) 1..3"),
+    # the ADR that closed it, and the fail-closed bound that keeps the
+    # disclosure honest (post-guard/unknown holes still FAIL-closed).
     assert "generation(s) 1..3" in register_text
-    assert "Grader-disclosure amendment" in register_text
+    assert "ADR-0018" in register_text
     assert "FAIL-closed" in register_text
 
 

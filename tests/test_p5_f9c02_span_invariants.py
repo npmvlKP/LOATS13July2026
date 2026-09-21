@@ -12,6 +12,12 @@ Three register items from the 19Sep2026 adversarial review, pinned RED-first:
    events (the fresh-start window before the first claim is a generation
    too) and FAIL-closes an ENDED run unless EACH generation carries its own
    verification event.
+   R-02 / ADR-0018 (2026-09-21): generations that OPENED before the probe
+   existed (cutoff ``2026-09-19T00:00:00+00:00``) disclose as a NON-GRADING
+   annotation instead of failing the span -- their writers ran pre-guard
+   code that could not emit the event. Post-guard and unknown-vintage
+   holes still FAIL-closed; a pre-guard-only span now PASSes with the
+   disclosure riding on the NOTE lines.
 2. The operator reported the OpenAlgo analyzer surface (``127.0.0.1:5000``,
    Zerodha feeds behind it) serving live market data through market hours.
    LOATS cannot read OpenAlgo's internal logs (separate process, separate
@@ -502,26 +508,35 @@ class TestGraderSpanAttachedKillSwitch:
     def test_ended_run_with_unproven_generations_fails(self) -> None:
         validator = _load_validator()
         log = _eligible_ended_log()
-        # Degrade to the live 20260916_140341 shape: only the LAST
-        # generation carries the verification event.
+        # Bracket the events: the shared fixture's Aug window predates
+        # the P5 guard, so pin a Sep window around the post-guard stamps.
+        log["started_at"] = "2026-09-05T00:00:00+00:00"
+        log["ended_at"] = "2026-09-21T00:00:00+00:00"
+        # Degrade to a POST-GUARD live shape: a run whose unproven
+        # generation opened after the P5-OPS-01 cutoff (19Sep midnight
+        # UTC) still hard-fails -- the R-02 disclosure never covers a
+        # writer that could have emitted the event. (The pre-guard
+        # counterpart -- unproven generations that opened before the
+        # cutoff -- is pinned PASS-with-disclosure in the frozen-infra
+        # net, test_ended_pre_guard_run_grades_pass_with_disclosure.)
         log["events"] = [
             {
-                "timestamp": "2026-08-01T00:00:00+00:00",
+                "timestamp": "2026-09-19T01:06:52+00:00",
                 "kind": "writer_claimed",
                 "detail": "PID 111",
             },
             {
-                "timestamp": "2026-08-01T00:00:05+00:00",
+                "timestamp": "2026-09-19T01:07:03+00:00",
                 "kind": "routing_enabled",
                 "detail": "gen 1 (no proof)",
             },
             {
-                "timestamp": "2026-08-08T00:00:00+00:00",
+                "timestamp": "2026-09-20T00:51:11+00:00",
                 "kind": "writer_claimed",
                 "detail": "PID 222",
             },
             {
-                "timestamp": "2026-08-08T00:00:11+00:00",
+                "timestamp": "2026-09-20T00:51:24+00:00",
                 "kind": "kill_switch_verified",
                 "detail": "gen 2 verified",
             },
@@ -541,12 +556,12 @@ class TestGraderSpanAttachedKillSwitch:
         log = _eligible_ended_log() | {"ended_at": None}
         log["events"] = [
             {
-                "timestamp": "2026-08-01T00:00:00+00:00",
+                "timestamp": "2026-09-20T13:12:29+00:00",
                 "kind": "writer_claimed",
                 "detail": "PID 111",
             },
             {
-                "timestamp": "2026-08-01T00:00:05+00:00",
+                "timestamp": "2026-09-20T13:12:40+00:00",
                 "kind": "routing_enabled",
                 "detail": "gen 1 (no proof)",
             },
@@ -554,6 +569,38 @@ class TestGraderSpanAttachedKillSwitch:
         grade = validator.grade_run_log(log)
         assert grade.verdict == "INCOMPLETE"
         assert any("KILL-SWITCH PROOF" in r for r in grade.reasons)
+
+    def test_ongoing_pre_guard_hole_is_disclosed_not_pending(self) -> None:
+        validator = _load_validator()
+        # The live 20260916_140341 shape, ongoing: its unproven
+        # generations all opened before the cutoff, so the hole rides as
+        # a disclosure instead of a pending hard criterion -- the
+        # operator sees exactly what the 30Sep checkpoint will see.
+        log = _eligible_ended_log() | {
+            "ended_at": None,
+            "started_at": "2026-09-16T14:03:41+00:00",
+            "events": [
+                {
+                    "timestamp": "2026-09-16T14:03:46+00:00",
+                    "kind": "routing_enabled",
+                },
+                {
+                    "timestamp": "2026-09-16T23:24:02+00:00",
+                    "kind": "writer_claimed",
+                },
+                {
+                    "timestamp": "2026-09-17T23:05:08+00:00",
+                    "kind": "writer_claimed",
+                },
+                {
+                    "timestamp": "2026-09-19T01:07:03+00:00",
+                    "kind": "kill_switch_verified",
+                },
+            ],
+        }
+        grade = validator.grade_run_log(log)
+        assert not any("KILL-SWITCH PROOF" in r for r in grade.reasons)
+        assert any("pre-guard" in note for note in grade.annotations)
 
     def test_grader_message_carries_market_data_verdict(self) -> None:
         validator = _load_validator()
@@ -618,10 +665,39 @@ class TestStatusAndBattery:
             rc = runner._status(run_log)
         out = buffer.getvalue()
         assert rc == 0
+        # R-02 / ADR-0018: the pre-guard hole (generations 1..3, opened
+        # before the 19Sep cutoff) discloses as a NOTE; the verified
+        # post-guard generation is reported clean. The old hard-hole
+        # phrasing must NOT appear for a pre-guard-only shape.
         assert "kill-switch span proof:" in out
-        assert "generation(s) 1..3 lack the verification event" in out
-        assert "verdict will be INCOMPLETE" in out
+        assert "pre-guard writer generation(s) 1..3" in out
+        assert "NON-GRADING (R-02 / ADR-0018)" in out
+        assert "every post-guard writer generation verified" in out
+        assert "generation(s) 1..3 lack the verification event" not in out
+        assert "verdict will be INCOMPLETE" not in out
         assert "market-data availability: unverified" in out
+
+    def test_status_output_still_flags_post_guard_hole(self, tmp_path: Path) -> None:
+        runner = _load_runner()
+        # A post-guard hole keeps the operator-facing FAIL surface:
+        # strip the verification event from the multi-generation log so
+        # generation 4 (opened 19Sep, post-cutoff) is unproven too.
+        run_log = _multi_generation_ongoing_log(tmp_path)
+        data = json.loads(run_log.read_text(encoding="utf-8"))
+        data["events"] = [
+            e for e in data["events"] if e["kind"] != "kill_switch_verified"
+        ]
+        data["last_sampled_at"] = datetime.datetime.now(datetime.UTC).isoformat()
+        data["supervisor_pid"] = None
+        run_log.write_text(json.dumps(data), encoding="utf-8")
+        buffer = io.StringIO()
+        with redirect_stdout(buffer):
+            rc = runner._status(run_log)
+        out = buffer.getvalue()
+        assert rc == 0
+        assert "pre-guard writer generation(s) 1..3" in out  # disclosure rides
+        assert "generation(s) 4 lack the verification event" in out
+        assert "verdict will be INCOMPLETE" in out
 
     def test_status_reports_live_verified_span(self, tmp_path: Path) -> None:
         runner = _load_runner()
