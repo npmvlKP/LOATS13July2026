@@ -146,7 +146,25 @@ values confirmed 0.0000/-0.0691/-0.2667/-0.4800/-0.7754/-0.8000):
    pre-implementation probe (§1), and the surface/full-tree runs carry
    their log stamps in `reports/`.
 
-## 6. Ceiling
+## 6. Pre-push-gate catch (round 3): fresh-age float flake
+
+The first push attempt was REJECTED by the gate's own full-tree run:
+`test_analyze_symbol_sentiment_positive_overall` flaked
+(`0.8999999999999999 != 0.9`) — both local full-tree runs had passed
+by timing. Root cause (reproduced, not inferred): a just-parsed
+article is 1-10 ms old; its decay weight 0.5**(age/4) lands at
+1 - ~5e-11 — NOT exactly 1.0 — adding one float rounding to the
+weighted mean, so strict-equality legacy pins flake depending on the
+construction→aggregation microsecond delta (the failing run sampled a
+10 ms async-scheduling gap). Fix: ages ≤ `FRESH_AGE_SNAP_HOURS`
+(100 ms — below any real feed timestamp granularity) snap to the
+exact fresh weight 1.0; the weighted path below the snap is
+bit-identical to the legacy plain mean, and the boundary
+discontinuity is ~5e-9 of relative weight. 4 pins added
+(`TestFreshAgeSnap`, including the exact `==` reproductions for
+±scores); legacy pins untouched (no assertion loosening anywhere).
+
+## 7. Ceiling
 
 `scripts/ratchet_baseline.py` 450 → 453: +3 tracked files (this
 record, the pin module, ADR-0017), re-pinned per the documented

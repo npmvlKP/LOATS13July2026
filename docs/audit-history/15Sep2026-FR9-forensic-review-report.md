@@ -103,8 +103,9 @@
 - **Risk Assessment:** High (conformance).
 - **Suggested Resolution:** (1) `sentiment_score: float = Field(ge=-1.0, le=1.0)`; (2) decay `0.5 ** (age_hours/4)` before averaging; (3) 70/30 weight scaffold — news 1.0 with explicit ADR note deferring the social leg (do NOT fabricate a social score).
 - **Recommended Tests:** bounds fuzz property; decay monotonicity; ensemble arithmetic vs hand-computed; model rejects out-of-range.
-- **Estimated Complexity:** 0.5 day · **Dependencies:** F9-H-03 (producer must persist again) · **Priority: P1.** · **Status: ✅ CLOSED 21Sep2026 — hard `Field(ge=-1.0, le=1.0)` bounds on BOTH models, 4 h half-life decay applied pre-average, `ENSEMBLE_WEIGHTS` news-leg scaffold with the social leg ADR-deferred (ADR-0017), cold-path aggregation dedup onto the single core; 29→42 RED-first pins (13 added after the adversarial round-2 review,
-which caught and fixed a real underflow ZeroDivisionError) + 348-test
+- **Estimated Complexity:** 0.5 day · **Dependencies:** F9-H-03 (producer must persist again) · **Priority: P1.** · **Status: ✅ CLOSED 21Sep2026 — hard `Field(ge=-1.0, le=1.0)` bounds on BOTH models, 4 h half-life decay applied pre-average, `ENSEMBLE_WEIGHTS` news-leg scaffold with the social leg ADR-deferred (ADR-0017), cold-path aggregation dedup onto the single core; 42→46 RED-first pins (13 after the adversarial round-2 review, 4 more
+after the pre-push gate caught a fresh-age float flake both local
+full-tree runs had passed by timing) + 348-test
 surface green; `docs/audit-history/21Sep2026-F9H05-p3-ensemble-decay-bounds.md`.
 
 ---
