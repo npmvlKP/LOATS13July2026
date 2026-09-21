@@ -451,8 +451,20 @@ History (most recent last):
       tests/test_repo_hygiene.py). The hygiene-module fix itself is a
       test edit (+36/-7) within the existing tree.
       Ceiling 446->447.
+    * 447->450 (2026-09-20, F9-H-03 BG-1 close-out wave): +3 tracked
+      files -- tests/test_cache_tiered_ttl_f9h03.py and
+      tests/test_sentiment_ttl_horizons_f9h03.py (the BG-1 pins: per-entry
+      TTL honored via per-TTL tier stores, expiry strict, delete/clear/
+      stats span all tiers, and the sentiment horizon chain
+      freshness(300) < degraded-threshold(600) < retention(900) that
+      makes degraded=True reachable) and docs/audit-history/
+      20Sep2026-F9H03-verification-and-BG1-closeout.md (the wave record:
+      CacheManager.set ignored per-call ttl= under the single-TTLCache;
+      freshness/threshold/retention chain). Source changes stayed within
+      the existing tree (cache.py, sentiment.py, conftest.py, test_cache.py).
+      Ceiling 447->450.
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 447
+TRACKED_FILE_CEILING = 450

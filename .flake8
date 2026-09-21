@@ -42,9 +42,19 @@ per-file-ignores =
 # which carry the same rationale): these directories are historical verification
 # artifacts and must not be mutated to satisfy lint. Excluded from repository-root
 # flake8 sweeps only; the CI gate scope remains src/ tests/ scripts/ (unchanged).
+#
+# .kilo/ (54ef203 follow-up): Kilo Code creates nested editor worktrees under
+# .kilo/worktrees/ holding merged snapshot trees. .gitignore covers them for
+# git-aware tools (ruff honors .gitignore; the pre-commit hook passes explicit
+# tracked filenames), but a BARE `flake8` sweep recurses untracked directories
+# and flake8 does not honor .gitignore — only its own exclude — so bare runs
+# and the hook/CI surface split (284 phantom findings on 2026-09-20). Exclude
+# keeps every invocation surface equivalent: a bare sweep must measure the same
+# tree the hook and CI measure (tracked paths only).
 exclude =
     docs/audit-history,
     reports/ai-generated,
+    .kilo,
     .git,
     __pycache__,
     .venv,

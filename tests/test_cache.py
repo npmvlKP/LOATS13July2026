@@ -170,9 +170,10 @@ class TestCacheManager:
         result = await cache_manager.set("test_key", "test_value", ttl=60)
         assert result is True
 
-        # Verify the value was stored
-        cache_key = cache_manager._get_cache_key("test_key")
-        assert cache_manager._cache[cache_key] == "test_value"
+        # Verify the value was stored. BG-1 close-out: per-call-TTL
+        # entries live in their per-TTL tier store (_cache is the
+        # default-tier store), so assert via the public read path.
+        assert await cache_manager.get("test_key") == "test_value"
 
     @pytest.mark.asyncio
     async def test_set_basemodel(self, cache_manager: CacheManager) -> None:
@@ -187,9 +188,10 @@ class TestCacheManager:
         result = await cache_manager.set("model_key", model, ttl=60)
         assert result is True
 
-        # Verify the value was stored as JSON
-        cache_key = cache_manager._get_cache_key("model_key")
-        cached_value = cache_manager._cache[cache_key]
+        # Verify the value was stored as JSON. BG-1 close-out: per-call-
+        # TTL entries live in their per-TTL tier store, so assert via the
+        # public read path.
+        cached_value = await cache_manager.get("model_key")
         assert isinstance(cached_value, str)
         assert "test" in cached_value
         assert "42" in cached_value
@@ -202,9 +204,10 @@ class TestCacheManager:
         result = await cache_manager.set("dict_key", data, ttl=60)
         assert result is True
 
-        # Verify the value was stored as JSON
-        cache_key = cache_manager._get_cache_key("dict_key")
-        cached_value = cache_manager._cache[cache_key]
+        # Verify the value was stored as JSON. BG-1 close-out: per-call-
+        # TTL entries live in their per-TTL tier store, so assert via the
+        # public read path.
+        cached_value = await cache_manager.get("dict_key")
         assert isinstance(cached_value, str)
         assert "test" in cached_value
         assert "42" in cached_value

@@ -355,11 +355,21 @@ def pytest_configure(config: pytest.Config) -> None:
 
 @pytest.fixture(autouse=True, scope="function")
 async def clear_cache_before_each_test() -> None:
-    """Clear cache before each test to prevent stale data."""
+    """Clear cache before each test to prevent stale data.
+
+    BG-1 close-out: the clear must be UNCONDITIONAL. The previous
+    ``if cache_manager._cache:`` gate relied on the historical single-
+    store behavior where any set() made the default-tier store non-empty.
+    After per-TTL tiering, an entry written with a non-default ttl (e.g.
+    the openalgo position-book cache, ttl=30) lives only in its tier
+    store while ``_cache`` stays empty/falsy -- the gate skipped clear()
+    and responses leaked across tests (TestPositionBookFieldVocabulary
+    pollution). clear() itself no-ops safely when the cache was never
+    initialized, so no gate is needed.
+    """
     from loats.utils.cache import cache_manager
 
-    if cache_manager._cache:
-        await cache_manager.clear()
+    await cache_manager.clear()
 
 
 @pytest.fixture(autouse=True, scope="function")

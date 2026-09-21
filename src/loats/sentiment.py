@@ -63,7 +63,20 @@ logger = get_logger(__name__)
 # the producer window -- is untouched because the detached task writes
 # caches, never signals).
 ARTICLE_CACHE_TTL_SECONDS = 300
+# Result-freshness window (ordinary 5-minute result cache entries).
+RESULT_TTL_SECONDS = 300
+# LKG retention horizon: how long the last-known-good entry survives in
+# the cache (CacheManager honors per-entry TTL as of the BG-1 fix).
 LKG_TTL_SECONDS = 900
+# Degraded provenance threshold: an LKG result older than this is served
+# with degraded=True. BG-1 close-out: this MUST sit strictly inside the
+# retention horizon (freshness < threshold < retention). An entry older
+# than retention is evicted and can never be served, so a threshold at or
+# beyond retention (the original implementation, threshold == retention)
+# made degraded=True unreachable dead code. 600 s = 2x the freshness
+# window, leaving a 300 s band where stale-but-served LKG signals carry
+# the degraded audit tag before a true cold start.
+DEGRADED_THRESHOLD_SECONDS = 600
 
 # Module-level (not CacheManager): _extract_article_content runs on worker
 # threads via asyncio.to_thread, so the cache needs a synchronous,
@@ -201,7 +214,7 @@ class SentimentAnalyzer:
             try:
                 lkg_result = SentimentAnalysisResult(**json.loads(lkg_raw))
                 age_s = (datetime.now(UTC) - lkg_result.timestamp).total_seconds()
-                lkg_result.degraded = age_s > LKG_TTL_SECONDS
+                lkg_result.degraded = age_s > DEGRADED_THRESHOLD_SECONDS
                 asyncio.create_task(
                     self._refresh_caches_only(
                         cache_key, lkg_key, symbol, rss_urls, max_items
@@ -274,7 +287,7 @@ class SentimentAnalyzer:
         # immediately with the detached refresh.
         try:
             await cache_manager.set(
-                cache_key, sentiment_result.model_dump_json(), ttl=300
+                cache_key, sentiment_result.model_dump_json(), ttl=RESULT_TTL_SECONDS
             )
             await cache_manager.set(
                 lkg_key, sentiment_result.model_dump_json(), ttl=LKG_TTL_SECONDS
@@ -306,7 +319,9 @@ class SentimentAnalyzer:
         try:
             fresh = await self._compute_and_count(symbol, rss_urls, max_items)
             if fresh is not None:
-                await cache_manager.set(cache_key, fresh.model_dump_json(), ttl=300)
+                await cache_manager.set(
+                    cache_key, fresh.model_dump_json(), ttl=RESULT_TTL_SECONDS
+                )
                 await cache_manager.set(
                     lkg_key, fresh.model_dump_json(), ttl=LKG_TTL_SECONDS
                 )
