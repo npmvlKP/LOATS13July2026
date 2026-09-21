@@ -478,8 +478,25 @@ History (most recent last):
       _compute_and_count, models.py Field bounds,
       test_sentiment.py naive-datetime correction).
       Ceiling 450->453.
+    * 453->456 (2026-09-21, risk-register wave): +3 tracked files --
+      docs/RISK-REGISTER.md (the tracked risk register replacing the
+      chat/paste transcript: paste lag re-proven 21Sep -- F9-H-03 was
+      already closed at HEAD when the register carried it open),
+      tests/test_risk_register_current.py (content pins: register
+      present, P1 items carry the 30Sep due date, R-01 cites the live
+      cycle count, R-02 names generations 1..3 and the two closure
+      options, closed references cite 07ab8ae and 633daae), and
+      tests/test_p5_verifier_frozen_infra.py (a frozen-infra test file
+      per the inf-runner classification: pins verify_p5_forward_test's
+      grading behavior by direct-function invocation -- P5-OPS-01
+      generation derivation, span-attached kill-switch grading, and
+      documented-outage annotation never grading -- so the 30Sep
+      checkpoint cannot move the gate mid-stream without a visible,
+      RED-proven test change; no CI job named inf-runner exists at
+      633daae, none introduced).
+      Ceiling 453->456.
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 453
+TRACKED_FILE_CEILING = 456
