@@ -106,6 +106,16 @@ DEGRADED_THRESHOLD_SECONDS = 600
 #   set scores its plain mean; whole-set staleness is surfaced by the
 #   result timestamp and the F9-H-03 degraded chain, not the score.
 SENTIMENT_HALF_LIFE_HOURS = 4.0
+# Ages at or below this snap to the EXACT fresh weight 1.0. A just-parsed
+# article is 1-10 ms "old" (same-process construction -> aggregation
+# latency), which lands its weight at 1 - ~5e-11: one extra float
+# rounding that made `sentiment_score == 0.9`-style legacy pins flake
+# (caught by the pre-push gate's full-tree run, 21Sep). Real feed
+# published_date granularity is seconds-to-minutes, so nothing honest
+# is lost inside 100 ms; the discontinuity at the boundary is ~5e-9 of
+# relative weight. Below the snap the weighted path is bit-identical to
+# the legacy plain mean.
+FRESH_AGE_SNAP_HOURS = 0.1 / 3600.0
 ENSEMBLE_WEIGHTS: dict[str, float] = {"news": 1.0}
 
 # Module-level (not CacheManager): _extract_article_content runs on worker
@@ -361,7 +371,12 @@ class SentimentAnalyzer:
             weighted_sum = 0.0
             for item in all_news:
                 age_hours = (now - item.published_date).total_seconds() / 3600.0
-                weight = 0.5 ** (max(age_hours, 0.0) / SENTIMENT_HALF_LIFE_HOURS)
+                if age_hours <= FRESH_AGE_SNAP_HOURS:
+                    # Just-parsed (sub-clock-noise): exact fresh weight,
+                    # no perturbation of the score's low bits.
+                    weight = 1.0
+                else:
+                    weight = 0.5 ** (age_hours / SENTIMENT_HALF_LIFE_HOURS)
                 weighted_sum += item.sentiment_score * weight
                 total_weight += weight
             if total_weight > 0.0:

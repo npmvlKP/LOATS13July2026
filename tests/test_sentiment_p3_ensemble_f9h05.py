@@ -35,6 +35,7 @@ from pydantic import ValidationError
 from loats.models import NewsItem, SentimentAnalysisResult
 from loats.sentiment import (
     ENSEMBLE_WEIGHTS,
+    FRESH_AGE_SNAP_HOURS,
     SENTIMENT_HALF_LIFE_HOURS,
     SentimentAnalyzer,
 )
@@ -419,6 +420,50 @@ class TestAdversarialRound2:
     def test_ensemble_weights_type_contract(self):
         assert ENSEMBLE_WEIGHTS == {"news": 1.0}
         assert all(isinstance(v, float) for v in ENSEMBLE_WEIGHTS.values())
+
+
+class TestFreshAgeSnap:
+    """Pre-push-gate catch (21Sep): a just-parsed article is 1-10 ms
+    old, which landed its decay weight at 1 - ~5e-11 -- one extra float
+    rounding that flaked strict-equality legacy pins
+    (0.8999999999999999 != 0.9) depending on scheduler timing. Ages at
+    or below FRESH_AGE_SNAP_HOURS snap to the exact fresh weight 1.0,
+    restoring bit-exact legacy behavior at the fresh boundary."""
+
+    def test_snap_constant_is_sub_clock_noise(self):
+        assert FRESH_AGE_SNAP_HOURS == pytest.approx(0.1 / 3600.0)
+        assert FRESH_AGE_SNAP_HOURS < 1.0 / 3600.0  # below one second
+
+    async def test_single_fresh_item_scores_bit_exact(self):
+        """The exact pre-push reproduction: == (not approx), on purpose."""
+        analyzer = SentimentAnalyzer()
+        with patch(
+            f"{MODULE}.SentimentAnalyzer.parse_rss_feed", new_callable=AsyncMock
+        ) as mock_parse:
+            mock_parse.return_value = [_news(0.9)]
+            result = await analyzer.analyze_symbol_sentiment("SNAP1", ["http://f"])
+        assert result.sentiment_score == 0.9
+
+    async def test_single_fresh_negative_item_scores_bit_exact(self):
+        analyzer = SentimentAnalyzer()
+        with patch(
+            f"{MODULE}.SentimentAnalyzer.parse_rss_feed", new_callable=AsyncMock
+        ) as mock_parse:
+            mock_parse.return_value = [_news(-0.8)]
+            result = await analyzer.analyze_symbol_sentiment("SNAP2", ["http://f"])
+        assert result.sentiment_score == -0.8
+
+    async def test_one_second_old_exercises_weighted_path(self):
+        """Beyond the snap the weighted path is live; a 1 s-old single
+        item still scores itself to floating precision (scale
+        invariance)."""
+        analyzer = SentimentAnalyzer()
+        with patch(
+            f"{MODULE}.SentimentAnalyzer.parse_rss_feed", new_callable=AsyncMock
+        ) as mock_parse:
+            mock_parse.return_value = [_news(0.7, age_hours=1.0 / 3600.0)]
+            result = await analyzer.analyze_symbol_sentiment("SNAP3", ["http://f"])
+        assert result.sentiment_score == pytest.approx(0.7)
 
 
 class TestDeserializationBounds:
