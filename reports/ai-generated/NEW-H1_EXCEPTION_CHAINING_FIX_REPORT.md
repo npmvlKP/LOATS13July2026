@@ -1,10 +1,10 @@
 # NEW-H1 — Async Client Error Re-wrap: Exception Chaining Fix
 ## Principal Engineering Final Report
 
-**Report Date:** 2026-07-22  
-**Issue ID:** NEW-H1  
-**Severity:** P1 – High  
-**Confidence:** Certain  
+**Report Date:** 2026-07-22
+**Issue ID:** NEW-H1
+**Severity:** P1 – High
+**Confidence:** Certain
 **Status:** ✅ RESOLVED — All quality gates green, 286/286 tests pass
 
 ---

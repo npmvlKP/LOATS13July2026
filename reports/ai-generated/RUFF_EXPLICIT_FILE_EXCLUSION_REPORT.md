@@ -8,7 +8,7 @@ Running `python -m ruff check .env.example src/loats/alerts.py` produces 4 synta
 
 ### What Works:
 - ✅ `ruff check src/` - Exclusions work
-- ✅ `ruff check .` - Exclusions work  
+- ✅ `ruff check .` - Exclusions work
 - ✅ `ruff check --exclude "*.env" src/` - CLI exclusions work for directories
 
 ### What Doesn't Work:

@@ -1,10 +1,10 @@
 # TODO-27 Final Report (Carried Items)
 
-**Date:** 2026-08-30  
-**Project:** LOATS13July2026 — Lite OpenAlgo Trading System  
-**Location:** `G:\.OA\LOATS-13July2026\LOATS13July2026`  
-**Git:** `https://github.com/npmvlKP/LOATS13July2026.git` (HEAD `1721a98a` → `TODO-27` branch)  
-**Scope:** TODO-27 (carried) — 4 items from 23Aug2026-Consolidated FR  
+**Date:** 2026-08-30
+**Project:** LOATS13July2026 — Lite OpenAlgo Trading System
+**Location:** `G:\.OA\LOATS-13July2026\LOATS13July2026`
+**Git:** `https://github.com/npmvlKP/LOATS13July2026.git` (HEAD `1721a98a` → `TODO-27` branch)
+**Scope:** TODO-27 (carried) — 4 items from 23Aug2026-Consolidated FR
 **Engineering Team:** Technical Lead · Software Architect · Senior Python Engineer · Performance · Security · DevOps/SRE · QA/Test · Code Reviewer
 
 ---
@@ -23,9 +23,9 @@ and “no unbounded growth” invariants required for production.
 | **(c) Bounded decision queue** | `asyncio.Queue()` unbounded + `await put` (no backpressure) → memory growth if enqueues outpace lazy `process_decision_queue` | `asyncio.Queue(maxsize=N)` (`N=settings.decision_queue_maxsize=100` default, env-overridable) + `put_nowait` + `QueueFull → rejected queue_full` + `get_queue_stats()` | `verify_todo27_external.py` (c) 11/11, live test 2 queued/3rd rejected, `test_trade_decision.py` 27/27 (added 2 new) |
 | **(d) bloombergquint re-validation** | Hardcoded `https://www.bloombergquint.com/markets-feed` in `orchestrator.py:372` and `scheduler.py:408` — defunct (404, non-RSS, domain now NDTV Profit) | Validated feeds via `settings.rss_feeds` (ET, Moneycontrol, **Livemint**), runtime `validate_rss_feed`, scheduler also validates, `.env.example` documents `RSS_FEEDS` | `verify_todo27_external.py` (d) 10/10, runtime `len=3` all `https`, no bloombergquint |
 
-Overall eval: **before 3/10 → after 10/10 (+7)** (`scripts/verify_todo27_eval.py`).  
-All 42 checks in `scripts/verify_todo27_external.py` **PASS** (0 failed).  
-Relevant test suites **92 passed** (`test_trade_decision` + `test_options` + `test_ta` + `test_config` + `test_scheduler` + `test_orchestrator` + `test_sentiment`).  
+Overall eval: **before 3/10 → after 10/10 (+7)** (`scripts/verify_todo27_eval.py`).
+All 42 checks in `scripts/verify_todo27_external.py` **PASS** (0 failed).
+Relevant test suites **92 passed** (`test_trade_decision` + `test_options` + `test_ta` + `test_config` + `test_scheduler` + `test_orchestrator` + `test_sentiment`).
 Quality gates for **changed files** — `ruff` clean, `mypy --strict` clean, import validation clean.
 
 ---
@@ -163,7 +163,7 @@ M  tests/test_options.py
 M  tests/test_trade_decision.py
 ```
 
-**No untracked junk** (`$null`, `[100%]`, `0.21.0` already clean from TODO-21).  
+**No untracked junk** (`$null`, `[100%]`, `0.21.0` already clean from TODO-21).
 **Commit will be:** `feat(TODO-27): vollib→hand-rolled, drop ta, bound queue, re-validate feeds` (see §16).
 
 ---

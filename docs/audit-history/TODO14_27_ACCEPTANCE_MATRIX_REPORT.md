@@ -1,10 +1,10 @@
 # LOATS13July2026 Acceptance Matrix (TODO-14..TODO-27) — Final Report
 
-**Project:** `G:\.OA\LOATS-13July2026\LOATS13July2026`  
-**Git:** `https://github.com/npmvlKP/LOATS13July2026.git`  
-**Branch:** `fix/fr7-wave`  
-**Venv:** `loatsNEW/Scripts/python.exe` (Python 3.11.16)  
-**Date:** 2026-09-01  
+**Project:** `G:\.OA\LOATS-13July2026\LOATS13July2026`
+**Git:** `https://github.com/npmvlKP/LOATS13July2026.git`
+**Branch:** `fix/fr7-wave`
+**Venv:** `loatsNEW/Scripts/python.exe` (Python 3.11.16)
+**Date:** 2026-09-01
 **Engineering Team:** Technical Lead · Software Architect · Senior Python Engineer · Production Debugging Engineer · Performance Engineer · Security Engineer · DevOps/SRE · QA/Test · Code Reviewer
 
 ---
