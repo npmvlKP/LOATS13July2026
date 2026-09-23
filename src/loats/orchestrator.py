@@ -264,7 +264,7 @@ class TradingOrchestrator:
         fetch failures.
         """
         try:
-            return await self._guarded_source_call(source, fetch, *args, **kwargs)
+            result = await self._guarded_source_call(source, fetch, *args, **kwargs)
         except CircuitBreakerOpenError as e:
             logger.warning(f"{source.value} source breaker open, degraded fetch: {e}")
             # Mirror the open state onto the :8001 metrics surface so
@@ -272,6 +272,17 @@ class TradingOrchestrator:
             # per-source isolation, not just the global breakers.
             set_circuit_breaker_status(f"source:{source.value}", True)
             return degraded
+        # Sticky-mirror reset (30Sep wave): the True written above used to
+        # be the ONLY mirror write -- nothing ever cleared it after the
+        # breaker's own OPEN -> HALF_OPEN -> CLOSED recovery, so a
+        # recovered source stayed flagged open on :8001 until restart
+        # (phantom-open metrics). Clear it on every successful
+        # pass-through; the success AFTER recovery is the recovery proof,
+        # and redundant clears are harmless. (Sequential fall-through,
+        # NOT try/else: an ``else`` suite never runs when the try exits
+        # via ``return``.)
+        set_circuit_breaker_status(f"source:{source.value}", False)
+        return result
 
     async def _source_guarded_history(
         self, source: StrengthSource, symbol: str, interval: str
