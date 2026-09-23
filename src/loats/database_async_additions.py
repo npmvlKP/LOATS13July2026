@@ -37,6 +37,7 @@ from .models import (  # noqa: E402 - imports after availability probe and lock 
     Trade,
     TradeDecision,
 )
+from .signal_source_guard import validate_signal_provenance  # noqa: E402
 
 
 def _get_pool(self: Database) -> Any | None:
@@ -49,6 +50,9 @@ def _get_pool(self: Database) -> Any | None:
 
 async def _async_create_signal(self: Database, signal: Signal) -> bool:
     """True async implementation using aiosqlite."""
+    # F9-L-03 (TODO-12): fail-closed provenance gate BEFORE any write,
+    # mirroring the sync path so the async pool cannot bypass the guard.
+    validate_signal_provenance(signal)
     pool = _get_pool(self)
     if pool is None:
         return await self.async_create_signal(signal)

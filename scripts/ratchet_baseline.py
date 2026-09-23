@@ -516,8 +516,13 @@ History (most recent last):
       recovery protocol; register R-07 section + header update and the
       F9-H-05 record §4 erratum landed in the same wave, no other new
       files). Ceiling 458->459.
+    * 459->461 (2026-09-23, FR9 Wave 4 c1 -- F9-L-03 provenance
+      guard): +2 tracked files -- src/loats/signal_source_guard.py
+      (insert-time enum-source guard on both signal write paths) and
+      tests/test_signal_source_guard.py (guard contract + store-policy
+      nets). Ceiling 459->461.
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 459
+TRACKED_FILE_CEILING = 461
