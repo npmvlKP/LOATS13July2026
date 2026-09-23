@@ -1,15 +1,15 @@
 # FR7 Health Check Fixes — Final Report
 
-**Project:** `G:\.OA\LOATS-13July2026\LOATS13July2026`  
-**Date:** 2026-09-01  
-**Venv:** `loatsNEW/Scripts/python.exe` (Python 3.12.7)  
+**Project:** `G:\.OA\LOATS-13July2026\LOATS13July2026`
+**Date:** 2026-09-01
+**Venv:** `loatsNEW/Scripts/python.exe` (Python 3.12.7)
 **Goal:** Drive `scripts/fr7_health_check.py` to **zero failures** and leave a reproducible verification trail.
 
 ---
 
 ## 1. Executive Summary
 
-The FR7 consolidated health check went from **6 failing checks** (and a broken `--fast` run that skipped coverage) to **27 PASS / 0 FAIL / 0 SKIP** in full mode.  
+The FR7 consolidated health check went from **6 failing checks** (and a broken `--fast` run that skipped coverage) to **27 PASS / 0 FAIL / 0 SKIP** in full mode.
 All originally failing checks were addressed at the root cause:
 
 | Check | Original failure | Root-cause fix |
@@ -116,8 +116,8 @@ The original run failed because:
 
 ## 5. Git Status (Before/After)
 
-**Before:** 24 PASS / 6 FAIL / 3 SKIP (`--fast`); 19 PASS / 8 FAIL / 0 SKIP (full).  
-**After:** 27 PASS / 0 FAIL / 0 SKIP (full).  
+**Before:** 24 PASS / 6 FAIL / 3 SKIP (`--fast`); 19 PASS / 8 FAIL / 0 SKIP (full).
+**After:** 27 PASS / 0 FAIL / 0 SKIP (full).
 
 No commit was made. The working tree has the intentional modifications listed above and the generated health-check JSON artifacts in `reports/health/`.
 
@@ -241,7 +241,7 @@ Expected: all commands return exit code 0 (full health check should print `27 PA
 3. **Commit** with a conventional message such as:
    ```
    fix(fr7): zero failing health checks
-   
+
    - Analyzer routing defaults off and integrates real client
    - Source-gate diversity uses canonical source count
    - Expose CMP config rules via Settings env bindings

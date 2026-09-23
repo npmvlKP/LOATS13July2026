@@ -1,7 +1,7 @@
 # CMP Rules 7 & 11 Implementation Report
 
-**Date:** 2026-08-21  
-**Task:** 21.1 - Prioritized Improvement Roadmap (REVIEW ONLY — awaits USER APPROVAL)  
+**Date:** 2026-08-21
+**Task:** 21.1 - Prioritized Improvement Roadmap (REVIEW ONLY — awaits USER APPROVAL)
 **Focus:** CMP Rule 7 (Per-order modification limit) and CMP Rule 11 (Position limits)
 
 > **STATUS UPDATE (2026-09-02, F8-H-02):** The Rule 7 sections below are
@@ -97,7 +97,7 @@ def check_modification_limit(self, order_id: str, limit: int = 25) -> bool:
 # In both OpenAlgoClient and AsyncOpenAlgoClient
 def modify_order(self, order_id: str, ...) -> dict[str, Any]:
     """Modify an order with circuit breaker protection and CMP Rule 7 enforcement."""
-    
+
     # CMP Rule 7: Check modification counter limit
     if not rules_engine.check_modification_limit(order_id, limit=25):
         current_modifications = rules_engine.get_modification_count(order_id)
@@ -105,9 +105,9 @@ def modify_order(self, order_id: str, ...) -> dict[str, Any]:
             f"Modification limit exceeded (25 max). "
             f"Current: {current_modifications}"
         )
-    
+
     # ... modification logic ...
-    
+
     # CMP Rule 7: Increment counter on successful modification
     rules_engine.increment_modification_counter(order_id)
 ```
@@ -121,7 +121,7 @@ def check_position_limits(
 ) -> tuple[bool, dict[str, Any]]:
     """
     Check position limits according to CMP Rule 11.
-    
+
     Limits:
     - 5 lots for NIFTY
     - 3 lots for BANKNIFTY
@@ -162,7 +162,7 @@ def check_position_limits(
 # In TradeDecisionEngine (trade_decision.py)
 async def create_trade_decision(self, ...) -> tuple[TradeDecision | None, dict[str, Any]]:
     """Create TradeDecision from signals using full CMP workflow."""
-    
+
     # Step 4: Check position limits (CMP Rule 11)
     position_check, position_result = rules_engine.check_position_limits(
         symbol, current_positions

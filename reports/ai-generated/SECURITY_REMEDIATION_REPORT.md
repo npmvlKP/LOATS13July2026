@@ -1,6 +1,6 @@
 # Security Remediation Report - LOATS13July2026
 
-**Date:** July 20, 2026  
+**Date:** July 20, 2026
 **Status:** ✅ ALL REMEDIATIONS COMPLETE
 
 ---
@@ -14,11 +14,11 @@ This report documents the forensic review and remediation of the LOATS13July2026
 ## Issues Addressed
 
 ### ✅ F-SEC-1: SQL Injection Vulnerability
-**Status:** NOT PRESENT (Already Fixed)  
+**Status:** NOT PRESENT (Already Fixed)
 **Finding:** The codebase was already using parameterized queries via SQLAlchemy ORM, which prevents SQL injection attacks.
 
 ### ✅ F-SEC-2: HTML Injection in Alerts
-**Status:** FIXED  
+**Status:** FIXED
 **Finding:** Added `html.escape()` sanitization for user-provided input in `_kill_switch()` and `_resume()` handlers.
 
 ```python
@@ -36,7 +36,7 @@ reason = (
 ---
 
 ### ⚠️ F-SEC-3: Telegram Auth Allow-List MISSING (CRITICAL)
-**Status:** ✅ FIXED  
+**Status:** ✅ FIXED
 
 **Finding:** Anyone in the Telegram chat could issue `/kill` or `/resume` commands.
 
@@ -89,13 +89,13 @@ async def _kill_switch(self, update: Update, context: ContextTypes.DEFAULT_TYPE)
 ---
 
 ### ⚠️ F-REL-1: Kill Switch Enforcement
-**Status:** ALREADY IMPLEMENTED  
+**Status:** ALREADY IMPLEMENTED
 **Finding:** The kill switch functionality was already properly implemented in `src/loats/openalgo.py`.
 
 ---
 
 ### ⚠️ F-SEC-4: Hardcoded Secret Default
-**Status:** ✅ FIXED  
+**Status:** ✅ FIXED
 **Finding:** `settings.py:55` had a hardcoded default `openalgo_api_key = SecretStr("default_openalgo_api_key")`.
 
 **Solution:** Added a Pydantic field validator to reject the placeholder value:

@@ -1,6 +1,6 @@
 # Technical Debt Fix: M6 - Expired Contract Error Handling
 
-**Date:** 2026-07-21  
+**Date:** 2026-07-21
 **Task:** Fix negative time-to-expiry silently clamped (options.py:53,109,173,263,309)
 
 ## Summary
@@ -14,7 +14,7 @@ Successfully replaced silent clamping of negative time-to-expiry values with pro
 ```python
 class ExpiredContractError(ValueError):
     """Raised when attempting to calculate Greeks for an expired option contract."""
-    
+
     def __init__(self, message: str, symbol=None, expiry=None, time_to_expiry=None):
         super().__init__(message)
         self.symbol = symbol
