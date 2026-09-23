@@ -531,8 +531,12 @@ History (most recent last):
       nets) and tests/test_signal_outcomes_wiring.py (orchestrator
       wiring net); the settings knob rides the same wave in-tree.
       Ceiling 462->464.
+    * 464->465 (same wave, commit 5/5): +1 tracked file --
+      docs/audit-history/23Sep2026-breaker-mirror-and-outcome-
+      instrumentation.md (the wave record; settings knob +
+      .env.example landed in-tree with commit 3/5). Ceiling 464->465.
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 464
+TRACKED_FILE_CEILING = 465
