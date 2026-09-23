@@ -37,6 +37,7 @@ from .models import (  # noqa: E402 - imports after availability probe and lock 
     Trade,
     TradeDecision,
 )
+from .signal_outcomes import SignalOutcomeState  # noqa: E402
 
 
 def _get_pool(self: Database) -> Any | None:
@@ -87,6 +88,69 @@ async def _async_create_signal(self: Database, signal: Signal) -> bool:
         finally:
             await pool.release(conn)
     return True
+
+
+async def _async_record_signal_outcome_open(
+    self: Database,
+    signal_id: str,
+    horizon_minutes: int,
+    metadata: dict[str, Any] | None = None,
+) -> bool:
+    """Pool-native outcome-open insert (mirrors ``_async_create_signal``).
+
+    Mirrors the sync ``record_signal_outcome_open`` exactly (same
+    ``INSERT OR IGNORE``, same columns); ``to_thread`` fallback would be
+    equally correct -- the pool path is preferred for symmetric behavior
+    with the signal write that precedes it.
+    """
+    pool = _get_pool(self)
+    if pool is None:
+        return await asyncio.to_thread(
+            self.record_signal_outcome_open, signal_id, horizon_minutes, metadata
+        )
+
+    now = datetime.now(UTC)
+    async with _async_write_lock:
+        conn = await pool.acquire()
+        try:
+            async with conn.cursor() as cursor:
+                await cursor.execute(
+                    """INSERT OR IGNORE INTO signal_outcomes
+                    (signal_id, outcome_state, horizon_minutes, created_at,
+                     metadata)
+                    VALUES (?, ?, ?, ?, ?)""",
+                    (
+                        signal_id,
+                        SignalOutcomeState.OPEN.value,
+                        int(horizon_minutes),
+                        now.isoformat(),
+                        json.dumps(metadata) if metadata else None,
+                    ),
+                )
+            await conn.commit()
+        finally:
+            await pool.release(conn)
+    return True
+
+
+async def _async_resolve_signal_outcomes(
+    self: Database,
+    now: datetime | None = None,
+    limit: int = 200,
+) -> list[dict[str, Any]]:
+    """Async resolve; offloads the sync resolver to a worker thread.
+
+    The resolver does one JOIN scan plus per-row history reads; running
+    it on the synchronous connection inside ``asyncio.to_thread`` follows
+    the F8-H-04 thread-offload precedent and keeps a single code path,
+    so a verdict can never differ between pool and non-pool deployments.
+    """
+    return await asyncio.to_thread(self.resolve_signal_outcomes, now, limit)
+
+
+async def _async_get_signal_outcome_summary(self: Database) -> dict[str, Any]:
+    """Async wrapper get_signal_outcome_summary(); avoids blocking the loop."""
+    return await asyncio.to_thread(self.get_signal_outcome_summary)
 
 
 async def _async_store_historical_data(
@@ -534,6 +598,9 @@ def extend_database_class() -> None:
         "_async_record_trade_decision": _async_record_trade_decision,
         "_async_log_audit": _async_log_audit,
         "_async_get_historical_data": _async_get_historical_data,
+        "_async_record_signal_outcome_open": _async_record_signal_outcome_open,
+        "_async_resolve_signal_outcomes": _async_resolve_signal_outcomes,
+        "_async_get_signal_outcome_summary": _async_get_signal_outcome_summary,
     }
 
     for method_name, method in method_map.items():

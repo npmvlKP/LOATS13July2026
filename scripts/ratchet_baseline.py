@@ -522,8 +522,12 @@ History (most recent last):
       (the breaker-mirror RED/GREEN lifecycle net); the orchestrator
       mirror reset rides this commit within the existing tree.
       Ceiling 459->461.
+    * 461->462 (same wave, commit 2/5): +1 tracked file --
+      tests/test_signal_outcomes_db.py (the outcome storage
+      persistence net); database.py outcome storage + async additions
+      ride this commit within the existing tree. Ceiling 461->462.
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 461
+TRACKED_FILE_CEILING = 462
