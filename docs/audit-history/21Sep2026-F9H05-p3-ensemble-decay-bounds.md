@@ -102,9 +102,19 @@ neither a production defect)
   test_sentiment_coverage, test_sentiment_f9h03_producer,
   test_sentiment_ttl_horizons_f9h03, test_models, test_orchestrator,
   test_orchestrator_extra, test_scheduler, test_cache,
-  test_cache_additional, test_cache_concurrency, test_strength,
+  test_cache_additional, test_cache_concurrency,
   test_repo_hygiene, test_single_engine_consolidation —
   **348 passed / 0 failed** (21Sep run).
+- Erratum (23Sep2026): this list originally named `test_strength` among
+  the surface modules, but `tests/test_strength.py` was deleted on
+  2026-07-21 (`bcc09c1`) — two months before this record's date — and is
+  absent at both of this wave's commits (`bd0b07f`, `633daae`); the 21Sep
+  "348 passed" run therefore cannot have included that literal file (the
+  module list was transcribed imprecisely). The list above is corrected
+  to the 13 surviving modules; the run tally itself is corroborated — the
+  corrected 13-module surface plus the pin module re-ran clean at HEAD
+  `7e124c3`: **394 passed / 0 failed** (158.6 s). `src/loats/strength.py`
+  itself remains live and unaffected by this correction.
 - Counts are decay-invariant (tallies pinned), bounds fuzz is seeded
   (`random.Random(0xF9E05/6)` — deterministic, no hypothesis
   dependency; ADR-0010 dependency-austerity precedent).

@@ -22,6 +22,16 @@ Updated 2026-09-21 (same day) by the R-02 wave: R-02 CLOSED by ADR-0018
 (grader-disclosure amendment; live grader re-scrape 2026-09-21T09:20Z shows
 the KILL-SWITCH PROOF reason replaced by the NON-GRADING pre-guard NOTE;
 P5 nets 165 passed).
+Updated 2026-09-23: R-07 opened (test-infra: orphaned fixer-hook mutant
+sweep after a hard suite kill — incident record
+`docs/audit-history/23Sep2026-orphaned-mutant-sweep-recovery.md`, recovery
+protocol verified same day at `7e124c3`: 2,162 passed / 1 skipped /
+89.48% branch cov / 534s rc=0 single-process; candidates for prevention
+(a) process-tree kill and (b) pre-run frozen-tree guard deliberately OPEN,
+not one-key). Also: erratum on the F9-H-05 record's §4 surface list
+(`test_strength` deleted 2026-07-21 by `bcc09c1`, absent at the wave's
+commits; corrected to the 13 surviving modules, tally corroborated by a
+394-passed re-run).
 
 | ID | Priority | Category | Status | Due | Next action |
 |----|----------|----------|--------|-----|-------------|
@@ -31,6 +41,7 @@ P5 nets 165 passed).
 | R-04 | P3 | Accepted residual | ACCEPTED | — | Revisit with the post-checkpoint producer wave |
 | R-05 | Ops | Environment, dated | OPEN | 2026-10-01 | Shared-venv rebuild; fresh-venv pip-audit replication until then |
 | R-06 | Process | Register discipline | CLOSED by this file | — | Maintain per the rules above |
+| R-07 | P2 | Test infra: orphaned mutant sweep | OPEN — candidates deferred | 2026-09-30 | Decide (a) process-tree kill vs (b) pre-run frozen-tree guard |
 
 ---
 
@@ -136,3 +147,28 @@ unconditional conftest clear; coverage 89.32% at close-out). F9-H-05 CMP P3
 ensemble semantics and hard score bounds closed by PR #66 `633daae` with
 ADR-0017. R-02 CMP P5 kill-switch span proof closed 2026-09-21 by ADR-0018
 (pre-guard grader disclosure; post-guard holes still FAIL-closed).
+
+## R-07 [P2] Orphaned fixer-hook mutant sweep after a hard suite kill
+
+Category: test infrastructure. Status: OPEN — recovered incident, prevention
+candidates deliberately deferred. Confidence: Certain (reproduced 23Sep).
+
+Evidence: hard-killing pytest MID-`TestFixerHooksSpareFrozenEvidence`
+orphans its excludes-stripped MUTANT `pre_commit run` child, which keeps
+rewriting the frozen evidence trees; the parent's `finally` repair never
+fires. The poisoned state compounds: later runs' damage-deltas read empty
+(files already ` M` at session start), the mutant test false-REDDs, and no
+repair happens — indistinguishable from order-dependence. Measured 23Sep:
+87 ` M` frozen-tree files, whitespace-only; recovery via verified
+frozen-confinement + `git checkout` + solo mutant-test green. Corollary:
+killed `--cov` runs skip the atexit flush, so `--cov-append` merges carried
+phantom floor failures (alerts.py 18.3% / backtest_sanity.py 25.3% were
+artifacts; single-process 88% / 86%, CI green).
+
+Incident record + recovery protocol:
+`docs/audit-history/23Sep2026-orphaned-mutant-sweep-recovery.md`.
+
+Next action: at the 30Sep ops-review window, decide (a) process-tree kill
+for suite timeouts (no hook child can outlive its parent) vs (b) pre-run
+frozen-tree guard in the mutant test (fails closed on pre-damaged trees).
+Neither is one-key mid-span.

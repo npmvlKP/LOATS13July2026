@@ -510,8 +510,14 @@ History (most recent last):
       grader split; run_p5_forward_test.py delegation + --status
       NOTE surface; frozen-infra/span-invariants/register pins
       re-based). Ceiling 456->458.
+    * 458->459 (2026-09-23, R-07 docs wave): +1 tracked file --
+      docs/audit-history/23Sep2026-orphaned-mutant-sweep-recovery.md
+      (the orphaned fixer-hook mutant sweep incident record and
+      recovery protocol; register R-07 section + header update and the
+      F9-H-05 record §4 erratum landed in the same wave, no other new
+      files). Ceiling 458->459.
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 458
+TRACKED_FILE_CEILING = 459
