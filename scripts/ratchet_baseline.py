@@ -521,8 +521,14 @@ History (most recent last):
       (insert-time enum-source guard on both signal write paths) and
       tests/test_signal_source_guard.py (guard contract + store-policy
       nets). Ceiling 459->461.
+    * 461->463 (2026-09-23, FR9 Wave 4 c2 -- F9-L-03 audited purge):
+      +2 tracked files -- scripts/purge_legacy_signal_rows.py
+      (dry-run-default audited purge: single-writer probes, safety
+      copies, audit-first chained DELETE entries, second-instance
+      verification) and tests/test_purge_script_f9l03.py (12 pins).
+      Ceiling 461->463.
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 461
+TRACKED_FILE_CEILING = 463
