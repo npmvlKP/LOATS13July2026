@@ -128,3 +128,53 @@ suites green).
   `DOCUMENTED_OUTAGE_WINDOWS` (scripts/verify_p5_forward_test.py) with
   the registry pin updated in the same commit
   (tests/test_p5_f9c02_outage_window.py) — window start untouched.
+
+## Continuation (re-landed 23 Sep): 21–23 Sep OpenAlgo process deaths
+
+An earlier 21Sep continuation documenting that day's outage was dropped
+by the `3d70824` record rewrite (17:36 IST 21Sep); re-landed here with
+the 23Sep evidence, which converts the incident into a **repeat defect
+with a root-cause lead**.
+
+### 21 Sep (digest-verified facts)
+
+- ~07:15 IST: OpenAlgo died silently (no WER record; stdout of the
+  pre-death instance ended mid-traffic, healthy). Transport class:
+  conn-refused, no listener on 5000. LOATS auth was valid (06:23 OAuth).
+- Three uncoordinated restart actors (automation 06:23, manual 10:40,
+  automation 12:23:28) each voided the broker session → operator
+  re-logins at 11:30 and ~15:4x. 180 in-session breaker opens.
+- Decisional evidence 53/53 provenance-locked; supervisor unharmed.
+
+### 23 Sep (fresh forensics)
+
+- 08:38:41 IST: automation instance (PID 24900) live; 08:40:15 operator
+  OAuth; breakers CLOSED 08:41:30 — cleanest setup of the span.
+- **09:41:47 IST: died silently again.** `log/errors.jsonl` (capped at
+  1,000 lines — rotation destroys death evidence) ends mid-traffic, no
+  fatal entry; no WER record. **Prime suspect captured pre-death**:
+  `sqlite3.OperationalError: database is locked` (08:40:36/47) on the
+  analyzer-mode toggle — SQLite write contention, consistent with the
+  known dual-instance co-existence sharing `openalgo.db`.
+- Automation restart loop restored the listener ~09:45 (PID 17452);
+  session voided again (second operator re-login before 10:00 IST).
+- LOATS side: 60 in-session-ish breaker opens around the death window,
+  all recovered; supervisor unharmed (restarts 11, zero exceptions).
+
+### Wave request (root-cause lead in hand)
+
+1. **Single instance, enforced**: kill-with-notify secondaries; restart
+   loop takes a global advisory lock so manual/automated restarts
+   cannot interleave.
+2. **DB contention fix**: enable WAL + busy_timeout on `openalgo.db`
+   (or move to a server DB) — multi-process access is the leading death
+   hypothesis.
+3. **Evidence retention**: raise/remove the 1,000-line `errors.jsonl`
+   cap; capture stdout on automation-managed instances (proven workable
+   on 21Sep).
+4. **Root-cause the silence**: unhandled exception in a non-logging
+   thread is the likely mechanism; a faulthandler dump would confirm.
+5. **Window-registry follow-up for the F9-C-02 owner**: verify and pin
+   21Sep + 23Sep in-session breaker windows (21Sep 10:08–10:37 and
+   12:14–12:27 IST clusters; 23Sep ~09:42–09:45 cluster) as
+   annotation-only outage windows, mirroring the 17Sep precedent.
