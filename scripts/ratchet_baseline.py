@@ -540,8 +540,16 @@ History (most recent last):
       includes S-14/S-15 holding the L-01/L-02 30Sep slots) and
       tests/test_cmp_supersession_register.py (7 content pins).
       Ceiling 465->467.
+    * 467->469 (2026-09-23, FR9 Wave 4 c5 -- disposition record and
+      dry-run evidence): +2 tracked files --
+      docs/audit-history/23Sep2026-fr9-wave4-low-tier.md (the wave
+      record: L-03 executed/staged, L-04/L-05 closed, L-01/L-02
+      scheduled to the 30Sep wave, L-06 reconciled) and
+      reports/ai-generated/f9l03-purge-record.json (the audited
+      dry-run evidence: 42 eligible rows classified, 5 valid-tag
+      rows retained, STRESS-ORD present). Ceiling 467->469.
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 467
+TRACKED_FILE_CEILING = 469
