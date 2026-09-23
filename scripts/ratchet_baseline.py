@@ -534,8 +534,14 @@ History (most recent last):
       (binary switch accepted for the ANALYZE horizon; 3-state machine
       deferred to a PRE-LIVE gate with a binding spec). Ceiling
       463->465.
+    * 465->467 (2026-09-23, FR9 Wave 4 c4 -- the register itself):
+      +2 tracked files -- docs/CMP-SUPERSESSION-REGISTER.md (15 rows
+      S-01..S-15: expectation / delivered reality / authority / state;
+      includes S-14/S-15 holding the L-01/L-02 30Sep slots) and
+      tests/test_cmp_supersession_register.py (7 content pins).
+      Ceiling 465->467.
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 465
+TRACKED_FILE_CEILING = 467
