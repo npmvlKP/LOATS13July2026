@@ -527,8 +527,15 @@ History (most recent last):
       copies, audit-first chained DELETE entries, second-instance
       verification) and tests/test_purge_script_f9l03.py (12 pins).
       Ceiling 461->463.
+    * 463->465 (2026-09-23, FR9 Wave 4 c3 -- F9-L-04/F9-L-05 decisions):
+      +2 tracked files -- docs/adr/0019-cmp-supersession-register.md
+      (the register's authority record) and
+      docs/adr/0020-killswitch-escalation-analyze-acceptance.md
+      (binary switch accepted for the ANALYZE horizon; 3-state machine
+      deferred to a PRE-LIVE gate with a binding spec). Ceiling
+      463->465.
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 463
+TRACKED_FILE_CEILING = 465
