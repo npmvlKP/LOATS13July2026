@@ -175,6 +175,9 @@ with a root-cause lead**.
 4. **Root-cause the silence**: unhandled exception in a non-logging
    thread is the likely mechanism; a faulthandler dump would confirm.
 5. **Window-registry follow-up for the F9-C-02 owner**: verify and pin
-   21Sep + 23Sep in-session breaker windows (21Sep 10:08–10:37 and
-   12:14–12:27 IST clusters; 23Sep ~09:42–09:45 cluster) as
-   annotation-only outage windows, mirroring the 17Sep precedent.
+   the same-day in-session breaker storms as annotation-only outage
+   windows, mirroring the 17Sep precedent: 21Sep (10:08–10:37 and
+   12:14–12:27 IST clusters), 23Sep (~09:42–09:45 cluster), and 24Sep
+   (09:15–12:09 IST session-stale storm — Zerodha token-expiry wall,
+   see Continuation 3; self-recovered 12:11:06 IST before the current
+   run started).
