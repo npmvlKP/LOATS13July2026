@@ -516,8 +516,15 @@ History (most recent last):
       recovery protocol; register R-07 section + header update and the
       F9-H-05 record §4 erratum landed in the same wave, no other new
       files). Ceiling 458->459.
+    * 459->460 (2026-09-24, R-08 degraded-duplicate docs wave): +1
+      tracked file -- docs/audit-history/24Sep2026-degraded-duplicate-
+      recurrence.md (the second same-day degraded-instance incident
+      record, live remediation evidence and OpenAlgo root-cause pin;
+      register R-08 row + header update + section and the RUNBOOK
+      troubleshooting entry landed in the same wave, no other new
+      files). Ceiling 459->460.
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 459
+TRACKED_FILE_CEILING = 460
