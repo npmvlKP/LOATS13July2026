@@ -535,8 +535,17 @@ History (most recent last):
       docs/audit-history/23Sep2026-breaker-mirror-and-outcome-
       instrumentation.md (the wave record; settings knob +
       .env.example landed in-tree with commit 3/5). Ceiling 464->465.
+    * 465->468 (2026-09-24, F9-M-01-R1 frozen-chain-head wave): +3
+      tracked files -- src/loats/database_async_additions.py chain
+      writer repair rides the existing tree, so the delta is the
+      fail-closed re-anchor tool scripts/repair_f9m01_chain_head.py
+      (live-cited in RUNBOOK.md Audit Log Integrity), its concurrency
+      regression net tests/test_audit_chain_f9m01_async_writer.py, and
+      the wave record docs/audit-history/
+      24Sep2026-f9m01-r1-frozen-chain-head-resolution.md. Ceiling
+      465->468.
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 465
+TRACKED_FILE_CEILING = 468
