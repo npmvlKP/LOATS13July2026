@@ -516,8 +516,17 @@ History (most recent last):
       recovery protocol; register R-07 section + header update and the
       F9-H-05 record §4 erratum landed in the same wave, no other new
       files). Ceiling 458->459.
+
+    * 459->460 (2026-09-24, F9-M-02 branch-protection closure wave): +1
+      tracked file -- docs/audit-history/24Sep2026-F9M02-branch-protection-
+      closure.md (the closure record: classic branch protection re-enabled
+      via the REST API after the silent 404 regression, 10 required
+      contexts per the documented contract, live direct-push 403 and
+      fast-forward rejection probes; register header update and the
+      CONTRIBUTING.md drift correction landed in the same wave, no other
+      new files). Ceiling 459->460.
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 459
+TRACKED_FILE_CEILING = 460
