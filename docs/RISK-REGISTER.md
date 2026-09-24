@@ -46,6 +46,11 @@ although the rule is live and enforced, so the GraphQL BPR query (or
 surface on this repo (this also explains the 13Sep "404 -> derive ->
 collapse" scare). Closure record:
 `docs/audit-history/24Sep2026-F9M02-branch-protection-closure.md`.
+Snapshot: HEAD `af3d72c` (PR #76 merged 2026-09-24), post-merge Pipeline
+run `36016934081` = success. This register update itself landed through
+the PR flow under the restored protection — the flow's first end-to-end
+pass since re-enablement (relax -> merge -> restore, GraphQL read-back
+count=1 / 10 contexts / admin-enforced).
 
 | ID | Priority | Category | Status | Due | Next action |
 |----|----------|----------|--------|-----|-------------|
