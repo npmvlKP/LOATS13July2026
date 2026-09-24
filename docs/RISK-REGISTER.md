@@ -32,6 +32,17 @@ not one-key). Also: erratum on the F9-H-05 record's §4 surface list
 (`test_strength` deleted 2026-07-21 by `bcc09c1`, absent at the wave's
 commits; corrected to the 13 surviving modules, tally corroborated by a
 394-passed re-run).
+Updated 2026-09-24: F9-M-01-R1 wave on
+`fix/breaker-mirror-reset-and-outcome-instrumentation` — the 17Sep F9-M-01
+chain was live-broken by the pooled async audit writer (head cache read but
+never advanced; 4,578 entries in 23 frozen runs; verifier False since
+18Sep). Root cause fixed (single `to_thread` hop under `_audit_lock`, head
+advance restored, uuid entry_ids), 9 regression pins added, live trail
+re-anchored fail-closed (`scripts/repair_f9m01_chain_head.py`), production
+verifier True post-repair. Evidence:
+`docs/audit-history/24Sep2026-f9m01-r1-frozen-chain-head-resolution.md`.
+No new R-row: fixed at the wave, not an open risk; the watch item is that
+PR #73's CI must stay green with the two new/changed writer files.
 
 | ID | Priority | Category | Status | Due | Next action |
 |----|----------|----------|--------|-----|-------------|
