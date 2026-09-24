@@ -773,24 +773,18 @@ class Database:
             except Exception as e:
                 logger.debug(f"Ignoring error closing audit log handle: {e}")
 
-    def _read_chain_head(self) -> str | None:
-        """F9-M-01: current hash-chain head.
+    def _scan_chain_head_uncached(self) -> str | None:
+        """Scan the JSONL tail-to-head for the last readable sha256_hash.
 
-        Per-instance CACHE: the first call scans the JSONL tail-to-head
-        cost once (in file order); every later call returns the cached
-        head, which the append path advances after each successful write.
-        This keeps audit writes O(1) (benchmark gate >50 inserts/sec).
-        None when the file is empty/missing or its tail is unreadable (a
-        corrupt tail is the verifier's CRITICAL finding, not the writer's
-        to guess at).
+        F9-M-01-R1 extraction: the scan formerly inlined in
+        ``_read_chain_head``. Skips unreadable lines (a corrupt tail is
+        the verifier's CRITICAL finding, not the writer's to guess at)
+        and treats an unroutable file as "no head" instead of raising --
+        the writer-side scan must never crash the write path.
         """
-        if self._chain_head_loaded:
-            return self._chain_head
         try:
             path = Path(self.audit_log_path)
             if not path.exists():
-                self._chain_head = None
-                self._chain_head_loaded = True
                 return None
             head: str | None = None
             with path.open(encoding="utf-8") as fh:
@@ -805,11 +799,18 @@ class Database:
                     stored = data.get("sha256_hash")
                     if isinstance(stored, str):
                         head = stored
-            self._chain_head = head
-            self._chain_head_loaded = True
             return head
         except OSError:
             return None
+
+    def _read_chain_head(self) -> str | None:
+        """Current hash-chain head (cached; scan deferred to first use)."""
+        if self._chain_head_loaded:
+            return self._chain_head
+        head = self._scan_chain_head_uncached()
+        self._chain_head = head
+        self._chain_head_loaded = True
+        return head
 
     def _advance_chain_head(self, new_hash: str) -> None:
         """Advance the cached chain head after a successful append."""

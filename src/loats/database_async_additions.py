@@ -12,6 +12,7 @@ import asyncio
 import json
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
+from uuid import uuid4
 
 if TYPE_CHECKING:
     from .database import Database
@@ -20,6 +21,12 @@ if TYPE_CHECKING:
 # module-level write lock so that all aiosqlite-backed writes are serialised
 # without contending for the database lock.  Reads remain unblocked.
 _async_write_lock = asyncio.Lock()
+
+
+def _audit_timestamp_ms(now: datetime) -> int:
+    """Sync-writer parity: audit_log.timestamp_ms = int(now.timestamp()*1000)."""
+    return int(now.timestamp() * 1000)
+
 
 try:
     import aiosqlite  # noqa: F401 - availability probe, flag used below
@@ -475,7 +482,30 @@ async def _async_log_audit(
     previous_state: dict[str, Any] | None = None,
     new_state: dict[str, Any] | None = None,
 ) -> None:
-    """Async dual-write audit log matching the canonical _log_audit behavior."""
+    """Async dual-write audit log matching the canonical _log_audit behavior.
+
+    F9-M-01-R1: the chain read -> hash -> JSONL append -> head-advance
+    sequence runs as ONE ``asyncio.to_thread`` hop inside the shared
+    ``_audit_lock`` -- the same critical section the canonical sync
+    writer uses -- so sync and async writers serialize against each
+    other and the per-instance chain-head cache stays honest. The
+    aiosqlite INSERT then completes on the loop under
+    ``_async_write_lock`` (resolving pool awaits inside the worker
+    deadlocks: the single-threaded pool queues on the very loop the
+    worker's future is blocking). It replaces the previous shape --
+    entry_id generated on the loop (microsecond timestamp + ``id(self)``
+    suffix, colliding under concurrency and mass-falling back via the
+    UNIQUE-constraint path) and a JSONL append on the loop thread
+    outside any lock (orphan lines, frozen chain head: the head was read
+    but never advanced, so every pooled entry linked to whichever head
+    was current at first cache load -- 4,578 broken links in the live
+    log before this fix).
+
+    Direct on-loop ``log_audit()`` calls remain loop-blocking by design;
+    they cannot share the sync writer's critical section from the loop
+    thread because the threading lock is re-entrant per thread. Call
+    ``async_log_audit`` from coroutines.
+    """
     pool = _get_pool(self)
     if pool is None:
         return await self.async_log_audit(
@@ -491,70 +521,101 @@ async def _async_log_audit(
     now = datetime.now(UTC)
     metadata = metadata or {}
     previous_state = previous_state or {}
-    new_state = new_state or {}
 
-    entry_id = f"audit_{now.strftime('%Y%m%d%H%M%S%f')}_{id(self)}"
-    entry_data: dict[str, Any] = {
-        "entry_id": entry_id,
-        "timestamp": now.isoformat(),
-        "action": action,
-        "entity_type": entity_type,
-        "entity_id": entity_id,
-        "user": user,
-        "metadata": metadata,
-        "previous_state": previous_state,
-        "new_state": new_state,
-        "timestamp_ms": int(now.timestamp() * 1000),
-    }
+    def _pooled_write() -> dict[str, Any]:
+        """Chain + JSONL append under _audit_lock; returns the entry."""
+        with self._audit_lock:
+            new_state_resolved = new_state or {}
+            # Model-parity entry_id: microsecond timestamp + uuid suffix.
+            # The old id(self) suffix collided between same-microsecond
+            # writes and mass-triggered the UNIQUE-constraint fallback.
+            entry_id = f"audit_{now.strftime('%Y%m%d%H%M%S%f')}_{uuid4().hex[:8]}"
+            entry_data: dict[str, Any] = {
+                "entry_id": entry_id,
+                "timestamp": now.isoformat(),
+                "action": action,
+                "entity_type": entity_type,
+                "entity_id": entity_id,
+                "user": user,
+                "metadata": metadata,
+                "previous_state": previous_state,
+                "new_state": new_state_resolved,
+                "timestamp_ms": _audit_timestamp_ms(now),
+            }
 
-    # F9-M-01 (TODO-6): hash-chain link, same semantics as the canonical
-    # sync writer -- link to the last line's sha256_hash, seeded at the
-    # legacy head for grandfathered files.
-    entry_data["previous_hash"] = self._read_chain_head()
-    # Calculate SHA-256 hash over data excluding the hash field itself
-    hash_data = dict(entry_data)
-    hash_data.pop("sha256_hash", None)
-    entry_data["sha256_hash"] = self._calculate_sha256(hash_data)
+            # F9-M-01 (TODO-6): hash-chain link, same semantics as the
+            # canonical sync writer -- link to the last line's
+            # sha256_hash, seeded at the legacy head for grandfathered
+            # files.
+            entry_data["previous_hash"] = self._read_chain_head()
+            # Calculate SHA-256 hash over data excluding the hash field
+            # itself
+            hash_data = dict(entry_data)
+            hash_data.pop("sha256_hash", None)
+            entry_data["sha256_hash"] = self._calculate_sha256(hash_data)
 
-    # Write JSONL first; abort DB write on failure to keep dual trails consistent
-    try:
-        self.audit_log_path.parent.mkdir(parents=True, exist_ok=True)
-        with self.audit_log_path.open("a", encoding="utf-8") as f:
-            f.write(json.dumps(entry_data, sort_keys=True) + "\n")
-    except OSError as e:
-        raise RuntimeError(
-            f"Failed to write audit log entry to JSONL file: {e}. "
-            "Database commit aborted to maintain consistency."
-        ) from e
+            # Write JSONL first; abort the DB write on failure to keep the
+            # dual trails consistent (same ordering as the sync writer).
+            try:
+                self.audit_log_path.parent.mkdir(parents=True, exist_ok=True)
+                with self.audit_log_path.open("a", encoding="utf-8") as f:
+                    f.write(json.dumps(entry_data, sort_keys=True) + "\n")
+            except OSError as e:
+                raise RuntimeError(
+                    "Failed to write audit log entry to JSONL file: "
+                    f"{e}. Database commit aborted to maintain consistency."
+                ) from e
+
+            # F9-M-01-R1: advance the chain head exactly like the sync
+            # writer. Every writer appends inside ``_audit_lock``, so our
+            # line IS the file's last line at this point; if the DB insert
+            # below fails, the fallback entry links to OUR hash (head
+            # already advanced), keeping the file chain unbroken -- the
+            # entry stays file-only, which is the documented sync-path
+            # failure mode as well.
+            self._advance_chain_head(entry_data["sha256_hash"])
+
+            # DB insert second, inside the same critical section.
+            return entry_data
 
     async with _async_write_lock:
         conn = await pool.acquire()
         try:
-            async with conn.cursor() as cursor:
-                await cursor.execute(
-                    """INSERT INTO audit_log
-                    (entry_id, timestamp, action, entity_type, entity_id, user,
-                     metadata, previous_state, new_state, sha256_hash, timestamp_ms,
-                     previous_hash)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                    (
-                        entry_data["entry_id"],
-                        entry_data["timestamp"],
-                        entry_data["action"],
-                        entry_data["entity_type"],
-                        entry_data["entity_id"],
-                        entry_data["user"],
-                        json.dumps(entry_data["metadata"]),
-                        json.dumps(entry_data["previous_state"]),
-                        json.dumps(entry_data["new_state"]),
-                        entry_data["sha256_hash"],
-                        entry_data["timestamp_ms"],
-                        entry_data["previous_hash"],
-                    ),
-                )
-            await conn.commit()
-        finally:
+            entry_data = await asyncio.to_thread(_pooled_write)
+        except BaseException:
             await pool.release(conn)
+            raise
+
+    try:
+        async with conn.cursor() as cursor:
+            await cursor.execute(
+                """INSERT INTO audit_log
+                (entry_id, timestamp, action, entity_type, entity_id, user,
+                 metadata, previous_state, new_state, sha256_hash, timestamp_ms,
+                 previous_hash)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    entry_data["entry_id"],
+                    entry_data["timestamp"],
+                    entry_data["action"],
+                    entry_data["entity_type"],
+                    entry_data["entity_id"],
+                    entry_data["user"],
+                    json.dumps(entry_data["metadata"]),
+                    json.dumps(entry_data["previous_state"]),
+                    json.dumps(entry_data["new_state"]),
+                    entry_data["sha256_hash"],
+                    entry_data["timestamp_ms"],
+                    entry_data["previous_hash"],
+                ),
+            )
+        await conn.commit()
+    except Exception as exc:
+        raise RuntimeError(
+            f"aiosqlite pooled audit insert failed for {entry_data['entry_id']}: {exc}"
+        ) from exc
+    finally:
+        await pool.release(conn)
 
 
 async def _async_get_historical_data(
