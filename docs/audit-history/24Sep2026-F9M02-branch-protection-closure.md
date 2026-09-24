@@ -84,3 +84,17 @@ to the ADR-0016 / F9-H-02 decision. Linear history deliberately NOT required
 - `scripts/ratchet_baseline.py`: ceiling re-pin 459→460 (commit 1 of 2,
   headroom-first; this record is the +1 tracked file landing exactly at
   ceiling).
+
+## 7. Landing evidence (addendum, same day)
+
+- PR #76 merged (merge method: merge) as `af3d72c` via the documented
+  solo-owner relax → merge → restore procedure; relaxed-window scope:
+  review requirement only (contexts stayed strict/10, admin-enforced).
+- Post-merge Pipeline on `main`: run `36016934081` = success
+  (HEAD `af3d72c`).
+- Post-restore read-back: GraphQL `branchProtectionRule`
+  (`isAdminEnforced:true`, `requiredApprovingReviewCount:1`, the 10
+  contexts) + `GET /branches/main` → `protected:true`.
+- PR #76's own CI run `36016204703`: all 16 checks pass — including
+  `pytest-coverage` (4m23s) on a clean runner, the authoritative judge
+  over the two machine-local failures discriminated in the PR body.
