@@ -32,6 +32,20 @@ not one-key). Also: erratum on the F9-H-05 record's §4 surface list
 (`test_strength` deleted 2026-07-21 by `bcc09c1`, absent at the wave's
 commits; corrected to the 13 surviving modules, tally corroborated by a
 394-passed re-run).
+Updated 2026-09-24: F9-M-02 (branch protection on `main` absent — third
+consecutive review; the 15Sep FR9 row re-confirmed live by a 404 on the
+classic REST GET with an admin token) CLOSED — classic branch protection
+re-enabled via the REST API the same day. Live proof: GraphQL rule
+`BPR_kwDOTXR8vs4E7JrB` (pattern `main`, isAdminEnforced, 1 approving
+review, dismiss-stale, the 10 documented required contexts, strict);
+direct push to `main` rejected by the remote hook (GH006) with the branch
+ahead by one commit. Discovered and documented: GitHub migrated the rule
+to unified ruleset storage — the classic REST GET 404s PERSISTENTLY
+although the rule is live and enforced, so the GraphQL BPR query (or
+`GET /branches/main` -> `protected:true`) is the required verification
+surface on this repo (this also explains the 13Sep "404 -> derive ->
+collapse" scare). Closure record:
+`docs/audit-history/24Sep2026-F9M02-branch-protection-closure.md`.
 
 | ID | Priority | Category | Status | Due | Next action |
 |----|----------|----------|--------|-----|-------------|
