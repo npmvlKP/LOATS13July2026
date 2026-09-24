@@ -37,7 +37,10 @@ the relaunch fails its :8765 WS bind fail-closed yet survives with a
 shadowed, double-bound :5000). Second same-day recurrence (first
 instance earlier today, duplicate PIDs 34740/36668 per the ops
 transcript; second at 15:32:58 IST, duplicate PID 36592 against primary
-29116). Duplicate verified zero-inbound, killed; per-port
+29116; third at 16:31:53 IST, duplicate PID 34316 behind a
+`uv run app.py` wrapper tree, killed with its wrappers the same hour —
+see Continuation 3 in the incident record). Duplicate verified
+zero-inbound, killed; per-port
 single-listener topology re-verified (:5000/:5555/:8765 -> 29116,
 :8001 -> P5 32968). Root cause pinned in the OpenAlgo checkout
 (a51822b4): asymmetric bind semantics — the WS path probes and fails
@@ -198,19 +201,24 @@ Neither is one-key mid-span.
 
 Category: live-estate ops / upstream (OpenAlgo checkout). Status: OPEN —
 remediated live, root cause pinned, fix deferred to the 30Sep ops-review
-window. Confidence: Certain (reproduced twice on 2026-09-24).
+window. Confidence: Certain (reproduced three times on 2026-09-24).
 
 Evidence: relaunching `python app.py` while a healthy instance holds the
 ports produces a HALF-ALIVE duplicate: the :8765 WebSocket bind fails
 closed exactly as designed (RuntimeError, SDK-compat guard), but the
 process does NOT exit — Windows lets the Flask listener double-bind
 :5000, leaving two `:5000` LISTENING sockets and one broker login shared
-by two processes. Second occurrence 24Sep 15:32:58 IST (duplicate 36592
-vs primary 29116; earlier same-day instance 34740/36668). The duplicate
-served nobody (zero inbound connections — browser SDK session rides the
-primary); killed and topology re-verified single-listener per port
-(:5000/:5555/:8765 -> 29116, :8001 -> P5 32968; probes :5000 200,
-:8765 426, :8001 200).
+by two processes. Occurrences on 24Sep: earlier today (duplicates
+34740/36668 per the ops transcript), 15:32:58 IST (duplicate 36592 vs
+primary 29116), and 16:31:53 IST (duplicate 34316 behind a
+`uv run app.py` wrapper tree uv 29640 -> python 4964 -> app.py 34316;
+its own log is the 16:32:02-05 excerpt showing healthy module bring-up
+followed by the :8765 fail-closed error). Each duplicate served nobody
+(zero inbound connections — browser SDK session rides the
+primary); each was killed and topology re-verified single-listener per
+port (:5000/:5555/:8765 -> 29116, :8001 -> P5 32968; probes :5000 200,
+:8765 426, :8001 200). Three recurrences in one day strengthen the case
+for the bind-or-exit pre-flight candidate.
 
 Root cause: asymmetric bind semantics in the OpenAlgo checkout
 (a51822b4) — the WS path probes the port and fails closed

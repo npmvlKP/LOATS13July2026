@@ -1,12 +1,14 @@
 # R-08 — Degraded Duplicate OpenAlgo Instance (Shadowed :5000):
-# Second Same-Day Recurrence, Live Remediation
+# Second and Third Same-Day Recurrences, Live Remediations
 
 **Finding:** the "relaunch fails the WS bind yet keeps running with a
 shadowed :5000" pattern (first recorded earlier on 2026-09-24, duplicate
 PIDs 34740/36668 per the ops transcript) RECURRED the same day: a
 `python app.py` relaunch at 15:32:58 IST failed its :8765 WebSocket bind
 fail-closed exactly as designed, but survived as a half-alive instance
-holding a second, shadowed :5000 Flask listener.
+holding a second, shadowed :5000 Flask listener. It RECURRED AGAIN the
+same evening: a `uv run app.py` relaunch at 16:31:53 IST produced an
+identical half-alive duplicate (Continuation 3 below).
 
 **Status:** REMEDIATED live (duplicate killed, topology re-verified);
 tracked as RISK-REGISTER R-08 with the fix candidate deferred to the
@@ -78,6 +80,38 @@ network); duplicate broker sessions race the primary's order path.
   no partial instances);
   (b) runbook-only mitigation — start-script port sweep + kill of stale
   listeners before launch.
+
+## Continuation 3 — third same-day recurrence (16:31:53 IST, remediated 17:33)
+
+While the R-08 docs wave was still in review (PR #75), the pattern struck
+a THIRD time, post-dating the register's "second occurrence" text. The
+pasted startup log excerpt (16:32:02-05) is this duplicate's own log:
+healthy module bring-up ("no open run to recover", "0 strategies, 0
+jobs", scheduler rebuilt) followed by the :8765 fail-closed
+RuntimeError — the same signature as Continuation 2.
+
+- 16:31:53 — duplicate started as a `uv run app.py` wrapper tree:
+  uv 29640 -> python 4964 ("G:\.OA\OpenAlgo\.venv\Scripts\python.exe"
+  app.py) -> app.py 34316. Root cause of the launch is agent/operator
+  relaunch discipline, not auto-respawn: the primary (29116, up since
+  12:06:58) was healthy throughout.
+- 17:28 scrape — netstat: TWO LISTENING sockets on 127.0.0.1:5000
+  (29116 and 34316); :8765 solely 29116; :8001 solely P5 32968. PID
+  34316's :5000 socket had ZERO inbound ESTABLISHED connections (all
+  three :5000 client sessions rode 29116's socket); its connection
+  table was loopback self-pairs, one idle :5555 feed client, and one
+  outbound broker session (13.207.98.174:443) — serving nobody.
+- 17:33 remediation — the wrapper tree died with a single
+  Stop-Process on the app.py root (34316), wrappers 4964/29640 swept;
+  taskkill //PID mangling under MSYS bash was worked around with
+  PowerShell Stop-Process. Re-scrape: single LISTENING line per port
+  (:5000/:5555/:8765 -> 29116; :8001 -> 32968); probes :5000 200,
+  :8765 426, :8001 200; no stray `app.py` python processes remain.
+  Primary and P5 undisturbed.
+
+Register discipline note: the "second occurrence" text landed in PR #75
+before this third event existed; the register chronology row and R-08
+section were reconciled in the same wave rather than left lagging.
 
 ## Paste reconciliation note (register discipline)
 
