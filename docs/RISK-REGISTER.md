@@ -42,9 +42,10 @@ single-listener topology re-verified (:5000/:5555/:8765 -> 29116,
 :8001 -> P5 32968). Root cause pinned in the OpenAlgo checkout
 (a51822b4): asymmetric bind semantics — the WS path probes and fails
 closed (RuntimeError at `websocket_proxy/server.py:65`), while the
-Flask listener is constructed with socket-reuse options
-(`websocket_proxy/server.py:203-209`), so Windows silently double-binds
-:5000. Fix candidates (bind-or-exit pre-flight vs runbook port sweep)
+:5000 listener rides the werkzeug stack behind `socketio.run`, whose
+server class sets `allow_reuse_address = True`
+(`werkzeug/serving.py:710`), so Windows silently double-binds :5000.
+Fix candidates (bind-or-exit pre-flight vs runbook port sweep)
 deferred to the 2026-09-30 ops-review window. Incident record:
 `docs/audit-history/24Sep2026-degraded-duplicate-recurrence.md`. Paste
 reconciliation: the same paste carried F9-H-05 as an open High finding
@@ -213,11 +214,13 @@ primary); killed and topology re-verified single-listener per port
 
 Root cause: asymmetric bind semantics in the OpenAlgo checkout
 (a51822b4) — the WS path probes the port and fails closed
-(`websocket_proxy/server.py:65` via `app_integration.py:277`), while the
-Flask/socket listener is constructed with socket-reuse options
-(`websocket_proxy/server.py:203-209`), which on Windows permits a silent
-second bind. The error text reads fatal; the process is not. That gap is
-the defect. If unremediated: SDK clients can land on the shadowed
+(`websocket_proxy/server.py:65` via `app_integration.py:277`), while
+the :5000 listener rides the werkzeug serving stack behind
+`socketio.run` (`app.py:1263`), whose server class sets
+`allow_reuse_address = True` (`werkzeug/serving.py:710`) — on Windows
+that permits a silent second bind. The error text reads fatal; the
+process is not. That gap is the defect. If unremediated: SDK clients
+can land on the shadowed
 listener (order-dependent intermittent failures) and two processes race
 one broker session.
 

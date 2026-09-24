@@ -187,7 +187,9 @@ Alerts have a 5-minute cooldown period to prevent spam.
 ERROR yet the new `python app.py` process keeps running; `netstat -ano |
 findstr ":5000.*LISTENING"` shows TWO listening sockets on :5000 (plus
 `:8765` held by the original instance). SDK/relay calls intermittently
-hit a listener with no WebSocket server attached. First aid, in order:
+hit a listener with no WebSocket server attached.
+
+**Resolution** (first aid, in order):
 
 1. Identify the duplicate: the process whose start time is LATER and
    which owns :5000 but NOT :8765.
@@ -209,10 +211,10 @@ hit a listener with no WebSocket server attached. First aid, in order:
 
 Root cause and recurrence history: R-08 in `docs/RISK-REGISTER.md` and
 `docs/audit-history/24Sep2026-degraded-duplicate-recurrence.md`. The
-process survives because the Flask listener is built with socket-reuse
-options (Windows permits the silent second bind) while only the :8765
-path fails closed — treat ANY 8765 bind error at startup as a
-must-resolve condition, not a warning.
+process survives because the :5000 listener rides the werkzeug serving
+stack (`allow_reuse_address = True`), which on Windows permits the
+silent second bind, while only the :8765 path fails closed — treat ANY
+8765 bind error at startup as a must-resolve condition, not a warning.
 
 ### Log Locations
 

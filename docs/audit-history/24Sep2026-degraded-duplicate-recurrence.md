@@ -42,20 +42,26 @@ tracked as RISK-REGISTER R-08 with the fix candidate deferred to the
 Asymmetric bind semantics in the sibling OpenAlgo checkout
 (`G:\.OA\OpenAlgo` @ `a51822b4`):
 
-- The :8765 WS path PROBES the port and fails closed (RuntimeError) —
+- The :8765 WS path PROBES the port and fails closed (RuntimeError,
+  `websocket_proxy/server.py:65` via `app_integration.py:277`) —
   correct, deliberate (SDK compatibility guard).
-- The Flask/socket listener is constructed with socket-reuse options
-  (`websocket_proxy/server.py:203-209`, "socket reuse options /
-  reuse_port"), which on Windows permits a silent double-bind of :5000.
-  SO_REUSEADDR-class reuse on Windows does not fail the second bind the
-  way it does on Linux, so the duplicate process survives its own
-  fatal-looking error.
+- The :5000 listener is the werkzeug serving stack behind
+  `socketio.run(app, ...)` (`app.py:1263`), whose server class sets
+  `allow_reuse_address = True` (`werkzeug/serving.py:710`, werkzeug
+  3.1.8 in the checkout's venv). On Windows that maps to SO_REUSEADDR,
+  which lets a SECOND bind of :5000 succeed silently — no probe, no
+  guard, so the duplicate process survives its own fatal-looking
+  error. (The `reuse_port=` argument on the :8765 `websockets.serve()`
+  at `websocket_proxy/server.py:203-209` is a Windows no-op —
+  SO_REUSEPORT does not exist there — and is NOT the :5000 mechanism.)
 
 Result: a degraded instance that answers HTTP on a shadowed :5000 with
-no WS server attached — the `strategies/ltp_example.py` SDK contract
-broken on that socket, and two processes sharing one broker login
-(order-path ambiguity risk in a live-trading estate). The error text
-reads fatal; the process is not. That gap is the defect.
+no WS server attached — the SDK contract broken on that socket (the
+example lives at `examples/python/ltp_example.py` in the current
+checkout; the guard's own message at `websocket_proxy/server.py:57`
+still names the legacy `strategies/` path), and two processes sharing
+one broker login (order-path ambiguity risk in a live-trading estate).
+The error text reads fatal; the process is not. That gap is the defect.
 
 Impact if unremediated: SDK/relay clients can land on the shadowed
 listener (intermittent, order-dependent failures that look like flaky
