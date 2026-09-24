@@ -32,6 +32,25 @@ not one-key). Also: erratum on the F9-H-05 record's §4 surface list
 (`test_strength` deleted 2026-07-21 by `bcc09c1`, absent at the wave's
 commits; corrected to the 13 surviving modules, tally corroborated by a
 394-passed re-run).
+Updated 2026-09-24: R-08 opened (degraded-duplicate OpenAlgo instance —
+the relaunch fails its :8765 WS bind fail-closed yet survives with a
+shadowed, double-bound :5000). Second same-day recurrence (first
+instance earlier today, duplicate PIDs 34740/36668 per the ops
+transcript; second at 15:32:58 IST, duplicate PID 36592 against primary
+29116). Duplicate verified zero-inbound, killed; per-port
+single-listener topology re-verified (:5000/:5555/:8765 -> 29116,
+:8001 -> P5 32968). Root cause pinned in the OpenAlgo checkout
+(a51822b4): asymmetric bind semantics — the WS path probes and fails
+closed (RuntimeError at `websocket_proxy/server.py:65`), while the
+Flask listener is constructed with socket-reuse options
+(`websocket_proxy/server.py:203-209`), so Windows silently double-binds
+:5000. Fix candidates (bind-or-exit pre-flight vs runbook port sweep)
+deferred to the 2026-09-30 ops-review window. Incident record:
+`docs/audit-history/24Sep2026-degraded-duplicate-recurrence.md`. Paste
+reconciliation: the same paste carried F9-H-05 as an open High finding
+— STALE, closed by PR #66 `633daae` (re-verified at the models: hard
+`Field(ge=-1.0, le=1.0)` bounds on both score fields, ADR-0017, the
+dedicated ensemble/decay/bounds nets).
 
 | ID | Priority | Category | Status | Due | Next action |
 |----|----------|----------|--------|-----|-------------|
@@ -42,6 +61,7 @@ commits; corrected to the 13 surviving modules, tally corroborated by a
 | R-05 | Ops | Environment, dated | OPEN | 2026-10-01 | Shared-venv rebuild; fresh-venv pip-audit replication until then |
 | R-06 | Process | Register discipline | CLOSED by this file | — | Maintain per the rules above |
 | R-07 | P2 | Test infra: orphaned mutant sweep | OPEN — candidates deferred | 2026-09-30 | Decide (a) process-tree kill vs (b) pre-run frozen-tree guard |
+| R-08 | P2-ops | Degraded duplicate OpenAlgo instance (shadowed :5000) | OPEN — remediated live, fix deferred | 2026-09-30 | Decide bind-or-exit pre-flight vs runbook port sweep; bind-or-exit recommended |
 
 ---
 
@@ -172,3 +192,40 @@ Next action: at the 30Sep ops-review window, decide (a) process-tree kill
 for suite timeouts (no hook child can outlive its parent) vs (b) pre-run
 frozen-tree guard in the mutant test (fails closed on pre-damaged trees).
 Neither is one-key mid-span.
+
+## R-08 [P2-ops] Degraded duplicate OpenAlgo instance with a shadowed :5000
+
+Category: live-estate ops / upstream (OpenAlgo checkout). Status: OPEN —
+remediated live, root cause pinned, fix deferred to the 30Sep ops-review
+window. Confidence: Certain (reproduced twice on 2026-09-24).
+
+Evidence: relaunching `python app.py` while a healthy instance holds the
+ports produces a HALF-ALIVE duplicate: the :8765 WebSocket bind fails
+closed exactly as designed (RuntimeError, SDK-compat guard), but the
+process does NOT exit — Windows lets the Flask listener double-bind
+:5000, leaving two `:5000` LISTENING sockets and one broker login shared
+by two processes. Second occurrence 24Sep 15:32:58 IST (duplicate 36592
+vs primary 29116; earlier same-day instance 34740/36668). The duplicate
+served nobody (zero inbound connections — browser SDK session rides the
+primary); killed and topology re-verified single-listener per port
+(:5000/:5555/:8765 -> 29116, :8001 -> P5 32968; probes :5000 200,
+:8765 426, :8001 200).
+
+Root cause: asymmetric bind semantics in the OpenAlgo checkout
+(a51822b4) — the WS path probes the port and fails closed
+(`websocket_proxy/server.py:65` via `app_integration.py:277`), while the
+Flask/socket listener is constructed with socket-reuse options
+(`websocket_proxy/server.py:203-209`), which on Windows permits a silent
+second bind. The error text reads fatal; the process is not. That gap is
+the defect. If unremediated: SDK clients can land on the shadowed
+listener (order-dependent intermittent failures) and two processes race
+one broker session.
+
+Incident record:
+`docs/audit-history/24Sep2026-degraded-duplicate-recurrence.md`.
+
+Next action: at the 30Sep ops-review window, decide (a) startup
+bind-or-exit pre-flight for EVERY port — any bind failure is
+process-fatal, no partial instances (recommended) vs (b) runbook-only
+mitigation (start-script port sweep killing stale listeners before
+launch). Touches the OpenAlgo checkout, not this repo's src tree.
