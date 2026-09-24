@@ -120,6 +120,37 @@ keeps its signature, dispatch precedence, and fallback semantics; the
 pool connection is acquired/released exactly once per successful call;
 failures still raise after a JSONL-only write (documented file-only
 failure mode, now also advancing the head like the sync path). The
-running P5 forward test (started 24Sep 04:39 IST from the pre-fix
+The running P5 forward test (started 24Sep 04:39 IST from the pre-fix
 tree) is unaffected at runtime; it picks up the fix on its next
 restart.
+
+## Live second repair (2026-09-24, same day)
+
+The "next restart" happened the same day, and the interim prediction
+in the first repair's evidence ("wrote zero audit entries") did not
+hold: the pre-fix supervisor kept cycling through the live session and
+by early afternoon the trail carried 623 broken links across 1 frozen
+run (span 18684..19306; two dry-runs 90 minutes apart measured 293 →
+623 — the writer was appending broken links at roughly one per second
+under live market cycles). Disposition, in order:
+
+1. Supervisor stopped (PIDs 7952/7984, up since 04:39 IST) BEFORE the
+   apply — the rewrite-vs-append race makes repair-under-live-writer
+   unsafe.
+2. `scripts/repair_f9m01_chain_head.py --apply`: 623 entries
+   re-anchored, DB mirror 623 rows updated, 0 orphans; REPAIR record
+   appended; post-repair chain verification PASS. Backups
+   `data/audit.log.f9m01r1-backup` / `data/loats.db.f9m01r1-backup`
+   were OVERWRITTEN by this second apply (now hold the pre-second-
+   repair state, not the morning's) — the morning's pre-first-repair
+   bytes are superseded on disk.
+3. Supervisor relaunched on the fixed tree (venv launcher → CPython
+   3.12 child, started 13:32 IST; single-instance `.claim` marker
+   verified), fresh run-log `reports/p5_forward_test_20260924_080208.json`.
+4. Production proof the fix holds under load: with the new writer
+   live, a fresh dry-run over 19,323 entries reports **"no broken
+   links found"** — 16+ entries appended post-restart, zero broken.
+   `verify_audit_log_integrity()` True. The failure mode is closed
+   end-to-end: same-day regression caught by the dry-run protocol,
+   repaired fail-closed, and the fixed writer verified against live
+   production traffic.
