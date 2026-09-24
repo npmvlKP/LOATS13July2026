@@ -1,5 +1,5 @@
 # R-08 — Degraded Duplicate OpenAlgo Instance (Shadowed :5000):
-# Second and Third Same-Day Recurrences, Live Remediations
+# Second, Third and Fourth Same-Day Recurrences, Live Remediations
 
 **Finding:** the "relaunch fails the WS bind yet keeps running with a
 shadowed :5000" pattern (first recorded earlier on 2026-09-24, duplicate
@@ -7,8 +7,10 @@ PIDs 34740/36668 per the ops transcript) RECURRED the same day: a
 `python app.py` relaunch at 15:32:58 IST failed its :8765 WebSocket bind
 fail-closed exactly as designed, but survived as a half-alive instance
 holding a second, shadowed :5000 Flask listener. It RECURRED AGAIN the
-same evening: a `uv run app.py` relaunch at 16:31:53 IST produced an
-identical half-alive duplicate (Continuation 3 below).
+same evening: a `uv run app.py` relaunch at
+16:31:53 IST produced an identical half-alive duplicate (Continuation 3
+below), and a FOURTH time later still: an 18:10:29 IST relaunch from the
+same shell window produced an identical duplicate (Continuation 4).
 
 **Status:** REMEDIATED live (duplicate killed, topology re-verified);
 tracked as RISK-REGISTER R-08 with the fix candidate deferred to the
@@ -122,3 +124,52 @@ score fields) + ADR-0017 + the dedicated ensemble/decay/bounds nets.
 One paste, both directions of lag: one live incident, one stale
 finding. Reconcile against git log / gh / live scrapes BEFORE acting —
 the standing rule that this wave re-proved.
+
+## Continuation 4 — fourth same-day recurrence (18:10:29 IST, remediated 18:26)
+
+The pattern struck a FOURTH time, from the same interactive PowerShell
+window (PID 8244, created 16:31:45) that produced the third: a second
+`uv run app.py` relaunch at 18:10:29 IST produced an identical
+half-alive duplicate, wrapper tree uv 9912 -> python 15960
+("G:\.OA\OpenAlgo\.venv\Scripts\python.exe" app.py) -> app.py 792. The
+primary (29116, up since 12:06:58) was healthy throughout; the driver
+is relaunch discipline in that shell session, not auto-respawn.
+
+The pasted excerpt (18:11:14-16) is this duplicate's own startup log,
+the same signature as Continuations 2 and 3: healthy module bring-up
+(websocket connected, order-update WS connected, "no open run to
+recover", checkpoint writer, scheduler rebuilt 0 strategies) followed
+by the :8765 fail-closed RuntimeError (`websocket_proxy/server.py:65`
+via `app_integration.py:277`). New detail: `port_check` waited its
+2.0 s grace first ("Port 8765 is still in use on 127.0.0.1 after 2.0 s
+wait", 18:11:16,337) before failing closed — the SDK-compat guard
+working exactly as designed while the Flask listener silently
+double-bound.
+
+- 18:25 scrape — TWO :5000 LISTENING sockets (29116 and 792); :8765
+  solely 29116; :8001 solely P5 32968. PID 792's :5000 socket had ZERO
+  inbound ESTABLISHED connections: its full socket table was loopback
+  self-pairs (ports 18288-18296), one :5555 feed-client connection to
+  the primary, and one outbound broker session (13.232.30.65:443).
+  All three :5000 client sessions rode 29116's socket (P5 harness
+  32968 x2, browser 29704 x1) — the duplicate was serving nobody.
+- 18:26 remediation — `taskkill /T /F /PID 9912` swept the wrapper tree
+  (792, 15960, 9912 confirmed terminated; the launching shell 8244 was
+  deliberately left alone). Re-scrape: single LISTENING line per port
+  (:5000/:5555/:8765 -> 29116; :8001 -> 32968); probes :5000 200,
+  :8765 426 (WebSocket-only listener, correct), :8001 200. Primary and
+  P5 undisturbed.
+
+Paste reconciliation, second instance: the ~18:20 IST paste that
+surfaced this incident re-carried the F9-H-05 block as an open High
+finding — stale a second time same day. Re-verified live during this
+continuation: `Field(ge=-1.0, le=1.0)` bounds on both score fields
+(`src/loats/models.py:301,440`), the ensemble/decay implementation in
+`src/loats/sentiment.py`, ADR-0017, and 53/53 passes across
+`tests/test_sentiment_p3_ensemble_f9h05.py` + `tests/test_sentiment.py`.
+
+Four recurrences in one day, two of them from one operator shell via
+`uv run app.py`, strengthen the bind-or-exit pre-flight candidate (fix
+candidate (a)): it neutralizes the class at startup regardless of which
+shell launches the duplicate. Decision stays at the 30Sep ops-review
+window (ADR-0016 mid-span freeze discipline).

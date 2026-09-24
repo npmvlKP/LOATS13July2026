@@ -38,8 +38,11 @@ shadowed, double-bound :5000). Second same-day recurrence (first
 instance earlier today, duplicate PIDs 34740/36668 per the ops
 transcript; second at 15:32:58 IST, duplicate PID 36592 against primary
 29116; third at 16:31:53 IST, duplicate PID 34316 behind a
-`uv run app.py` wrapper tree, killed with its wrappers the same hour —
-see Continuation 3 in the incident record). Duplicate verified
+`uv run app.py` wrapper tree, killed with its wrappers the same hour;
+fourth at 18:10:29 IST, duplicate PID 792 behind a second `uv run
+app.py` launch from the same operator shell (8244), killed with its
+wrappers 18 minutes later — see Continuations 3 and 4 in the incident
+record). Duplicate verified
 zero-inbound, killed; per-port
 single-listener topology re-verified (:5000/:5555/:8765 -> 29116,
 :8001 -> P5 32968). Root cause pinned in the OpenAlgo checkout
@@ -54,7 +57,8 @@ deferred to the 2026-09-30 ops-review window. Incident record:
 reconciliation: the same paste carried F9-H-05 as an open High finding
 — STALE, closed by PR #66 `633daae` (re-verified at the models: hard
 `Field(ge=-1.0, le=1.0)` bounds on both score fields, ADR-0017, the
-dedicated ensemble/decay/bounds nets).
+dedicated ensemble/decay/bounds nets). The ~18:20 IST paste that
+surfaced the fourth occurrence re-carried the same stale block.
 
 | ID | Priority | Category | Status | Due | Next action |
 |----|----------|----------|--------|-----|-------------|
@@ -201,7 +205,7 @@ Neither is one-key mid-span.
 
 Category: live-estate ops / upstream (OpenAlgo checkout). Status: OPEN —
 remediated live, root cause pinned, fix deferred to the 30Sep ops-review
-window. Confidence: Certain (reproduced three times on 2026-09-24).
+window. Confidence: Certain (reproduced four times on 2026-09-24).
 
 Evidence: relaunching `python app.py` while a healthy instance holds the
 ports produces a HALF-ALIVE duplicate: the :8765 WebSocket bind fails
@@ -210,14 +214,19 @@ process does NOT exit — Windows lets the Flask listener double-bind
 :5000, leaving two `:5000` LISTENING sockets and one broker login shared
 by two processes. Occurrences on 24Sep: earlier today (duplicates
 34740/36668 per the ops transcript), 15:32:58 IST (duplicate 36592 vs
-primary 29116), and 16:31:53 IST (duplicate 34316 behind a
+primary 29116), 16:31:53 IST (duplicate 34316 behind a
 `uv run app.py` wrapper tree uv 29640 -> python 4964 -> app.py 34316;
 its own log is the 16:32:02-05 excerpt showing healthy module bring-up
-followed by the :8765 fail-closed error). Each duplicate served nobody
+followed by the :8765 fail-closed error), and 18:10:29 IST (duplicate
+792 behind a second `uv run app.py` wrapper tree uv 9912 ->
+python 15960 -> app.py 792 from the same operator shell 8244; its own
+log is the 18:11:14-16 excerpt — same signature, plus the 2.0 s
+`port_check` grace wait before the fail-closed error). Each duplicate
+served nobody
 (zero inbound connections — browser SDK session rides the
 primary); each was killed and topology re-verified single-listener per
 port (:5000/:5555/:8765 -> 29116, :8001 -> P5 32968; probes :5000 200,
-:8765 426, :8001 200). Three recurrences in one day strengthen the case
+:8765 426, :8001 200). Four recurrences in one day strengthen the case
 for the bind-or-exit pre-flight candidate.
 
 Root cause: asymmetric bind semantics in the OpenAlgo checkout
