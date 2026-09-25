@@ -607,8 +607,16 @@ History (most recent last):
       register R-08 row + header update + section and the RUNBOOK
       troubleshooting entry landed in the same wave, no other new
       files). Ceiling 479->480.
+  481. 25Sep2026 (F9-M-02-R1 protection-contract-drift wave): +1 -- the
+      reconciliation record docs/audit-history/
+      25Sep2026-f9m02-r1-protection-contract-drift.md (live rule found
+      drifted from the documented contract -- strict:false, 16 contexts
+      incl. the six advisory jobs -- restored by idempotent PUT, GH006
+      direct-push rejection probe re-passed; register + CONTRIBUTING
+      edits are in-place modifications of tracked files, no other new
+      files). Ceiling 480->481.
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 480
+TRACKED_FILE_CEILING = 481
