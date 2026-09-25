@@ -243,6 +243,19 @@ class PerformanceAnalyzer:
             p1_pass = p1_rate >= min_sample_pass_rate
             p5_pass = p5_rate >= min_sample_pass_rate
 
+            # A failed sample is not a fast sample (fail-closed, 25Sep2026):
+            # grade the SUCCESS rate of the measured samples alongside the
+            # latency budgets. The previous grading used only the recorded
+            # durations -- exceptions record their (tiny) elapsed time and
+            # the gate then graded a run whose samples all failed as green.
+            measurements = [m for m in self.latency_history if m.operation == operation]
+            success_rate = (
+                sum(1 for m in measurements if m.success) / len(measurements)
+                if measurements
+                else 1.0
+            )
+            sample_success = success_rate >= min_sample_pass_rate
+
             result: dict[str, Any] = {
                 "samples": len(durations),
                 "p1_threshold": p1_threshold,
@@ -253,7 +266,9 @@ class PerformanceAnalyzer:
                 "p5_actual_p99": metrics["p99"],
                 "p5_pass_rate": p5_rate,
                 "p5_pass": p5_pass,
-                "overall_pass": p1_pass and p5_pass,
+                "sample_success_rate": success_rate,
+                "sample_success": sample_success,
+                "overall_pass": p1_pass and p5_pass and sample_success,
             }
 
             # ANALYZE round-trip stages carry their own CMP budget: grade
@@ -270,7 +285,7 @@ class PerformanceAnalyzer:
                 result["stage_budget"] = stage_budget
                 result["stage_pass_rate"] = stage_rate
                 result["stage_pass"] = stage_pass
-                result["overall_pass"] = stage_pass
+                result["overall_pass"] = stage_pass and sample_success
 
             validation_results[operation] = result
 
@@ -539,7 +554,10 @@ async def run_latency_benchmark(db: Database) -> dict[str, Any]:
             strength=0.8,
             timestamp=datetime.now(UTC),
             indicators={"rsi": 70.0, "macd": 0.5},
-            metadata={"benchmark": "p1_p5"},
+            # "test" is the guard's explicit test-fixture provenance key
+            # (F9-L-03): without it the insert-time guard rejects every
+            # sample of this leg (found live 25Sep2026).
+            metadata={"test": "latency", "benchmark": "p1_p5"},
         )
         await db.async_create_signal(signal)
 
