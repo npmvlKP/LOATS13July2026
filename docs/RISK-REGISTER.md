@@ -100,6 +100,28 @@ reconciliation: the same paste carried F9-H-05 as an open High finding
 `Field(ge=-1.0, le=1.0)` bounds on both score fields, ADR-0017, the
 dedicated ensemble/decay/bounds nets). The ~18:20 IST paste that
 surfaced the fourth occurrence re-carried the same stale block.
+Updated 2026-09-25: F9-M-02-R1 (drift follow-up on the F9-M-02 closure —
+the same silent-drift class, now the second documented instance): a
+fresh paste reconciliation found the server-side rule LIVE but DRIFTED
+from the documented contract — `strict:false` with 16 required contexts
+(the 10 merge-gating contexts plus the six advisory jobs the 24Sep
+closure §3 deliberately excluded, two of their pinned names still
+carrying `advisory` / `recorded fallback`). No commit explains the
+change (server-side-only state). Corrected the same hour by idempotent
+PUT of the documented contract (10 contexts, `strict:true`, 1 approval,
+dismiss-stale, admin-enforced): the PUT response echoed it verbatim,
+the classic REST GET now resolves the rule directly (the 24Sep
+"persistent 404" quirk did NOT reproduce; conversely the GraphQL
+`branchProtectionRule` field is gone from the schema — verification is
+surface-agnostic, re-probe all surfaces before concluding absence), and
+a direct push of an empty probe commit was remote-rejected (GH006,
+"Changes must be made through a pull request", "10 of 10 required
+status checks are expected") with `origin/main` byte-identical
+before/after. No new R-row — the standing re-verify-before-trusting-doc
+rule is corroborated by this second instance; every review wave must
+live-probe protection against CONTRIBUTING's pinned contract and
+restore + record on divergence. Record:
+`docs/audit-history/25Sep2026-f9m02-r1-protection-contract-drift.md`.
 
 | ID | Priority | Category | Status | Due | Next action |
 |----|----------|----------|--------|-----|-------------|
