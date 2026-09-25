@@ -623,8 +623,20 @@ History (most recent last):
       max 48.24 s -- evidence staging only, NO decision, NO constant
       moved; register R-01 row/section updated in place). Ceiling
       481->482.
+  484. 25Sep2026 (30Sep-wave staging, branch docs/sep30-r01-checkpoint):
+      +2 -- docs/audit-history/25Sep2026-r01-wave-paste-reconciliation.md
+      (staging pack: paste reconciliation incl. the STALE F9-M-03 block,
+      17:29 IST live probes, the two promotion traps -- context name
+      string and the R-01-close register pin -- and the ordered 30Sep
+      checklist) and docs/audit-history/25Sep2026-s14-s15-rider-work-
+      orders.md (S-14 surfaces orchestrator.py:758/902/1045; S-15 SL-M
+      fixture + run-log pin work order). NO decision, NO constant moved
+      -- ADR-0016 freeze still binds; register R-01 section appended in
+      place. Ceiling 482->484 (the tree equals the ceiling at #80 --
+      482 == 482 -- so +2 files lands the count AT 484, not 483; the
+      commit-time repo-hygiene hook caught the 483 first draft).
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 482
+TRACKED_FILE_CEILING = 484
