@@ -615,8 +615,16 @@ History (most recent last):
       direct-push rejection probe re-passed; register + CONTRIBUTING
       edits are in-place modifications of tracked files, no other new
       files). Ceiling 480->481.
+  482. 25Sep2026 (R-01 evidence-staging wave): +1 -- the ADR-0016
+      checkpoint evidence pack docs/audit-history/
+      25Sep2026-r01-benchmark-evidence-pack.md (7 consecutive green
+      advisory benchmark-perf main runs 24-25Sep cited with artifact id;
+      live :8001/metrics re-probe 0/26,413 compliant, avg 1.430 s,
+      max 48.24 s -- evidence staging only, NO decision, NO constant
+      moved; register R-01 row/section updated in place). Ceiling
+      481->482.
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 481
+TRACKED_FILE_CEILING = 482

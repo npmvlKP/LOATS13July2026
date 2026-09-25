@@ -122,10 +122,22 @@ rule is corroborated by this second instance; every review wave must
 live-probe protection against CONTRIBUTING's pinned contract and
 restore + record on divergence. Record:
 `docs/audit-history/25Sep2026-f9m02-r1-protection-contract-drift.md`.
+Updated 2026-09-25 (R-01 evidence staging): the ADR-0016 checkpoint
+evidence pack landed at
+`docs/audit-history/25Sep2026-r01-benchmark-evidence-pack.md` — seven
+consecutive green advisory `benchmark-perf` main runs (24–25Sep, artifact
+id 10854087767: PASS 12/12, round trip 13.1 ms) plus a live `:8001/metrics`
+re-probe (0/26,413 compliant, avg 1.430 s, max 48.24 s, kill switch
+inactive, breakers 4/4). No decision taken, no constant moved: the
+mid-span freeze binds until the 2026-09-30 checkpoint. R-01 row and
+section updated in place to cite the pack. Same-day protection probe:
+zero drift (10 contexts, strict, admin-enforced — 4th consecutive clean
+since the F9-M-02-R1 restoration). Snapshot: HEAD `a01e31c` (PR #79
+merged 2026-09-25), pre-merge branch state.
 
 | ID | Priority | Category | Status | Due | Next action |
 |----|----------|----------|--------|-----|-------------|
-| R-01 | P1 | CMP latency decision | OPEN — deferred by ADR-0016 | 2026-09-30 | Decide (a) vs (b) at the checkpoint with the accumulated advisory evidence |
+| R-01 | P1 | CMP latency decision | OPEN — deferred by ADR-0016 | 2026-09-30 | Decide (a) vs (b) at the checkpoint citing the 25Sep evidence pack (`25Sep2026-r01-benchmark-evidence-pack.md`); promote benchmark-perf in the same wave |
 | R-02 | P1 | CMP P5 kill-switch span proof | CLOSED by ADR-0018 | — | See the R-02 section below |
 | R-03 | P2-watch | Benchmark flake | OPEN — watch | on recurrence | py-spy dump protocol on next hang |
 | R-04 | P3 | Accepted residual | ACCEPTED | — | Revisit with the post-checkpoint producer wave |
@@ -158,6 +170,19 @@ decoupling producers into background tasks with last-known-good snapshots, or
 bounded 8 s producer window, strike < 5 ms, trail < 1 ms), then promote the
 `benchmark-perf` context in the same wave per the documented context-list
 rule.
+
+Evidence refresh (2026-09-25, pre-decision staging per ADR-0016 §Decision.2):
+live `:8001/metrics` re-probe — count=26413, `target_compliance_count=0`
+(0.0%), average 1.430 s (was 4.48 s at the 21Sep snapshot), max 48.24 s
+(was 206.1 s), min 0.252 s; kill switch inactive; source breakers 4/4
+healthy. Advisory `benchmark-perf` job green on seven consecutive main
+runs 24–25Sep (latest run `36113777776`, artifact `10854087767`:
+overall PASS, cmp_validation 10/10, benchmark_validation 2/2, ANALYZE
+round trip 13.1 ms vs the 100 ms budget). Reading: the span is
+stabilizing over a 12x larger population, the stage-level gate is
+stably green, and only option (a) mechanics can move cycle compliance
+above 0%. Full pack:
+`docs/audit-history/25Sep2026-r01-benchmark-evidence-pack.md`.
 
 ## R-02 [P1] CMP P5 kill-switch span proof — CLOSED by ADR-0018 (2026-09-21)
 
