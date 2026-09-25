@@ -31,8 +31,14 @@ from .models import (
     Position,
     QuoteData,
     Signal,
+    SignalType,
     Trade,
     TradeDecision,
+)
+from .signal_outcomes import (
+    SignalOutcomeState,
+    evaluate_signal_outcome,
+    parse_signal_type,
 )
 from .signal_source_guard import validate_signal_provenance
 from .utils.lazy_singleton import lazy_singleton
@@ -458,6 +464,27 @@ class Database:
                 PRIMARY KEY (symbol, as_of_date)
             )
         """)
+        # Signal-outcome instrumentation (30Sep evidence wave): one row per
+        # emitted BUY/SELL signal, resolved later against independently
+        # recorded market data -- never updated in place. A separate table
+        # (not columns on ``signals``) keeps the outcome lifecycle disjoint
+        # from signal writes, whose INSERT OR REPLACE upsert would clobber
+        # outcome columns on producer re-emission. ``outcome_state`` is
+        # OPEN until the resolver records a terminal state.
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS signal_outcomes (
+                signal_id TEXT PRIMARY KEY,
+                outcome_state TEXT NOT NULL,
+                entry_price REAL,
+                exit_price REAL,
+                favorable_excursion REAL,
+                adverse_excursion REAL,
+                resolved_at TEXT,
+                horizon_minutes INTEGER NOT NULL,
+                created_at TEXT NOT NULL,
+                metadata TEXT
+            )
+        """)
 
     def _create_indexes(self, cursor: sqlite3.Cursor) -> None:
         """Create performance indexes on core tables."""
@@ -747,24 +774,18 @@ class Database:
             except Exception as e:
                 logger.debug(f"Ignoring error closing audit log handle: {e}")
 
-    def _read_chain_head(self) -> str | None:
-        """F9-M-01: current hash-chain head.
+    def _scan_chain_head_uncached(self) -> str | None:
+        """Scan the JSONL tail-to-head for the last readable sha256_hash.
 
-        Per-instance CACHE: the first call scans the JSONL tail-to-head
-        cost once (in file order); every later call returns the cached
-        head, which the append path advances after each successful write.
-        This keeps audit writes O(1) (benchmark gate >50 inserts/sec).
-        None when the file is empty/missing or its tail is unreadable (a
-        corrupt tail is the verifier's CRITICAL finding, not the writer's
-        to guess at).
+        F9-M-01-R1 extraction: the scan formerly inlined in
+        ``_read_chain_head``. Skips unreadable lines (a corrupt tail is
+        the verifier's CRITICAL finding, not the writer's to guess at)
+        and treats an unroutable file as "no head" instead of raising --
+        the writer-side scan must never crash the write path.
         """
-        if self._chain_head_loaded:
-            return self._chain_head
         try:
             path = Path(self.audit_log_path)
             if not path.exists():
-                self._chain_head = None
-                self._chain_head_loaded = True
                 return None
             head: str | None = None
             with path.open(encoding="utf-8") as fh:
@@ -779,11 +800,18 @@ class Database:
                     stored = data.get("sha256_hash")
                     if isinstance(stored, str):
                         head = stored
-            self._chain_head = head
-            self._chain_head_loaded = True
             return head
         except OSError:
             return None
+
+    def _read_chain_head(self) -> str | None:
+        """Current hash-chain head (cached; scan deferred to first use)."""
+        if self._chain_head_loaded:
+            return self._chain_head
+        head = self._scan_chain_head_uncached()
+        self._chain_head = head
+        self._chain_head_loaded = True
+        return head
 
     def _advance_chain_head(self, new_hash: str) -> None:
         """Advance the cached chain head after a successful append."""
@@ -1387,6 +1415,249 @@ class Database:
             metadata=json.loads(row[6]) if row[6] else {},
             confidence=row[7],
         )
+
+    # -------------------------------------------------------------------------
+    # Signal-outcome instrumentation (30Sep evidence wave)
+    # -------------------------------------------------------------------------
+    def record_signal_outcome_open(
+        self,
+        signal_id: str,
+        horizon_minutes: int,
+        metadata: dict[str, Any] | None = None,
+    ) -> bool:
+        """Open an outcome row for an emitted directional signal.
+
+        One row per emitted BUY/SELL signal; the terminal verdict is
+        written by :meth:`resolve_signal_outcomes` via a guarded UPDATE,
+        never in place here. Callers pass the already-validated horizon
+        (``1 <= horizon_minutes <= 1440``).
+        """
+        now = datetime.now(UTC)
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            INSERT OR IGNORE INTO signal_outcomes
+            (signal_id, outcome_state, horizon_minutes, created_at, metadata)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (
+                signal_id,
+                SignalOutcomeState.OPEN.value,
+                int(horizon_minutes),
+                now.isoformat(),
+                json.dumps(metadata) if metadata else None,
+            ),
+        )
+        conn.commit()
+        return True
+
+    def resolve_signal_outcomes(
+        self,
+        now: datetime | None = None,
+        limit: int = 200,
+    ) -> list[dict[str, Any]]:
+        """Resolve OPEN outcome rows whose evaluation horizon has elapsed.
+
+        Directional outcomes are graded against independently recorded
+        ``historical_data`` rows (1d interval) -- market data, not the
+        signal row itself, decides POSITIVE/NEGATIVE. HOLD/NEUTRAL
+        signals are terminal NON_DIRECTIONAL. A signal whose window
+        carries no recorded bars stays OPEN (an honest hole, not a
+        fabricated verdict); terminal writes are guarded
+        (``WHERE outcome_state = 'open'``): the first verdict wins and
+        re-runs are no-ops. Returns the resolved rows.
+        """
+        now = now or datetime.now(UTC)
+        scan_cutoff_ms = int(now.timestamp() * 1000)
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT so.signal_id, s.symbol, s.signal_type, s.strength,
+                   s.timestamp, s.indicators, s.metadata, s.confidence,
+                   so.horizon_minutes
+            FROM signal_outcomes so
+            JOIN signals s ON s.signal_id = so.signal_id
+            WHERE so.outcome_state = ?
+              AND s.timestamp_ms <= ?
+            ORDER BY s.timestamp_ms ASC
+            LIMIT ?
+            """,
+            (SignalOutcomeState.OPEN.value, scan_cutoff_ms, int(limit)),
+        )
+        rows = cursor.fetchall()
+        resolved: list[dict[str, Any]] = []
+        for (
+            signal_id,
+            symbol,
+            signal_type_value,
+            strength,
+            timestamp_iso,
+            indicators_json,
+            metadata_json,
+            confidence,
+            horizon_minutes,
+        ) in rows:
+            parsed = parse_signal_type(signal_type_value)
+            try:
+                horizon_start = datetime.fromisoformat(str(timestamp_iso))
+                if horizon_start.tzinfo is None:
+                    horizon_start = horizon_start.replace(tzinfo=UTC)
+            except (TypeError, ValueError):
+                horizon_start = None
+            if parsed in (SignalType.HOLD, SignalType.NEUTRAL):
+                resolved.append(
+                    self._write_signal_outcome_resolution(
+                        cursor,
+                        signal_id=signal_id,
+                        state=SignalOutcomeState.NON_DIRECTIONAL,
+                    )
+                )
+                conn.commit()
+                continue
+            if parsed is None or horizon_start is None:
+                resolved.append(
+                    self._write_signal_outcome_resolution(
+                        cursor,
+                        signal_id=signal_id,
+                        state=SignalOutcomeState.UNRESOLVABLE,
+                        metadata={"reason": "invalid_signal_type_or_timestamp"},
+                    )
+                )
+                conn.commit()
+                continue
+            horizon_end = horizon_start + timedelta(minutes=int(horizon_minutes))
+            if now < horizon_end:
+                # Horizon not yet elapsed: the verdict must wait for the
+                # window it grades, never jump the gun.
+                continue
+            bars = self.get_historical_data(
+                symbol=symbol,
+                interval="1d",
+                start_date=horizon_start,
+                end_date=horizon_end,
+            )
+            state, outcome_metadata = evaluate_signal_outcome(
+                signal_id=signal_id,
+                signal_type=signal_type_value,
+                timestamp=horizon_start,
+                bars=bars,
+                horizon_minutes=int(horizon_minutes),
+                strength=strength,
+                indicators=(json.loads(indicators_json) if indicators_json else {}),
+                metadata=(json.loads(metadata_json) if metadata_json else {}),
+                confidence=confidence,
+            )
+            if state == SignalOutcomeState.OPEN:
+                continue
+            resolved.append(
+                self._write_signal_outcome_resolution(
+                    cursor,
+                    signal_id=signal_id,
+                    state=state,
+                    metadata=dict(outcome_metadata or {}),
+                )
+            )
+            conn.commit()
+        return resolved
+
+    def get_signal_outcome_summary(self) -> dict[str, Any]:
+        """Outcome counts by state (the >=80% gate's evidence surface).
+
+        ``positive_rate`` divides by the DIRECTIONAL denominator only
+        (positive + negative): NON_DIRECTIONAL and UNRESOLVABLE rows
+        carry no tradeable verdict and must never dilute the gate.
+        ``None`` until at least one directional verdict exists.
+        """
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT outcome_state, COUNT(*) FROM signal_outcomes
+            GROUP BY outcome_state
+            """
+        )
+        counts: dict[str, int] = {row[0]: int(row[1]) for row in cursor.fetchall()}
+        positive = counts.get(SignalOutcomeState.POSITIVE.value, 0)
+        negative = counts.get(SignalOutcomeState.NEGATIVE.value, 0)
+        directional = positive + negative
+        return {
+            "counts": counts,
+            "positive": positive,
+            "negative": negative,
+            "directional": directional,
+            "positive_rate": (positive / directional if directional else None),
+        }
+
+    def _write_signal_outcome_resolution(
+        self,
+        cursor: sqlite3.Cursor,
+        signal_id: str,
+        state: SignalOutcomeState,
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Write one terminal outcome verdict + audit entry.
+
+        The ``WHERE outcome_state = 'open'`` guard makes the FIRST
+        terminal write win and re-runs no-ops (rowcount 0), even across
+        processes -- a resolved verdict is never overwritten.
+        """
+        now = datetime.now(UTC)
+        cursor.execute(
+            """
+            UPDATE signal_outcomes
+            SET outcome_state = ?,
+                entry_price = ?,
+                exit_price = ?,
+                favorable_excursion = ?,
+                adverse_excursion = ?,
+                resolved_at = ?,
+                metadata = ?
+            WHERE signal_id = ? AND outcome_state = ?
+            """,
+            (
+                state.value,
+                (
+                    float(metadata["entry_price"])
+                    if metadata and metadata.get("entry_price") is not None
+                    else None
+                ),
+                (
+                    float(metadata["exit_price"])
+                    if metadata and metadata.get("exit_price") is not None
+                    else None
+                ),
+                (
+                    float(metadata["favorable_excursion"])
+                    if metadata and metadata.get("favorable_excursion") is not None
+                    else None
+                ),
+                (
+                    float(metadata["adverse_excursion"])
+                    if metadata and metadata.get("adverse_excursion") is not None
+                    else None
+                ),
+                now.isoformat(),
+                json.dumps(metadata) if metadata else None,
+                signal_id,
+                SignalOutcomeState.OPEN.value,
+            ),
+        )
+        self._log_audit(
+            action="UPDATE",
+            entity_type="signal_outcome",
+            entity_id=signal_id,
+            new_state={
+                "outcome_state": state.value,
+                "resolved_at": now.isoformat(),
+            },
+        )
+        return {
+            "signal_id": signal_id,
+            "outcome_state": state.value,
+            "resolved_at": now.isoformat(),
+        }
 
     # -------------------------------------------------------------------------
     # Historical Data methods
@@ -2601,6 +2872,41 @@ class Database:
         if hasattr(self, "_async_pool") and self._async_pool is not None:
             return bool(await cast("Any", self)._async_create_signal(signal))
         return await asyncio.to_thread(self.create_signal, signal)
+
+    async def async_record_signal_outcome_open(
+        self,
+        signal_id: str,
+        horizon_minutes: int,
+        metadata: dict[str, Any] | None = None,
+    ) -> bool:
+        """Async open a signal-outcome row; prefers the pool when available."""
+        if hasattr(self, "_async_pool") and self._async_pool is not None:
+            return bool(
+                await cast("Any", self)._async_record_signal_outcome_open(
+                    signal_id, horizon_minutes, metadata
+                )
+            )
+        return await asyncio.to_thread(
+            self.record_signal_outcome_open, signal_id, horizon_minutes, metadata
+        )
+
+    async def async_resolve_signal_outcomes(
+        self,
+        now: datetime | None = None,
+        limit: int = 200,
+    ) -> list[dict[str, Any]]:
+        """Async resolve signal outcomes; prefers the pool when available."""
+        if hasattr(self, "_async_pool") and self._async_pool is not None:
+            return list(
+                await cast("Any", self)._async_resolve_signal_outcomes(now, limit)
+            )
+        return await asyncio.to_thread(self.resolve_signal_outcomes, now, limit)
+
+    async def async_get_signal_outcome_summary(self) -> dict[str, Any]:
+        """Async outcome summary; prefers the pool when available."""
+        if hasattr(self, "_async_pool") and self._async_pool is not None:
+            return dict(await cast("Any", self)._async_get_signal_outcome_summary())
+        return await asyncio.to_thread(self.get_signal_outcome_summary)
 
     async def async_store_historical_data(self, data: list[HistoricalData]) -> bool:
         """Async store historical data; prefers aiosqlite pool when available."""

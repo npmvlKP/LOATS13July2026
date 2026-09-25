@@ -7,6 +7,7 @@ Coordinates all trading operations with strict latency guarantees.
 import asyncio
 import datetime
 import math
+import time
 from typing import Any
 from urllib.parse import urlparse
 
@@ -26,6 +27,7 @@ from .models import HistoricalData, OptionContract, QuoteData, Signal, SignalTyp
 from .openalgo import KillSwitchError, async_client
 from .rules import Rule7ModificationLimitError, rules_engine
 from .sentiment import sentiment
+from .signal_outcomes import validate_signal_outcome_horizon
 from .strength import StrengthSource
 from .strike_selection import select_strikes
 from .ta import technical_analysis
@@ -225,6 +227,11 @@ class TradingOrchestrator:
         # F9-C-01 (TODO-1): resolved lazily in initialize() -- module-level
         # settings is None until first lazy resolution (TODO-18 contract).
         self._iv_symbol: str | None = None
+        # Signal-outcome instrumentation (30Sep evidence wave): outcome
+        # rows are opened inline at each emission site; resolution of
+        # horizon-expired rows runs on the cycle loop (throttled) and
+        # once more at shutdown so the final in-flight window is not lost.
+        self._last_outcome_resolve_time = 0.0
 
     @staticmethod
     async def _guarded_source_call(
@@ -264,7 +271,7 @@ class TradingOrchestrator:
         fetch failures.
         """
         try:
-            return await self._guarded_source_call(source, fetch, *args, **kwargs)
+            result = await self._guarded_source_call(source, fetch, *args, **kwargs)
         except CircuitBreakerOpenError as e:
             logger.warning(f"{source.value} source breaker open, degraded fetch: {e}")
             # Mirror the open state onto the :8001 metrics surface so
@@ -272,6 +279,59 @@ class TradingOrchestrator:
             # per-source isolation, not just the global breakers.
             set_circuit_breaker_status(f"source:{source.value}", True)
             return degraded
+        # Sticky-mirror reset (30Sep wave): the True written above used to
+        # be the ONLY mirror write -- nothing ever cleared it after the
+        # breaker's own OPEN -> HALF_OPEN -> CLOSED recovery, so a
+        # recovered source stayed flagged open on :8001 until restart
+        # (phantom-open metrics). Clear it on every successful
+        # pass-through; the success AFTER recovery is the recovery proof,
+        # and redundant clears are harmless. (Sequential fall-through,
+        # NOT try/else: an ``else`` suite never runs when the try exits
+        # via ``return``.)
+        set_circuit_breaker_status(f"source:{source.value}", False)
+        return result
+
+    def _track_signal_outcome_open(self, signal: Signal) -> None:
+        """Open an outcome row for an emitted directional signal.
+
+        Signal-outcome instrumentation (30Sep evidence wave): fire-and-
+        record -- instrumentation must NEVER fail or slow the producer
+        path that emitted the signal, so every failure degrades to a
+        WARNING and the horizon clamps via
+        ``validate_signal_outcome_horizon``. HOLD/NEUTRAL carry no
+        tradeable verdict and are recorded terminal NON_DIRECTIONAL by
+        the resolver, not here.
+        """
+        global settings
+        if settings is None:
+            settings = get_settings()
+        if signal.signal_type in (SignalType.HOLD, SignalType.NEUTRAL):
+            return
+        horizon = validate_signal_outcome_horizon(
+            int(settings.signal_outcome_horizon_minutes)
+        )
+        try:
+            awaitable = db.async_record_signal_outcome_open(
+                signal.signal_id,
+                horizon,
+                metadata=dict(signal.metadata),
+            )
+            task = asyncio.create_task(awaitable)
+            task.add_done_callback(self._log_outcome_task_failure)
+        except Exception as exc:
+            logger.warning(
+                "Signal-outcome open failed for %s: %s", signal.signal_id, exc
+            )
+
+    @staticmethod
+    def _log_outcome_task_failure(task: "asyncio.Task[bool]") -> None:
+        """Surface a failed detached outcome-open task without raising."""
+        try:
+            task.result()
+        except asyncio.CancelledError:
+            pass
+        except Exception as exc:
+            logger.warning("Signal-outcome open task failed: %s", exc)
 
     async def _source_guarded_history(
         self, source: StrengthSource, symbol: str, interval: str
@@ -584,6 +644,30 @@ class TradingOrchestrator:
                 f"{cycle_duration * 1000:.2f}ms"
             )
 
+        # Signal-outcome instrumentation (30Sep evidence wave): resolve
+        # outcome rows whose horizon has elapsed, throttled off the hot
+        # path (see _maybe_resolve_signal_outcomes).
+        await self._maybe_resolve_signal_outcomes()
+
+    async def _maybe_resolve_signal_outcomes(self) -> None:
+        """Resolve horizon-expired outcome rows, throttled.
+
+        Best-effort by contract: instrumentation must never fail the
+        cycle, so a failing store degrades to a WARNING. The first call
+        after process start always runs (``_last_outcome_resolve_time``
+        starts at 0.0), then at most one pass per
+        ``OUTCOME_RESOLVE_INTERVAL_SECONDS``.
+        """
+        now_monotonic = time.monotonic()
+        if now_monotonic - self._last_outcome_resolve_time >= (
+            OUTCOME_RESOLVE_INTERVAL_SECONDS
+        ):
+            self._last_outcome_resolve_time = now_monotonic
+            try:
+                await db.async_resolve_signal_outcomes()
+            except Exception as exc:
+                logger.warning("Signal-outcome resolution skipped: %s", exc)
+
     async def _execute_ta_analysis(self) -> None:
         """Execute technical analysis with performance monitoring."""
         start_time = datetime.datetime.now(datetime.UTC)
@@ -655,6 +739,7 @@ class TradingOrchestrator:
                         },
                     )
                     await db.async_create_signal(signal)
+                    self._track_signal_outcome_open(signal)
 
         except CircuitBreakerOpenError as e:
             # This source's breaker is open -- skip the producer for this
@@ -800,6 +885,7 @@ class TradingOrchestrator:
                     },
                 )
                 await db.async_create_signal(signal)
+                self._track_signal_outcome_open(signal)
 
         except CircuitBreakerOpenError as e:
             # Source breaker open -- skip gracefully (see TA handler).
@@ -944,6 +1030,7 @@ class TradingOrchestrator:
                 },
             )
             await db.async_create_signal(signal)
+            self._track_signal_outcome_open(signal)
 
         except CircuitBreakerOpenError as e:
             # Source breaker open -- skip gracefully (see TA handler).
@@ -1912,6 +1999,18 @@ class TradingOrchestrator:
                 pass
             self._rss_drift_task = None
 
+        # Signal-outcome instrumentation (30Sep evidence wave): flush
+        # pending outcome resolution once more at shutdown -- the cycle
+        # loop is gone, so this is the last chance to resolve rows whose
+        # horizon expired while the process was stopping. Best-effort:
+        # a failing store must never block or fail the shutdown path.
+        try:
+            resolved = await db.async_resolve_signal_outcomes()
+            if resolved:
+                logger.info("Final signal-outcome resolution: %d row(s)", len(resolved))
+        except Exception as exc:
+            logger.warning("Final signal-outcome resolution skipped: %s", exc)
+
         logger.info("TradingOrchestrator shutdown complete")
 
     async def _check_kill_switch(self) -> None:
@@ -2052,6 +2151,13 @@ class TradingOrchestrator:
 
 # Module-level singleton instance
 orchestrator = TradingOrchestrator()
+
+# Signal-outcome instrumentation (30Sep evidence wave): minimum seconds
+# between resolver passes on the cycle loop. 900 s quarter-hour cadence
+# matches the intraday horizon scale without adding measurable cycle
+# overhead (one indexed JOIN scan per pass); the shutdown path flushes
+# once more regardless of this throttle.
+OUTCOME_RESOLVE_INTERVAL_SECONDS = 900.0
 
 
 async def start_orchestrator() -> None:

@@ -178,3 +178,56 @@ with a root-cause lead**.
    21Sep + 23Sep in-session breaker windows (21Sep 10:08–10:37 and
    12:14–12:27 IST clusters; 23Sep ~09:42–09:45 cluster) as
    annotation-only outage windows, mirroring the 17Sep precedent.
+
+## Continuation 3 (24 Sep): token wall erratum — the invalidation is progressive
+
+**The week's pattern resolves into one mechanism.** On 24 Sep the
+operator re-logged at 12:10:00 IST (login id 93, oauth zerodha) — and
+the session **survived** an OpenAlgo restart afterward (12:29 manual
+restart), with quotes succeeding through the full chain at 12:35 IST
+(`x-api-key` + body-key probe, HTTP 200, live RELIANCE quote). Access
+tokens therefore persist in `openalgo.db` across restarts; restarts
+alone never voided anything.
+
+What voided sessions on 17, 21 and 24 Sep was **time of day** — and the
+24 Sep evidence shows the invalidation is **progressive, not
+instantaneous**. Verified sequence on 24 Sep: 05:20:17 IST — first
+quotes-permission failures seen LOATS-side (`API Error 500: API
+Permission denied: Insufficient permission for that call`; breaker
+OPEN 05:20:18, log anchor `logs/loats.log.5` line 52740); 05:33:40-50
+— OpenAlgo-side historical-data permission denials and the websocket
+goodbye + 403 handshake (`G:/.OA/OpenAlgo/log/errors.jsonl`); 06:35:14
+— first explicit quotes rejection `Incorrect api_key or access_token`
+in the OpenAlgo auth-layer log (the stage the first draft pinned as
+THE death). The 12:08 IST order-WS 403 is the same dead session's
+downstream symptom. Across the week the quotes-auth stage lands at
+06:19-07:49 IST (19-23 Sep: 07:41, 06:38, 06:19, 07:45), consistent
+with Zerodha's daily pre-open token wall; the 05:20-05:33
+permission-stage precursor was observed only on 24 Sep — that other
+days had no supervisor traffic in that window (the 04:50-06:25 restart
+wave) is plausible but unverified.
+
+**Operational rule going forward**: treat ANY broker failure from
+~05:20 IST as the session entering the daily invalidation. Land the
+broker login AFTER the band — on current evidence never before
+~08:00 IST — ideally before the 09:15 open so the open is covered; if
+the morning is lost, a mid-day re-login covers the remainder of the
+session (24 Sep 12:10 precedent). Evidence cost of the 24 Sep
+misalignment: dead 05:20-12:10 IST; within trading hours the open
+through 12:10 was lost (~2.9 of the day's 6.25 trading hours).
+Recovery was clean at 12:11:06 IST (breakers CLOSED, 06:41:06 UTC),
+cycles executing real analysis by 12:12 IST. Supervisor unharmed
+throughout (cycles 21k+, zero exceptions); OpenAlgo process death #3
+(12:25 IST, silent, no WER) remains part of the SQLite-contention
+wave request above.
+
+Erratum note (24 Sep, principal pass): the first draft pinned a single
+death at "06:35 IST (403)" with a "~2.5 trading hours" cost; a
+LOATS-side log pass then re-pinned 05:20:17; the cross-layer
+reconciliation against the OpenAlgo auth-layer log shows both are
+STAGES of one progressive invalidation — 06:35 is the quotes-auth
+stage, 05:20 the permission-stage onset. This section records the
+reconciled sequence. Log line anchors: `logs/loats.log.5` line 52740
+(onset), line 52747 (breaker OPEN); `logs/loats.log` line 944 (CLOSED
+after recovery) — timestamps are the durable anchors, rotation will
+retire the line numbers.

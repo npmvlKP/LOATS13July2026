@@ -62,6 +62,17 @@ run `36016934081` = success. This register update itself landed through
 the PR flow under the restored protection — the flow's first end-to-end
 pass since re-enablement (relax -> merge -> restore, GraphQL read-back
 count=1 / 10 contexts / admin-enforced).
+Updated 2026-09-24: F9-M-01-R1 wave on
+`fix/breaker-mirror-reset-and-outcome-instrumentation` — the 17Sep F9-M-01
+chain was live-broken by the pooled async audit writer (head cache read but
+never advanced; 4,578 entries in 23 frozen runs; verifier False since
+18Sep). Root cause fixed (single `to_thread` hop under `_audit_lock`, head
+advance restored, uuid entry_ids), 9 regression pins added, live trail
+re-anchored fail-closed (`scripts/repair_f9m01_chain_head.py`), production
+verifier True post-repair. Evidence:
+`docs/audit-history/24Sep2026-f9m01-r1-frozen-chain-head-resolution.md`.
+No new R-row: fixed at the wave, not an open risk; the watch item is that
+PR #73's CI must stay green with the two new/changed writer files.
 
 | ID | Priority | Category | Status | Due | Next action |
 |----|----------|----------|--------|-----|-------------|
