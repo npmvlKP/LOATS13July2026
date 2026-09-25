@@ -169,6 +169,16 @@ INSERTs leaving open transactions that starved sibling writers for the
 30 s busy_timeout), NOT a latency-budget regression; ADR-0016 budgets
 untouched. Closed as R-09 (see row). Snapshot: HEAD `ba4febd`
 (PR #81 merged), branch `fix/benchmark-txn-hygiene`.
+Updated 2026-09-25 (evening, follow-up wave `fix/perf-gate-success-rate`
+at main `879015c`, PR #82 merged): the post-merge verification run
+exposed a SECOND, masked defect — the F9-L-03 insert-time guard
+rejected 100/100 focused `signal_round_trip` samples (fixture missing
+the `test` provenance tag) and the gate still graded green because
+grading ignored the success flag entirely (exceptions record
+durations too). Fixed fail-closed: success-rate component in
+`validate_cmp_latency_gates` (generic AND stage composition),
+test-provenance tag on the fixture; post-fix run zero failures,
+PASS, exit 0. Closed as R-10 (see row).
 
 | ID | Priority | Category | Status | Due | Next action |
 |----|----------|----------|--------|-----|-------------|
@@ -181,6 +191,7 @@ untouched. Closed as R-09 (see row). Snapshot: HEAD `ba4febd`
 | R-07 | P2 | Test infra: orphaned mutant sweep | OPEN — candidates deferred | 2026-09-30 | Decide (a) process-tree kill vs (b) pre-run frozen-tree guard |
 | R-08 | P2-ops | Degraded duplicate OpenAlgo instance (shadowed :5000) | OPEN — remediated live, fix deferred | 2026-09-30 | Decide bind-or-exit pre-flight vs runbook port sweep; bind-or-exit recommended |
 | R-09 | P2-fixed | Benchmark write-path poisoning (failed INSERTs left open transactions; wall-clock ids collided) | CLOSED by `fix/benchmark-txn-hygiene` | — | Same-commit runs at `ba4febd` graded 8/10 PARTIAL (12:59) and 12/12 PASS (13:13): root cause was nondeterministic lock cascade (30 s busy_timeout starvation), not a budget regression. Fixed: `_rollback_on_error` on 15 sync writers, pool-release transaction repair, uuid4 benchmark ids; `tests/test_transaction_hygiene.py` pins it |
+| R-10 | P2-fixed | Benchmark gate false-green: sample success rate ungraded; focused signal fixture rejected at insert | CLOSED by `fix/perf-gate-success-rate` | — | Found by the post-merge verification run at `879015c`: the F9-L-03 guard rejected 100/100 `signal_round_trip` samples (fixture lacked the `test` provenance tag) while the gate graded green off the exceptions' durations. Fixed: `validate_cmp_latency_gates` now grades the sample success rate (incl. the stage-gate composition) fail-closed, and the fixture carries `metadata["test"]`; pinned in `tests/test_performance_analyzer.py::TestSuccessRateGate` |
 
 ---
 
