@@ -181,6 +181,41 @@ Alerts have a 5-minute cooldown period to prevent spam.
 2. Check market holiday calendar
 3. Verify NTP time synchronization
 
+#### 5. Degraded Duplicate Instance (Two `:5000` Listeners, 8765 Bind Error)
+
+**Symptom**: startup log shows `WebSocket port 8765 is already in use`
+ERROR yet the new `python app.py` process keeps running; `netstat -ano |
+findstr ":5000.*LISTENING"` shows TWO listening sockets on :5000 (plus
+`:8765` held by the original instance). SDK/relay calls intermittently
+hit a listener with no WebSocket server attached.
+
+**Resolution** (first aid, in order):
+
+1. Identify the duplicate: the process whose start time is LATER and
+   which owns :5000 but NOT :8765.
+   `netstat -ano | findstr "LISTENING" | findstr ":5000 :8765"` ->
+   PIDs; `tasklist /FI "PID eq <pid>"` for names/start times.
+2. Confirm the duplicate serves nobody before killing: zero inbound
+   ESTABLISHED connections on its :5000 socket (loopback self-pairs and
+   an idle broker-API outbound session are expected on a freshly
+   degraded instance).
+3. Kill it: `taskkill /PID <duplicate-pid> /F` (keep the process that
+   owns :8765 — it is the complete instance; never touch the P5
+   forward-test listener on :8001).
+4. Re-verify: exactly ONE LISTENING line per port (:5000, :5555, :8765
+   on the primary; :8001 on P5); `:8765` answering HTTP with 426 is
+   CORRECT (WebSocket-only listener).
+5. Record the incident in `docs/audit-history/` and reconcile
+   `docs/RISK-REGISTER.md` (R-08) — recurrence decides fix candidates
+   at the ops-review window.
+
+Root cause and recurrence history: R-08 in `docs/RISK-REGISTER.md` and
+`docs/audit-history/24Sep2026-degraded-duplicate-recurrence.md`. The
+process survives because the :5000 listener rides the werkzeug serving
+stack (`allow_reuse_address = True`), which on Windows permits the
+silent second bind, while only the :8765 path fails closed — treat ANY
+8765 bind error at startup as a must-resolve condition, not a warning.
+
 ### Log Locations
 
 | Environment | Log Location |

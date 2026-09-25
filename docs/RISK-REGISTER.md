@@ -73,6 +73,33 @@ verifier True post-repair. Evidence:
 `docs/audit-history/24Sep2026-f9m01-r1-frozen-chain-head-resolution.md`.
 No new R-row: fixed at the wave, not an open risk; the watch item is that
 PR #73's CI must stay green with the two new/changed writer files.
+Updated 2026-09-24: R-08 opened (degraded-duplicate OpenAlgo instance —
+the relaunch fails its :8765 WS bind fail-closed yet survives with a
+shadowed, double-bound :5000). Second same-day recurrence (first
+instance earlier today, duplicate PIDs 34740/36668 per the ops
+transcript; second at 15:32:58 IST, duplicate PID 36592 against primary
+29116; third at 16:31:53 IST, duplicate PID 34316 behind a
+`uv run app.py` wrapper tree, killed with its wrappers the same hour;
+fourth at 18:10:29 IST, duplicate PID 792 behind a second `uv run
+app.py` launch from the same operator shell (8244), killed with its
+wrappers 18 minutes later — see Continuations 3 and 4 in the incident
+record). Duplicate verified
+zero-inbound, killed; per-port
+single-listener topology re-verified (:5000/:5555/:8765 -> 29116,
+:8001 -> P5 32968). Root cause pinned in the OpenAlgo checkout
+(a51822b4): asymmetric bind semantics — the WS path probes and fails
+closed (RuntimeError at `websocket_proxy/server.py:65`), while the
+:5000 listener rides the werkzeug stack behind `socketio.run`, whose
+server class sets `allow_reuse_address = True`
+(`werkzeug/serving.py:710`), so Windows silently double-binds :5000.
+Fix candidates (bind-or-exit pre-flight vs runbook port sweep)
+deferred to the 2026-09-30 ops-review window. Incident record:
+`docs/audit-history/24Sep2026-degraded-duplicate-recurrence.md`. Paste
+reconciliation: the same paste carried F9-H-05 as an open High finding
+— STALE, closed by PR #66 `633daae` (re-verified at the models: hard
+`Field(ge=-1.0, le=1.0)` bounds on both score fields, ADR-0017, the
+dedicated ensemble/decay/bounds nets). The ~18:20 IST paste that
+surfaced the fourth occurrence re-carried the same stale block.
 
 | ID | Priority | Category | Status | Due | Next action |
 |----|----------|----------|--------|-----|-------------|
@@ -83,6 +110,7 @@ PR #73's CI must stay green with the two new/changed writer files.
 | R-05 | Ops | Environment, dated | OPEN | 2026-10-01 | Shared-venv rebuild; fresh-venv pip-audit replication until then |
 | R-06 | Process | Register discipline | CLOSED by this file | — | Maintain per the rules above |
 | R-07 | P2 | Test infra: orphaned mutant sweep | OPEN — candidates deferred | 2026-09-30 | Decide (a) process-tree kill vs (b) pre-run frozen-tree guard |
+| R-08 | P2-ops | Degraded duplicate OpenAlgo instance (shadowed :5000) | OPEN — remediated live, fix deferred | 2026-09-30 | Decide bind-or-exit pre-flight vs runbook port sweep; bind-or-exit recommended |
 
 ---
 
@@ -213,3 +241,52 @@ Next action: at the 30Sep ops-review window, decide (a) process-tree kill
 for suite timeouts (no hook child can outlive its parent) vs (b) pre-run
 frozen-tree guard in the mutant test (fails closed on pre-damaged trees).
 Neither is one-key mid-span.
+
+## R-08 [P2-ops] Degraded duplicate OpenAlgo instance with a shadowed :5000
+
+Category: live-estate ops / upstream (OpenAlgo checkout). Status: OPEN —
+remediated live, root cause pinned, fix deferred to the 30Sep ops-review
+window. Confidence: Certain (reproduced four times on 2026-09-24).
+
+Evidence: relaunching `python app.py` while a healthy instance holds the
+ports produces a HALF-ALIVE duplicate: the :8765 WebSocket bind fails
+closed exactly as designed (RuntimeError, SDK-compat guard), but the
+process does NOT exit — Windows lets the Flask listener double-bind
+:5000, leaving two `:5000` LISTENING sockets and one broker login shared
+by two processes. Occurrences on 24Sep: earlier today (duplicates
+34740/36668 per the ops transcript), 15:32:58 IST (duplicate 36592 vs
+primary 29116), 16:31:53 IST (duplicate 34316 behind a
+`uv run app.py` wrapper tree uv 29640 -> python 4964 -> app.py 34316;
+its own log is the 16:32:02-05 excerpt showing healthy module bring-up
+followed by the :8765 fail-closed error), and 18:10:29 IST (duplicate
+792 behind a second `uv run app.py` wrapper tree uv 9912 ->
+python 15960 -> app.py 792 from the same operator shell 8244; its own
+log is the 18:11:14-16 excerpt — same signature, plus the 2.0 s
+`port_check` grace wait before the fail-closed error). Each duplicate
+served nobody
+(zero inbound connections — browser SDK session rides the
+primary); each was killed and topology re-verified single-listener per
+port (:5000/:5555/:8765 -> 29116, :8001 -> P5 32968; probes :5000 200,
+:8765 426, :8001 200). Four recurrences in one day strengthen the case
+for the bind-or-exit pre-flight candidate.
+
+Root cause: asymmetric bind semantics in the OpenAlgo checkout
+(a51822b4) — the WS path probes the port and fails closed
+(`websocket_proxy/server.py:65` via `app_integration.py:277`), while
+the :5000 listener rides the werkzeug serving stack behind
+`socketio.run` (`app.py:1263`), whose server class sets
+`allow_reuse_address = True` (`werkzeug/serving.py:710`) — on Windows
+that permits a silent second bind. The error text reads fatal; the
+process is not. That gap is the defect. If unremediated: SDK clients
+can land on the shadowed
+listener (order-dependent intermittent failures) and two processes race
+one broker session.
+
+Incident record:
+`docs/audit-history/24Sep2026-degraded-duplicate-recurrence.md`.
+
+Next action: at the 30Sep ops-review window, decide (a) startup
+bind-or-exit pre-flight for EVERY port — any bind failure is
+process-fatal, no partial instances (recommended) vs (b) runbook-only
+mitigation (start-script port sweep killing stale listeners before
+launch). Touches the OpenAlgo checkout, not this repo's src tree.

@@ -595,8 +595,20 @@ History (most recent last):
       PR #72 plus the 9 evidence-wave files above (zero filename
       overlap between the branches) = 479 tracked files. Ceiling
       470->479.
+
+    * Parallel lineage (branch docs/sep24-degraded-duplicate-recurrence,
+      grown from the same 459 baseline; reconciled into main by the
+      PR #72-#75 merge flow, 2026-09-24):
+    * 479->480 (2026-09-24, R-08 degraded-duplicate docs wave; the
+      fourth same-day R-08 reconciliation rides this lineage entry):
+      +1 tracked file -- docs/audit-history/24Sep2026-degraded-duplicate-
+      recurrence.md (the second same-day degraded-instance incident
+      record, live remediation evidence and OpenAlgo root-cause pin;
+      register R-08 row + header update + section and the RUNBOOK
+      troubleshooting entry landed in the same wave, no other new
+      files). Ceiling 479->480.
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 479
+TRACKED_FILE_CEILING = 480
