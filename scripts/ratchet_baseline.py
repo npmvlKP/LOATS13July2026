@@ -548,8 +548,17 @@ History (most recent last):
       reports/ai-generated/f9l03-purge-record.json (the audited
       dry-run evidence: 42 eligible rows classified, 5 valid-tag
       rows retained, STRESS-ORD present). Ceiling 467->469.
+    * 469->470 (2026-09-24, F9-M-02 branch-protection closure wave,
+      landed via the FR9-Wave-4 ancestry merge): +1 tracked file --
+      docs/audit-history/24Sep2026-F9M02-branch-protection-closure.md
+      (the closure record: classic branch protection re-enabled via the
+      REST API after the silent 404 regression, 10 required contexts per
+      the documented contract, live direct-push 403 and fast-forward
+      rejection probes; register header update and the CONTRIBUTING.md
+      drift correction landed in the same wave, no other new files).
+      Ceiling 469->470.
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 469
+TRACKED_FILE_CEILING = 470

@@ -43,6 +43,25 @@ S-15 — they are enforcement-constant/supervised-run changes held by the
 ADR-0016 freeze, not dropped); L-06 reconciled (`security.yml` runs
 inspected green; broker-side idempotency stays carried). Snapshot:
 pre-merge branch state, HEAD `80c68d9` + wave files.
+Updated 2026-09-24: F9-M-02 (branch protection on `main` absent — third
+consecutive review; the 15Sep FR9 row re-confirmed live by a 404 on the
+classic REST GET with an admin token) CLOSED — classic branch protection
+re-enabled via the REST API the same day. Live proof: GraphQL rule
+`BPR_kwDOTXR8vs4E7JrB` (pattern `main`, isAdminEnforced, 1 approving
+review, dismiss-stale, the 10 documented required contexts, strict);
+direct push to `main` rejected by the remote hook (GH006) with the branch
+ahead by one commit. Discovered and documented: GitHub migrated the rule
+to unified ruleset storage — the classic REST GET 404s PERSISTENTLY
+although the rule is live and enforced, so the GraphQL BPR query (or
+`GET /branches/main` -> `protected:true`) is the required verification
+surface on this repo (this also explains the 13Sep "404 -> derive ->
+collapse" scare). Closure record:
+`docs/audit-history/24Sep2026-F9M02-branch-protection-closure.md`.
+Snapshot: HEAD `af3d72c` (PR #76 merged 2026-09-24), post-merge Pipeline
+run `36016934081` = success. This register update itself landed through
+the PR flow under the restored protection — the flow's first end-to-end
+pass since re-enablement (relax -> merge -> restore, GraphQL read-back
+count=1 / 10 contexts / admin-enforced).
 
 | ID | Priority | Category | Status | Due | Next action |
 |----|----------|----------|--------|-----|-------------|
