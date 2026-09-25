@@ -129,11 +129,37 @@ consecutive green advisory `benchmark-perf` main runs (24–25Sep, artifact
 id 10854087767: PASS 12/12, round trip 13.1 ms) plus a live `:8001/metrics`
 re-probe (0/26,413 compliant, avg 1.430 s, max 48.24 s, kill switch
 inactive, breakers 4/4). No decision taken, no constant moved: the
-mid-span freeze binds until the 2026-09-30 checkpoint. R-01 row and
-section updated in place to cite the pack. Same-day protection probe:
-zero drift (10 contexts, strict, admin-enforced — 4th consecutive clean
-since the F9-M-02-R1 restoration). Snapshot: HEAD `a01e31c` (PR #79
+the ADR-0016 mid-span freeze binds until the 2026-09-30 checkpoint. R-01
+row and section updated in place to cite the pack. Same-day protection
+probe: zero drift (10 contexts, strict, admin-enforced — 4th consecutive
+clean since the F9-M-02-R1 restoration). Snapshot: HEAD `a01e31c` (PR #79
 merged 2026-09-25), pre-merge branch state.
+Updated 2026-09-25 (evening, 30Sep-wave staging): the checkpoint wave was
+STAGED, not executed — the freeze binds until the checkpoint. Landed on
+`docs/sep30-r01-checkpoint`: (1) the wave staging pack
+`docs/audit-history/25Sep2026-r01-wave-paste-reconciliation.md` —
+paste reconciliation (F9-M-03 block in the evening paste is STALE —
+resolved 18Sep by ADR-006 Amendment 7 / PR #56; R-01/R-05/R-07/R-08 and
+the protection-watch rows are CURRENT), fresh live probes at 17:29 IST
+(protection GET field-by-field exact contract match, 5th consecutive
+clean; span 27,557 cycles, 0 compliant, avg 1.663 s, max unchanged
+48.243 s, kill switch inactive, breakers 4/4), two decision-frame traps
+pinned for the checkpoint executor (the required context is the full
+`name:` string `benchmark-perf (F9-H-02 prerequisite, advisory)` —
+rename ci.yml BEFORE the 11-context PUT; closing R-01 reds
+`tests/test_risk_register_current.py::test_p1_items_carry_the_checkpoint_due_date`
+— extend the net in the same commit), and the ordered 30Sep execution
+checklist including the promotion sequence and the protection drill;
+(2) the rider work orders
+`docs/audit-history/25Sep2026-s14-s15-rider-work-orders.md` — S-14
+surfaces pinned (orchestrator.py:758/902/1045, all THREE move in one
+commit, derived from the decision), S-15 deliverables pinned (SL-M
+fixture incl. the Rule7ModificationLimitError degradation leg, run-log
+pin, supervised enablement AFTER the checkpoint). R-05 stays dated
+2026-10-01 and is NOT folded into the checkpoint wave. Snapshot: HEAD
+`840ffca` (PR #80 merged 2026-09-25), branch `docs/sep30-r01-checkpoint`
+created at the same SHA, zero divergence, upstream verified by
+`git ls-remote`.
 
 | ID | Priority | Category | Status | Due | Next action |
 |----|----------|----------|--------|-----|-------------|
