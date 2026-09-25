@@ -87,6 +87,30 @@ class SimpleConnectionPool:
 
     async def release(self, conn: aiosqlite.Connection) -> None:
         """Release a connection back to the pool."""
+        # Transaction hygiene (25Sep2026): a connection carrying an open
+        # transaction -- e.g. its DML failed between acquire and release
+        # -- holds SQLite's write lock; the next acquirer of THIS pooled
+        # connection would stall for the full busy_timeout. Repair the
+        # connection's transaction state before parking it.
+        try:
+            in_txn = conn.in_transaction
+        except Exception as exc:
+            # A closed/stale connection raises from the in_transaction
+            # property (aiosqlite proxies through the raw handle). The
+            # contract is that release() never raises and still parks the
+            # connection -- the next acquire detects the stale handle and
+            # replaces it.
+            logger.warning(f"Pooled connection in_transaction probe failed: {exc}")
+            in_txn = False
+        if in_txn:
+            try:
+                await conn.rollback()
+                logger.warning(
+                    "Rolled back an open transaction on a pooled connection "
+                    "at release time (leaked by its previous user)"
+                )
+            except Exception as exc:
+                logger.error(f"Rollback at pool release failed: {exc}")
         async with self._cond:
             self._pool.append(conn)
             self._cond.notify_all()

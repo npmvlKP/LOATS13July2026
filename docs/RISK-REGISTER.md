@@ -160,6 +160,15 @@ pin, supervised enablement AFTER the checkpoint). R-05 stays dated
 `840ffca` (PR #80 merged 2026-09-25), branch `docs/sep30-r01-checkpoint`
 created at the same SHA, zero divergence, upstream verified by
 `git ls-remote`.
+Updated 2026-09-25 (evening, same-day repair wave
+`fix/benchmark-txn-hygiene`): the 12:59 benchmark run at `ba4febd`
+graded PARTIAL (8/10) while an exclusive 13:13 re-run of the same
+commit graded 12/12 PASS — root-caused to benchmark write-path
+poisoning (UNIQUE collision from wall-clock signal ids + failed
+INSERTs leaving open transactions that starved sibling writers for the
+30 s busy_timeout), NOT a latency-budget regression; ADR-0016 budgets
+untouched. Closed as R-09 (see row). Snapshot: HEAD `ba4febd`
+(PR #81 merged), branch `fix/benchmark-txn-hygiene`.
 
 | ID | Priority | Category | Status | Due | Next action |
 |----|----------|----------|--------|-----|-------------|
@@ -171,6 +180,7 @@ created at the same SHA, zero divergence, upstream verified by
 | R-06 | Process | Register discipline | CLOSED by this file | — | Maintain per the rules above |
 | R-07 | P2 | Test infra: orphaned mutant sweep | OPEN — candidates deferred | 2026-09-30 | Decide (a) process-tree kill vs (b) pre-run frozen-tree guard |
 | R-08 | P2-ops | Degraded duplicate OpenAlgo instance (shadowed :5000) | OPEN — remediated live, fix deferred | 2026-09-30 | Decide bind-or-exit pre-flight vs runbook port sweep; bind-or-exit recommended |
+| R-09 | P2-fixed | Benchmark write-path poisoning (failed INSERTs left open transactions; wall-clock ids collided) | CLOSED by `fix/benchmark-txn-hygiene` | — | Same-commit runs at `ba4febd` graded 8/10 PARTIAL (12:59) and 12/12 PASS (13:13): root cause was nondeterministic lock cascade (30 s busy_timeout starvation), not a budget regression. Fixed: `_rollback_on_error` on 15 sync writers, pool-release transaction repair, uuid4 benchmark ids; `tests/test_transaction_hygiene.py` pins it |
 
 ---
 

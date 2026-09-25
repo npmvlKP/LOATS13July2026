@@ -5,12 +5,14 @@ Implements SQLite database audit trail JSONL dual-write.
 
 import asyncio
 import contextlib
+import functools
 import hashlib
 import json
 import math
 import sqlite3
 import threading
 import time
+from collections.abc import Callable
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
@@ -45,6 +47,44 @@ from .utils.lazy_singleton import lazy_singleton
 
 # Note: aiosqlite is imported locally in async methods where needed
 logger = get_logger(__name__)
+
+
+def _rollback_on_error[TypeT](fn: Callable[..., TypeT]) -> Callable[..., TypeT]:
+    """Roll the thread-local connection back when the wrapped DML raises.
+
+    A failed DML leaves SQLite's implicit transaction OPEN on the
+    thread-local connection; every later writer on a different thread
+    then stalls for the full ``busy_timeout`` ("database is locked")
+    until that connection commits or rolls back. Found live 25Sep2026:
+    a UNIQUE violation in the benchmark poisoned its thread's
+    connection and starved sibling threads (PARTIAL 8/10 verdict at
+    ``ba4febd``; the same commit passed 12/12 on an exclusive re-run).
+    The guard preserves the wrapped method's semantics exactly: the
+    exception still propagates (or is still swallowed, for methods that
+    swallow) -- only the connection state is repaired.
+    """
+
+    @functools.wraps(fn)
+    def wrapper(self: Any, *args: Any, **kwargs: Any) -> TypeT:
+        try:
+            return fn(self, *args, **kwargs)
+        except BaseException:
+            holder = getattr(self, "_thread_local", None)
+            conn = getattr(holder, "connection", None) if holder else None
+            if conn is not None:
+                try:
+                    if conn.in_transaction:
+                        conn.rollback()
+                except Exception as rollback_exc:  # pragma: no cover - defensive
+                    logger.error(
+                        f"Rollback after failed {fn.__name__} also failed: "
+                        f"{rollback_exc}"
+                    )
+            raise
+
+    return wrapper
+
+
 T = TypeVar("T", bound=BaseModel)
 # -------------------------------------------------------------------------
 # FIX-F-PERF-1:
@@ -849,6 +889,7 @@ class Database:
                 new_state,
             )
 
+    @_rollback_on_error
     def _log_audit_inner(
         self,
         action: str,
@@ -1019,6 +1060,7 @@ class Database:
             new_state=new_state,
         )
 
+    @_rollback_on_error
     def _cleanup_old_data(self) -> None:
         """
         Clean data older than retention period.
@@ -1055,6 +1097,7 @@ class Database:
     # -------------------------------------------------------------------------
     # Trade CRUD methods
     # -------------------------------------------------------------------------
+    @_rollback_on_error
     def create_trade(self, trade: Trade) -> bool:
         """
         Create new trade record.
@@ -1146,6 +1189,7 @@ class Database:
             return None
         return self._row_to_trade(row)
 
+    @_rollback_on_error
     def update_trade(self, trade: Trade) -> bool:
         """
         Update existing trade record.
@@ -1309,6 +1353,7 @@ class Database:
     # -------------------------------------------------------------------------
     # Signal CRUD methods
     # -------------------------------------------------------------------------
+    @_rollback_on_error
     def create_signal(self, signal: Signal) -> bool:
         """
         Create new signal record.
@@ -1419,6 +1464,7 @@ class Database:
     # -------------------------------------------------------------------------
     # Signal-outcome instrumentation (30Sep evidence wave)
     # -------------------------------------------------------------------------
+    @_rollback_on_error
     def record_signal_outcome_open(
         self,
         signal_id: str,
@@ -1452,6 +1498,7 @@ class Database:
         conn.commit()
         return True
 
+    @_rollback_on_error
     def resolve_signal_outcomes(
         self,
         now: datetime | None = None,
@@ -1662,6 +1709,7 @@ class Database:
     # -------------------------------------------------------------------------
     # Historical Data methods
     # -------------------------------------------------------------------------
+    @_rollback_on_error
     def store_historical_data(self, data: list[HistoricalData]) -> bool:
         """
         Store historical data records.
@@ -1701,6 +1749,7 @@ class Database:
             conn.commit()
         return True
 
+    @_rollback_on_error
     def store_chain_iv(self, symbol: str, atm_iv: float, as_of_date: date) -> bool:
         """Persist one option-chain ATM IV observation (F9-C-01, TODO-1).
 
@@ -1805,6 +1854,7 @@ class Database:
     # -------------------------------------------------------------------------
     # Quote methods
     # -------------------------------------------------------------------------
+    @_rollback_on_error
     def store_quote(self, quote: QuoteData) -> bool:
         """
         Store quote record.
@@ -1887,6 +1937,7 @@ class Database:
     # -------------------------------------------------------------------------
     # Position methods
     # -------------------------------------------------------------------------
+    @_rollback_on_error
     def store_position(self, position: Position) -> bool:
         """
         Store position record.
@@ -1969,6 +2020,7 @@ class Database:
     # -------------------------------------------------------------------------
     # Funds methods
     # -------------------------------------------------------------------------
+    @_rollback_on_error
     def store_funds(self, funds: FundsData) -> bool:
         """
         Store funds data.
@@ -2036,6 +2088,7 @@ class Database:
     # -------------------------------------------------------------------------
     # Order methods
     # -------------------------------------------------------------------------
+    @_rollback_on_error
     def store_order(self, order: Order) -> bool:
         """
         Store order record with idempotency check.
@@ -2381,6 +2434,7 @@ class Database:
     # -------------------------------------------------------------------------
     # TradeDecision CRUD methods for CMP strategy
     # -------------------------------------------------------------------------
+    @_rollback_on_error
     def create_trade_decision(self, decision: TradeDecision) -> bool:
         """
         Create new trade decision record.
@@ -2527,6 +2581,7 @@ class Database:
         rows = cursor.fetchall()
         return [self._row_to_trade_decision(row) for row in rows]
 
+    @_rollback_on_error
     def update_trade_decision_status(self, decision_id: str, status: str) -> bool:
         """
         Update status trade decision.

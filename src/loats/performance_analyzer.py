@@ -10,6 +10,7 @@ from collections import deque
 from collections.abc import Callable, Coroutine
 from datetime import UTC, datetime, timedelta
 from typing import Any
+from uuid import uuid4
 
 import numpy as np
 
@@ -307,7 +308,7 @@ class DatabasePerformanceAnalyzer:
         # Test async operations
         async def test_async_create_signal() -> bool:
             signal = Signal(
-                signal_id=f"test_{int(time.time() * 1000)}",
+                signal_id=f"test_{uuid4().hex}",
                 symbol="NIFTY",
                 signal_type=SignalType.BUY,
                 strength=0.8,
@@ -338,7 +339,7 @@ class DatabasePerformanceAnalyzer:
         # Test sync operations
         def test_sync_create_signal() -> bool:
             signal = Signal(
-                signal_id=f"test_{int(time.time() * 1000)}",
+                signal_id=f"test_{uuid4().hex}",
                 symbol="NIFTY",
                 signal_type=SignalType.BUY,
                 strength=0.8,
@@ -527,9 +528,12 @@ async def run_latency_benchmark(db: Database) -> dict[str, Any]:
 
     # Test 1: Signal creation and retrieval
     async def test_signal_round_trip() -> int:
-        # Create signal
+        # Create signal. uuid4: iteration-unique by construction -- the
+        # previous wall-clock millisecond template collided when the sync
+        # and async legs of one iteration ran within the same millisecond
+        # (UNIQUE violation poisoning the write path, 25Sep2026).
         signal = Signal(
-            signal_id=f"benchmark_{int(time.time() * 1000)}",
+            signal_id=f"benchmark_{uuid4().hex}",
             symbol="NIFTY",
             signal_type=SignalType.BUY,
             strength=0.8,
