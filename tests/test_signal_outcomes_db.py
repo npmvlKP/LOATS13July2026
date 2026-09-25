@@ -53,7 +53,7 @@ def _signal(
         timestamp=timestamp,
         indicators={"x": 1.0},
         confidence=0.8,
-        metadata=metadata or {"scan_type": "ta", "source": "technical_analysis"},
+        metadata=metadata or {"scan_type": "ta", "source": "ta"},
     )
 
 

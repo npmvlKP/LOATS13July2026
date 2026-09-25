@@ -1,4 +1,11 @@
-"""End-to-end CMP chain tests driving the REAL orchestrator producers.
+"""
+Signal-store provenance policy (F9-L-03 store hygiene): every
+production-signal fixture in this module either carries a valid
+``metadata["source"]`` tag (a StrengthSource value or a documented
+exemption) or uses the explicit ``{"test": ...}`` provenance key.
+The insert-time guard rejects untagged/unknown-source rows by design;
+pinned by tests/test_signal_source_guard.py.
+End-to-end CMP chain tests driving the REAL orchestrator producers.
 
 F8-C-01 remediation (TODO-10 honored): these tests spin the actual producer
 methods (``_execute_ta_analysis``, ``_execute_sentiment_analysis``,
@@ -21,7 +28,9 @@ rejects it).
 """
 
 import asyncio
+import json
 import re
+import sqlite3
 import tempfile
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -36,7 +45,6 @@ from loats.models import (
     NewsItem,
     QuoteData,
     SentimentAnalysisResult,
-    Signal,
     SignalType,
 )
 from loats.orchestrator import TradingOrchestrator
@@ -264,6 +272,55 @@ def fixture_funds_data():
 # --------------------------------------------------------------------------
 # Real-producer e2e tests
 # --------------------------------------------------------------------------
+
+
+def _insert_pre_guard_corruption_row(
+    db_path: Path,
+    *,
+    signal_id: str,
+    source: str,
+    age_seconds: int,
+) -> None:
+    """Insert an untagged-source signal row at the STORAGE layer.
+
+    The F9-L-03 insert-time guard makes corrupt provenance unreachable
+    through the Database API -- which is exactly its purpose. These two
+    probes exercise the F8-M-01 strength-layer exclusion of a store that
+    ALREADY contains corrupt rows (the legacy-store state the guard now
+    prevents recurring); the corruption is therefore constructed below
+    the API, at the storage layer, mirroring the pre-guard legacy state.
+    """
+    conn = sqlite3.connect(db_path)
+    try:
+        created = (datetime.now(UTC) - timedelta(seconds=age_seconds)).isoformat()
+        created_ms = int(
+            (datetime.now(UTC) - timedelta(seconds=age_seconds)).timestamp() * 1000
+        )
+        metadata = json.dumps({"scan_type": "corruption_probe", "source": source})
+        conn.execute(
+            """
+            INSERT INTO signals
+            (signal_id, symbol, signal_type, strength, timestamp, indicators,
+             metadata, confidence, created_at, created_at_ms, timestamp_ms)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                signal_id,
+                "NIFTY",
+                "NEUTRAL",
+                0.5,
+                created,
+                "{}",
+                metadata,
+                0.5,
+                created,
+                created_ms,
+                created_ms,
+            ),
+        )
+        conn.commit()
+    finally:
+        conn.close()
 
 
 class TestRealProducersE2E:
@@ -592,18 +649,15 @@ class TestRealProducersE2E:
             await orchestrator._execute_volatility_analysis()
             await orchestrator._execute_price_action_analysis()
 
-        # Inject one signal with a bogus source directly into the DB (this is
-        # a deliberate corruption probe, not a producer fixture).
-        bogus = Signal(
-            symbol="NIFTY",
-            signal_type=SignalType.NEUTRAL,
-            timestamp=datetime.now(UTC) - timedelta(seconds=10),
-            strength=0.5,
-            indicators={},
-            confidence=0.5,
-            metadata={"scan_type": "corruption_probe", "source": "not_a_source"},
+        # Inject one bogus-source row at the STORAGE layer (deliberate
+        # corruption probe -- pre-guard legacy state, unreachable via the
+        # guarded API; see the helper docstring).
+        _insert_pre_guard_corruption_row(
+            temp_db.db_path,
+            signal_id="e2e_bogus_source_probe",
+            source="not_a_source",
+            age_seconds=10,
         )
-        await temp_db.async_create_signal(bogus)
 
         with (
             patch("loats.trade_decision.rules_engine") as mock_rules,
@@ -702,18 +756,16 @@ class TestRealProducersE2E:
         # producer signals so the decision window (newest 10) contains
         # only unknown provenance (no update API exists; newest-first
         # windowing does the selection).
-        ts_base = datetime.now(UTC)
+        # Inject a batch of all-unknown-source rows newer than the producer
+        # signals so the decision window (newest 10) contains only unknown
+        # provenance -- constructed at the storage layer (see helper).
         for i in range(10):
-            ghost = Signal(
-                symbol="NIFTY",
-                signal_type=SignalType.BUY,
-                strength=0.7,
-                timestamp=ts_base + timedelta(seconds=i + 1),
-                indicators={},
-                confidence=0.7,
-                metadata={"scan_type": "corruption_probe", "source": "ghost_source"},
+            _insert_pre_guard_corruption_row(
+                temp_db.db_path,
+                signal_id=f"e2e_ghost_source_probe_{i}",
+                source="ghost_source",
+                age_seconds=-(i + 1),
             )
-            await temp_db.async_create_signal(ghost)
 
         with (
             patch("loats.trade_decision.rules_engine") as mock_rules,

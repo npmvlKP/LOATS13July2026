@@ -28,7 +28,7 @@ class TestSignalOutcomeWiring:
             timestamp=datetime.now(UTC),
             indicators={},
             confidence=0.8,
-            metadata={"scan_type": "ta", "source": "technical_analysis"},
+            metadata={"scan_type": "ta", "source": "ta"},
         )
         with (
             patch("loats.orchestrator.db") as mock_db,
@@ -50,7 +50,7 @@ class TestSignalOutcomeWiring:
         assert args[1] == 60
         assert kwargs.get("metadata") == {
             "scan_type": "ta",
-            "source": "technical_analysis",
+            "source": "ta",
         }
 
     def test_non_directional_signal_skips_outcome_row(self) -> None:
