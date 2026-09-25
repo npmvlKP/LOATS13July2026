@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
@@ -404,6 +405,73 @@ class TestStageBudgetGrading:
         v = pa.validate_cmp_latency_gates()["ta_calculation"]
         assert bool(v["stage_pass"]) is False
         assert bool(v["overall_pass"]) is False
+
+
+class TestSuccessRateGate:
+    """A failed sample is not a fast sample: the success rate must gate.
+
+    Found live 2026-09-25 (post-merge verification run at ``879015c``):
+    the focused benchmark's signal fixture lacked the F9-L-03 provenance
+    tag, the insert-time guard rejected all 100 samples, and the gate
+    still graded ``signal_round_trip`` green because grading used ONLY
+    the durations of failed samples. Latency percentiles of exceptions
+    are meaningless; a run whose samples all failed must fail-closed.
+    """
+
+    @staticmethod
+    def _analyzer_with_samples(
+        op: str, ok_fast: int, failed: int
+    ) -> PerformanceAnalyzer:
+        from loats.performance_analyzer import LatencyMeasurement
+
+        pa = PerformanceAnalyzer()
+        for i in range(ok_fast):
+            m = LatencyMeasurement(
+                operation=op, start_time=0.0, end_time=0.001, success=True
+            )
+            pa.latency_history.append(m)
+            pa.operation_stats.setdefault(op, []).append(m.duration)
+        for _ in range(failed):
+            m = LatencyMeasurement(
+                operation=op, start_time=0.0, end_time=0.002, success=False
+            )
+            pa.latency_history.append(m)
+            pa.operation_stats.setdefault(op, []).append(m.duration)
+        return pa
+
+    def test_majority_failed_samples_fail_the_gate(self) -> None:
+        # 20 fast successes + 8 failures: every DURATION is inside the
+        # 20 ms budget, but the success rate is 20/28 < 80% -> the gate
+        # must fail (it graded True before the success-rate gate).
+        pa = self._analyzer_with_samples("signal_round_trip", ok_fast=20, failed=8)
+        v = pa.validate_cmp_latency_gates()["signal_round_trip"]
+        assert v["sample_success_rate"] == pytest.approx(20 / 28)
+        assert bool(v["sample_success"]) is False
+        assert bool(v["overall_pass"]) is False
+
+    def test_all_success_samples_keep_passing(self) -> None:
+        pa = self._analyzer_with_samples("signal_round_trip", ok_fast=20, failed=0)
+        v = pa.validate_cmp_latency_gates()["signal_round_trip"]
+        assert v["sample_success_rate"] == pytest.approx(1.0)
+        assert bool(v["sample_success"]) is True
+        assert bool(v["overall_pass"]) is True
+
+    def test_focused_signal_fixture_carries_test_provenance(self) -> None:
+        # The guard accepts metadata["test"] (TEST_PROVENANCE_KEY) as an
+        # explicit test fixture; the focused benchmark's signal fixture
+        # must carry it or the F9-L-03 insert-time guard rejects every
+        # sample (the false-green leg this net pins).
+        src = (
+            Path(__file__).resolve().parents[1]
+            / "src"
+            / "loats"
+            / "performance_analyzer.py"
+        ).read_text(encoding="utf-8")
+        assert 'metadata={"test": "latency", "benchmark": "p1_p5"}' in src, (
+            "the focused benchmark signal fixture lost its test-provenance "
+            "tag; the F9-L-03 guard rejects untagged rows and every "
+            "signal_round_trip sample fails at insert time"
+        )
 
 
 def _load_benchmark_script_module() -> Any:
