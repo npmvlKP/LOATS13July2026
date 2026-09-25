@@ -516,15 +516,99 @@ History (most recent last):
       recovery protocol; register R-07 section + header update and the
       F9-H-05 record §4 erratum landed in the same wave, no other new
       files). Ceiling 458->459.
-    * 459->460 (2026-09-24, R-08 degraded-duplicate docs wave): +1
-      tracked file -- docs/audit-history/24Sep2026-degraded-duplicate-
+    * 459->461 (2026-09-23, FR9 Wave 4 c1 -- F9-L-03 provenance
+      guard): +2 tracked files -- src/loats/signal_source_guard.py
+      (insert-time enum-source guard on both signal write paths) and
+      tests/test_signal_source_guard.py (guard contract + store-policy
+      nets). Ceiling 459->461.
+    * 461->463 (2026-09-23, FR9 Wave 4 c2 -- F9-L-03 audited purge):
+      +2 tracked files -- scripts/purge_legacy_signal_rows.py
+      (dry-run-default audited purge: single-writer probes, safety
+      copies, audit-first chained DELETE entries, second-instance
+      verification) and tests/test_purge_script_f9l03.py (12 pins).
+      Ceiling 461->463.
+    * 463->465 (2026-09-23, FR9 Wave 4 c3 -- F9-L-04/F9-L-05 decisions):
+      +2 tracked files -- docs/adr/0019-cmp-supersession-register.md
+      (the register's authority record) and
+      docs/adr/0020-killswitch-escalation-analyze-acceptance.md
+      (binary switch accepted for the ANALYZE horizon; 3-state machine
+      deferred to a PRE-LIVE gate with a binding spec). Ceiling
+      463->465.
+    * 465->467 (2026-09-23, FR9 Wave 4 c4 -- the register itself):
+      +2 tracked files -- docs/CMP-SUPERSESSION-REGISTER.md (15 rows
+      S-01..S-15: expectation / delivered reality / authority / state;
+      includes S-14/S-15 holding the L-01/L-02 30Sep slots) and
+      tests/test_cmp_supersession_register.py (7 content pins).
+      Ceiling 465->467.
+    * 467->469 (2026-09-23, FR9 Wave 4 c5 -- disposition record and
+      dry-run evidence): +2 tracked files --
+      docs/audit-history/23Sep2026-fr9-wave4-low-tier.md (the wave
+      record: L-03 executed/staged, L-04/L-05 closed, L-01/L-02
+      scheduled to the 30Sep wave, L-06 reconciled) and
+      reports/ai-generated/f9l03-purge-record.json (the audited
+      dry-run evidence: 42 eligible rows classified, 5 valid-tag
+      rows retained, STRESS-ORD present). Ceiling 467->469.
+    * 469->470 (2026-09-24, F9-M-02 branch-protection closure wave,
+      landed via the FR9-Wave-4 ancestry merge, PR #72 merge 7516e83):
+      +1 tracked file --
+      docs/audit-history/24Sep2026-F9M02-branch-protection-closure.md
+      (the closure record: classic branch protection re-enabled via the
+      REST API after the silent 404 regression, 10 required contexts per
+      the documented contract, live direct-push 403 and fast-forward
+      rejection probes; register header update and the CONTRIBUTING.md
+      drift correction landed in the same wave, no other new files).
+      Ceiling 469->470.
+    * Parallel lineage (branch
+      fix/breaker-mirror-reset-and-outcome-instrumentation, grown from
+      the same 459 baseline; reconciled into main by the PR #72-#75
+      merge flow, 2026-09-24):
+    * 459->461 (2026-09-23, 30Sep evidence wave, commit 1/5): +2
+      tracked files -- src/loats/signal_outcomes.py (pure
+      outcome-grading core) and tests/test_breaker_mirror_lifecycle.py
+      (the breaker-mirror RED/GREEN lifecycle net); the orchestrator
+      mirror reset rides this commit within the existing tree.
+      Ceiling 459->461.
+    * 461->462 (same wave, commit 2/5): +1 tracked file --
+      tests/test_signal_outcomes_db.py (the outcome storage
+      persistence net); database.py outcome storage + async additions
+      ride this commit within the existing tree. Ceiling 461->462.
+    * 462->464 (same wave, commit 4/5): +2 tracked files --
+      tests/test_signal_outcomes_core.py (grading fuzz + arithmetic
+      nets) and tests/test_signal_outcomes_wiring.py (orchestrator
+      wiring net); the settings knob rides the same wave in-tree.
+      Ceiling 462->464.
+    * 464->465 (same wave, commit 5/5): +1 tracked file --
+      docs/audit-history/23Sep2026-breaker-mirror-and-outcome-
+      instrumentation.md (the wave record; settings knob +
+      .env.example landed in-tree with commit 3/5). Ceiling 464->465.
+    * 465->468 (2026-09-24, F9-M-01-R1 frozen-chain-head wave): +3
+      tracked files -- src/loats/database_async_additions.py chain
+      writer repair rides the existing tree, so the delta is the
+      fail-closed re-anchor tool scripts/repair_f9m01_chain_head.py
+      (live-cited in RUNBOOK.md Audit Log Integrity), its concurrency
+      regression net tests/test_audit_chain_f9m01_async_writer.py, and
+      the wave record docs/audit-history/
+      24Sep2026-f9m01-r1-frozen-chain-head-resolution.md. Ceiling
+      465->468.
+    * 470->479 (2026-09-24, PR #72 ancestry-merge reconciliation):
+      merged union of the two parallel lineages -- main at 470 after
+      PR #72 plus the 9 evidence-wave files above (zero filename
+      overlap between the branches) = 479 tracked files. Ceiling
+      470->479.
+
+    * Parallel lineage (branch docs/sep24-degraded-duplicate-recurrence,
+      grown from the same 459 baseline; reconciled into main by the
+      PR #72-#75 merge flow, 2026-09-24):
+    * 479->480 (2026-09-24, R-08 degraded-duplicate docs wave; the
+      fourth same-day R-08 reconciliation rides this lineage entry):
+      +1 tracked file -- docs/audit-history/24Sep2026-degraded-duplicate-
       recurrence.md (the second same-day degraded-instance incident
       record, live remediation evidence and OpenAlgo root-cause pin;
       register R-08 row + header update + section and the RUNBOOK
       troubleshooting entry landed in the same wave, no other new
-      files). Ceiling 459->460.
+      files). Ceiling 479->480.
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 460
+TRACKED_FILE_CEILING = 480
