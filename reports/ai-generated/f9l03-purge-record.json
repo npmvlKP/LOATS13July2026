@@ -1,0 +1,317 @@
+{
+  "finding": "F9-L-03 (TODO-12)",
+  "mode": "DRY-RUN",
+  "executed_at": "2026-09-23T10:46:10.271496+00:00",
+  "cutoff": "2026-09-01",
+  "total_signals": 210901,
+  "eligible": [
+    {
+      "signal_id": "signal_20260814033912669088_7e588c71",
+      "symbol": "NIFTY",
+      "signal_type": "BUY",
+      "created_at": "2026-08-14T03:39:12.669088+00:00",
+      "reason": "missing_tag"
+    },
+    {
+      "signal_id": "signal_20260814034541084042_a3089128",
+      "symbol": "NIFTY",
+      "signal_type": "BUY",
+      "created_at": "2026-08-14T03:45:41.084042+00:00",
+      "reason": "missing_tag"
+    },
+    {
+      "signal_id": "signal_20260814035038226479_1193c101",
+      "symbol": "NIFTY",
+      "signal_type": "BUY",
+      "created_at": "2026-08-14T03:50:38.227479+00:00",
+      "reason": "missing_tag"
+    },
+    {
+      "signal_id": "signal_20260814035251937621_3c77356d",
+      "symbol": "NIFTY",
+      "signal_type": "BUY",
+      "created_at": "2026-08-14T03:52:51.937621+00:00",
+      "reason": "missing_tag"
+    },
+    {
+      "signal_id": "signal_20260814035709692480_a60ab702",
+      "symbol": "NIFTY",
+      "signal_type": "BUY",
+      "created_at": "2026-08-14T03:57:09.692480+00:00",
+      "reason": "missing_tag"
+    },
+    {
+      "signal_id": "signal_20260814035953352887_0a352279",
+      "symbol": "NIFTY",
+      "signal_type": "BUY",
+      "created_at": "2026-08-14T03:59:53.352887+00:00",
+      "reason": "missing_tag"
+    },
+    {
+      "signal_id": "signal_20260814041424622619_0e93182c",
+      "symbol": "NIFTY",
+      "signal_type": "BUY",
+      "created_at": "2026-08-14T04:14:24.622619+00:00",
+      "reason": "missing_tag"
+    },
+    {
+      "signal_id": "signal_20260814041655022011_070b03dc",
+      "symbol": "NIFTY",
+      "signal_type": "BUY",
+      "created_at": "2026-08-14T04:16:55.022011+00:00",
+      "reason": "missing_tag"
+    },
+    {
+      "signal_id": "signal_20260814041859022400_5680db57",
+      "symbol": "NIFTY",
+      "signal_type": "BUY",
+      "created_at": "2026-08-14T04:18:59.023400+00:00",
+      "reason": "missing_tag"
+    },
+    {
+      "signal_id": "signal_20260814042112750525_c8d66d9b",
+      "symbol": "NIFTY",
+      "signal_type": "BUY",
+      "created_at": "2026-08-14T04:21:12.750525+00:00",
+      "reason": "missing_tag"
+    },
+    {
+      "signal_id": "signal_20260814042315845509_8fefcb39",
+      "symbol": "NIFTY",
+      "signal_type": "BUY",
+      "created_at": "2026-08-14T04:23:15.846508+00:00",
+      "reason": "unknown_tag"
+    },
+    {
+      "signal_id": "signal_20260814042603593972_f96f71ca",
+      "symbol": "NIFTY",
+      "signal_type": "BUY",
+      "created_at": "2026-08-14T04:26:03.593972+00:00",
+      "reason": "missing_tag"
+    },
+    {
+      "signal_id": "signal_20260814044154599891_ec035fb7",
+      "symbol": "NIFTY",
+      "signal_type": "BUY",
+      "created_at": "2026-08-14T04:41:54.599891+00:00",
+      "reason": "missing_tag"
+    },
+    {
+      "signal_id": "signal_20260814044956409460_572fa131",
+      "symbol": "NIFTY",
+      "signal_type": "BUY",
+      "created_at": "2026-08-14T04:49:56.410460+00:00",
+      "reason": "missing_tag"
+    },
+    {
+      "signal_id": "signal_20260814045200705515_91756e3d",
+      "symbol": "NIFTY",
+      "signal_type": "BUY",
+      "created_at": "2026-08-14T04:52:00.705515+00:00",
+      "reason": "missing_tag"
+    },
+    {
+      "signal_id": "signal_20260814053148215677_675f61b6",
+      "symbol": "NIFTY",
+      "signal_type": "BUY",
+      "created_at": "2026-08-14T05:31:48.216859+00:00",
+      "reason": "missing_tag"
+    },
+    {
+      "signal_id": "signal_20260814053410786880_10d0a28c",
+      "symbol": "NIFTY",
+      "signal_type": "BUY",
+      "created_at": "2026-08-14T05:34:10.787880+00:00",
+      "reason": "missing_tag"
+    },
+    {
+      "signal_id": "signal_20260814053627592261_b667289e",
+      "symbol": "NIFTY",
+      "signal_type": "BUY",
+      "created_at": "2026-08-14T05:36:27.592261+00:00",
+      "reason": "missing_tag"
+    },
+    {
+      "signal_id": "signal_20260814054009987141_f6b1361b",
+      "symbol": "NIFTY",
+      "signal_type": "BUY",
+      "created_at": "2026-08-14T05:40:09.987141+00:00",
+      "reason": "missing_tag"
+    },
+    {
+      "signal_id": "signal_20260814054239539416_bf742998",
+      "symbol": "NIFTY",
+      "signal_type": "BUY",
+      "created_at": "2026-08-14T05:42:39.539416+00:00",
+      "reason": "missing_tag"
+    },
+    {
+      "signal_id": "signal_20260814054529535724_0bbd0649",
+      "symbol": "NIFTY",
+      "signal_type": "BUY",
+      "created_at": "2026-08-14T05:45:29.535724+00:00",
+      "reason": "missing_tag"
+    },
+    {
+      "signal_id": "signal_20260814054836521151_f50744d2",
+      "symbol": "NIFTY",
+      "signal_type": "BUY",
+      "created_at": "2026-08-14T05:48:36.521959+00:00",
+      "reason": "missing_tag"
+    },
+    {
+      "signal_id": "signal_20260814055112596308_c4b4edfe",
+      "symbol": "NIFTY",
+      "signal_type": "BUY",
+      "created_at": "2026-08-14T05:51:12.596308+00:00",
+      "reason": "missing_tag"
+    },
+    {
+      "signal_id": "signal_20260814055552276872_ad2b2ba0",
+      "symbol": "NIFTY",
+      "signal_type": "BUY",
+      "created_at": "2026-08-14T05:55:52.276872+00:00",
+      "reason": "missing_tag"
+    },
+    {
+      "signal_id": "signal_20260814055939799847_5319875e",
+      "symbol": "NIFTY",
+      "signal_type": "BUY",
+      "created_at": "2026-08-14T05:59:39.799847+00:00",
+      "reason": "missing_tag"
+    },
+    {
+      "signal_id": "signal_20260814060224946581_3f9ff205",
+      "symbol": "NIFTY",
+      "signal_type": "BUY",
+      "created_at": "2026-08-14T06:02:24.947583+00:00",
+      "reason": "missing_tag"
+    },
+    {
+      "signal_id": "signal_20260814060225091829_d41c511f",
+      "symbol": "NIFTY",
+      "signal_type": "BUY",
+      "created_at": "2026-08-14T06:02:25.092830+00:00",
+      "reason": "missing_tag"
+    },
+    {
+      "signal_id": "signal_20260814060650792087_4cca31f6",
+      "symbol": "NIFTY",
+      "signal_type": "BUY",
+      "created_at": "2026-08-14T06:06:50.792087+00:00",
+      "reason": "missing_tag"
+    },
+    {
+      "signal_id": "signal_20260814111701944155_85293647",
+      "symbol": "NIFTY",
+      "signal_type": "BUY",
+      "created_at": "2026-08-14T11:17:01.945157+00:00",
+      "reason": "missing_tag"
+    },
+    {
+      "signal_id": "signal_20260814112017612754_6a3bed29",
+      "symbol": "NIFTY",
+      "signal_type": "BUY",
+      "created_at": "2026-08-14T11:20:17.612754+00:00",
+      "reason": "missing_tag"
+    },
+    {
+      "signal_id": "signal_20260814112252506842_cfa5ff79",
+      "symbol": "NIFTY",
+      "signal_type": "BUY",
+      "created_at": "2026-08-14T11:22:52.506842+00:00",
+      "reason": "missing_tag"
+    },
+    {
+      "signal_id": "signal_20260814112505058449_977090c9",
+      "symbol": "NIFTY",
+      "signal_type": "BUY",
+      "created_at": "2026-08-14T11:25:05.059447+00:00",
+      "reason": "missing_tag"
+    },
+    {
+      "signal_id": "signal_20260814120506488620_82d02e43",
+      "symbol": "NIFTY",
+      "signal_type": "BUY",
+      "created_at": "2026-08-14T12:05:06.488620+00:00",
+      "reason": "missing_tag"
+    },
+    {
+      "signal_id": "signal_20260814120955963687_54138a7e",
+      "symbol": "NIFTY",
+      "signal_type": "BUY",
+      "created_at": "2026-08-14T12:09:55.964686+00:00",
+      "reason": "missing_tag"
+    },
+    {
+      "signal_id": "signal_20260814121303534186_f4884ad8",
+      "symbol": "NIFTY",
+      "signal_type": "BUY",
+      "created_at": "2026-08-14T12:13:03.535188+00:00",
+      "reason": "missing_tag"
+    },
+    {
+      "signal_id": "signal_20260814121518014113_c45a58df",
+      "symbol": "NIFTY",
+      "signal_type": "BUY",
+      "created_at": "2026-08-14T12:15:18.015113+00:00",
+      "reason": "missing_tag"
+    },
+    {
+      "signal_id": "signal_20260814165515142249_91798f31",
+      "symbol": "NIFTY",
+      "signal_type": "BUY",
+      "created_at": "2026-08-14T16:55:15.142249+00:00",
+      "reason": "missing_tag"
+    },
+    {
+      "signal_id": "signal_20260814165858155309_7de5b7ca",
+      "symbol": "NIFTY",
+      "signal_type": "BUY",
+      "created_at": "2026-08-14T16:58:58.155309+00:00",
+      "reason": "missing_tag"
+    },
+    {
+      "signal_id": "signal_20260814170124715899_ee8ba0b1",
+      "symbol": "NIFTY",
+      "signal_type": "BUY",
+      "created_at": "2026-08-14T17:01:24.716901+00:00",
+      "reason": "missing_tag"
+    },
+    {
+      "signal_id": "signal_20260814170432979426_e45002b7",
+      "symbol": "NIFTY",
+      "signal_type": "BUY",
+      "created_at": "2026-08-14T17:04:32.980425+00:00",
+      "reason": "missing_tag"
+    },
+    {
+      "signal_id": "signal_20260814170546281142_499b0d31",
+      "symbol": "NIFTY",
+      "signal_type": "BUY",
+      "created_at": "2026-08-14T17:05:46.282143+00:00",
+      "reason": "missing_tag"
+    },
+    {
+      "signal_id": "signal_20260814170651155919_cee92b6b",
+      "symbol": "NIFTY",
+      "signal_type": "BUY",
+      "created_at": "2026-08-14T17:06:51.156916+00:00",
+      "reason": "missing_tag"
+    }
+  ],
+  "retained_with_valid_tag": [
+    {
+      "signal_id": "signal_20260825145346328520_69f951ac",
+      "symbol": "NIFTY",
+      "signal_type": "NEUTRAL",
+      "created_at": "2026-08-25T14:53:46.328520+00:00",
+      "reason": "valid_tag"
+    }
+  ],
+  "stress_ord_rows": 1,
+  "reason_counts": {
+    "missing_tag": 41,
+    "unknown_tag": 1
+  }
+}

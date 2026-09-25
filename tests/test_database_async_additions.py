@@ -5,6 +5,13 @@ Comprehensive test suite for database async operations.
 Tests both the public async wrappers on ``Database`` and the aiosqlite-backed
 private helpers in ``database_async_additions``.  Tests are written against the
 *actual* Database API rather than an idealised one.
+
+Signal-store provenance policy (F9-L-03 store hygiene): every
+production-signal fixture in this module either carries a valid
+``metadata["source"]`` tag (a StrengthSource value or a documented
+exemption) or uses the explicit ``{"test": ...}`` provenance key.
+The insert-time guard rejects untagged/unknown-source rows by design;
+pinned by tests/test_signal_source_guard.py.
 """
 
 import asyncio
@@ -172,7 +179,7 @@ class TestDatabaseAsyncAdditions:
             timestamp=datetime.now(UTC),
             indicators={"rsi": 30.0, "macd": 1.5},
             confidence=0.9,
-            metadata={"scan_type": "technical", "source": "test"},
+            metadata={"scan_type": "technical", "source": "ta"},
         )
 
         result = await temp_db.async_create_signal(signal)
@@ -197,7 +204,7 @@ class TestDatabaseAsyncAdditions:
             timestamp=datetime.now(UTC),
             indicators={"rsi": 70.0, "macd": -1.5},
             confidence=0.8,
-            metadata={"scan_type": "technical", "source": "test"},
+            metadata={"scan_type": "technical", "source": "ta"},
         )
 
         result = await temp_db._async_create_signal(signal)
@@ -354,7 +361,7 @@ class TestDatabaseAsyncAdditions:
                 timestamp=base_time - timedelta(seconds=10 - i),
                 indicators={"rsi": 30.0 + i * 2, "macd": 1.0 + i * 0.2},
                 confidence=0.8 + i * 0.02,
-                metadata={"scan_type": "technical", "source": "test"},
+                metadata={"scan_type": "technical", "source": "ta"},
             )
             for i in range(3)
         ]
@@ -382,7 +389,7 @@ class TestDatabaseAsyncAdditions:
                 timestamp=now,
                 indicators={"rsi": 30.0},
                 confidence=0.9,
-                metadata={"scan_type": "technical", "source": "test"},
+                metadata={"scan_type": "technical", "source": "ta"},
             ),
             Signal(
                 signal_id="signal_fund_001",
@@ -392,7 +399,7 @@ class TestDatabaseAsyncAdditions:
                 timestamp=now,
                 indicators={"pe_ratio": 25.0},
                 confidence=0.85,
-                metadata={"scan_type": "fundamental", "source": "test"},
+                metadata={"scan_type": "fundamental", "source": "fundamental"},
             ),
         ]
 
@@ -687,7 +694,7 @@ class TestDatabaseAsyncAdditions:
                 timestamp=base_time - timedelta(seconds=15 - i),
                 indicators={"rsi": 25.0 + i * 3, "macd": 1.2 + i * 0.3},
                 confidence=0.85 + i * 0.01,
-                metadata={"scan_type": "core_test", "source": "test"},
+                metadata={"scan_type": "core_test", "source": "ta"},
             )
             for i in range(4)
         ]
@@ -854,6 +861,7 @@ class TestDatabaseAsyncAdditions:
             timestamp=datetime.now(UTC),
             indicators={"rsi": 30.0},
             confidence=0.9,
+            metadata={"test": "pool-lifecycle"},
         )
 
         result = await temp_db.async_create_signal(signal)
@@ -934,6 +942,7 @@ class TestProductionAsyncWiring:
                 timestamp=datetime.now(UTC),
                 indicators={"put_call_volume_ratio": 1.4},
                 confidence=0.8,
+                metadata={"test": "pool-attach"},
             )
             assert await db.async_create_signal(signal) is True
         finally:

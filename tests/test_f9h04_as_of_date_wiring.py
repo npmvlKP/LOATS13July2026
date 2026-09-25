@@ -1,4 +1,11 @@
-"""F9-H-04 (TODO-5): the live CMP cycle must supply the snapshot date.
+"""
+Signal-store provenance policy (F9-L-03 store hygiene): every
+production-signal fixture in this module either carries a valid
+``metadata["source"]`` tag (a StrengthSource value or a documented
+exemption) or uses the explicit ``{"test": ...}`` provenance key.
+The insert-time guard rejects untagged/unknown-source rows by design;
+pinned by tests/test_signal_source_guard.py.
+F9-H-04 (TODO-5): the live CMP cycle must supply the snapshot date.
 
 FR9 forensic finding: the F8-L-02 half-close built the entire
 ``as_of_date`` plumbing (model field, engine parameter, SQLite column,

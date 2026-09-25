@@ -1,4 +1,11 @@
-"""Load and latency tests with live data simulation for LOATS13July2026.
+"""
+Signal-store provenance policy (F9-L-03 store hygiene): every
+production-signal fixture in this module either carries a valid
+``metadata["source"]`` tag (a StrengthSource value or a documented
+exemption) or uses the explicit ``{"test": ...}`` provenance key.
+The insert-time guard rejects untagged/unknown-source rows by design;
+pinned by tests/test_signal_source_guard.py.
+Load and latency tests with live data simulation for LOATS13July2026.
 
 This module provides comprehensive load testing and latency measurement
 simulating real-world production scenarios with concurrent operations.
@@ -188,6 +195,7 @@ class TestLoadLatencyIntegration:
                         metadata={
                             "test_batch": batch_id,
                             "test_index": i,
+                            "test": "load",
                         },
                     )
                     await test_db.async_create_signal(signal)
@@ -224,6 +232,7 @@ class TestLoadLatencyIntegration:
                     signal_type=SignalType.BUY,
                     strength=0.75,
                     timestamp=datetime.now(UTC),
+                    metadata={"test": "load"},
                 )
                 try:
                     await test_db.async_create_signal(signal)
@@ -651,7 +660,7 @@ class TestLoadLatencyIntegration:
                             "RSI": float(latest_rsi),
                             "Supertrend": float(latest_supertrend),
                         },
-                        metadata={"cycle_id": cycle_id},
+                        metadata={"cycle_id": cycle_id, "test": "load"},
                     )
                     await test_db.async_create_signal(signal)
                 signal_duration = time.time() - signal_start

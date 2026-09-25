@@ -138,6 +138,17 @@ class Settings(BaseSettings):
         False,
         description="Enable trailing stop updates in CMP strategy cycle",
     )
+    # Signal-outcome instrumentation (30Sep evidence wave): minutes after
+    # emission before a BUY/SELL outcome row becomes resolvable against
+    # recorded 1d market data. Clamped to [1, 1440] by
+    # signal_outcomes.validate_signal_outcome_horizon at the call site.
+    signal_outcome_horizon_minutes: int = Field(
+        60,
+        description=(
+            "Minutes after emission before a BUY/SELL signal outcome "
+            "becomes resolvable (clamped 1..1440)"
+        ),
+    )
 
     # Telegram Configuration
     telegram_bot_token: SecretStr = Field(

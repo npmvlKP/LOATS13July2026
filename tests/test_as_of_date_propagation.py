@@ -1,4 +1,11 @@
-"""F8-L-02 (CMP Rule 8): caller-supplied as-of date propagation.
+"""
+Signal-store provenance policy (F9-L-03 store hygiene): every
+production-signal fixture in this module either carries a valid
+``metadata["source"]`` tag (a StrengthSource value or a documented
+exemption) or uses the explicit ``{"test": ...}`` provenance key.
+The insert-time guard rejects untagged/unknown-source rows by design;
+pinned by tests/test_signal_source_guard.py.
+F8-L-02 (CMP Rule 8): caller-supplied as-of date propagation.
 
 Registered audit item ``as_of_date`` (F8-L-02) -- the carried determinism
 gap from the 01Sep2026 forensic register: decision/audit records carried

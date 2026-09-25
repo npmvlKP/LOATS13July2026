@@ -282,6 +282,13 @@ docker kill loats
 
 1. Run database vacuum
 2. Review audit log integrity
+   - Verify: `python -c "from loats.database import db; print(db.verify_audit_log_integrity())"`
+   - If it reports a broken hash-chain link, re-anchor with the
+     fail-closed tool (dry-run default, snapshots both trails, refuses
+     on any self-hash or shape anomaly):
+     `python scripts/repair_f9m01_chain_head.py --apply`
+     Evidence record: docs/audit-history/24Sep2026-f9m01-r1-frozen-
+     chain-head-resolution.md
 3. Check disk space
 4. Review backup procedures
 5. Update dependencies if needed
