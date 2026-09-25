@@ -40,6 +40,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+from types import ModuleType
 
 import pytest
 
@@ -271,18 +272,30 @@ class TestNonCovRunPasses:
         assert proc.returncode == 0, proc.stdout[-2000:] + proc.stderr[-2000:]
         assert "1 passed" in proc.stdout
 
-    def test_cov_run_passes_when_lock_free(self) -> None:
+    def test_cov_run_passes_when_lock_free(self, conftest_mod: ModuleType) -> None:
         """A legitimate --cov run on a free lock completes normally.
 
         Runs a fast slice of this very test file through the REAL repo
         conftest (the production acquisition path). Skipped when the
-        parent suite itself holds the cov lock (i.e. this suite was
-        launched with --cov): the child would be refused by the very
-        guard under test, which is the other test's contract, not this
-        one's.
+        guard would refuse the child for environmental reasons — the
+        parent suite itself holding the cov lock (i.e. this suite was
+        launched with --cov), or a third-party coverage writer holding
+        the gate — because in both cases the child is excluded by the
+        very guard under test, which is the other test's contract, not
+        this one's (2026-09-25: an external P5-verifier hold turned
+        this into a false failure).
         """
         if os.environ.get("LOATS_COV_LOCK_ACTIVE") == "1":
             pytest.skip("parent suite holds the cov lock (--cov run)")
+        # Probe the real gate with the production primitives: if another
+        # writer holds it, the child cannot be admitted, so the positive
+        # contract is untestable here (skip, not fail).
+        probe = conftest_mod._acquire_coverage_lock(
+            conftest_mod._cov_lock_path(REPO_ROOT)
+        )
+        if probe is None:
+            pytest.skip("another coverage writer holds the cov gate")
+        conftest_mod._release_coverage_lock(probe)
         proc = subprocess.run(
             [
                 *_base_child_cmd(REPO_ROOT / "tests" / "test_coverage_lock_guard.py"),
@@ -296,6 +309,14 @@ class TestNonCovRunPasses:
             cwd=REPO_ROOT,
             timeout=300,
         )
+        # Residual TOCTOU: a third party may take the gate between the
+        # probe release and the child's pytest_configure. A genuine
+        # refusal banner means the guard excluded the child correctly;
+        # only a non-refusal failure is a real regression.
+        if proc.returncode == 4 and "another pytest --cov run is active" in (
+            proc.stdout + proc.stderr
+        ):
+            pytest.skip("cov gate was taken by another writer during the child run")
         assert proc.returncode == 0, proc.stdout[-2000:] + proc.stderr[-2000:]
         assert "1 passed" in proc.stdout
 
