@@ -635,8 +635,22 @@ History (most recent last):
       place. Ceiling 482->484 (the tree equals the ceiling at #80 --
       482 == 482 -- so +2 files lands the count AT 484, not 483; the
       commit-time repo-hygiene hook caught the 483 first draft).
+  485. 25Sep2026 (fix/benchmark-txn-hygiene, same-day repair wave):
+      root-caused the PARTIAL benchmark verdict at ``ba4febd`` (12:59
+      IST) -- NOT a regression and NOT a budget violation: (a)
+      benchmark signal ids derived from wall-clock milliseconds
+      collided across the sync/async legs of one iteration (UNIQUE
+      violation), and (b) 15 sync DML writers plus the async pool
+      release left failed/open transactions on their connections,
+      starving sibling writers for the 30 s busy_timeout ("database is
+      locked"); the grading asymmetry (rate gates absorb lost samples,
+      n=1 stage and focused legs do not) made the verdict
+      nondeterministic -- the same commit passed 12/12 on an exclusive
+      13:13 re-run. Fix: ``_rollback_on_error`` guard on the writers,
+      transaction repair in ``SimpleConnectionPool.release``, uuid4
+      ids. +1 tests/test_transaction_hygiene.py. Ceiling 484->485.
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 484
+TRACKED_FILE_CEILING = 485
