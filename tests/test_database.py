@@ -1,4 +1,11 @@
 """
+Signal-store provenance policy (F9-L-03 store hygiene): every
+production-signal fixture in this module either carries a valid
+``metadata["source"]`` tag (a StrengthSource value or a documented
+exemption) or uses the explicit ``{"test": ...}`` provenance key.
+The insert-time guard rejects untagged/unknown-source rows by design;
+pinned by tests/test_signal_source_guard.py.
+
 Tests for database module.
 """
 
@@ -205,7 +212,7 @@ class TestDatabase:
             **sample_signal.model_dump(exclude={"signal_id", "timestamp", "metadata"}),
             signal_id="filter_sentiment_0",
             timestamp=datetime.now(),
-            metadata={"scan_type": "sentiment", "news_count": 5},
+            metadata={"scan_type": "sentiment", "news_count": 5, "source": "sentiment"},
         )
         db.create_signal(sentiment_signal)
 

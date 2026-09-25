@@ -272,7 +272,7 @@ def sample_signal() -> Signal:
         timestamp=datetime.datetime(2023, 1, 1, 10, 0),
         indicators={"rsi": 25.0, "macd": 1.5, "supertrend": 99.5},
         confidence=0.85,
-        metadata={"scan_type": "ta", "timeframe": "1min"},
+        metadata={"scan_type": "ta", "timeframe": "1min", "source": "ta"},
     )
 
 

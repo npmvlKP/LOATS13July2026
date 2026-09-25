@@ -516,17 +516,49 @@ History (most recent last):
       recovery protocol; register R-07 section + header update and the
       F9-H-05 record §4 erratum landed in the same wave, no other new
       files). Ceiling 458->459.
-
-    * 459->460 (2026-09-24, F9-M-02 branch-protection closure wave): +1
-      tracked file -- docs/audit-history/24Sep2026-F9M02-branch-protection-
-      closure.md (the closure record: classic branch protection re-enabled
-      via the REST API after the silent 404 regression, 10 required
-      contexts per the documented contract, live direct-push 403 and
-      fast-forward rejection probes; register header update and the
-      CONTRIBUTING.md drift correction landed in the same wave, no other
-      new files). Ceiling 459->460.
+    * 459->461 (2026-09-23, FR9 Wave 4 c1 -- F9-L-03 provenance
+      guard): +2 tracked files -- src/loats/signal_source_guard.py
+      (insert-time enum-source guard on both signal write paths) and
+      tests/test_signal_source_guard.py (guard contract + store-policy
+      nets). Ceiling 459->461.
+    * 461->463 (2026-09-23, FR9 Wave 4 c2 -- F9-L-03 audited purge):
+      +2 tracked files -- scripts/purge_legacy_signal_rows.py
+      (dry-run-default audited purge: single-writer probes, safety
+      copies, audit-first chained DELETE entries, second-instance
+      verification) and tests/test_purge_script_f9l03.py (12 pins).
+      Ceiling 461->463.
+    * 463->465 (2026-09-23, FR9 Wave 4 c3 -- F9-L-04/F9-L-05 decisions):
+      +2 tracked files -- docs/adr/0019-cmp-supersession-register.md
+      (the register's authority record) and
+      docs/adr/0020-killswitch-escalation-analyze-acceptance.md
+      (binary switch accepted for the ANALYZE horizon; 3-state machine
+      deferred to a PRE-LIVE gate with a binding spec). Ceiling
+      463->465.
+    * 465->467 (2026-09-23, FR9 Wave 4 c4 -- the register itself):
+      +2 tracked files -- docs/CMP-SUPERSESSION-REGISTER.md (15 rows
+      S-01..S-15: expectation / delivered reality / authority / state;
+      includes S-14/S-15 holding the L-01/L-02 30Sep slots) and
+      tests/test_cmp_supersession_register.py (7 content pins).
+      Ceiling 465->467.
+    * 467->469 (2026-09-23, FR9 Wave 4 c5 -- disposition record and
+      dry-run evidence): +2 tracked files --
+      docs/audit-history/23Sep2026-fr9-wave4-low-tier.md (the wave
+      record: L-03 executed/staged, L-04/L-05 closed, L-01/L-02
+      scheduled to the 30Sep wave, L-06 reconciled) and
+      reports/ai-generated/f9l03-purge-record.json (the audited
+      dry-run evidence: 42 eligible rows classified, 5 valid-tag
+      rows retained, STRESS-ORD present). Ceiling 467->469.
+    * 469->470 (2026-09-24, F9-M-02 branch-protection closure wave,
+      landed via the FR9-Wave-4 ancestry merge): +1 tracked file --
+      docs/audit-history/24Sep2026-F9M02-branch-protection-closure.md
+      (the closure record: classic branch protection re-enabled via the
+      REST API after the silent 404 regression, 10 required contexts per
+      the documented contract, live direct-push 403 and fast-forward
+      rejection probes; register header update and the CONTRIBUTING.md
+      drift correction landed in the same wave, no other new files).
+      Ceiling 469->470.
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 460
+TRACKED_FILE_CEILING = 470

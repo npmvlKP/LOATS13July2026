@@ -34,6 +34,7 @@ from .models import (
     Trade,
     TradeDecision,
 )
+from .signal_source_guard import validate_signal_provenance
 from .utils.lazy_singleton import lazy_singleton
 
 # Note: aiosqlite is imported locally in async methods where needed
@@ -1287,7 +1288,13 @@ class Database:
             signal: Signal model instance
         Returns:
             True successful
+        Raises:
+            InvalidSignalSourceError: missing/unknown source provenance
+                (F9-L-03 insert-time enum-source guard; the row and its
+                audit entry are rejected before any write).
         """
+        # F9-L-03 (TODO-12): fail-closed provenance gate BEFORE any write.
+        validate_signal_provenance(signal)
         now = datetime.now(UTC)
         now_iso = now.isoformat()
         now_ms = int(now.timestamp() * 1000)

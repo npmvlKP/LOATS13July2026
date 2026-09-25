@@ -32,6 +32,17 @@ not one-key). Also: erratum on the F9-H-05 record's §4 surface list
 (`test_strength` deleted 2026-07-21 by `bcc09c1`, absent at the wave's
 commits; corrected to the 13 surviving modules, tally corroborated by a
 394-passed re-run).
+Updated 2026-09-23 (FR9 Wave 4, branch `fix/fr9-wave4-low-tier`): the FR9
+Low tier (F9-L-01…06) is dispositioned — L-04/L-05 CLOSED by ADR-0020 and
+ADR-0019 (CMP supersession register in-tree, content-pinned); L-03's
+root-cause guard is live (`src/loats/signal_source_guard.py`, both write
+paths) with the audited purge dry-run-verified at 42 rows and `--apply`
+staged for an operator-timed maintenance window; L-01/L-02 are formally
+scheduled to the 30Sep decision wave (supersession register rows S-14/
+S-15 — they are enforcement-constant/supervised-run changes held by the
+ADR-0016 freeze, not dropped); L-06 reconciled (`security.yml` runs
+inspected green; broker-side idempotency stays carried). Snapshot:
+pre-merge branch state, HEAD `80c68d9` + wave files.
 Updated 2026-09-24: F9-M-02 (branch protection on `main` absent — third
 consecutive review; the 15Sep FR9 row re-confirmed live by a 404 on the
 classic REST GET with an admin token) CLOSED — classic branch protection
