@@ -680,8 +680,16 @@ History (most recent last):
       reconciliation.md (records-only docs wave; register paragraph is
       a modification, not an addition). Tree at ceiling 488 pre-wave
       (488 == 488), so +1 lands AT 489. Ceiling 488->489.
+
+      2026-09-26 (console-probe paste reconciliation wave): +1
+      docs/audit-history/26Sep2026-console-probe-paste-
+      reconciliation.md (records-only docs wave; the isort charmap
+      class is proven console-cosmetic — rc=0 under cp1252 and UTF-8
+      consoles at the CI-exact scope; register paragraph is a
+      modification, not an addition). Tree at ceiling 489 pre-wave
+      (489 == 489), so +1 lands AT 490. Ceiling 489->490.
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 489
+TRACKED_FILE_CEILING = 490
