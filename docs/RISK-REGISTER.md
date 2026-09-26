@@ -196,6 +196,25 @@ candidates: 24Sep 770 insufficient_strength + 307 gating_rules_failed;
 unless an attempt fires first. Protection watch: 6th consecutive clean
 field-by-field read-back. Snapshot: HEAD `00d5b8c` (PR #85 merged
 2026-09-26), CI run `36230558303` green.
+Updated 2026-09-26 (performance-review paste reconciliation): the
+pasted 8-row Performance Review table reconciled live at HEAD `f4a80ee`
+— every flagged row is already dispositioned: F9-H-02's gate EXISTS in
+CI (`benchmark-perf`, exit-code contract, wired 17Sep) and is ADVISORY
+BY DESIGN until the deferred R-01 decision (ADR-0016 promotion
+deferral; live protection = 10 contexts, no benchmark-perf, exactly as
+registered); the strike/trail "benchmarked" mechanism was
+misattributed (no strike/trail budgets live in
+`benchmark_performance.py`; real surfaces: strike_selection.py:219 +
+orchestrator.py:1945 warn-only 5 ms, orchestrator.py:2188 trail budget,
+collector constants DB 20 / RT 100 / TA 80 ms); F9-L-01/F9-L-02 are the
+S-14/S-15 30Sep riders (freeze-bound, unchanged). All six clean rows
+(provider window settle, SQLite WAL+30 s+to_thread, TTL caches, numba
+Supertrend, 10 MB rotation, N²/blocking-I/O tail) re-verified in-tree.
+P5 span LIVE during probes (mtime 21:49 IST); INCOMPLETE grade is
+correct in-progress state. Full verdict table and mechanism
+corrections: `26Sep2026-performance-review-paste-reconciliation.md`.
+Snapshot: HEAD `f4a80ee` (PR #86 merged 2026-09-26), CI run
+`36247737708` green.
 
 | ID | Priority | Category | Status | Due | Next action |
 |----|----------|----------|--------|-----|-------------|
