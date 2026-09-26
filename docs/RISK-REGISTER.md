@@ -192,6 +192,7 @@ PASS, exit 0. Closed as R-10 (see row).
 | R-08 | P2-ops | Degraded duplicate OpenAlgo instance (shadowed :5000) | OPEN — remediated live, fix deferred | 2026-09-30 | Decide bind-or-exit pre-flight vs runbook port sweep; bind-or-exit recommended |
 | R-09 | P2-fixed | Benchmark write-path poisoning (failed INSERTs left open transactions; wall-clock ids collided) | CLOSED by `fix/benchmark-txn-hygiene` | — | Same-commit runs at `ba4febd` graded 8/10 PARTIAL (12:59) and 12/12 PASS (13:13): root cause was nondeterministic lock cascade (30 s busy_timeout starvation), not a budget regression. Fixed: `_rollback_on_error` on 15 sync writers, pool-release transaction repair, uuid4 benchmark ids; `tests/test_transaction_hygiene.py` pins it |
 | R-10 | P2-fixed | Benchmark gate false-green: sample success rate ungraded; focused signal fixture rejected at insert | CLOSED by `fix/perf-gate-success-rate` | — | Found by the post-merge verification run at `879015c`: the F9-L-03 guard rejected 100/100 `signal_round_trip` samples (fixture lacked the `test` provenance tag) while the gate graded green off the exceptions' durations. Fixed: `validate_cmp_latency_gates` now grades the sample success rate (incl. the stage-gate composition) fail-closed, and the fixture carries `metadata["test"]`; pinned in `tests/test_performance_analyzer.py::TestSuccessRateGate` |
+| R-11 | P2-fixed | Stage gates graded a single-sample population (n=1 TA spike graded 26Sep 9/10 PARTIAL; same class 09/17/20Sep) | CLOSED by `fix/benchmark-stage-samples` | — | Under-sampled STAGE gates fail closed (`insufficient_samples`); round-trip harness discards one warm-up call and measures 5 samples/stage, medians reported; pinned in `tests/test_performance_analyzer.py::TestStageGateSamplePopulation` |
 
 ---
 
@@ -384,3 +385,44 @@ bind-or-exit pre-flight for EVERY port — any bind failure is
 process-fatal, no partial instances (recommended) vs (b) runbook-only
 mitigation (start-script port sweep killing stale listeners before
 launch). Touches the OpenAlgo checkout, not this repo's src tree.
+
+## R-11 [P2-fixed] Stage gates graded a single-sample population — fail-closed + population repair
+
+Category: benchmark gate integrity / measurement validity. Status:
+CLOSED by `fix/benchmark-stage-samples`. Confidence: Certain (reproduced
+from 55 stored runs and a live host probe on 2026-09-26).
+
+Evidence: the post-#83 verification benchmark at main `36212f0`
+(2026-09-26 07:20 IST) graded PARTIAL 9/10 — the sole failure was
+`ta_calculation` measured ONCE at 83.5 ms against its 80 ms stage
+budget (`p5_pass_rate` 1.00, `sample_success` 1.00, DB stage 9.0 ms
+clean). A warm host probe showed TA at ~6 ms (cold ~11 ms), and the
+same log window shows OpenAlgo's 109k-row master-contract bulk insert
+churning — first-call warm-up plus host contention, not a latency
+regression. Stored-run forensics: the same n=1 spike class graded runs
+PARTIAL on 09Sep (21.8 ms), 17Sep (67.8 ms), and 20Sep (34.8 ms) — the
+defect predates the R-09/R-10 fixes and would fire again on any noisy
+host; the 18Sep 9/10 PARTIAL shows `db_operations` carries the same
+exposure. The 25Sep 12:59 8/10 PARTIAL was R-09's DIFFERENT class
+(db_p95 65 s starvation) — do not conflate.
+
+Root cause: `measure_analyze_round_trip` measured each ANALYZE stage
+exactly once, then `validate_cmp_latency_gates` applied an
+80%-within-budget pass-rate rule to a one-element population — an
+80% threshold decided by a single CPU-bound sample is a coin flip on
+host noise (and would equally green-light a promotion on a fluke).
+
+Fix (fail-closed, both legs): (1) grading — a STAGE-budget operation
+below `MIN_STAGE_SAMPLES` (5) is UNGRADEABLE: `overall_pass` False with
+an explicit `insufficient_samples` marker, so one noisy sample can
+neither block a healthy run nor green-light promotion; (2) measurement
+— `measure_analyze_round_trip` discards one warm-up call (side-channel,
+not registry-polluting) and accumulates `ANALYZE_STAGE_SAMPLES` (5)
+per stage, reporting the per-stage MEDIAN in the round trip while the
+gate grades the full accumulated population. Regression nets:
+`tests/test_performance_analyzer.py::TestStageGateSamplePopulation`,
+`test_roundtrip_harness_accumulates_gate_population` (real-path
+subprocess probe), and `test_generate_summary_marks_under_sampled_
+stage_benchmark`. ADR-0016 budgets untouched; no behavior change
+outside the gate/summary path. Snapshot: HEAD `36212f0` (PR #83
+merged), branch `fix/benchmark-stage-samples`.
