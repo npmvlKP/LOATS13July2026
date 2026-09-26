@@ -43,6 +43,18 @@ STAGE_BUDGET_S: dict[str, tuple[str, float]] = {
     "db_operations": ("db", P1_GATE_S),
 }
 
+# Minimum sample population for a STAGE gate to be gradeable (R-11,
+# 2026-09-26): the ANALYZE round-trip used to measure each stage exactly
+# once, so an 80%-within-budget pass rate was decided by a single
+# CPU-bound sample (first-call warm-up, GC, host contention). Below this
+# population the stage gate is UNGRADEABLE and fails closed -- one noisy
+# sample must neither block a healthy run nor green-light promotion.
+MIN_STAGE_SAMPLES = 5
+
+# Samples taken per ANALYZE round-trip stage, including the discarded
+# process-warm-up call that precedes them.
+ANALYZE_STAGE_SAMPLES = 5
+
 # Iterations for the focused latency benchmark (tests shrink this to keep
 # the real code path fast).
 BENCHMARK_ITERATIONS = 100
@@ -229,6 +241,13 @@ class PerformanceAnalyzer:
         Fail-closed: with no measured operations this returns an empty
         result set, which callers must grade as a gate failure -- never
         as a vacuous pass.
+
+        Fail-closed on an under-sampled stage: a STAGE-budget operation
+        with fewer than MIN_STAGE_SAMPLES samples has no distribution
+        for its pass rate to come from, so it cannot grade -- its
+        ``overall_pass`` is False with ``insufficient_samples`` set
+        (R-11). Non-stage operations keep the generic rule; their DB
+        measurements already accumulate large populations.
         """
         stats = self.get_statistics()
 
@@ -256,6 +275,16 @@ class PerformanceAnalyzer:
             )
             sample_success = success_rate >= min_sample_pass_rate
 
+            # An under-sampled STAGE gate cannot grade (R-11, 26Sep2026):
+            # an 80%-within-budget pass rate decided by a single CPU-bound
+            # sample green-lights and red-flags on host noise alike (a
+            # first-call warm-up spike graded the 26Sep morning run 9/10
+            # PARTIAL on an otherwise healthy host). Below the minimum
+            # population the stage is UNGRADEABLE -- fail closed with an
+            # explicit marker instead of a coin-flip grade.
+            stage = STAGE_BUDGET_S.get(operation)
+            under_sampled = stage is not None and len(durations) < MIN_STAGE_SAMPLES
+
             result: dict[str, Any] = {
                 "samples": len(durations),
                 "p1_threshold": p1_threshold,
@@ -268,14 +297,19 @@ class PerformanceAnalyzer:
                 "p5_pass": p5_pass,
                 "sample_success_rate": success_rate,
                 "sample_success": sample_success,
-                "overall_pass": p1_pass and p5_pass and sample_success,
             }
+            if under_sampled:
+                result["insufficient_samples"] = True
+                result["min_stage_samples"] = MIN_STAGE_SAMPLES
+                # overall_pass deliberately absent-set to False below.
+                result["overall_pass"] = False
+            else:
+                result["overall_pass"] = p1_pass and p5_pass and sample_success
 
             # ANALYZE round-trip stages carry their own CMP budget: grade
             # overall_pass on the stage budget, keep the generic p1 fields
             # as informational context.
-            stage = STAGE_BUDGET_S.get(operation)
-            if stage is not None:
+            if stage is not None and not under_sampled:
                 stage_name, stage_budget = stage
                 stage_rate = sum(1 for d in durations if d <= stage_budget) / len(
                     durations
@@ -427,7 +461,15 @@ class DatabasePerformanceAnalyzer:
         return self.analyzer.get_statistics()
 
     async def measure_analyze_round_trip(self, data_size: int = 1000) -> dict[str, Any]:
-        """Measure ANALYZE round-trip latency with realistic data."""
+        """Measure ANALYZE round-trip latency with realistic data.
+
+        Each stage is measured ANALYZE_STAGE_SAMPLES times after one
+        discarded warm-up call (R-11): the round trip reports the MEDIAN
+        sample per stage, and the gate grades the accumulated
+        population, so a single first-call spike (JIT/page/GC noise,
+        host contention) can neither red-flag a healthy run nor
+        green-light a promotion on a fluke.
+        """
         # Generate test data
         test_data = self._generate_test_data(data_size)
 
@@ -446,25 +488,67 @@ class DatabasePerformanceAnalyzer:
             signals = await self.db.async_get_latest_signals("TEST", limit=10)
             return len(signals)
 
-        # Run measurements
-        ta_result, ta_measurement = await self.analyzer.measure_latency(
-            "ta_calculation", measure_ta_calculation, _metadata={"data_size": data_size}
-        )
+        # Discarded warm-up: absorbs first-call interpreter/allocator
+        # noise (imports, page faults, CPU frequency ramp) so it cannot
+        # masquerade as a latency regression. Deliberately NOT routed
+        # through measure_latency: that would append the warm-up
+        # duration to the graded population it exists to exclude. A
+        # warm-up failure is not itself a latency signal (the graded
+        # samples below record success and the success-rate gate fails
+        # closed on real breakage), so it is logged and swallowed.
+        try:
+            await measure_ta_calculation()
+        except Exception as warmup_err:  # pragma: no cover - defensive
+            logger.warning(f"ANALYZE warm-up call failed (ignored): {warmup_err}")
 
-        db_result, db_measurement = await self.analyzer.measure_latency(
-            "db_operations", measure_db_operations, _metadata={"data_size": data_size}
-        )
+        # Run measurements
+        ta_durations = []
+        ta_result = None
+        for _ in range(ANALYZE_STAGE_SAMPLES):
+            ta_result, ta_measurement = await self.analyzer.measure_latency(
+                "ta_calculation",
+                measure_ta_calculation,
+                _metadata={"data_size": data_size},
+            )
+            ta_durations.append(ta_measurement.duration)
+
+        db_durations = []
+        db_result = None
+        for _ in range(ANALYZE_STAGE_SAMPLES):
+            db_result, db_measurement = await self.analyzer.measure_latency(
+                "db_operations",
+                measure_db_operations,
+                _metadata={"data_size": data_size},
+            )
+            db_durations.append(db_measurement.duration)
+
+        # Representative stage latencies: the median sample. The full
+        # populations stay in the registry for the gate's pass-rate rule.
+        ta_median = statistics.median(ta_durations)
+        db_median = statistics.median(db_durations)
 
         # Calculate round-trip
-        round_trip_duration = ta_measurement.duration + db_measurement.duration
+        round_trip_duration = ta_median + db_median
 
         return {
-            "ta_calculation": ta_measurement.to_dict(),
-            "db_operations": db_measurement.to_dict(),
+            "ta_calculation": {
+                "duration": ta_median,
+                "samples": len(ta_durations),
+                "min": min(ta_durations),
+                "max": max(ta_durations),
+                "median": ta_median,
+            },
+            "db_operations": {
+                "duration": db_median,
+                "samples": len(db_durations),
+                "min": min(db_durations),
+                "max": max(db_durations),
+                "median": db_median,
+            },
             "round_trip": {
                 "duration": round_trip_duration,
-                "ta_percentage": ta_measurement.duration / round_trip_duration * 100,
-                "db_percentage": db_measurement.duration / round_trip_duration * 100,
+                "ta_percentage": ta_median / round_trip_duration * 100,
+                "db_percentage": db_median / round_trip_duration * 100,
             },
             "data_size": data_size,
             "ta_result": ta_result,
