@@ -215,6 +215,24 @@ correct in-progress state. Full verdict table and mechanism
 corrections: `26Sep2026-performance-review-paste-reconciliation.md`.
 Snapshot: HEAD `f4a80ee` (PR #86 merged 2026-09-26), CI run
 `36247737708` green.
+Updated 2026-09-26 (console-probe paste reconciliation): the evening
+paste's console-probe tail reconciled live at HEAD `d486f75` — the
+pasted isort charmap warnings are PROVEN CONSOLE-COSMETIC: the
+CI-exact scope grades rc=0 on the canonical venv under a UTF-8 console
+(zero warnings) and reproduces exactly 26 warnings under a forced
+cp1252 console with the SAME rc=0; glyph content (em-dash, ✓, 🚀, μ,
+≈, →, ≤) fails the cp1252 decoder only. Operator guidance pinned:
+`python -X utf8 -m isort --check-only src tests scripts`; never strip
+glyphs to silence the warnings. The pasted local `pip_audit` finding is
+the raw no-ignore-leg invocation; CI pins `--ignore-vuln PYSEC-2026-3740`
+(ci.yml:323, ADR-0010 monitor stands). PR #87's fumbled create line and
+the PowerShell `<changed paths>` redirect error both resolve to already
+merged/verified state (merge commit `d486f75` content-identical to
+`a4f94db`, diff empty). Protection: 8th consecutive clean field-by-field
+read-back — first watch with NO dismiss_stale derive-gap repair needed.
+Full verdict table: `26Sep2026-console-probe-paste-reconciliation.md`.
+Snapshot: HEAD `d486f75` (PR #87 merged 2026-09-26), CI run
+`36257907490` green.
 
 | ID | Priority | Category | Status | Due | Next action |
 |----|----------|----------|--------|-----|-------------|
