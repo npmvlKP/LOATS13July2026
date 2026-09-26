@@ -35,6 +35,12 @@ import subprocess
 import sys
 from pathlib import Path
 
+try:
+    from pytest_isolation import pytest_child_cmd, pytest_child_env
+except ModuleNotFoundError:  # exec_module-style loaders: no scripts/ on sys.path
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from pytest_isolation import pytest_child_cmd, pytest_child_env
+
 PASS = FAIL = 0
 
 _SUMMARY_PASSED_RE = re.compile(r"(\d+) passed")
@@ -130,24 +136,30 @@ if cov_path.exists():
     cov_path.unlink()
 cmd = [
     sys.executable,
-    "-m",
-    "pytest",
-    "tests/",
-    "--cov=src",
-    "--cov-branch",
-    "--cov-report=json:coverage.json",
-    "--cov-report=term",
-    "--cov-fail-under=80",
-    "-q",
-    "--no-header",
-    # Keep this verifier's cache writes out of the repo it measures.
-    "-p",
-    "no:cacheprovider",
+    *pytest_child_cmd(
+        "tests/",
+        extra_args=[
+            "--cov=src",
+            "--cov-branch",
+            "--cov-report=json:coverage.json",
+            "--cov-report=term",
+            "--cov-fail-under=80",
+            "-q",
+            "--no-header",
+            # Keep this verifier's cache writes out of the repo it measures.
+            "-p",
+            "no:cacheprovider",
+        ],
+    ),
 ]
 print(f"  Running: {' '.join(cmd[3:8])} ... (full suite, ~4-5 min)")
 try:
     result = subprocess.run(
-        cmd, capture_output=True, text=True, timeout=_PYTEST_TIMEOUT_S
+        cmd,
+        capture_output=True,
+        text=True,
+        timeout=_PYTEST_TIMEOUT_S,
+        env=pytest_child_env(),
     )
 except subprocess.TimeoutExpired:
     gate("All tests pass", False, f"embedded pytest run exceeded {_PYTEST_TIMEOUT_S}s")

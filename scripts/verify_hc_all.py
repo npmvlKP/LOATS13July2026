@@ -18,6 +18,12 @@ import subprocess
 import sys
 from pathlib import Path
 
+try:
+    from pytest_isolation import pytest_child_env, with_private_basetemp
+except ModuleNotFoundError:  # exec_module-style loaders: no scripts/ on sys.path
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from pytest_isolation import pytest_child_env, with_private_basetemp
+
 # ---------------------------------------------------------------------------
 # Windows UTF-8 stdout/stderr fix (so Unicode symbols do not crash when
 # stdout is piped by a health-check wrapper).
@@ -84,8 +90,15 @@ PY = _resolve_python()
 
 
 def _child_env() -> dict[str, str]:
-    """Environment handed to every subprocess probe."""
-    env = os.environ.copy()
+    """Environment handed to every subprocess probe.
+
+    Built from the pytest_isolation scrubbed copy: an ambient operator
+    ``PYTEST_ADDOPTS`` -- notably a shared ``--basetemp`` -- can never
+    leak into pytest children spawned here. The probe defaults below
+    keep their original ``setdefault`` semantics (explicit operator
+    values are never clobbered).
+    """
+    env = pytest_child_env()
     env.setdefault("PYTHONIOENCODING", "utf-8")
     env.setdefault("PYTHONUTF8", "1")
     # Settings may validate these on import; harmless defaults.
@@ -283,19 +296,22 @@ def check_coverage() -> bool:
             "(pytest --cov, may take a few minutes)"
         )
         rc, out, err = run_cmd(
-            [
-                PY,
-                "-m",
-                "pytest",
-                "tests/",
-                "-q",
-                "-p",
-                "no:cacheprovider",
-                "--cov=src",
-                "--cov-branch",
-                "--cov-fail-under=80",
-                "--cov-report=json:coverage.json",
-            ],
+            with_private_basetemp(
+                [
+                    PY,
+                    "-m",
+                    "pytest",
+                    "tests/",
+                    "-q",
+                    "-p",
+                    "no:cacheprovider",
+                    "--cov=src",
+                    "--cov-branch",
+                    "--cov-fail-under=80",
+                    "--cov-report=json:coverage.json",
+                ],
+                label="hc12",
+            ),
             timeout=1200,
         )
         if not cov_file.exists():
@@ -338,16 +354,19 @@ def check_coverage() -> bool:
 def check_new_tests() -> bool:
     """New coverage lift tests for performance_analyzer, rules, sizing."""
     rc, out, err = run_cmd(
-        [
-            PY,
-            "-m",
-            "pytest",
-            "tests/test_performance_analyzer.py",
-            "tests/test_rules_engine.py",
-            "tests/test_sizing_engine.py",
-            "-q",
-            "--tb=short",
-        ],
+        with_private_basetemp(
+            [
+                PY,
+                "-m",
+                "pytest",
+                "tests/test_performance_analyzer.py",
+                "tests/test_rules_engine.py",
+                "tests/test_sizing_engine.py",
+                "-q",
+                "--tb=short",
+            ],
+            label="hc-new-tests",
+        ),
         timeout=120,
     )
     ok = rc == 0
