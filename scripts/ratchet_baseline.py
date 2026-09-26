@@ -663,8 +663,19 @@ History (most recent last):
       (485 == 485), so +2 lands AT 487, not 486 -- the same
       commit-time arithmetic the 25Sep wave documented. Ceiling
       485->487.
+  488. 26Sep2026 (fix/sep26-paste-reconciliation): pasted 15Sep FR9
+      Low-tier block (F9-L-01/02/03) reconciled live at 00d5b8c --
+      L-01/L-02 are the staged S-14/S-15 30Sep riders (STALE as action
+      items, freeze-bound), L-03's --apply window never ran. Errata:
+      S-14's census is FIVE producer budget surfaces (758/902/1045/
+      1217/1369), not three; S-15's surface is orchestrator.py:2264-2285
+      at HEAD. R-12 opened (P5 decisional-leg accumulation, deadline
+      08Oct). +1 docs/audit-history/26Sep2026-paste-reconciliation-
+      F9L-block.md; register paragraph + R-12 row are docs-only edits.
+      The tree equals the ceiling pre-wave (487 == 487), so +1 lands
+      AT 488. Ceiling 487->488.
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 487
+TRACKED_FILE_CEILING = 488
