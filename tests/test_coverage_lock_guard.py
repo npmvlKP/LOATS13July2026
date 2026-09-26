@@ -245,8 +245,18 @@ def _write_smoke_test(target: Path) -> None:
     )
 
 
-def _base_child_cmd(test_dir: Path) -> list[str]:
-    return [
+def _base_child_cmd(test_dir: Path, basetemp: Path | None = None) -> list[str]:
+    r"""Child pytest invocation shared by every subprocess leg.
+
+    ``basetemp`` gives the child a PRIVATE temp root: without it the
+    child shares (and, as the first suite to exit, PRUNES) the volatile
+    numbered ``%TEMP%\\pytest-of-<user>\\pytest-N`` tree — a concurrent
+    sibling suite's tmp_path fixtures then die mid-run (WinError 2/3
+    error clusters that are all tmp_path-consumers). See the Class 2
+    cross-pruning wedge: invocation poison, never a code defect.
+    Passed as direct argv (never PYTEST_ADDOPTS — shlex eats backslashes).
+    """
+    cmd = [
         sys.executable,
         "-m",
         "pytest",
@@ -254,16 +264,31 @@ def _base_child_cmd(test_dir: Path) -> list[str]:
         "--no-header",
         "-p",
         "no:cacheprovider",
-        str(test_dir),
     ]
+    if basetemp is not None:
+        cmd += ["--basetemp", str(basetemp)]
+    cmd.append(str(test_dir))
+    return cmd
 
 
 class TestNonCovRunPasses:
     def test_bare_pytest_smoke_completes(self, tmp_path) -> None:
         """A non-coverage pytest run is never gated by the guard."""
         _write_smoke_test(tmp_path)
+        # Private basetemp + explicit rootdir: the child must never
+        # touch the shared numbered %TEMP%\pytest-of-* tree — a sibling
+        # suite exiting mid-run prunes that root out from under the
+        # child's collection walk (WinError 2 FileNotFoundError storm,
+        # the 2026-09-26 false failure). tmp_path (the parent's own
+        # managed fixture, guaranteed to exist) is rootdir, collection
+        # scope, and the basetemp home; no inifile or conftest above it
+        # can leak repo-foreign addopts into the child.
         proc = subprocess.run(
-            _base_child_cmd(tmp_path),
+            [
+                *_base_child_cmd(tmp_path, tmp_path / "basetemp"),
+                "--rootdir",
+                str(tmp_path),
+            ],
             capture_output=True,
             text=True,
             cwd=REPO_ROOT,

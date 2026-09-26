@@ -34,6 +34,12 @@ import sys
 import traceback
 from pathlib import Path
 
+try:
+    from pytest_isolation import pytest_child_cmd, pytest_child_env
+except ModuleNotFoundError:  # exec_module-style loaders: no scripts/ on sys.path
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from pytest_isolation import pytest_child_cmd, pytest_child_env
+
 _PY_CANDIDATES = (
     Path(__file__).resolve().parent.parent / "loatsNEW" / "Scripts" / "python.exe",
     Path(__file__).resolve().parent.parent / ".venv" / "Scripts" / "python.exe",
@@ -79,9 +85,17 @@ _SUMMARY_FAILED_RE = re.compile(r"(\d+) failed")
 
 
 def run_command(cmd: list[str], cwd: Path | None = None) -> tuple[int, str, str]:
-    """Run command and return exit code, stdout, stderr."""
+    """Run command and return exit code, stdout, stderr.
+
+    The child environment is scrubbed of ``PYTEST_ADDOPTS`` (an ambient
+    addopts flag would leak operator basetemp/flags into the probe).
+    """
     result = subprocess.run(
-        cmd, capture_output=True, text=True, cwd=cwd or PROJECT_ROOT
+        cmd,
+        capture_output=True,
+        text=True,
+        cwd=cwd or PROJECT_ROOT,
+        env=pytest_child_env(),
     )
     return result.returncode, result.stdout, result.stderr
 
@@ -232,13 +246,10 @@ def run_unit_tests() -> bool:
 
         cmd = [
             _python(),
-            "-m",
-            "pytest",
-            str(TEST_FILE),
-            "-q",
-            "--no-header",
-            "-p",
-            "no:cacheprovider",
+            *pytest_child_cmd(
+                str(TEST_FILE),
+                extra_args=["-q", "--no-header", "-p", "no:cacheprovider"],
+            ),
         ]
 
         exit_code, stdout, stderr = run_command(cmd)

@@ -24,6 +24,12 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from types import SimpleNamespace
 
+try:
+    from pytest_isolation import pytest_child_env, with_private_basetemp
+except ModuleNotFoundError:  # exec_module-style loaders: no scripts/ on sys.path
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from pytest_isolation import pytest_child_env, with_private_basetemp
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SRC = REPO_ROOT / "src"
 LOATS = SRC / "loats"
@@ -913,7 +919,9 @@ def probe_hc30(rep: Report) -> None:
 
 
 def run_gate(rep: Report, check_id, todo, name, cmd, timeout=300, allow_skip=None):
-    env = os.environ.copy()
+    # Scrubbed copy: PYTEST_ADDOPTS never leaks into child gates (the
+    # pytest gates get their own private --basetemp at the call site).
+    env = pytest_child_env()
     # pip-audit on Windows fails if USERPROFILE/HOMEDRIVE are stripped by the
     # runner; ensure HOME-like variables are present so Path.home() works.
     env.setdefault("USERPROFILE", os.environ.get("USERPROFILE", r"C:\Users\npmvl-KP"))
@@ -1061,19 +1069,22 @@ def check_gates(rep: Report, fast: bool) -> dict:
             "HC-12",
             "TODO-3",
             "pytest --cov-fail-under=80 (aggregate)",
-            [
-                py,
-                "-m",
-                "pytest",
-                "tests/",
-                "--cov=src",
-                "--cov-branch",
-                "--cov-report=term-missing:skip-covered",
-                "--cov-report=json:"
-                + (REPO_ROOT / "reports/health/coverage.json").as_posix(),
-                "--cov-fail-under=80",
-                "-q",
-            ],
+            with_private_basetemp(
+                [
+                    py,
+                    "-m",
+                    "pytest",
+                    "tests/",
+                    "--cov=src",
+                    "--cov-branch",
+                    "--cov-report=term-missing:skip-covered",
+                    "--cov-report=json:"
+                    + (REPO_ROOT / "reports/health/coverage.json").as_posix(),
+                    "--cov-fail-under=80",
+                    "-q",
+                ],
+                label="hc-12",
+            ),
             900,
         )
         check_module_floors(rep)

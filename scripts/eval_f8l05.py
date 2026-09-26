@@ -17,6 +17,12 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
+try:
+    from pytest_isolation import pytest_child_cmd, pytest_child_env
+except ModuleNotFoundError:  # exec_module-style loaders: no scripts/ on sys.path
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from pytest_isolation import pytest_child_cmd, pytest_child_env
+
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 SRC = PROJECT_ROOT / "src"
 if str(SRC) not in sys.path:
@@ -188,17 +194,16 @@ def live_e10() -> tuple[bool, str]:
     proc = subprocess.run(
         [
             sys.executable,
-            "-m",
-            "pytest",
-            "tests/test_rss_validation.py",
-            "-q",
-            "--no-header",
-            "-x",
+            *pytest_child_cmd(
+                "tests/test_rss_validation.py",
+                extra_args=["-q", "--no-header", "-x"],
+            ),
         ],
         capture_output=True,
         text=True,
         cwd=PROJECT_ROOT,
         timeout=300,
+        env=pytest_child_env(),
     )
     line = next((ln for ln in reversed(proc.stdout.splitlines()) if "passed" in ln), "")
     return proc.returncode == 0, line.strip()

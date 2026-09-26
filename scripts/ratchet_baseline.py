@@ -649,8 +649,22 @@ History (most recent last):
       13:13 re-run. Fix: ``_rollback_on_error`` guard on the writers,
       transaction repair in ``SimpleConnectionPool.release``, uuid4
       ids. +1 tests/test_transaction_hygiene.py. Ceiling 484->485.
+  486. 26Sep2026 (fix/verifier-pytest-isolation): root-caused two
+      in-suite false failures to ONE hermeticity class -- verifier
+      scripts spawn pytest children that inherit the caller's
+      environment and share the numbered/explicit temp roots (the
+      child's session-start rm_rf demolishes the outer suite's live
+      tmp_path fixtures; canary-proven deterministically). Fix:
+      scripts/pytest_isolation.py (env scrub + private --basetemp via
+      direct argv) wired into the five pytest-spawning verifiers,
+      pinned by tests/test_verifier_pytest_isolation.py; the
+      lock-guard smoke child got its own private basetemp/rootdir.
+      +2 files (module + net). The tree equals the ceiling pre-wave
+      (485 == 485), so +2 lands AT 487, not 486 -- the same
+      commit-time arithmetic the 25Sep wave documented. Ceiling
+      485->487.
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 485
+TRACKED_FILE_CEILING = 487
