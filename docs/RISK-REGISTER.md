@@ -179,6 +179,23 @@ durations too). Fixed fail-closed: success-rate component in
 `validate_cmp_latency_gates` (generic AND stage composition),
 test-provenance tag on the fixture; post-fix run zero failures,
 PASS, exit 0. Closed as R-10 (see row).
+Updated 2026-09-26 (paste reconciliation `fix/sep26-paste-reconciliation`):
+the pasted 15Sep FR9 Low-tier block (F9-L-01/02/03) reconciled live at
+HEAD `00d5b8c` — L-01/L-02 are the already-staged S-14/S-15 30Sep riders
+(freeze-bound, not dropped; STALE as action items), L-03's guard is
+in-tree and the DRY-RUN record stands but `--apply` never ran (live store
+still carries the STRESS-ORD row; window = operator, post-supervisor,
+`--allow-active-writer` is NOT safe). Two work-order ERRATA pinned in
+`26Sep2026-paste-reconciliation-F9L-block.md` §2: S-14's census is FIVE
+producer surfaces (758/902/1045/1217/1369), not three; S-15's surface is
+`orchestrator.py:2264-2285` at HEAD. New R-12 opened: the live P5 span's
+decisional leg has zero routed attempts after two full trading sessions —
+root-caused strategy-legitimate (every session cycle audited-rejected its
+candidates: 24Sep 770 insufficient_strength + 307 gating_rules_failed;
+25Sep 102 + 8) — and ends FAIL-closed at the 2026-10-08 earliest close
+unless an attempt fires first. Protection watch: 6th consecutive clean
+field-by-field read-back. Snapshot: HEAD `00d5b8c` (PR #85 merged
+2026-09-26), CI run `36230558303` green.
 
 | ID | Priority | Category | Status | Due | Next action |
 |----|----------|----------|--------|-----|-------------|
@@ -193,6 +210,7 @@ PASS, exit 0. Closed as R-10 (see row).
 | R-09 | P2-fixed | Benchmark write-path poisoning (failed INSERTs left open transactions; wall-clock ids collided) | CLOSED by `fix/benchmark-txn-hygiene` | — | Same-commit runs at `ba4febd` graded 8/10 PARTIAL (12:59) and 12/12 PASS (13:13): root cause was nondeterministic lock cascade (30 s busy_timeout starvation), not a budget regression. Fixed: `_rollback_on_error` on 15 sync writers, pool-release transaction repair, uuid4 benchmark ids; `tests/test_transaction_hygiene.py` pins it |
 | R-10 | P2-fixed | Benchmark gate false-green: sample success rate ungraded; focused signal fixture rejected at insert | CLOSED by `fix/perf-gate-success-rate` | — | Found by the post-merge verification run at `879015c`: the F9-L-03 guard rejected 100/100 `signal_round_trip` samples (fixture lacked the `test` provenance tag) while the gate graded green off the exceptions' durations. Fixed: `validate_cmp_latency_gates` now grades the sample success rate (incl. the stage-gate composition) fail-closed, and the fixture carries `metadata["test"]`; pinned in `tests/test_performance_analyzer.py::TestSuccessRateGate` |
 | R-11 | P2-fixed | Stage gates graded a single-sample population (n=1 TA spike graded 26Sep 9/10 PARTIAL; same class 09/17/20Sep) | CLOSED by `fix/benchmark-stage-samples` | — | Under-sampled STAGE gates fail closed (`insufficient_samples`); round-trip harness discards one warm-up call and measures 5 samples/stage, medians reported; pinned in `tests/test_performance_analyzer.py::TestStageGateSamplePopulation` |
+| R-12 | P3-watch | P5 decisional-leg accumulation: zero routed attempts through two full trading sessions (span 24Sep→) | OPEN — accumulation deficit, not a code defect | 2026-10-08 | Earliest valid span close 08Oct 08:02Z: an attempt must fire before `ended_at`, else the run grades FAIL-closed on the decisional criterion by design. 30Sep options: record the FAIL-closed evidence (safety-path span) or schedule a successor span after a CMP review of the strength/gating parameters that rejected every candidate (24Sep 770+307, 25Sep 102+8). Evidence: `26Sep2026-paste-reconciliation-F9L-block.md` §3 |
 
 ---
 
