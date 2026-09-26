@@ -151,6 +151,14 @@ async def test_database_performance_analyzer_with_mocks() -> None:
         assert "round_trip" in result
         assert result["data_size"] == 3
         assert "duration" in result["round_trip"]
+        # R-11: stages report median-of-population summaries, not a
+        # single serialized LatencyMeasurement.
+        assert result["ta_calculation"]["samples"] == pamod.ANALYZE_STAGE_SAMPLES
+        assert result["db_operations"]["samples"] == pamod.ANALYZE_STAGE_SAMPLES
+        assert (
+            result["ta_calculation"]["duration"] == result["ta_calculation"]["median"]
+        )
+        assert result["db_operations"]["duration"] == result["db_operations"]["median"]
     finally:
         pamod.asyncio.to_thread = original  # type: ignore[assignment]
 
@@ -474,8 +482,214 @@ class TestSuccessRateGate:
         )
 
 
+class TestStageGateSamplePopulation:
+    """A stage gate decided by a single CPU-bound sample is a coin flip.
+
+    Found live 2026-09-26 07:20 IST at main ``36212f0`` (post-#83
+    verification run): ``ta_calculation`` measured ONCE landed at
+    83.5 ms -- inside its 80..100 ms stage-to-P5 corridor on a healthy
+    host (warm TA is ~6 ms; the spike was first-call warm-up plus host
+    contention from a concurrent master-contract bulk insert) -- and the
+    80%-pass-rate rule graded the run 9/10 PARTIAL. 55 stored runs show
+    the same n=1 spike class red-flagging runs on 09/17/20 Sep
+    (21.8/67.8/34.8 ms) long before the R-09/R-10 fixes. Two legs are
+    pinned here: the gate must fail closed on an under-sampled STAGE
+    operation (UNGRADEABLE, explicit marker -- one noisy sample can
+    neither block a healthy run nor green-light a promotion), and the
+    round-trip harness must accumulate a population per stage with the
+    first call discarded as warm-up.
+    """
+
+    @staticmethod
+    def _analyzer_with(op: str, durations: list[float]) -> PerformanceAnalyzer:
+        pa = PerformanceAnalyzer()
+        pa.operation_stats[op] = list(durations)
+        return pa
+
+    def test_single_sample_stage_fails_closed_with_marker(self) -> None:
+        # The live 26Sep failure shape: one 83.5 ms TA sample. The old
+        # grading returned stage_pass=False and overall_pass=False with
+        # no way to tell "measured slow" from "cannot grade"; the fixed
+        # grading must mark the population insufficient.
+        import loats.performance_analyzer as pamod
+
+        pa = self._analyzer_with("ta_calculation", [0.0835])
+        v = pa.validate_cmp_latency_gates()["ta_calculation"]
+        assert v["samples"] == 1
+        assert v.get("insufficient_samples") is True
+        assert v["min_stage_samples"] == pamod.MIN_STAGE_SAMPLES
+        assert bool(v["overall_pass"]) is False
+
+    def test_under_population_stage_fails_closed(self) -> None:
+        # n=4 (one spiking): below MIN_STAGE_SAMPLES -- ungradeable,
+        # fail-closed regardless of how good the samples look.
+        import loats.performance_analyzer as pamod
+
+        pa = self._analyzer_with("ta_calculation", [0.006, 0.006, 0.006, 0.300])
+        v = pa.validate_cmp_latency_gates()["ta_calculation"]
+        assert v["samples"] == 4
+        assert v.get("insufficient_samples") is True
+        assert v["min_stage_samples"] == pamod.MIN_STAGE_SAMPLES
+        assert bool(v["overall_pass"]) is False
+        assert "stage_pass" not in v
+
+    def test_sufficient_population_grades_on_stage_budget(self) -> None:
+        # 5 samples, 4 in-budget + 1 spike: 80% exactly -- gradeable,
+        # and the stage budget (not the sample count) decides.
+        pa = self._analyzer_with("ta_calculation", [0.006, 0.006, 0.006, 0.006, 0.300])
+        v = pa.validate_cmp_latency_gates()["ta_calculation"]
+        assert "insufficient_samples" not in v
+        assert v["stage_gate"] == "ta"
+        assert bool(v["stage_pass"]) is True
+        assert bool(v["overall_pass"]) is True
+
+    def test_non_stage_operation_keeps_generic_grading(self) -> None:
+        # DB operations accumulate large populations by design; a small
+        # non-stage population must NOT inherit the stage fail-closed
+        # marker (the generic P1/P5 rule keeps grading it).
+        pa = self._analyzer_with("async_create_signal", [0.005] * 3)
+        v = pa.validate_cmp_latency_gates()["async_create_signal"]
+        assert "insufficient_samples" not in v
+        assert bool(v["overall_pass"]) is True
+
+    def test_min_population_constant_matches_measurement_plan(self) -> None:
+        # The gate's minimum must be satisfiable by the harness's
+        # per-stage sample count, or every stage run grades ungradeable.
+        import loats.performance_analyzer as pamod
+
+        assert pamod.ANALYZE_STAGE_SAMPLES >= pamod.MIN_STAGE_SAMPLES
+
+
+def _roundtrip_probe_main(data_size: int) -> str:
+    """Body for the real-path round-trip subprocess probe (R-11).
+
+    Points the DB singleton at a per-probe scratch dir (the benchmark
+    script's isolation pattern) and prints the stage medians plus the
+    gate verdict for ``ta_calculation``.
+    """
+    return (
+        "import asyncio, json, sys, tempfile, os\n"
+        "sys.path.insert(0, r'" + str(Path(__file__).resolve().parents[1]) + "')\n"
+        "d = tempfile.mkdtemp(prefix='loats_rt_probe_')\n"
+        "os.environ['SQLITE_DB_PATH'] = os.path.join(d, 'rt.db')\n"
+        "os.environ['AUDIT_LOG_PATH'] = os.path.join(d, 'rt_audit.jsonl')\n"
+        "os.environ.setdefault('OPENALGO_API_KEY', 'rt-probe-no-auth-value')\n"
+        "os.environ.setdefault('ENVIRONMENT', 'test')\n"
+        "from src.loats.main import db\n"
+        "from src.loats.performance_analyzer import (\n"
+        "    DatabasePerformanceAnalyzer, MIN_STAGE_SAMPLES,\n"
+        ")\n"
+        f"size = {data_size}\n"
+        "async def run():\n"
+        "    await db.async_initialize()\n"
+        "    try:\n"
+        "        dpa = DatabasePerformanceAnalyzer(db)\n"
+        "        rt = await dpa.measure_analyze_round_trip(data_size=size)\n"
+        "        gates = dpa.analyzer.validate_cmp_latency_gates()\n"
+        "        ta = gates['ta_calculation']\n"
+        "        dbo = gates['db_operations']\n"
+        "        print(json.dumps({\n"
+        "            'ta_samples': ta['samples'],\n"
+        "            'ta_stage_pass': bool(ta.get('stage_pass')),\n"
+        "            'ta_insufficient': bool(ta.get('insufficient_samples')),\n"
+        "            'ta_overall': bool(ta['overall_pass']),\n"
+        "            'db_samples': dbo['samples'],\n"
+        "            'db_overall': bool(dbo['overall_pass']),\n"
+        "            'rt_duration': rt['round_trip']['duration'],\n"
+        "        }))\n"
+        "    finally:\n"
+        "        await db.async_close_all()\n"
+        "        import shutil\n"
+        "        shutil.rmtree(d, ignore_errors=True)\n"
+        "asyncio.run(run())\n"
+    )
+
+
+def test_roundtrip_harness_accumulates_gate_population(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The REAL round-trip path must grade on >=MIN_STAGE_SAMPLES samples.
+
+    Subprocess probe (fresh interpreter, scratch DB): runs
+    measure_analyze_round_trip against the real TA + real SQLite stack,
+    then validates the gates from the same registry the run populated.
+    Regression net: the harness measured each stage once, so every run
+    carried exactly one sample per stage into an 80%-pass-rate rule.
+    """
+    import json
+    import os as _os
+    import subprocess
+    import sys
+
+    import loats.performance_analyzer as pamod
+
+    repo = Path(__file__).resolve().parents[1]
+    env = dict(_os.environ)
+    # Settings-required mirrors (the probe process constructs Settings
+    # via src.loats.main); without them a strict local env dies at
+    # import, and the failure would masquerade as a harness defect.
+    env.setdefault("OPENALGO_API_KEY", "rt-probe-no-auth-value")
+    env.setdefault("OPENALGO_BASE_URL", "https://test.openalgo.com")
+    env.setdefault("TELEGRAM_BOT_TOKEN", "test_bot_token")
+    env.setdefault("TELEGRAM_CHAT_ID", "123456789")
+    env.setdefault("ENVIRONMENT", "test")
+    env.setdefault("LOATS_SUPPRESS_NLTK_WARNING", "1")
+    # Never let a host-level data-dir override leak into the probe.
+    monkeypatch.delenv("SQLITE_DB_PATH", raising=False)
+    monkeypatch.delenv("AUDIT_LOG_PATH", raising=False)
+    monkeypatch.delenv("LOATS_BENCHMARK_DATA_DIR", raising=False)
+    env.pop("SQLITE_DB_PATH", None)
+    env.pop("AUDIT_LOG_PATH", None)
+    env.pop("LOATS_BENCHMARK_DATA_DIR", None)
+    proc = subprocess.run(
+        [sys.executable, "-c", _roundtrip_probe_main(data_size=200)],
+        capture_output=True,
+        text=True,
+        env=env,
+        cwd=str(repo),
+        timeout=300,
+    )
+    assert proc.returncode == 0, proc.stderr[-800:]
+    payload = json.loads(proc.stdout.strip().splitlines()[-1])
+    assert payload["ta_samples"] == pamod.ANALYZE_STAGE_SAMPLES, payload
+    assert payload["ta_samples"] >= pamod.MIN_STAGE_SAMPLES, payload
+    assert payload["ta_insufficient"] is False, payload
+    assert payload["ta_stage_pass"] is True, payload
+    assert payload["ta_overall"] is True, payload
+    assert payload["db_samples"] == pamod.ANALYZE_STAGE_SAMPLES, payload
+    assert payload["db_overall"] is True, payload
+    assert payload["rt_duration"] > 0, payload
+
+
+def test_generate_summary_marks_under_sampled_stage_benchmark(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The standalone benchmark must surface an ungradeable run.
+
+    Simulates the live 26Sep shape -- one TA sample in the registry --
+    against a THROWAWAY CWD so the harness's reports/ write never lands
+    in the repo tree. The run must FAIL CLOSED (PARTIAL, not PASS).
+    """
+    mod = _load_benchmark_script_module()
+    cmp_val = {
+        "ta_calculation": {
+            "samples": 1,
+            "insufficient_samples": True,
+            "overall_pass": False,
+        },
+        "db_operations": {"samples": 5, "overall_pass": True},
+    }
+    comprehensive, benchmark = _summary_inputs(cmp_val, {})
+    monkeypatch.chdir(tmp_path)
+    summary = mod.generate_summary(comprehensive, benchmark)
+    assert summary["overall_status"] == "PARTIAL"
+    assert summary["cmp_validation"]["passing_operations"] == 1
+    assert summary["cmp_validation"]["total_operations"] == 2
+
+
 def _load_benchmark_script_module() -> Any:
-    """Load scripts/benchmark_performance.py as a module for unit probes."""
+    """Load scripts/benchmark_performance.py; probes must clean up its env."""
     import importlib.util
     from pathlib import Path
 
