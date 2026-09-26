@@ -674,8 +674,14 @@ History (most recent last):
       F9L-block.md; register paragraph + R-12 row are docs-only edits.
       The tree equals the ceiling pre-wave (487 == 487), so +1 lands
       AT 488. Ceiling 487->488.
+
+      2026-09-26 (performance-review paste reconciliation wave): +1
+      docs/audit-history/26Sep2026-performance-review-paste-
+      reconciliation.md (records-only docs wave; register paragraph is
+      a modification, not an addition). Tree at ceiling 488 pre-wave
+      (488 == 488), so +1 lands AT 489. Ceiling 488->489.
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 488
+TRACKED_FILE_CEILING = 489
