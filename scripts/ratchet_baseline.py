@@ -699,8 +699,15 @@ History (most recent last):
       modifications/additions within tracked files, no other new
       files). Tree at ceiling 490 pre-wave (490 == 490), so +1 lands
       AT 491. Ceiling 490->491.
+
+  492. 27Sep2026 (P5 resume counter-carry wave): +1 -- docs/audit-history/
+      27Sep2026-p5-resume-counter-carry-reconciliation.md (root-cause fix
+      for the R-12 instrument defect: _effective_resume_baseline carry
+      semantics; R-12/R-13 register truth-ups are row modifications, no
+      other new files). Tree at ceiling 491 pre-wave (491 == 491), so +1
+      lands AT 492. Ceiling 491->492.
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 491
+TRACKED_FILE_CEILING = 492
