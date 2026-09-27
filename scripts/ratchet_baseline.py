@@ -728,8 +728,21 @@ History (most recent last):
       header + R-13 row + R-13 section are modifications, no other new
       files). Tree at ceiling 493 pre-wave (493 == 493), so +1 lands AT
       494. Ceiling 493->494.
+
+  495. 28Sep2026 00:46 IST (FR9 sections-11-12 re-slice reconciliation):
+      +1 -- docs/audit-history/
+      28Sep2026-sections-11-12-reslice-reconciliation.md (ninth
+      paste-family member; Testing/DevOps sections containment-proven
+      12/12 against archive lines 221/225, §13 byte-identical to the
+      23:18 paste; every era-claim dispositioned upstream -- F9-M-02
+      contradicted live by the GraphQL read-back, benchmark-perf
+      present at ci.yml:365; failure tail reproduced live as a PS 5.1
+      parse-time artifact while PR #92 itself merged green; register
+      header paragraph is a modification, no other new files). Tree at
+      ceiling 494 pre-wave (494 == 494), so +1 lands AT 495. Ceiling
+      494->495.
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 494
+TRACKED_FILE_CEILING = 495
