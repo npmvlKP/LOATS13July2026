@@ -292,6 +292,26 @@ fail-closed refusals, zero decisions, zero P5 residue, self-healed; the
 19:55 host console restart in the paste landed MID-STORM. Record:
 `docs/audit-history/27Sep2026-fr9-riskmatrix-reslice-reconciliation.md`.
 Snapshot: HEAD `a2991c2` (PR #91 merged 2026-09-27).
+Updated 2026-09-28 (00:46 IST paste, FR9 §11/§12 re-slice
+reconciliation): the ninth family member re-sliced the archive's
+Testing/DevOps sections — containment 12/12 verbatim fragments against
+`15Sep2026-FR9-forensic-review-report.md` lines 221/225, with §13 again
+byte-identical to the 23:18 paste (25/25 normalized lines). Every
+era-claim dispositioned: F9-M-02 contradicted live (GraphQL
+approving=1, dismiss_stale, admin-enforced, 10 contexts — ninth
+consecutive clean read-back), benchmark-perf present at `ci.yml:365`
+(advisory; R-01 owns promotion at the 30Sep window), the 15Sep report
+itself already relocated to `docs/audit-history/`, security.yml runs
+inspected green (FR9 Wave 4). The pasted `--body-file <file>` PS 5.1
+ParserError was reproduced live and died at parse time — the intended
+PR create succeeded as PR #92 (merged `4201a02`, branch purged,
+post-merge run `36341230913` green). No new findings: zero breaker
+events after the 15:00:50Z recovery (R-13 stays at four occurrences),
+P5 span live (529 cycles, kill_switch_verified). The §9-§13 re-slice
+pool is exhausted. Record:
+`docs/audit-history/28Sep2026-sections-11-12-reslice-reconciliation.md`.
+Snapshot: HEAD `4201a02` (PR #92 merged 2026-09-27), post-merge main
+run `36341230913` success.
 
 | ID | Priority | Category | Status | Due | Next action |
 |----|----------|----------|--------|-----|-------------|
