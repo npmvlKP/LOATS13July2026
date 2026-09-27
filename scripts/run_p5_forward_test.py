@@ -452,18 +452,34 @@ def _engine_identity() -> str:
 def _effective_resume_baseline(
     raw: dict[str, Any], logged_cycles: int, logged_counters: dict[str, int]
 ) -> dict[str, Any]:
-    """Shift a fresh process's live counters so a resumed run log continues
-    from where the previous process's last sample left off.
+    """Shift a resumed run so the graded stream continues cumulatively
+    from the prior process's last sample.
 
-    Per key: baseline = max(live_now - logged, 0). When live >= logged the
-    log continues seamlessly (deltas keep accumulating); when a counter
-    RESET happened across the restart (live < logged) the baseline floors
-    at the live value, so only post-resume activity is counted — a drop in
-    the log, never inflation.
+    Span integrity (27Sep root cause, F9-M-03 audited-attempt evidence):
+    a CLI resume is a fresh process whose engine counters start at zero,
+    so the previous ``max(live - logged, 0)`` floor silently DISCARDED
+    every prior generation's audited attempts (the 24-26Sep generation's
+    289 routed decisions vanished from the graded stream at the 26Sep
+    resume; ``cycles_completed`` was generation-local for the same
+    reason). The graded stream is cumulative across the span, so the
+    baseline IS the logged total: the next sample reports
+    ``logged + (live_now - live_at_resume)``, which telescopes to true
+    activity in every regime:
+
+    - fresh engine (live starts at 0): logged + new work -- exact;
+    - engine alive across the restart (live >= logged at resume):
+      logged + live - logged == live -- the stream jumps to the true
+      total and can never exceed it, so inflation stays impossible;
+    - post-reset counters (live < logged): the stream holds at the
+      carried total until live re-climbs -- a hold, never a drop and
+      never a double-count, because per-sample deltas floor at the
+      baseline and the carried total is corroborated by run events and
+      ROUTE audit rows, never invented here.
     """
     live_counters = raw["counters"]
-    # Merge over the known keys PLUS any engine-carried keys (the F9-C-02
-    # divergence flag) so resume baselines stay delta-correct per key.
+    # Carry EVERY logged key (including the engine-carried F9-C-02
+    # divergence flag) so per-key delta arithmetic in
+    # _sample_live_activity stays well-defined after the resume.
     merged_keys = tuple(
         dict.fromkeys(
             ("success", "disabled", "error")
@@ -472,13 +488,9 @@ def _effective_resume_baseline(
         )
     )
     return {
-        "cycles_completed": max(int(raw["cycles_completed"]) - int(logged_cycles), 0),
+        "cycles_completed": max(int(logged_cycles), 0),
         "counters": {
-            key: max(
-                int(live_counters.get(key, 0)) - int(logged_counters.get(key, 0)),
-                0,
-            )
-            for key in merged_keys
+            key: max(int(logged_counters.get(key, 0)), 0) for key in merged_keys
         },
     }
 

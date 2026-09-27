@@ -814,8 +814,12 @@ class TestResumeBaseline:
             logged_cycles=7,
             logged_counters={"success": 2, "disabled": 1, "error": 0},
         )
-        assert baseline["cycles_completed"] == 3
-        assert baseline["counters"] == {"success": 2, "disabled": 0, "error": 0}
+        # F9-M-03 span-integrity: the baseline IS the logged total (pure
+        # carry). The stream continues cumulatively from the log in every
+        # regime: a fresh engine's future deltas add on top of the carried
+        # total, a live>logged engine reproduces exactly ``live``.
+        assert baseline["cycles_completed"] == 7
+        assert baseline["counters"] == {"success": 2, "disabled": 1, "error": 0}
 
     def test_counter_reset_never_inflates(self) -> None:
         runner = _load_runner()
@@ -828,8 +832,69 @@ class TestResumeBaseline:
             logged_cycles=7,
             logged_counters={"success": 4, "disabled": 1, "error": 0},
         )
-        assert baseline["cycles_completed"] == 0
-        assert baseline["counters"] == {"success": 0, "disabled": 0, "error": 0}
+        # Carry, not floor: a post-restart live counter BELOW the logged
+        # total means the fresh engine lost history, not that the history
+        # was never real (it is corroborated by run events + ROUTE rows).
+        # The baseline keeps the logged total so the stream never DROPS;
+        # it can never exceed logged + genuinely new activity either, so
+        # inflation stays impossible.
+        assert baseline["cycles_completed"] == 7
+        assert baseline["counters"] == {"success": 4, "disabled": 1, "error": 0}
+
+    def test_cross_process_resume_carries_prior_generations(self) -> None:
+        # Regression pin for the 27Sep root cause: every CLI resume is a
+        # fresh process whose engine starts at zero, so the pre-fix
+        # max(live - logged, 0) floor silently discarded all prior
+        # generations' audited attempts (25Sep generation: 289 routed
+        # decisions, all success, vanished from the graded stream).
+        runner = _load_runner()
+        raw = {
+            "cycles_completed": 0,
+            "counters": {
+                "success": 0,
+                "disabled": 0,
+                "error": 0,
+                "routed_decisions": 0,
+                "routing_divergence_detected": 0,
+            },
+        }
+        baseline = runner._effective_resume_baseline(
+            raw,
+            logged_cycles=2695,
+            logged_counters={
+                "success": 289,
+                "disabled": 0,
+                "error": 0,
+                "routed_decisions": 289,
+                "routing_divergence_detected": 0,
+            },
+        )
+        assert baseline["cycles_completed"] == 2695
+        assert baseline["counters"]["routed_decisions"] == 289
+        assert baseline["counters"]["success"] == 289
+
+    def test_resume_baseline_keys_superset_of_known_triple(self) -> None:
+        # The carried baseline keeps every logged key (including the
+        # engine-carried F9-C-02 divergence flag) so per-key delta
+        # arithmetic in _sample_live_activity stays well-defined.
+        runner = _load_runner()
+        raw = {"cycles_completed": 0, "counters": {}}
+        baseline = runner._effective_resume_baseline(
+            raw,
+            logged_cycles=5,
+            logged_counters={
+                "success": 1,
+                "disabled": 2,
+                "error": 3,
+                "routing_divergence_detected": 0,
+            },
+        )
+        assert set(baseline["counters"]) == {
+            "success",
+            "disabled",
+            "error",
+            "routing_divergence_detected",
+        }
 
     @staticmethod
     def _write_log(path: Path, *, dry_run: bool = False, ended: bool = True) -> None:
