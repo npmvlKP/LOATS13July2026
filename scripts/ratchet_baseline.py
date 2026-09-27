@@ -716,8 +716,20 @@ History (most recent last):
       the PR #90 row truth-up; register header paragraph is a
       modification, no other new files). Tree at ceiling 492 pre-wave
       (492 == 492), so +1 lands AT 493. Ceiling 492->493.
+
+  494. 27Sep2026 night (FR9 risk-matrix re-slice reconciliation): +1 --
+      docs/audit-history/27Sep2026-fr9-riskmatrix-reslice-reconciliation.md
+      (night paste's console block byte-identical to the 20:01 paste's;
+      its one new section, FR9 §13 Risk Matrix, containment-proven 13/13
+      against archive lines 227-243 with every row dispositioned
+      upstream; the wave's one real finding is R-13's fourth occurrence
+      -- Sunday-evening breaker storm 19:38-20:31 IST, 85 OPENED events,
+      3,373 fail-closed refusals, zero decisions, self-healed; register
+      header + R-13 row + R-13 section are modifications, no other new
+      files). Tree at ceiling 493 pre-wave (493 == 493), so +1 lands AT
+      494. Ceiling 493->494.
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 493
+TRACKED_FILE_CEILING = 494
