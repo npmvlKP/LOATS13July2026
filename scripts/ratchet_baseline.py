@@ -688,8 +688,19 @@ History (most recent last):
       consoles at the CI-exact scope; register paragraph is a
       modification, not an addition). Tree at ceiling 489 pre-wave
       (489 == 489), so +1 lands AT 490. Ceiling 489->490.
+
+  491. 27Sep2026 (paste reconciliation, OpenAlgo rollover/rebuild
+      window): +1 -- docs/audit-history/
+      27Sep2026-openalgo-rollover-rebuild-breaker-window.md (records-only
+      docs wave; every pasted failure reconciled host-layer/transient/
+      stale at HEAD 10d410f, and the LOATS-side breaker storm the paste
+      did not contain is pinned as first-occurrence R-13 P3-watch;
+      register header paragraph + R-13 row + R-13 section are
+      modifications/additions within tracked files, no other new
+      files). Tree at ceiling 490 pre-wave (490 == 490), so +1 lands
+      AT 491. Ceiling 490->491.
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 490
+TRACKED_FILE_CEILING = 491
