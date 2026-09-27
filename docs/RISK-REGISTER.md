@@ -280,6 +280,18 @@ the PR #90 row truth-up (register-internal row/section contradiction).
 Record:
 `docs/audit-history/27Sep2026-fr9-sections-reslice-reconciliation.md`.
 Snapshot: HEAD `ea6f78f` (PR #90 merged 2026-09-27).
+Updated 2026-09-27 (night, FR9 §13 risk-matrix re-slice reconciliation):
+the paste's §13 Risk Matrix proven a verbatim re-slice of the archived
+15Sep FR9 report — 13/13 rows containment-true against archive lines
+227-243 — and every row dispositioned upstream (F9-M-02 contradicted
+live by the protection GET at this HEAD: approving=1, dismiss_stale,
+enforce_admins, strict, 10 contexts). The wave's one real finding: R-13's
+FOURTH occurrence — a Sunday-evening storm 19:38-20:31 IST
+(14:08:49-15:00:50Z), 85 OPENED events (17 cycles x 5 breakers), 3,373
+fail-closed refusals, zero decisions, zero P5 residue, self-healed; the
+19:55 host console restart in the paste landed MID-STORM. Record:
+`docs/audit-history/27Sep2026-fr9-riskmatrix-reslice-reconciliation.md`.
+Snapshot: HEAD `a2991c2` (PR #91 merged 2026-09-27).
 
 | ID | Priority | Category | Status | Due | Next action |
 |----|----------|----------|--------|-----|-------------|
@@ -295,7 +307,7 @@ Snapshot: HEAD `ea6f78f` (PR #90 merged 2026-09-27).
 | R-10 | P2-fixed | Benchmark gate false-green: sample success rate ungraded; focused signal fixture rejected at insert | CLOSED by `fix/perf-gate-success-rate` | — | Found by the post-merge verification run at `879015c`: the F9-L-03 guard rejected 100/100 `signal_round_trip` samples (fixture lacked the `test` provenance tag) while the gate graded green off the exceptions' durations. Fixed: `validate_cmp_latency_gates` now grades the sample success rate (incl. the stage-gate composition) fail-closed, and the fixture carries `metadata["test"]`; pinned in `tests/test_performance_analyzer.py::TestSuccessRateGate` |
 | R-11 | P2-fixed | Stage gates graded a single-sample population (n=1 TA spike graded 26Sep 9/10 PARTIAL; same class 09/17/20Sep) | CLOSED by `fix/benchmark-stage-samples` | — | Under-sampled STAGE gates fail closed (`insufficient_samples`); round-trip harness discards one warm-up call and measures 5 samples/stage, medians reported; pinned in `tests/test_performance_analyzer.py::TestStageGateSamplePopulation` |
 | R-12 | P3-watch | P5 decisional-leg evidence: the graded stream read zero routed attempts because every cross-process resume DISCARDED prior generations' counters (`max(live−logged,0)` floor in the supervisor resume path); the span's true population is 395 audited attempts (106 on 24Sep + 289 on 25Sep), DB-corroborated | OPEN — instrument defect root-caused and fixed (`fix/p5-resume-counter-carry`); span disposition rides 30Sep | 2026-10-08 | Earliest valid span close 08Oct 08:02Z: an attempt must be carried or fired before `ended_at`, else the run grades FAIL-closed on the decisional criterion by design. The "candidates rejected every time" reading was one-sided: the same 25Sep log window holds 110 rejections AND 289 routed successes (all `success` outcomes, statuses PENDING in `trade_decisions`). 30Sep options: seed-carry the corroborated totals into the graded stream (supervisor provenance event) vs successor span vs record the FAIL-closed evidence. Evidence: `27Sep2026-p5-resume-counter-carry-reconciliation.md` |
-| R-13 | P3-watch | Host maintenance/absence windows drove LOATS's breaker storms (documented: 27Sep 06:46-06:58 IST, global OPEN, 351 refusals, 35 per-source cycles, 102 fallback-expiry 404s); fail-closed held, zero decisions, self-healed | OPEN — watch; hardening decision rides the 30Sep ops window | 2026-09-30 | Decide at the ops window alongside R-08: rollover-window synthetic-cycle grace vs rebuild-aware readiness probe vs accept-as-designed (fail-closed evidence stands). NOT single-occurrence: the same fail-closed storm signature preceded the documented Sunday window at least twice — Fri 25Sep ~10:56-14:12 IST (host-absent, ~14.8k breaker-open refusals across two rotated logs) and Sat 26Sep 06:30-08:30 IST (rollover, ~4.3k) — every occurrence fail-closed, self-healed. ADR-0016 freeze binds. Evidence: `27Sep2026-p5-resume-counter-carry-reconciliation.md` §3 |
+| R-13 | P3-watch | Host maintenance/absence windows drove LOATS's breaker storms — FOUR occurrences 25-27Sep, every one fail-closed and self-healed: Fri 25Sep ~10:56-14:12 IST (host-absent, ~14.8k breaker-open refusals across two rotated logs); Sat 26Sep 06:30-08:30 IST (rollover, ~4.3k); Sun 27Sep morning 06:46-06:58 IST (documented window: global OPEN, 351 refusals, 35 per-source cycles, 102 fallback-expiry 404s); Sun 27Sep EVENING 19:38-20:31 IST (85 OPENED events = 17 cycles x 5 breakers, 3,373 refusals, ZERO 404s — expiry-cache state differed, noise profile is not fixed; the 19:55 host restart landed mid-storm) | OPEN — watch; hardening decision rides the 30Sep ops window | 2026-09-30 | Decide at the ops window alongside R-08: rollover-window synthetic-cycle grace vs rebuild-aware readiness probe vs accept-as-designed (fail-closed evidence stands, now four occurrences). ADR-0016 freeze binds. Evidence: `27Sep2026-p5-resume-counter-carry-reconciliation.md` §3, `27Sep2026-fr9-riskmatrix-reslice-reconciliation.md` §4 |
 
 ---
 
@@ -533,12 +545,13 @@ merged), branch `fix/benchmark-stage-samples`.
 ## R-13 [P3-watch] Host rollover/rebuild windows drove LOATS's breaker storms (recurring)
 
 Category: ops resilience / host-coupling watch. Status: OPEN — watch
-item, RECURRING signature (three occurrences 25-27Sep), every
+item, RECURRING signature (four occurrences 25-27Sep), every
 occurrence fail-closed and self-healed; hardening decision rides the
 2026-09-30 ops window (ADR-0016 mid-span freeze binds until the
 checkpoint). Confidence: Certain (log forensics at HEAD `10d410f` for
 the documented Sunday window; PR #90 rotated-log forensics for the
-Fri/Sat predecessors).
+Fri/Sat predecessors; night-wave log forensics at HEAD `a2991c2` for
+the Sunday-evening occurrence).
 
 Evidence (2026-09-27, all times UTC in `logs/loats.log`; IST = Z+5:30):
 the OpenAlgo host performed its daily session rollover at 06:46:04 IST
@@ -576,13 +589,23 @@ operating correctly through a host maintenance window, not a defect.
 
 Why watch, not close: RECURRING, not single-occurrence — the same
 fail-closed storm signature preceded the documented Sunday window at
-least twice: Fri 25Sep ~10:56-14:12 IST (host-absent window; ~14.8k
-`Circuit breaker 'openalgo' is open` cycle errors across
-`logs/loats.log.5` + `.log.4`, plus ~4.8k no-historical-data) and Sat
+least three times: Fri 25Sep ~10:56-14:12 IST (host-absent window;
+~14.8k `Circuit breaker 'openalgo' is open` cycle errors across
+`logs/loats.log.5` + `.log.4`, plus ~4.8k no-historical-data), Sat
 26Sep 06:30-08:30 IST (the daily ~06:30 IST rollover; 326 + 2234 +
-2045 errors across the 22Z-02Z buckets of `logs/loats.log.2`). Every
-occurrence: fail-closed held, zero decisions, self-healed, zero audit
-residue. The 404 burst is
+2045 errors across the 22Z-02Z buckets of `logs/loats.log.2`), and
+Sun 27Sep EVENING 19:38-20:31 IST (14:08:49-15:00:50Z; 85 OPENED
+events = 17 full cycles x 5 breakers, 3,373 fail-closed refusals,
+ZERO fallback-expiry 404s — unlike the morning window's 102: the
+expiry-cache state differed, so the storm's noise profile is not
+fixed; the 19:55 IST host restart visible in the night console paste
+landed MID-STORM, ~17 minutes after onset — consequence/recovery
+attempt, not cause; positive control: the sentiment source served
+5,767/5,767 calls with zero rejections through the window, its
+cache-only path immune by design; P5 snapshot at 23:24 IST:
+`unhandled_exceptions: 0`, zero routing decisions in the window).
+Every occurrence: fail-closed held, zero decisions, self-healed,
+zero audit residue. The 404 burst is
 loud-but-expected synthetic-cycle noise that a production operator
 would need to triage against real incidents. Hardening candidates
 (30Sep, alongside R-08): (a) rollover-window synthetic-cycle grace —
@@ -594,6 +617,9 @@ hint; (c) accept-as-designed — the fail-closed evidence (this record)
 stands, no change. Decision owner: the 30Sep ops-review window.
 Incident record: `docs/audit-history/27Sep2026-openalgo-rollover-
 rebuild-breaker-window.md`; recurrence forensics:
-`27Sep2026-p5-resume-counter-carry-reconciliation.md` §3. Snapshot:
-HEAD `10d410f` (PR #88 merged 2026-09-26), CI run `36263835750` green;
-row truth-up PR #90 (`2990240`), section sync this wave.
+`27Sep2026-p5-resume-counter-carry-reconciliation.md` §3 and
+`27Sep2026-fr9-riskmatrix-reslice-reconciliation.md` §4. Section
+snapshots: HEAD `10d410f` (PR #88 merged 2026-09-26), CI run
+`36263835750` green; row truth-up PR #90 (`2990240`); section sync PR
+#91 wave; evening occurrence truth-up at HEAD `a2991c2` (PR #91
+merged 2026-09-27).
