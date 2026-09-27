@@ -233,6 +233,32 @@ read-back — first watch with NO dismiss_stale derive-gap repair needed.
 Full verdict table: `26Sep2026-console-probe-paste-reconciliation.md`.
 Snapshot: HEAD `d486f75` (PR #87 merged 2026-09-26), CI run
 `36257907490` green.
+Updated 2026-09-27 (paste reconciliation, rollover/rebuild window): the
+morning paste (OpenAlgo host console, 06:46-06:48 IST) reconciled live
+at HEAD `10d410f` — every pasted failure is host-layer, transient, or
+stale: the 06:46 auth errors are the designed daily-rollover gap
+(self-detected via the empty-funds probe, fresh broker login
+06:47:13), the NSE_INDEX token errors fall strictly inside the
+master-contract rebuild window (Symtoken deleted 06:47:17, 109,485-row
+bulk insert completed 06:47:47, cache loaded 06:47:54 — zero
+occurrences in the stream after), and the paste's
+Performance/Scalability/Reliability sections are verbatim re-slices of
+the 15Sep FR9 report with all four "Open" findings closed upstream
+(F9-C-01/S-02 RESTORED, F9-C-02/S-05 SUPERSEDED, F9-M-01/S-13
+RESTORED, F9-H-03 closed 20Sep). New LOATS-side observation the paste
+did NOT contain: the same window drove LOATS's FIRST breaker storm
+(24-26Sep greps: zero occurrences) — global breaker OPEN 01:16:44Z on
+the rollover auth gap, 351 fail-closed quote refusals, 35 per-source
+OPENED cycles, and 102 guaranteed-404 strikes fetches while the
+fallback-expiry hint (`openalgo.py:250-262`, today+7d) emitted a
+Sunday expiry (04OCT26) because `/expiry` could not resolve through
+the window. Fail-closed worked as designed: zero decisions, zero
+fabricated data, P5 span unharmed (`unhandled_exceptions` 0), full
+recovery by 01:28:40Z. Opened as R-13 (P3-watch); hardening rides the
+30Sep ops window (ADR-0016 freeze binds). Record:
+`docs/audit-history/27Sep2026-openalgo-rollover-rebuild-breaker-window.md`.
+Snapshot: HEAD `10d410f` (PR #88 merged 2026-09-26), CI run
+`36263835750` green.
 
 | ID | Priority | Category | Status | Due | Next action |
 |----|----------|----------|--------|-----|-------------|
@@ -248,6 +274,7 @@ Snapshot: HEAD `d486f75` (PR #87 merged 2026-09-26), CI run
 | R-10 | P2-fixed | Benchmark gate false-green: sample success rate ungraded; focused signal fixture rejected at insert | CLOSED by `fix/perf-gate-success-rate` | — | Found by the post-merge verification run at `879015c`: the F9-L-03 guard rejected 100/100 `signal_round_trip` samples (fixture lacked the `test` provenance tag) while the gate graded green off the exceptions' durations. Fixed: `validate_cmp_latency_gates` now grades the sample success rate (incl. the stage-gate composition) fail-closed, and the fixture carries `metadata["test"]`; pinned in `tests/test_performance_analyzer.py::TestSuccessRateGate` |
 | R-11 | P2-fixed | Stage gates graded a single-sample population (n=1 TA spike graded 26Sep 9/10 PARTIAL; same class 09/17/20Sep) | CLOSED by `fix/benchmark-stage-samples` | — | Under-sampled STAGE gates fail closed (`insufficient_samples`); round-trip harness discards one warm-up call and measures 5 samples/stage, medians reported; pinned in `tests/test_performance_analyzer.py::TestStageGateSamplePopulation` |
 | R-12 | P3-watch | P5 decisional-leg accumulation: zero routed attempts through two full trading sessions (span 24Sep→) | OPEN — accumulation deficit, not a code defect | 2026-10-08 | Earliest valid span close 08Oct 08:02Z: an attempt must fire before `ended_at`, else the run grades FAIL-closed on the decisional criterion by design. 30Sep options: record the FAIL-closed evidence (safety-path span) or schedule a successor span after a CMP review of the strength/gating parameters that rejected every candidate (24Sep 770+307, 25Sep 102+8). Evidence: `26Sep2026-paste-reconciliation-F9L-block.md` §3 |
+| R-13 | P3-watch | Host rollover/rebuild window drove LOATS's first breaker storm (27Sep 06:46-06:58 IST: global OPEN, 351 refusals, 35 per-source cycles, 102 fallback-expiry 404s); fail-closed held, zero decisions, self-healed | OPEN — watch; hardening decision rides the 30Sep ops window | 2026-09-30 | Decide at the ops window alongside R-08: rollover-window synthetic-cycle grace vs rebuild-aware readiness probe vs accept-as-designed (fail-closed evidence stands). Single occurrence; ADR-0016 freeze binds. Evidence: `27Sep2026-openalgo-rollover-rebuild-breaker-window.md` §2 |
 
 ---
 
@@ -481,3 +508,61 @@ subprocess probe), and `test_generate_summary_marks_under_sampled_
 stage_benchmark`. ADR-0016 budgets untouched; no behavior change
 outside the gate/summary path. Snapshot: HEAD `36212f0` (PR #83
 merged), branch `fix/benchmark-stage-samples`.
+
+## R-13 [P3-watch] Host rollover/rebuild window drove LOATS's first breaker storm
+
+Category: ops resilience / host-coupling watch. Status: OPEN — watch
+item, single occurrence, self-healed; hardening decision rides the
+2026-09-30 ops window (ADR-0016 mid-span freeze binds until the
+checkpoint). Confidence: Certain (log forensics at HEAD `10d410f`,
+identical greps over 24-26Sep returning zero, source-verified fallback
+chain).
+
+Evidence (2026-09-27, all times UTC in `logs/loats.log`; IST = Z+5:30):
+the OpenAlgo host performed its daily session rollover at 06:46:04 IST
+(stored broker session stale, quotes/margin auth failures) and its daily
+master-contract rebuild at 06:47:13-06:47:54 IST (Symtoken table
+deleted 06:47:17, 109,485-row bulk insert completed 06:47:47, memory
+cache loaded 06:47:54). During the combined window LOATS experienced:
+
+- 01:16:44Z first error; global breaker `openalgo` OPEN — tripped by
+  the rollover auth gap BEFORE the host's 06:47:13 fresh login;
+- 351 `Failed to get quotes: global circuit breaker open` refusals
+  (01:16:45-01:21:16Z) — the fail-closed design refusing every
+  market-data fetch while the broker token was invalid;
+- 35 per-source breaker OPENED events (ta, volatility, price_action,
+  options_flow) cycling OPEN -> HALF_OPEN -> CLOSED as the instrument
+  registry emptied and refilled;
+- 102 `404 No strikes found for NIFTY expiring 04OCT26` errors
+  (01:18:59-01:27:18Z): with `/expiry` unresolvable through the
+  window, the computed fallback hint `_option_chain_expiry_date(7)`
+  (`openalgo.py:250-262`; fallback selection `:301-309`) emitted
+  2026-09-27+7d = 04OCT26 — a Sunday, not a listed NIFTY weekly
+  (real expiry Tue 29Sep) — a guaranteed 404 per chain fetch from the
+  breaker-guarded orchestrator leg (`orchestrator.py:378-411`). The
+  404 tail persisted ~9 minutes past rebuild completion because every
+  failed `/expiry` kept re-emitting the hint until the global breaker
+  closed; the resolved-expiry cache (`openalgo.py:1195-1200`) stores
+  on success only, by design.
+
+Outcome: full recovery — final `CLOSED after recovery` 01:28:40Z, ZERO
+breaker events after 01:29Z; the decisional funnel produced zero
+outcomes (grep-verified), no fabricated data entered any store, and
+the live P5 span carries no residue (`unhandled_exceptions: 0`,
+1494 cycles at probe time). This is the designed fail-closed behavior
+operating correctly through a host maintenance window, not a defect.
+
+Why watch, not close: first occurrence of the interleaving (zero
+occurrences 24-26Sep for all three signatures), and the 404 burst is
+loud-but-expected synthetic-cycle noise that a production operator
+would need to triage against real incidents. Hardening candidates
+(30Sep, alongside R-08): (a) rollover-window synthetic-cycle grace —
+suppress/skip scheduler cycles across the known daily rollover +
+rebuild window instead of cycling into a closed breaker; (b)
+rebuild-aware readiness probe — gate chain fetches on a host
+instrument-registry readiness signal instead of burning the fallback
+hint; (c) accept-as-designed — the fail-closed evidence (this record)
+stands, no change. Decision owner: the 30Sep ops-review window.
+Incident record: `docs/audit-history/27Sep2026-openalgo-rollover-
+rebuild-breaker-window.md`. Snapshot: HEAD `10d410f` (PR #88 merged
+2026-09-26), CI run `36263835750` green.
