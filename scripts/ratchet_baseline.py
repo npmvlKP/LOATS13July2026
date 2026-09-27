@@ -706,8 +706,18 @@ History (most recent last):
       semantics; R-12/R-13 register truth-ups are row modifications, no
       other new files). Tree at ceiling 491 pre-wave (491 == 491), so +1
       lands AT 492. Ceiling 491->492.
+
+  493. 27Sep2026 (FR9-sections re-slice reconciliation): +1 --
+      docs/audit-history/27Sep2026-fr9-sections-reslice-reconciliation.md
+      (evening paste proven a verbatim re-slice of the 15Sep FR9 report's
+      sections 9-12, containment-proven 8/8 against the archive; every
+      pasted finding already dispositioned upstream -- verdict table in
+      the record; the wave's one real fix is the R-13 section synced to
+      the PR #90 row truth-up; register header paragraph is a
+      modification, no other new files). Tree at ceiling 492 pre-wave
+      (492 == 492), so +1 lands AT 493. Ceiling 492->493.
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 492
+TRACKED_FILE_CEILING = 493

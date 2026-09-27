@@ -259,6 +259,27 @@ recovery by 01:28:40Z. Opened as R-13 (P3-watch); hardening rides the
 `docs/audit-history/27Sep2026-openalgo-rollover-rebuild-breaker-window.md`.
 Snapshot: HEAD `10d410f` (PR #88 merged 2026-09-26), CI run
 `36263835750` green.
+Updated 2026-09-27 (evening, FR9-sections re-slice reconciliation): the
+paste's four review sections (Testing §11, DevOps §12, Maintainability
+§9, Code Quality §10) were proven a verbatim re-slice of the archived
+15Sep FR9 report — containment 8/8 against
+`15Sep2026-FR9-forensic-review-report.md` — and every pasted finding is
+already dispositioned upstream: F9-C-01/S-02 RESTORED
+(`insufficient_history` live at `rules.py:513`), F9-C-02/S-05 closed
+(routing-guard + kill-switch span-proof nets, INVALID-EVIDENCE archive),
+F9-M-05 strike band implemented + 28-pin net, F9-H-03 liveness
+remediated 17/20Sep, benchmark-perf gate present at `ci.yml:365`
+(advisory per ADR-0016), F9-M-02 closed 24Sep, F9-H-01/S-03 conformance
+pins live, F9-L-05 closed by ADR-0019. The §10 figures (1841 tests /
+88.93 % / mypy 38 files) are the 15Sep session's numbers: session suite
+at this HEAD is 2290 passed / 1 skipped (the by-design cov-lock guard
+skip; the vollib optional-parity skip did not fire — module present in
+the shared venv), branch coverage 89.49 % (7298/8001), mypy strict
+clean on 40 files. The wave's one real fix: the R-13 section synced to
+the PR #90 row truth-up (register-internal row/section contradiction).
+Record:
+`docs/audit-history/27Sep2026-fr9-sections-reslice-reconciliation.md`.
+Snapshot: HEAD `ea6f78f` (PR #90 merged 2026-09-27).
 
 | ID | Priority | Category | Status | Due | Next action |
 |----|----------|----------|--------|-----|-------------|
@@ -509,14 +530,15 @@ stage_benchmark`. ADR-0016 budgets untouched; no behavior change
 outside the gate/summary path. Snapshot: HEAD `36212f0` (PR #83
 merged), branch `fix/benchmark-stage-samples`.
 
-## R-13 [P3-watch] Host rollover/rebuild window drove LOATS's first breaker storm
+## R-13 [P3-watch] Host rollover/rebuild windows drove LOATS's breaker storms (recurring)
 
 Category: ops resilience / host-coupling watch. Status: OPEN — watch
-item, single occurrence, self-healed; hardening decision rides the
+item, RECURRING signature (three occurrences 25-27Sep), every
+occurrence fail-closed and self-healed; hardening decision rides the
 2026-09-30 ops window (ADR-0016 mid-span freeze binds until the
-checkpoint). Confidence: Certain (log forensics at HEAD `10d410f`,
-identical greps over 24-26Sep returning zero, source-verified fallback
-chain).
+checkpoint). Confidence: Certain (log forensics at HEAD `10d410f` for
+the documented Sunday window; PR #90 rotated-log forensics for the
+Fri/Sat predecessors).
 
 Evidence (2026-09-27, all times UTC in `logs/loats.log`; IST = Z+5:30):
 the OpenAlgo host performed its daily session rollover at 06:46:04 IST
@@ -552,8 +574,15 @@ the live P5 span carries no residue (`unhandled_exceptions: 0`,
 1494 cycles at probe time). This is the designed fail-closed behavior
 operating correctly through a host maintenance window, not a defect.
 
-Why watch, not close: first occurrence of the interleaving (zero
-occurrences 24-26Sep for all three signatures), and the 404 burst is
+Why watch, not close: RECURRING, not single-occurrence — the same
+fail-closed storm signature preceded the documented Sunday window at
+least twice: Fri 25Sep ~10:56-14:12 IST (host-absent window; ~14.8k
+`Circuit breaker 'openalgo' is open` cycle errors across
+`logs/loats.log.5` + `.log.4`, plus ~4.8k no-historical-data) and Sat
+26Sep 06:30-08:30 IST (the daily ~06:30 IST rollover; 326 + 2234 +
+2045 errors across the 22Z-02Z buckets of `logs/loats.log.2`). Every
+occurrence: fail-closed held, zero decisions, self-healed, zero audit
+residue. The 404 burst is
 loud-but-expected synthetic-cycle noise that a production operator
 would need to triage against real incidents. Hardening candidates
 (30Sep, alongside R-08): (a) rollover-window synthetic-cycle grace —
@@ -564,5 +593,7 @@ instrument-registry readiness signal instead of burning the fallback
 hint; (c) accept-as-designed — the fail-closed evidence (this record)
 stands, no change. Decision owner: the 30Sep ops-review window.
 Incident record: `docs/audit-history/27Sep2026-openalgo-rollover-
-rebuild-breaker-window.md`. Snapshot: HEAD `10d410f` (PR #88 merged
-2026-09-26), CI run `36263835750` green.
+rebuild-breaker-window.md`; recurrence forensics:
+`27Sep2026-p5-resume-counter-carry-reconciliation.md` §3. Snapshot:
+HEAD `10d410f` (PR #88 merged 2026-09-26), CI run `36263835750` green;
+row truth-up PR #90 (`2990240`), section sync this wave.
