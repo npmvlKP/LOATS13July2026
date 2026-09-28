@@ -7,8 +7,10 @@ report, the pasted §13 risk block, the pasted "Prioritized remaining
 risks" list, and a fresh failure tail (`gh pr create ... --body-file
 <file>` dying in PowerShell 5.1). Reconciliation HEAD: `4201a02` (PR #92
 merged 2026-09-27T18:29:48Z, merge commit `4201a0200bdc`; post-merge
-main Pipeline run `36341230913` = success). This is the ninth tracked
-stale-paste reconciliation record since 26Sep and the ninth member of
+main Pipeline run `36341230913` = success). This is the eighth tracked
+stale-paste reconciliation record since 26Sep (ERRATUM 28Sep: the
+merged revision over-stated this as "ninth" — seven records preceded
+this one, three on 26Sep and four on 27Sep) and the ninth member of
 the 27Sep paste family.
 
 ## 1. Re-slice proof — verbatim, not a fresh audit
@@ -53,7 +55,7 @@ the 27Sep paste family.
 | "Security workflow present (weekly; results uninspected — carried)" | Carried item closed: `security.yml` runs inspected green by the FR9 Wave 4 reconciliation (register, 23Sep; broker-side idempotency stays carried by design) | STALE — carried item closed 23Sep |
 | "Metrics :8001 wired with cycle/chain counters" | Era-neutral fact; unchanged — no action | TRUE, no action |
 | "Docker: multi-stage, non-root, no dev extras" | Era-neutral fact; unchanged — no action | TRUE, no action |
-| "branch protection (F9-M-02)" absent | CONTRADICTED LIVE at this reconciliation: GraphQL `branchProtectionRule` read-back — pattern `main`, `isAdminEnforced: true`, `requiredApprovingReviewCount: 1`, `dismissesStaleReviews: true`, the 10 required contexts (isort, flake8, bandit, deps-sync, ruff-lint, ruff-format, commit-lint, mypy, pytest-coverage, pip-audit); `GET /branches/main` → `protected: true`. Ninth consecutive clean field-by-field read-back | STALE — contradicted live |
+| "branch protection (F9-M-02)" absent | CONTRADICTED LIVE at this reconciliation: GraphQL `branchProtectionRule` read-back — pattern `main`, `isAdminEnforced: true`, `requiredApprovingReviewCount: 1`, `dismissesStaleReviews: true`, the 10 required contexts (isort, flake8, bandit, deps-sync, ruff-lint, ruff-format, commit-lint, mypy, pytest-coverage, pip-audit); `GET /branches/main` → `protected: true`. Clean field-by-field read-back on BOTH surfaces pre-merge and post-restore (ERRATUM 28Sep: the merged revision's "ninth consecutive" ordinal was unverifiable and is retracted; no per-wave ordinal ledger exists) | STALE — contradicted live |
 | "this report is an untracked root artifact (relocate to docs/audit-history/ before release)" | The relocation the section demanded HAPPENED: `15Sep2026-FR9-forensic-review-report.md` lives in `docs/audit-history/` — the document being re-sliced is the archived copy | STALE — already satisfied |
 
 No pasted claim survives as an open work item.
@@ -117,3 +119,41 @@ R-07 riders, R-05 shared-venv rebuild 01Oct, and the mid-run Telegram
 kill-switch re-verify at the window. The archive-first containment
 probe + consecutive-paste diff remains the cheapest first check for the
 next family member.
+
+## 7. Post-merge addendum (28Sep) — advisory benchmark flake on the main run; errata
+
+- Post-merge main run `36363406997` attempt 1: conclusion `failure`,
+  ALL 10 required contexts `success` — the merge was legal under
+  protection; the sole failing job was `benchmark-perf
+  (F9-H-02 prerequisite, advisory)`, fail-closed BY DESIGN (ADR-0016)
+  on verdict `PARTIAL (9/10 latency-gate checks passing)`.
+- Failing check (artifact `performance_benchmark_20260928_004630.json`):
+  `cmp_validation.db_operations` — the ANALYZE round-trip DB stage,
+  5 samples, P1 threshold 0.02 s, actual p95 0.0641 s, pass-rate 0.6
+  (stage budget 0.02 s). The same stage's P5 check (threshold 0.1 s,
+  p99 0.0689 s) PASSED, as did all 9 other checks. A 64 ms p95 on a
+  5-sample percentile against a 20 ms budget is shared-runner latency
+  jitter, not a code path change: the wave is docs-only, and the
+  IDENTICAL commit passed the same gate on PR #93's own run ~30
+  minutes earlier.
+- First-occurrence proof: every visible prior main-Pipeline run
+  (`36341230913` back through `36079281988`, PR #73 era) is `success`
+  — zero benchmark failures in main history before this one.
+- Retry proof: `rerun-failed-jobs` attempt 2 on the same commit →
+  `conclusion: success`. Flake class: environment-side, self-clearing,
+  advisory-only. Runner image floats (ubuntu-24.04, image release
+  20260920.314.1 at the failing attempt).
+- Suite identity at the merge HEAD `6515afb`: 2,292 passed / 0
+  skipped, rc=0 single-process bare run (the two
+  environment-conditional by-design skips did not fire: no parent
+  coverage run holds the cov-lock guard's lock; vollib present in the
+  shared venv).
+- R-01 input (30Sep): promoting `benchmark-perf` to REQUIRED as-is
+  converts this flake class into a merge-blocker. Promotion must first
+  harden the db stage's sample basis (sample count and/or percentile
+  basis vs the 20 ms budget) — record the decision dependency in the
+  30Sep checkpoint.
+- Errata against the merged revision of this record: the lineage
+  count is corrected to eighth in the header, and the unverifiable
+  "ninth consecutive" read-back ordinal is retracted in the F9-M-02
+  row (the clean both-surface read-backs stand).
