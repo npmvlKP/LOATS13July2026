@@ -753,8 +753,19 @@ History (most recent last):
       register header + R-13 row + R-13 section are modifications, no
       other new files). Tree at ceiling 495 pre-wave (495 == 495), so +1
       lands AT 496. Ceiling 495->496.
+  497. 28Sep2026 (FR9 production-readiness re-slice reconciliation): +1 --
+      docs/audit-history/
+      28Sep2026-fr9-prodreadiness-reslice-reconciliation.md (eleventh
+      paste-family member; §15 Production Readiness Assessment
+      containment-proven 14/14 against archive lines 255-271 -- first
+      per-claim verdicts for that section, every gate row STALE or
+      contradicted live at HEAD 422b022; §14 repeat collapses under the
+      debt-matrix record; no new findings, no code changes; register
+      header paragraph is a modification, no other new files). Tree at
+      ceiling 496 pre-wave (496 == 496), so +1 lands AT 497. Ceiling
+      496->497.
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 496
+TRACKED_FILE_CEILING = 497
