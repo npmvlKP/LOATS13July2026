@@ -325,6 +325,21 @@ passed), rerun-failed-jobs attempt 2 `success` on the same commit —
 shared-runner latency jitter, not a regression; R-01 promotion of
 benchmark-perf to required requires hardening the stage's sample basis
 first. Record §7.
+Updated 2026-09-28 morning (FR9 debt-matrix re-slice reconciliation):
+the paste presented the OpenAlgo host console (06:42-06:44 IST
+rollover/rebuild/login window, attributed host-layer — all five console
+signatures are host-checkout emitters with zero LOATS-tree hits) plus
+the FR9 report's sections 14 + 13, containment-proven 7/7 and 14/14
+against archive lines 227-253; every F9 row already dispositioned
+upstream (F9-H-04's closure re-verified live at the wired call site
+`orchestrator.py:1856-1857`). The wave's one real finding: R-13's
+FIFTH occurrence — 28Sep morning rollover storm 00:43:31-01:14:58Z
+(IST 06:13-06:44), 145 OPENED events = 29 cycles x 5 breakers, 1,233
+fail-closed refusals, ZERO 404s, zero decisions, self-healed exactly
+at the host's 06:44 broker login; recovery forward-scan clean.
+Record:
+`docs/audit-history/28Sep2026-fr9-debtmatrix-reslice-reconciliation.md`.
+Snapshot: HEAD `8384264` (PR #94 merged 2026-09-28).
 
 | ID | Priority | Category | Status | Due | Next action |
 |----|----------|----------|--------|-----|-------------|
@@ -340,7 +355,7 @@ first. Record §7.
 | R-10 | P2-fixed | Benchmark gate false-green: sample success rate ungraded; focused signal fixture rejected at insert | CLOSED by `fix/perf-gate-success-rate` | — | Found by the post-merge verification run at `879015c`: the F9-L-03 guard rejected 100/100 `signal_round_trip` samples (fixture lacked the `test` provenance tag) while the gate graded green off the exceptions' durations. Fixed: `validate_cmp_latency_gates` now grades the sample success rate (incl. the stage-gate composition) fail-closed, and the fixture carries `metadata["test"]`; pinned in `tests/test_performance_analyzer.py::TestSuccessRateGate` |
 | R-11 | P2-fixed | Stage gates graded a single-sample population (n=1 TA spike graded 26Sep 9/10 PARTIAL; same class 09/17/20Sep) | CLOSED by `fix/benchmark-stage-samples` | — | Under-sampled STAGE gates fail closed (`insufficient_samples`); round-trip harness discards one warm-up call and measures 5 samples/stage, medians reported; pinned in `tests/test_performance_analyzer.py::TestStageGateSamplePopulation` |
 | R-12 | P3-watch | P5 decisional-leg evidence: the graded stream read zero routed attempts because every cross-process resume DISCARDED prior generations' counters (`max(live−logged,0)` floor in the supervisor resume path); the span's true population is 395 audited attempts (106 on 24Sep + 289 on 25Sep), DB-corroborated | OPEN — instrument defect root-caused and fixed (`fix/p5-resume-counter-carry`); span disposition rides 30Sep | 2026-10-08 | Earliest valid span close 08Oct 08:02Z: an attempt must be carried or fired before `ended_at`, else the run grades FAIL-closed on the decisional criterion by design. The "candidates rejected every time" reading was one-sided: the same 25Sep log window holds 110 rejections AND 289 routed successes (all `success` outcomes, statuses PENDING in `trade_decisions`). 30Sep options: seed-carry the corroborated totals into the graded stream (supervisor provenance event) vs successor span vs record the FAIL-closed evidence. Evidence: `27Sep2026-p5-resume-counter-carry-reconciliation.md` |
-| R-13 | P3-watch | Host maintenance/absence windows drove LOATS's breaker storms — FOUR occurrences 25-27Sep, every one fail-closed and self-healed: Fri 25Sep ~10:56-14:12 IST (host-absent, ~14.8k breaker-open refusals across two rotated logs); Sat 26Sep 06:30-08:30 IST (rollover, ~4.3k); Sun 27Sep morning 06:46-06:58 IST (documented window: global OPEN, 351 refusals, 35 per-source cycles, 102 fallback-expiry 404s); Sun 27Sep EVENING 19:38-20:31 IST (85 OPENED events = 17 cycles x 5 breakers, 3,373 refusals, ZERO 404s — expiry-cache state differed, noise profile is not fixed; the 19:55 host restart landed mid-storm) | OPEN — watch; hardening decision rides the 30Sep ops window | 2026-09-30 | Decide at the ops window alongside R-08: rollover-window synthetic-cycle grace vs rebuild-aware readiness probe vs accept-as-designed (fail-closed evidence stands, now four occurrences). ADR-0016 freeze binds. Evidence: `27Sep2026-p5-resume-counter-carry-reconciliation.md` §3, `27Sep2026-fr9-riskmatrix-reslice-reconciliation.md` §4 |
+| R-13 | P3-watch | Host maintenance/absence windows drove LOATS's breaker storms — FIVE occurrences 25-28Sep, every one fail-closed and self-healed: Fri 25Sep ~10:56-14:12 IST (host-absent, ~14.8k breaker-open refusals across two rotated logs); Sat 26Sep 06:30-08:30 IST (rollover, ~4.3k); Sun 27Sep morning 06:46-06:58 IST (documented window: global OPEN, 351 refusals, 35 per-source cycles, 102 fallback-expiry 404s); Sun 27Sep EVENING 19:38-20:31 IST (85 OPENED events = 17 cycles x 5 breakers, 3,373 refusals, ZERO 404s — expiry-cache state differed, noise profile is not fixed; the 19:55 host restart landed mid-storm); Mon 28Sep morning 06:13-06:44 IST (145 OPENED events = 29 cycles x 5 breakers, 1,233 refusals, ZERO 404s, zero decisions, self-healed at the host's 06:44 broker login + master-contract rebuild completion) | OPEN — watch; hardening decision rides the 30Sep ops window | 2026-09-30 | Decide at the ops window alongside R-08: rollover-window synthetic-cycle grace vs rebuild-aware readiness probe vs accept-as-designed (fail-closed evidence stands, now five occurrences). ADR-0016 freeze binds. Evidence: `27Sep2026-p5-resume-counter-carry-reconciliation.md` §3, `27Sep2026-fr9-riskmatrix-reslice-reconciliation.md` §4, `28Sep2026-fr9-debtmatrix-reslice-reconciliation.md` §3 |
 
 ---
 
@@ -656,3 +671,27 @@ snapshots: HEAD `10d410f` (PR #88 merged 2026-09-26), CI run
 `36263835750` green; row truth-up PR #90 (`2990240`); section sync PR
 #91 wave; evening occurrence truth-up at HEAD `a2991c2` (PR #91
 merged 2026-09-27).
+
+Fifth occurrence (2026-09-28 morning, structured-log forensics at HEAD
+`8384264`; json-parse-first scan, all times UTC in `logs/loats.log`,
+IST = Z+5:30): storm span 00:43:31Z->01:14:58Z (IST 06:13-06:44).
+Counts: 145 per-source OPENED events (= 29 full cycles x 5 breakers),
+1,233 `Failed to get quotes: global circuit breaker open` fail-closed
+refusals, 5 CLOSED-after-recovery events (01:14:42-01:14:58Z), ZERO
+fallback-expiry 404s — the 27Sep evening's zero-404 noise class again.
+Decisional funnel: zero decisions in-window (the single probe-pattern
+match, `Enabled Analyzer routing` at 00:43:26Z, is a lifecycle line
+whose LOGGER NAME matched, five seconds before onset). Forward scan
+after the 01:15Z cutoff: zero breaker hits — positive recovery
+evidence. Correlation: onset precedes the paste console's first line
+(06:42:32 IST = 01:12:32Z); recovery aligns exactly with the host's
+06:44:04 IST broker login + master-contract rebuild completion
+(109,485 symbols, console paste). P5 quartet at probe: snapshot mtime
+07:05 IST, `last_sampled_at` 01:35:23Z, `kill_switch_verified: true`,
+`unhandled_exceptions: 0`; `ended_at: null` correct in-progress state.
+The daily-rollover correlation class now holds three mornings running
+(26Sep, 27Sep, 28Sep); hardening decision unchanged, 30Sep ops window
+alongside R-08; ADR-0016 freeze binds. Evidence:
+`28Sep2026-fr9-debtmatrix-reslice-reconciliation.md` §3. Section
+snapshot: HEAD `8384264` (PR #94 merged 2026-09-28; this truth-up
+rides the PR #95 wave).
