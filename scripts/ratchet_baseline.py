@@ -774,8 +774,16 @@ History (most recent last):
       code changes; register header paragraph is a modification, no
       other new files). Tree at ceiling 497 pre-wave (497 == 497), so
       +1 lands AT 498. Ceiling 497->498.
+  499. 28Sep2026 (R-13 sixth-occurrence pin): +1 --
+      docs/audit-history/28Sep2026-r13-sixth-occurrence.md (the
+      mid-session breaker storm record: 06:44:26-06:46:32Z, 5 OPENED
+      events = 1 cycle x 5 breakers, 48 refusals, ~2-min self-heal,
+      first non-rollover occurrence; register header + R-13 row + R-13
+      section are modifications, no other new files). Tree at ceiling
+      498 pre-wave (498 == 498), so +1 lands AT 499. Ceiling
+      498->499.
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 498
+TRACKED_FILE_CEILING = 499
