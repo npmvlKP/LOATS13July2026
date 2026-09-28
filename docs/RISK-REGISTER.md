@@ -874,3 +874,20 @@ PR #56). Containment: STEP-0 3/3, §17 7/8, §16 15/16 — every miss is a
 unre-sliced. Evidence:
 `28Sep2026-fr9-sixteenth-member-collapse-reconciliation.md` §7-8.
 Snapshot: branch state at `bcbc277` + this wave.
+
+Updated 2026-09-28 (night, F9-M-02-R2): the PR #101 relax → merge →
+restore sequence exposed a RESTORE-PUT semantics drift — the server now
+RESETS omitted review flags to false, so the 24Sep/R1-era restore body
+(count-only `required_pull_request_reviews`) silently applied
+`dismiss_stale_reviews:false` (PUT 2xx; caught by the GraphQL read-back,
+not the exit code). Corrected minutes later with an explicit-boolean
+re-PUT; authoritative read-back 10/10 PASS, zero divergences, both
+surfaces agree (`dismissesStaleReviews:true`, count 1,
+admin-enforced, the 10 contexts, strict). Exposure window: minutes,
+inside the merge session, no pushes by any actor; only stale-review
+dismissal was relaxed. Seventh consecutive clean probe at the corrected
+read-back. Standing rule strengthened: restore bodies always carry the
+review flags explicitly; derive keeps snapshot review flags verbatim;
+the read-back — never the PUT exit code — is the contract. Record:
+`28Sep2026-f9m02-restore-put-semantics-drift.md`. Snapshot: HEAD
+`8063380` (PR #101 merged 2026-09-28) + this wave.
