@@ -810,8 +810,20 @@ History (most recent last):
       findings, no code changes; register header paragraph is a
       modification, no other new files). Tree at ceiling 500 pre-wave
       (500 == 500), so +1 lands AT 501. Ceiling 500->501.
+  502. 28Sep2026 (F9-M-02-R2 restore-PUT semantics drift record): +1 --
+      docs/audit-history/28Sep2026-f9m02-restore-put-semantics-drift.md
+      (the PR #101 relax -> merge -> restore window exposed a server-side
+      semantics change: omitted review flags in the branch-protection PUT
+      body now RESET to false, so the count-only restore body silently
+      applied dismiss_stale_reviews:false; caught by the mandatory
+      GraphQL read-back, corrected minutes later with an explicit-boolean
+      re-PUT, post-fix contract diff 10/10 PASS zero divergences; the
+      session skill copy of the protected-main procedure was patched with
+      the explicit-flags rule; register header paragraph is a
+      modification, no other new files). Tree at ceiling 501 pre-wave
+      (501 == 501), so +1 lands AT 502. Ceiling 501->502.
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 501
+TRACKED_FILE_CEILING = 502
