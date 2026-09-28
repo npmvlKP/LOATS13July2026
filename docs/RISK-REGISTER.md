@@ -359,6 +359,26 @@ breaker events, no sixth storm; R-13 stays at five occurrences).
 Record:
 `docs/audit-history/28Sep2026-fr9-prodreadiness-reslice-reconciliation.md`.
 Snapshot: HEAD `422b022` (PR #95 merged 2026-09-28).
+Updated 2026-09-28 (FR9 re-slice family final-member collapse, post-PR-#96
+main): the twelfth family member — router paragraph plus verbatim §15/§14
+repeats, NO new section — collapsed as predicted by the #95 and #96 pool
+arithmetic: containment-proven 12/12 (§15) and 7/7 (§14) against the
+archive; the #96 per-claim §15 verdicts carry over untouched (the code
+state is bit-identical at this HEAD — only docs and the ratchet re-pin
+landed since). Router paragraph verified claim-by-claim: all REGISTERED,
+none new (R-01/S-14/R-13-hardening/R-08/S-15 30Sep, R-05 01Oct, R-12
+08Oct 08:02Z); P5 span live (quartet green, earliest valid close 08Oct
+08:02Z); protection read-back clean on both surfaces — eleventh
+consecutive (the classic REST protection GET 404'd again minutes before
+rendering the full config; the untracked UTF-16 junk capture it left was
+deleted, never staged); R-13 forward scan from the 01:15:58Z recovery
+cutoff clean — 21,750 structured records, zero breaker events, no sixth
+storm, count stays at FIVE. The NOT-READY verdict stands; the unre-sliced
+pool is UNCHANGED (§1-8, §16-21, Appendix) — this member consumed no new
+section. Record:
+`docs/audit-history/28Sep2026-fr9-final-member-collapse-reconciliation.md`.
+Snapshot: HEAD `3732fe7` (PR #96 merged 2026-09-28), post-merge main run
+`36378162598` success.
 
 | ID | Priority | Category | Status | Due | Next action |
 |----|----------|----------|--------|-----|-------------|
