@@ -85,3 +85,61 @@ Unre-sliced pool UNCHANGED by this member: **§1-8, §17-21, Appendix**. A
 further member carrying only §13/§14/§15/§16 repeats collapses whole under
 the #95-#100 chain plus this record. §17-21 remain unre-sliced: a member
 carrying any of them needs fresh per-claim verdicts on arrival.
+
+## 7. Seventeenth member — same-day continuation (28Sep evening)
+
+A further family member arrived 2026-09-28 ~18:15 IST on the user channel:
+the §18 roadmap heading + STEP-0 block (STEP-0 lines 3/3 verbatim after
+normalization; the §18 heading itself is a `##`-scaffold miss against
+source L303), the §17 Dependency Overview table (7/8 — body rows all
+match; heading-only miss on source L292), and the §16 table repeat
+(15/16, heading-only miss on source L273 — the same scaffolding class §4
+recorded). Fresh composition again (no shared text with earlier members).
+Per §6's rule the §17 content required fresh per-claim verdicts on
+arrival — delivered in §8. Pool arithmetic after this member: §17 and
+§18-STEP-0 are consumed by this record; §1-8, §19-21, Appendix and the
+§18 steps beyond STEP-0 remain unre-sliced.
+
+## 8. STEP-0 drill executed live (F9-M-02: sixth consecutive clean) + §17 verdicts
+
+The member's STEP-0 instruction (PUT protection, save response JSON,
+verify GET→200 / direct-push→403) was re-executed as the standing F9-M-02-R1
+drill rather than taken as work to do — the finding itself stays STALE
+(protection live since 24Sep):
+
+1. **Contract diff, field-by-field** (classic REST GET snapshot,
+   18:21 IST): 10/10 PASS, ZERO divergences — the exact 10-context set,
+   `strict:true`, approving count 1, dismiss-stale true, code-owner
+   false, admin-enforced, `restrictions:null`,
+   conversation-resolution false, force-push/deletions denied.
+2. **Enforcement probe:** `git push origin <probe>:refs/heads/main`
+   where the probe is a dangling `git commit-tree` empty commit on
+   `origin/main`'s tree parented on `origin/main` (worktree-free; the
+   only possible landing delta is the probe itself) — rejected by the
+   remote hook: GH006 protected-branch declined, "Changes must be made
+   through a pull request", "10 of 10 required status checks are
+   expected"; `origin/main` byte-identical before/after (`37d9ad7`).
+   The probe commit remains unreferenced.
+3. **Verification-surface state change (recorded for the R1 rule):**
+   ALL THREE surfaces resolved this time — GraphQL `branchProtectionRule`
+   (`isAdminEnforced:true`, approving 1, the 10 contexts,
+   `dismissesStaleReviews:true`), classic REST GET **200** (the 24Sep
+   "persistent 404" and 25Sep GraphQL-absent quirks have HEALED; the
+   25Sep surface-agnostic rule stands: re-probe all before concluding
+   absence), `/branches/main` `protected:true`.
+4. **Evidence retention per R1:** the GET JSON is kept OUT of the tree
+   (session scratch `protection_snapshot_28sep.json`, sha256
+   `27eb7756…d2b656e`) — no tracked artifact added; the wave's ceiling
+   501 stays exact.
+
+§17 per-claim verdicts (live probes 18:15-18:25 IST, HEAD `bcbc277`
+tree):
+
+| §17 row | Claim | Live evidence | Verdict |
+|---|---|---|---|
+| Manifest sync | check_deps_sync PASS (gate-enforced) | `scripts/check_deps_sync.py` in-tree; `deps-sync` required context green at the #100 merge (15 success + 1 by-design skip of 16 check runs) | CONFIRMED |
+| `ta` lib | dropped (ADR-0003, numba rationale) | `docs/adr/0003-drop-ta-dependency.md`; no `ta` pin in `pyproject.toml`; zero `import ta` under `src/`; S-08 SUPERSEDED | CONFIRMED |
+| py_vollib | hand-rolled migration (ADR-0004) alongside, 🟡 | `docs/adr/0004-vollib-handrolled-migration.md`; no vollib pin in manifests, no `py_vollib` import under `src/` (only the UNtracked `egg-info` residue carries it); S-09 SUPERSEDED | CONFIRMED |
+| pip-audit | 0 vulns live | `pip-audit` required context green at the #100 merge; shared-venv ambient caveat unchanged (R-05, due 01Oct) | CONFIRMED |
+| npm artifacts | gone from tree post-purge | `git ls-files` grep: zero package manifests, lockfiles, `node_modules/`, npmrc/yarn/pnpm | CONFIRMED |
+| External integrations | OpenAlgo REST (ANALYZE default), Telegram, 3 RSS feeds, INDIAVIX; 🟡 intake decision F9-M-03 | `settings.py`: `openalgo_mode` Literal ANALYZE/LIVE defaults ANALYZE; `rss_feeds` = exactly 3 (EconomicTimes, Moneycontrol, Livemint; bloombergquint removed); INDIAVIX in settings; telegram in `alerts.py`+settings. The 🟡 is STALE: F9-M-03 resolved 18Sep (ADR-006 Amendment 7 / PR #56; register 25Sep paragraph) | CONFIRMED; 🟡 annotation STALE |

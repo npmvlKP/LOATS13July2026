@@ -847,3 +847,30 @@ Telegram alert fired in-window. P5 residue: none
 in-progress). Evidence: `28Sep2026-r13-sixth-occurrence.md`. Section
 snapshot: HEAD `22b6670` (PR #97 merged 2026-09-28; this truth-up
 rides the next protected-main wave).
+
+Updated 2026-09-28 (evening, seventeenth FR9 paste-family member, branch
+`docs/sep28-s17-sixteenth-collapse`): the member's STEP-0 F9-M-02 block
+was re-executed as the standing R1 drill, not taken as open work —
+protection read back contract-exact with ZERO divergences (field-by-field
+REST-GET diff vs the pinned contract: the exact 10 contexts, strict, 1
+approving review, dismiss-stale, code-owner false, admin-enforced,
+restrictions null, force-push/deletions denied); the enforcement probe
+rejected a worktree-free commit-tree probe pushed at `main` (GH006, "10
+of 10 required status checks are expected"), `origin/main` unchanged
+(`37d9ad7`); and ALL THREE verification surfaces resolved for the first
+time since the 24Sep migration (GraphQL BPR + classic REST GET 200 — the
+24Sep persistent-404 and 25Sep GraphQL-absent quirks have HEALED — +
+`protected:true`). SIXTH consecutive clean since the F9-M-02-R1
+restoration. GET JSON retained out-of-tree per R1 (session scratch,
+sha256 `27eb7756…d2b656e`); ceiling 501 unchanged. §17 per-claim
+verdicts: every row CONFIRMED live (ADR-0003/0004 records present; no
+`ta`/`py_vollib` pins or imports; zero npm artifacts; deps-sync and
+pip-audit required contexts green at the #100 merge; ANALYZE default;
+3-feed RSS list; INDIAVIX; telegram) — the external-integrations 🟡
+annotation is STALE (F9-M-03 resolved 18Sep by ADR-006 Amendment 7 /
+PR #56). Containment: STEP-0 3/3, §17 7/8, §16 15/16 — every miss is a
+`##`-heading scaffold (source L273/292/303). Pool after this member:
+§1-8, §19-21, Appendix and the §18 steps beyond STEP-0 remain
+unre-sliced. Evidence:
+`28Sep2026-fr9-sixteenth-member-collapse-reconciliation.md` §7-8.
+Snapshot: branch state at `bcbc277` + this wave.
