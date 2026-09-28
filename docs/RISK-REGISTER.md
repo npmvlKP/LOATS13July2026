@@ -395,6 +395,28 @@ chain unchanged. Record:
 `docs/audit-history/28Sep2026-r13-sixth-occurrence.md`.
 Snapshot: HEAD `22b6670` (PR #97 merged 2026-09-28), post-merge main
 run `36384520008` success.
+Updated 2026-09-28 (second wave: foreign continuation edit reconciled,
+R-14 pinned): the uncommitted `17Sep2026-p5-openalgo-auth-outage.md`
+Continuation-4/5 sections (edited outside the session at 13:05 IST)
+were claimed by the operator and reconciled by live probes — C4
+anchors verified (289 decisions DB=log for 2026-09-25, recovery
+08:58-08:59Z); C5 observations stand (zero `data/audit.log` rows
+26-28Sep despite a live Monday session, routing quartet green,
+breaker green) but its mechanism was FALSIFIED: all three configured
+RSS feeds fetch in <0.5s from the host (no dead content was ever
+served) and the real cause is untimed newspaper4k article downloads
+(4.3-26.6s each measured live, up to ~60 per cycle) inside the 8.0s
+producer window — once cold-article churn crossed the window at
+02:28:22Z (last persist 07:58:22 IST, scores healthy 0.76-0.80 up to
+the stop), every sweep is cancelled pre-aggregation and the 15-min
+freshness gate starves (368+ min by 14:06 IST, 1,587 alerts, zero
+recovery) while transport counters stay green (breaker 8,009/8,009
+successful; budget-warning median pinned at 8,003-8,009ms = the
+window firing). Opened as R-14 (P2-watch); the fix decision rides the
+30Sep window under the ADR-0016 freeze. Record: erratum appended to
+`docs/audit-history/17Sep2026-p5-openalgo-auth-outage.md` (28Sep).
+Snapshot: HEAD `8c62520` (PR #98 merged 2026-09-28), post-merge main
+run `36393072938` success.
 
 | ID | Priority | Category | Status | Due | Next action |
 |----|----------|----------|--------|-----|-------------|
@@ -411,6 +433,7 @@ run `36384520008` success.
 | R-11 | P2-fixed | Stage gates graded a single-sample population (n=1 TA spike graded 26Sep 9/10 PARTIAL; same class 09/17/20Sep) | CLOSED by `fix/benchmark-stage-samples` | — | Under-sampled STAGE gates fail closed (`insufficient_samples`); round-trip harness discards one warm-up call and measures 5 samples/stage, medians reported; pinned in `tests/test_performance_analyzer.py::TestStageGateSamplePopulation` |
 | R-12 | P3-watch | P5 decisional-leg evidence: the graded stream read zero routed attempts because every cross-process resume DISCARDED prior generations' counters (`max(live−logged,0)` floor in the supervisor resume path); the span's true population is 395 audited attempts (106 on 24Sep + 289 on 25Sep), DB-corroborated | OPEN — instrument defect root-caused and fixed (`fix/p5-resume-counter-carry`); span disposition rides 30Sep | 2026-10-08 | Earliest valid span close 08Oct 08:02Z: an attempt must be carried or fired before `ended_at`, else the run grades FAIL-closed on the decisional criterion by design. The "candidates rejected every time" reading was one-sided: the same 25Sep log window holds 110 rejections AND 289 routed successes (all `success` outcomes, statuses PENDING in `trade_decisions`). 30Sep options: seed-carry the corroborated totals into the graded stream (supervisor provenance event) vs successor span vs record the FAIL-closed evidence. Evidence: `27Sep2026-p5-resume-counter-carry-reconciliation.md` |
 | R-13 | P3-watch | Host maintenance/absence windows drove LOATS's breaker storms — SIX occurrences 25-28Sep, every one fail-closed and self-healed: Fri 25Sep ~10:56-14:12 IST (host-absent, ~14.8k breaker-open refusals across two rotated logs); Sat 26Sep 06:30-08:30 IST (rollover, ~4.3k); Sun 27Sep morning 06:46-06:58 IST (documented window: global OPEN, 351 refusals, 35 per-source cycles, 102 fallback-expiry 404s); Sun 27Sep EVENING 19:38-20:31 IST (85 OPENED events = 17 cycles x 5 breakers, 3,373 refusals, ZERO 404s — expiry-cache state differed, noise profile is not fixed; the 19:55 host restart landed mid-storm); Mon 28Sep morning 06:13-06:44 IST (145 OPENED events = 29 cycles x 5 breakers, 1,233 refusals, ZERO 404s, zero decisions, self-healed at the host's 06:44 broker login + master-contract rebuild completion); Mon 28Sep MIDDAY 12:14 IST (06:44:26-06:46:32Z, mid-session regular hours — first non-rollover occurrence: 5 OPENED events = 1 cycle x 5 breakers, 48 refusals, ZERO 404s, zero decisions, ~2-min self-heal) | OPEN — watch; hardening decision rides the 30Sep ops window | 2026-09-30 | Decide at the ops window alongside R-08: rollover-window synthetic-cycle grace vs rebuild-aware readiness probe vs accept-as-designed (fail-closed evidence stands, now six occurrences — the sixth hit MID-SESSION, so option (a)'s rollover-window grace alone cannot cover the class; see `28Sep2026-r13-sixth-occurrence.md` §6). ADR-0016 freeze binds. Evidence: `27Sep2026-p5-resume-counter-carry-reconciliation.md` §3, `27Sep2026-fr9-riskmatrix-reslice-reconciliation.md` §4, `28Sep2026-fr9-debtmatrix-reslice-reconciliation.md` §3, `28Sep2026-r13-sixth-occurrence.md` |
+| R-14 | P2-watch | Sentiment producer starvation via untimed article downloads: `parse_rss_feed` extracts up to ~60 article pages per sweep with newspaper4k (`Article.download()`, no timeout, sequential) inside the 8.0s producer window; measured live 28Sep: 4.3-5.7s economictimes, 16.6-26.6s moneycontrol, 5.9-19.3s livemint per article. Once cold-article churn pushed sweep cost past the window (28Sep 02:28:22Z = 07:58:22 IST, last persist; scores healthy 0.76-0.80, news_count 55, degraded=0 up to the stop), the window cancelled EVERY sweep — budget-warning median pinned 8,003-8,009ms from 03Z, zero persists thereafter, the 15-min freshness gate starved to 368+ min by 14:06 IST (1,587 alerts, zero recovery), zero audit rows on the day, while transport counters stayed green by design (breaker 8,009/8,009 successful — breakers count only raised exceptions; feeds themselves fetch <0.5s) | OPEN — mechanism root-caused by live probes 28Sep; fix rides the 30Sep window | 2026-09-30 | Decide fix shape at the ops window under the ADR-0016 freeze: (i) bound the download leg (per-download timeout + concurrency cap) vs (ii) defer cold downloads to the existing detached cache-only refresh (F9-H-03 mechanism) vs (iii) persist an analysis-liveness row per completed analysis independent of downstream signal gating; plus (iv) escalate sustained gate starvation to run health, not just log warnings. Evidence: erratum in `17Sep2026-p5-openalgo-auth-outage.md` (Continuation 5, 28Sep) |
 
 ---
 

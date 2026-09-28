@@ -177,10 +177,11 @@ with a root-cause lead**.
 5. **Window-registry follow-up for the F9-C-02 owner**: verify and pin
    the same-day in-session breaker storms as annotation-only outage
    windows, mirroring the 17Sep precedent: 21Sep (10:08–10:37 and
-   12:14–12:27 IST clusters), 23Sep (~09:42–09:45 cluster), and 24Sep
-   (09:15–12:09 IST session-stale storm — Zerodha token-expiry wall,
-   see Continuation 3; self-recovered 12:11:06 IST before the current
-   run started).
+   12:14–12:27 IST clusters), 23Sep (~09:42–09:45 cluster), 24Sep
+   (09:15–12:09 IST session-stale storm — token-expiry wall,
+   Continuation 3; self-recovered 12:11:06 IST), and 25Sep
+   (09:15–14:29 IST storm — Continuation 4; recovered by operator
+   re-auth 14:29:05 IST).
 
 ## Continuation 3 (24 Sep): token wall erratum — the invalidation is progressive
 
@@ -234,3 +235,103 @@ reconciled sequence. Log line anchors: `logs/loats.log.5` line 52740
 (onset), line 52747 (breaker OPEN); `logs/loats.log` line 944 (CLOSED
 after recovery) — timestamps are the durable anchors, rotation will
 retire the line numbers.
+
+## Continuation 4 (25 Sep): second consecutive pre-band login — full morning lost
+
+**Recurrence confirmed the mechanism and quantified the cost.** The
+automation's morning cycle logged in at 04:48:12 IST (row 107, oauth
+zerodha) — again inside the 05:20+ invalidation band. Progressive
+sequence identical: 05:29:59 history-permission denials, 06:15+ steady
+~2/min `Incorrect api_key or access_token` (413 by 09:17), 07:06
+websocket goodbye + 403 handshake. Session stale from the band through
+14:29 IST — no operator re-login across the entire morning. In-session
+storm: 1,515 opens. **Recovery**: operator re-auth 14:28:35/14:29:05
+IST (rows 108/109); last breaker open 14:29:06; afternoon banked 289
+provenance-locked decisions in 61 minutes (~4.8/min, span-best rate).
+Day cost: ~5.25 of 6.25 trading hours.
+
+**Pattern data for the wave owner**: two consecutive days (24–25Sep),
+identical root cause (login scheduled inside the invalidation band),
+identical signature, combined ~10 trading hours of evidence loss on
+the two highest-leverage sessions then remaining. The single
+high-leverage fix remains moving the automation's daily login step to
+**after 08:00 IST**. On 28Sep the operator self-served at 06:44:04 IST
+and the band did not fire — evidence the band is not deterministic;
+the post-band-login rule stands as the only reliable play.
+
+## Continuation 5 (28 Sep): new failure class — silent staleness (transport green, data dead)
+
+**Signature**: the sentiment source served content up to 279 minutes
+old through the 28Sep session while its transport stayed perfectly
+healthy — 6,777/6,777 successful fetches, circuit `closed`, zero
+errors. The only signal was the orchestrator's content-age warning
+("liveness ALERT ... exceeds the 15.0 min freshness threshold during
+REGULAR session"), 1,064 warnings from ~08:30 IST, staleness climbing
+monotonically 15 → 279 min; onset just after the open (last-fresh
+≈ 08:15 IST), no recovery by 13:30 IST.
+
+**Downstream effect**: zero audit rows of ANY kind on the day — the
+freshness gate kills candidate formation upstream of the rejecting
+stage (prudence days still write REJECT rows; this day writes
+nothing). Routing verified enabled (fresh engine identity 06:13 IST,
+enabled-at-start true, zero disabled-routes); all other sources
+healthy; broker session valid (operator 06:44:04 login) — the silence
+is solely the stale-source gate.
+
+**Why this class is distinct**: breaker architecture correctly keeps
+the circuit closed (transport is fine); a successful fetch of dead
+content is invisible to every existing alarm except the 15-min
+warning. Wave items suggested: (a) escalate sustained stale-content
+beyond a threshold (e.g. 60 min in-session) to a degraded state that
+surfaces in run health, not just log warnings; (b) operator runbook:
+"liveness ALERT on a zero-error source = check upstream feed
+reachability (RSS), not the transport." Suspected trigger today:
+upstream RSS reachability from this host — broker-path transport
+unaffected, consistent with feed-side outage or egress filtering.
+
+**Erratum (28Sep session, ~14:06 IST live probes — root cause
+corrected).** Continuation 4's anchors re-verified against live state
+and stand: 289 `trade_decisions` rows for 2026-09-25 (DB) = 289
+`Routing TradeDecision` log lines; recovery cluster 08:58–08:59Z.
+Continuation 5's observations stand (zero audit rows, routing quartet,
+breaker green, monotonic staleness); its MECHANISM and TRIGGER do not
+survive probing:
+
+- Feed reachability is NOT the cause. All three configured feeds
+  fetched from this host in <0.5s at 14:00 IST (economictimes 50
+  entries, moneycontrol 15, livemint 35; newest entries same-hour);
+  zero `Failed parse RSS feed` / `Failed process RSS item` events all
+  day. No dead content was ever served — rows simply stopped
+  persisting.
+- Gate-age semantics: the 15-min gate measures time since the last
+  PERSISTED sentiment signal
+  (`async_get_latest_signals(scan_type='sentiment')` filters on
+  `signals.metadata.scan_type`), not article age. Last persist
+  02:28:22Z = 07:58:22 IST (349 rows that day, all |score| 0.76–0.80
+  vs the 0.05 threshold, news_count 55, degraded=0 — healthy computes
+  right up to the stop). First alert 09:15:31 IST (77 min), not
+  ~08:30; staleness still climbing past 368 min at 14:06 IST with
+  1,587 alerts and zero recovery — the day's sentiment leg is lost.
+- Root cause: untimed article downloads. `parse_rss_feed` extracts up
+  to ~60 article pages per sweep via newspaper4k (`Article.download()`,
+  no timeout) sequentially inside the 8.0s producer window. Live
+  measurement from this host: 4.3–5.7s per economictimes article,
+  16.6–26.6s moneycontrol, 5.9–19.3s livemint. Morning cycles survived
+  on the per-URL download cache (TTL 5 min, same-article hits); once
+  cold-article churn pushed sweep cost past the window (07:58 IST),
+  the producer window cancelled the sweep EVERY cycle — the budget
+  warnings' median pinned at 8,003–8,009ms from 03Z onward is the 8.0s
+  window firing to the millisecond. Cancelled cycles seed no caches,
+  so every cycle re-pays cold downloads: self-sustaining through the
+  close. Transport counters stay green because feedparser GETs succeed
+  instantly and the breaker counts only raised exceptions (8,009/8,009
+  successful, zero failed — P5 snapshot 13:56 IST).
+- Corrected wave items: (a) stands — escalate sustained gate
+  starvation to run health; (b) inverted — "liveness ALERT on a
+  zero-error source = check ARTICLE-DOWNLOAD latency (the newspaper
+  leg), not feed reachability"; (c) new — bound the download leg
+  (per-download timeout plus a concurrency cap, or defer cold
+  downloads to the existing detached cache-only refresh) and/or
+  persist a liveness row per completed analysis independent of
+  downstream signal gating. Pinned as R-14 in the risk register; the
+  decision rides the 30Sep window under the ADR-0016 freeze.
