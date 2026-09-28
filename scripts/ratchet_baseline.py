@@ -764,8 +764,18 @@ History (most recent last):
       header paragraph is a modification, no other new files). Tree at
       ceiling 496 pre-wave (496 == 496), so +1 lands AT 497. Ceiling
       496->497.
+  498. 28Sep2026 (FR9 re-slice family final-member collapse): +1 --
+      docs/audit-history/
+      28Sep2026-fr9-final-member-collapse-reconciliation.md (twelfth
+      paste-family member; router paragraph + verbatim sec15/sec14
+      repeats with NO new section -- collapses under the #95+#96 pool
+      arithmetic, containment-proven 12/12 and 7/7 against the archive;
+      every router claim registered and current, zero new findings, no
+      code changes; register header paragraph is a modification, no
+      other new files). Tree at ceiling 497 pre-wave (497 == 497), so
+      +1 lands AT 498. Ceiling 497->498.
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 497
+TRACKED_FILE_CEILING = 498
