@@ -782,8 +782,22 @@ History (most recent last):
       section are modifications, no other new files). Tree at ceiling
       498 pre-wave (498 == 498), so +1 lands AT 499. Ceiling
       498->499.
+  500. 28Sep2026 (FR9 sec16 module-table member reconciliation): +1 --
+      docs/audit-history/
+      28Sep2026-fr9-s16-module-table-reslice-reconciliation.md (the
+      fifteenth paste-family member: FIRST consumption of the archive's
+      sec16 module-by-module table, containment-proven 15/15, plus a
+      verbatim sec15 repeat 12/12 carrying the #96 dispositions; 14-row
+      per-claim verdict table -- 8 CONFIRMED, 1 PARTIAL (stale F9-H-04
+      citation; closed by the wired snapshot call site), 4 rows citing
+      findings restored/closed upstream (F9-C-01, F9-H-01, F9-M-05,
+      F9-M-01) and 1 superseded (the F9-H-03 producer-dead claim
+      superseded by the R-14 starvation watch); zero new findings, no
+      code changes; register header paragraph is a modification, no
+      other new files). Tree at ceiling 499 pre-wave (499 == 499), so
+      +1 lands AT 500. Ceiling 499->500.
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 499
+TRACKED_FILE_CEILING = 500
