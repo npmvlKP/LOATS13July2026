@@ -275,8 +275,40 @@ freshness gate kills candidate formation upstream of the rejecting
 stage (prudence days still write REJECT rows; this day writes
 nothing). Routing verified enabled (fresh engine identity 06:13 IST,
 enabled-at-start true, zero disabled-routes); all other sources
-healthy; broker session valid (operator 06:44:04 login) — the silence
-is solely the stale-source gate.
+healthy; broker session valid (operator 06:44:04 login).
+
+**Corrections at day close (16:10 IST digest reconciliation)**: (1) the
+5 in-session breaker opens today were NOT stale-window chatter — they
+are 12:14:26–12:14:33 IST (log stamps 06:44Z are UTC; an earlier draft
+of this section misread them as IST), a 63-second openalgo storm
+self-recovered by 12:15:28 — the 7th recurrence of the **pinned R-13
+class** (untimed newspaper4k downloads starving the producer window),
+whose remediation rides the 30Sep wave; the watch bucketed it
+correctly. (2) The digest attributes the floored counters to the
+known **R-14 producer starvation** (producer cancelled each cycle
+before persisting; fix also riding 30Sep) rather than to the sentiment
+staleness alone. Both mechanisms are real in today's logs (1,064
+staleness warnings AND zero persisted rows); whether staleness is the
+trigger for the cancels or an independent co-cause will be
+discriminated by the 30Sep fix landing — if rows flow Tuesday, R-14
+was the binding constraint and this section's gate explanation is
+downstream detail.
+
+**Operator-adopted annotation (28Sep, keep+annotate verdict; live
+probes at HEAD `d0bfaf0`)**: the corrections block is kept with three
+claim-level fixes pinned here. (1) The 12:14 IST storm IS the SIXTH
+occurrence the register already pins (`28Sep2026-r13-sixth-occurrence.md`)
+— not a seventh; no count increment. (2) The untimed newspaper4k
+download mechanism belongs to **R-14** (sentiment producer starvation,
+P2-watch, rides the 30Sep window), not R-13 — R-13 is the
+breaker-storm class; the corrections text conflated the two register
+rows. (3) The "63-second storm" span is the GLOBAL breaker only
+(openalgo 06:44:26Z open → 06:45:28Z close = 62 s); the four
+per-source breakers stayed open until 06:46:32Z (full storm 2m06s),
+so the fail-closed refusal window is the register's ~2 min. Kept as
+corroborated live: the R-14 starvation attribution, zero persisted
+sentiment rows on the day against 2,077 freshness events (liveness
+ALERTs reaching 445 min staleness), and the 30Sep remediation ride.
 
 **Why this class is distinct**: breaker architecture correctly keeps
 the circuit closed (transport is fine); a successful fetch of dead

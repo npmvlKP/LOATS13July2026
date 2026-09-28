@@ -417,6 +417,30 @@ window firing). Opened as R-14 (P2-watch); the fix decision rides the
 `docs/audit-history/17Sep2026-p5-openalgo-auth-outage.md` (28Sep).
 Snapshot: HEAD `8c62520` (PR #98 merged 2026-09-28), post-merge main
 run `36393072938` success.
+Updated 2026-09-28 (FR9 §16 module-table member reconciliation,
+post-PR-#99 main): the fifteenth family member re-sliced the archive's
+§16 Module-by-Module Review — the FIRST member to consume §16 — plus a
+verbatim §15 repeat; containment-proven 15/15 (§16) and 12/12 (§15)
+against the 15Sep source. Fresh §16 per-claim verdicts at `e4e110e`:
+8 of 14 rows CONFIRMED; 1 PARTIAL (orchestrator's F9-H-04 citation
+stale — the wired call site `orchestrator.py:620` passes the snapshot
+key into `_execute_cmp_strategy(as_of_date=None)`, whose None-default
+resolves the UTC-date-under-IST-offset semantic); 4 rows cite findings
+restored/closed upstream (F9-C-01 `insufficient_history` sentinel live
+at `rules.py:513`; F9-H-01 0.6/0.4 pins live at `strength.py:115/:130`,
+S-03 RESTORED; F9-M-05 2SD live at `strike_selection.py:30-32`, S-06
+RESTORED; F9-M-01 `previous_hash` chaining live in database.py); 1
+superseded (sentiment "dead in prod" → F9-H-03 closed 20Sep; live
+state is the R-14 P2-watch starvation mechanism). The NOT-READY
+verdict stands; the unre-sliced pool SHRINKS to §1-8, §17-21,
+Appendix. The member also surfaced a SECOND foreign edit — a
+"corrections at day close" block on the 17Sep outage doc — kept with
+an inline operator annotation (sixth-occurrence count confirmed, not
+seventh; R-13/R-14 conflation fixed; full storm span 2m06s, global
+breaker 62 s). Record:
+`docs/audit-history/28Sep2026-fr9-s16-module-table-reslice-reconciliation.md`.
+Snapshot: HEAD `e4e110e` (PR #99 merged 2026-09-28), post-merge main
+run `36403612800` success.
 
 | ID | Priority | Category | Status | Due | Next action |
 |----|----------|----------|--------|-----|-------------|
