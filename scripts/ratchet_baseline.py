@@ -741,8 +741,20 @@ History (most recent last):
       header paragraph is a modification, no other new files). Tree at
       ceiling 494 pre-wave (494 == 494), so +1 lands AT 495. Ceiling
       494->495.
+  496. 28Sep2026 (FR9 debt-matrix re-slice reconciliation): +1 --
+      docs/audit-history/28Sep2026-fr9-debtmatrix-reslice-reconciliation.md
+      (morning paste's console block attributed host-layer five-signature;
+      §14 debt matrix containment-proven 7/7 and §13 14/14 against archive
+      lines 227-253 with every F9 row dispositioned upstream; the wave's
+      one real finding is R-13's FIFTH occurrence -- 28Sep morning
+      rollover storm 00:43:31-01:14:58Z IST 06:13-06:44, 145 OPENED
+      events = 29 cycles x 5 breakers, 1,233 fail-closed refusals, zero
+      404s, zero decisions, self-healed at the host's 06:44 broker login;
+      register header + R-13 row + R-13 section are modifications, no
+      other new files). Tree at ceiling 495 pre-wave (495 == 495), so +1
+      lands AT 496. Ceiling 495->496.
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 495
+TRACKED_FILE_CEILING = 496
