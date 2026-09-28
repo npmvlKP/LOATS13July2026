@@ -340,6 +340,25 @@ at the host's 06:44 broker login; recovery forward-scan clean.
 Record:
 `docs/audit-history/28Sep2026-fr9-debtmatrix-reslice-reconciliation.md`.
 Snapshot: HEAD `8384264` (PR #94 merged 2026-09-28).
+Updated 2026-09-28 (FR9 production-readiness re-slice reconciliation,
+post-PR-#95 main): the paste's §15 Production Readiness Assessment was
+containment-proven 14/14 against archive lines 255-271 (first per-claim
+verdicts for §15; its §14 repeat collapsed under the debt-matrix
+record). Every pasted gate row dispositioned live at this HEAD:
+as_of_date call site re-verified (`orchestrator.py:1858`), IV-rank
+sentinel two-sided clean, gate-calibration pins live (composite 0.6 /
+opposition 0.4), audit chain present (`previous_hash` schema +
+head-seed extension), benchmark-perf advisory at `ci.yml:365`,
+protection contradicted-live on both surfaces (tenth consecutive clean
+read-back); P5 span of record live (quartet green, `ended_at: null` is
+in-progress state, earliest valid close 08Oct 08:02Z). The NOT-READY
+verdict stands — live capital stays gated on the dated chain (R-01/
+R-13/S-14/S-15 30Sep, R-05 01Oct, R-12 08Oct 08:02Z). No new findings:
+forward scan clean past the 01:15:58Z recovery cutoff (713 lines, zero
+breaker events, no sixth storm; R-13 stays at five occurrences).
+Record:
+`docs/audit-history/28Sep2026-fr9-prodreadiness-reslice-reconciliation.md`.
+Snapshot: HEAD `422b022` (PR #95 merged 2026-09-28).
 
 | ID | Priority | Category | Status | Due | Next action |
 |----|----------|----------|--------|-----|-------------|
