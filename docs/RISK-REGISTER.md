@@ -312,6 +312,19 @@ pool is exhausted. Record:
 `docs/audit-history/28Sep2026-sections-11-12-reslice-reconciliation.md`.
 Snapshot: HEAD `4201a02` (PR #92 merged 2026-09-27), post-merge main
 run `36341230913` success.
+Updated 2026-09-28 (erratum + post-merge addendum, PR #93): two claims
+in the #93 record corrected — the lineage count is EIGHTH (seven
+records preceded it), and the protection read-back ordinal retracted
+(clean both-surface read-backs stand; the count does not). Post-merge
+main run `36363406997` attempt 1 ended `failure` with ALL 10 required
+contexts green — the sole failure was the ADVISORY `benchmark-perf`
+job (fail-closed by design): first occurrence in all visible main
+history, failing check `cmp_validation.db_operations` (5-sample
+ANALYZE DB stage, P1 20ms budget, p95 64.1ms; the P5 100ms budget
+passed), rerun-failed-jobs attempt 2 `success` on the same commit —
+shared-runner latency jitter, not a regression; R-01 promotion of
+benchmark-perf to required requires hardening the stage's sample basis
+first. Record §7.
 
 | ID | Priority | Category | Status | Due | Next action |
 |----|----------|----------|--------|-----|-------------|
