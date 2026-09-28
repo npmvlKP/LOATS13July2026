@@ -379,6 +379,22 @@ section. Record:
 `docs/audit-history/28Sep2026-fr9-final-member-collapse-reconciliation.md`.
 Snapshot: HEAD `3732fe7` (PR #96 merged 2026-09-28), post-merge main run
 `36378162598` success.
+Updated 2026-09-28 (R-13 sixth-occurrence pin, post-PR-#97 main): the
+thirteenth paste-family member's three PS 5.1 failure tails reproduced
+live as parse-time artifacts with their intended operations' real
+outcomes verified on the remote (PR #97 MERGED 05:56:31Z, `git diff
+5ebb3ad origin/main` EMPTY via bash, `protection-live.json` never
+tracked in any commit); §15/§14 repeats containment-proven 12/12 and
+7/7 against the 15Sep source; router block all-REGISTERED. The wave's
+one real finding: R-13's SIXTH occurrence — mid-session
+06:44:26-06:46:32Z (12:14 IST Monday, first non-rollover profile),
+5 OPENED events = 1 cycle x 5 breakers, 48 fail-closed refusals,
+~2-minute self-heal, zero decisions, zero residue (P5 quartet green
+through; `unhandled_exceptions: 0`). NOT-READY verdict stands; dated
+chain unchanged. Record:
+`docs/audit-history/28Sep2026-r13-sixth-occurrence.md`.
+Snapshot: HEAD `22b6670` (PR #97 merged 2026-09-28), post-merge main
+run `36384520008` success.
 
 | ID | Priority | Category | Status | Due | Next action |
 |----|----------|----------|--------|-----|-------------|
@@ -394,7 +410,7 @@ Snapshot: HEAD `3732fe7` (PR #96 merged 2026-09-28), post-merge main run
 | R-10 | P2-fixed | Benchmark gate false-green: sample success rate ungraded; focused signal fixture rejected at insert | CLOSED by `fix/perf-gate-success-rate` | — | Found by the post-merge verification run at `879015c`: the F9-L-03 guard rejected 100/100 `signal_round_trip` samples (fixture lacked the `test` provenance tag) while the gate graded green off the exceptions' durations. Fixed: `validate_cmp_latency_gates` now grades the sample success rate (incl. the stage-gate composition) fail-closed, and the fixture carries `metadata["test"]`; pinned in `tests/test_performance_analyzer.py::TestSuccessRateGate` |
 | R-11 | P2-fixed | Stage gates graded a single-sample population (n=1 TA spike graded 26Sep 9/10 PARTIAL; same class 09/17/20Sep) | CLOSED by `fix/benchmark-stage-samples` | — | Under-sampled STAGE gates fail closed (`insufficient_samples`); round-trip harness discards one warm-up call and measures 5 samples/stage, medians reported; pinned in `tests/test_performance_analyzer.py::TestStageGateSamplePopulation` |
 | R-12 | P3-watch | P5 decisional-leg evidence: the graded stream read zero routed attempts because every cross-process resume DISCARDED prior generations' counters (`max(live−logged,0)` floor in the supervisor resume path); the span's true population is 395 audited attempts (106 on 24Sep + 289 on 25Sep), DB-corroborated | OPEN — instrument defect root-caused and fixed (`fix/p5-resume-counter-carry`); span disposition rides 30Sep | 2026-10-08 | Earliest valid span close 08Oct 08:02Z: an attempt must be carried or fired before `ended_at`, else the run grades FAIL-closed on the decisional criterion by design. The "candidates rejected every time" reading was one-sided: the same 25Sep log window holds 110 rejections AND 289 routed successes (all `success` outcomes, statuses PENDING in `trade_decisions`). 30Sep options: seed-carry the corroborated totals into the graded stream (supervisor provenance event) vs successor span vs record the FAIL-closed evidence. Evidence: `27Sep2026-p5-resume-counter-carry-reconciliation.md` |
-| R-13 | P3-watch | Host maintenance/absence windows drove LOATS's breaker storms — FIVE occurrences 25-28Sep, every one fail-closed and self-healed: Fri 25Sep ~10:56-14:12 IST (host-absent, ~14.8k breaker-open refusals across two rotated logs); Sat 26Sep 06:30-08:30 IST (rollover, ~4.3k); Sun 27Sep morning 06:46-06:58 IST (documented window: global OPEN, 351 refusals, 35 per-source cycles, 102 fallback-expiry 404s); Sun 27Sep EVENING 19:38-20:31 IST (85 OPENED events = 17 cycles x 5 breakers, 3,373 refusals, ZERO 404s — expiry-cache state differed, noise profile is not fixed; the 19:55 host restart landed mid-storm); Mon 28Sep morning 06:13-06:44 IST (145 OPENED events = 29 cycles x 5 breakers, 1,233 refusals, ZERO 404s, zero decisions, self-healed at the host's 06:44 broker login + master-contract rebuild completion) | OPEN — watch; hardening decision rides the 30Sep ops window | 2026-09-30 | Decide at the ops window alongside R-08: rollover-window synthetic-cycle grace vs rebuild-aware readiness probe vs accept-as-designed (fail-closed evidence stands, now five occurrences). ADR-0016 freeze binds. Evidence: `27Sep2026-p5-resume-counter-carry-reconciliation.md` §3, `27Sep2026-fr9-riskmatrix-reslice-reconciliation.md` §4, `28Sep2026-fr9-debtmatrix-reslice-reconciliation.md` §3 |
+| R-13 | P3-watch | Host maintenance/absence windows drove LOATS's breaker storms — SIX occurrences 25-28Sep, every one fail-closed and self-healed: Fri 25Sep ~10:56-14:12 IST (host-absent, ~14.8k breaker-open refusals across two rotated logs); Sat 26Sep 06:30-08:30 IST (rollover, ~4.3k); Sun 27Sep morning 06:46-06:58 IST (documented window: global OPEN, 351 refusals, 35 per-source cycles, 102 fallback-expiry 404s); Sun 27Sep EVENING 19:38-20:31 IST (85 OPENED events = 17 cycles x 5 breakers, 3,373 refusals, ZERO 404s — expiry-cache state differed, noise profile is not fixed; the 19:55 host restart landed mid-storm); Mon 28Sep morning 06:13-06:44 IST (145 OPENED events = 29 cycles x 5 breakers, 1,233 refusals, ZERO 404s, zero decisions, self-healed at the host's 06:44 broker login + master-contract rebuild completion); Mon 28Sep MIDDAY 12:14 IST (06:44:26-06:46:32Z, mid-session regular hours — first non-rollover occurrence: 5 OPENED events = 1 cycle x 5 breakers, 48 refusals, ZERO 404s, zero decisions, ~2-min self-heal) | OPEN — watch; hardening decision rides the 30Sep ops window | 2026-09-30 | Decide at the ops window alongside R-08: rollover-window synthetic-cycle grace vs rebuild-aware readiness probe vs accept-as-designed (fail-closed evidence stands, now six occurrences — the sixth hit MID-SESSION, so option (a)'s rollover-window grace alone cannot cover the class; see `28Sep2026-r13-sixth-occurrence.md` §6). ADR-0016 freeze binds. Evidence: `27Sep2026-p5-resume-counter-carry-reconciliation.md` §3, `27Sep2026-fr9-riskmatrix-reslice-reconciliation.md` §4, `28Sep2026-fr9-debtmatrix-reslice-reconciliation.md` §3, `28Sep2026-r13-sixth-occurrence.md` |
 
 ---
 
@@ -632,7 +648,7 @@ merged), branch `fix/benchmark-stage-samples`.
 ## R-13 [P3-watch] Host rollover/rebuild windows drove LOATS's breaker storms (recurring)
 
 Category: ops resilience / host-coupling watch. Status: OPEN — watch
-item, RECURRING signature (four occurrences 25-27Sep), every
+item, RECURRING signature (six occurrences 25-28Sep), every
 occurrence fail-closed and self-healed; hardening decision rides the
 2026-09-30 ops window (ADR-0016 mid-span freeze binds until the
 checkpoint). Confidence: Certain (log forensics at HEAD `10d410f` for
@@ -734,3 +750,25 @@ alongside R-08; ADR-0016 freeze binds. Evidence:
 `28Sep2026-fr9-debtmatrix-reslice-reconciliation.md` §3. Section
 snapshot: HEAD `8384264` (PR #94 merged 2026-09-28; this truth-up
 rides the PR #95 wave).
+
+Sixth occurrence (2026-09-28 midday, structured-log forensics at HEAD
+`22b6670`; json-parse-first scan, all times UTC in `logs/loats.log`,
+IST = Z+5:30): storm span 06:44:26Z->06:46:32Z (IST 12:14-12:16),
+REGULAR Monday session. Counts: 5 OPENED events (= 1 cycle x 5
+breakers: global `openalgo` 06:44:26.495Z, then
+`source:ta`/`source:volatility`/`source:price_action`/
+`source:options_flow` 06:44:32-06:44:33Z), 48 `global circuit breaker
+open` fail-closed refusals, 5 CLOSED-after-recovery events
+(06:45:28.914-06:46:32.308Z, ~2 minutes — smallest storm of the six),
+ZERO fallback-expiry 404s, zero decisions. Onset trigger: three
+consecutive host API HTTP 500 `Server disconnected` failures within
+one second (quotes / LTP for NIFTY / historical data), each on its
+first retry — no rollover, restart, or rebuild context; the FIRST
+mid-session occurrence, so the rollover-window grace option (a) would
+NOT have covered it (options (b)/(c) survive for 30Sep). Forward scan
+after 06:46:33Z: 905 records through 07:04:42Z, zero breaker mentions.
+Telegram alert fired in-window. P5 residue: none
+(`unhandled_exceptions: 0`, quartet green, `ended_at: null`
+in-progress). Evidence: `28Sep2026-r13-sixth-occurrence.md`. Section
+snapshot: HEAD `22b6670` (PR #97 merged 2026-09-28; this truth-up
+rides the next protected-main wave).
