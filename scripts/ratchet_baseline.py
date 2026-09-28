@@ -796,8 +796,22 @@ History (most recent last):
       code changes; register header paragraph is a modification, no
       other new files). Tree at ceiling 499 pre-wave (499 == 499), so
       +1 lands AT 500. Ceiling 499->500.
+  501. 28Sep2026 (FR9 sixteenth member collapse): +1 --
+      docs/audit-history/
+      28Sep2026-fr9-sixteenth-member-collapse-reconciliation.md (the
+      sixteenth paste-family member: five PS 5.1 failure tails whose
+      inline comments cite the s16 wave's own commands/SHAs -- every
+      intended operation re-proved green live (ceiling 500 three ways,
+      d0bfaf0 in history, PR #100 merged and branch purged, protection
+      field-by-field, 54e5306..origin/main EMPTY); a 9-row risk table
+      verified consistent row-by-row including the kill-switch
+      exercise-still-outstanding log zero; a verbatim sec16 15/15 +
+      sec15 12/12 re-slice collapsing under #95-#100; zero new
+      findings, no code changes; register header paragraph is a
+      modification, no other new files). Tree at ceiling 500 pre-wave
+      (500 == 500), so +1 lands AT 501. Ceiling 500->501.
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 500
+TRACKED_FILE_CEILING = 501
