@@ -822,8 +822,17 @@ History (most recent last):
       the explicit-flags rule; register header paragraph is a
       modification, no other new files). Tree at ceiling 501 pre-wave
       (501 == 501), so +1 lands AT 502. Ceiling 501->502.
+  503. 28Sep2026 (FR9 eighteenth-member re-presentation collapse record):
+      +1 -- docs/audit-history/28Sep2026-fr9-eighteenth-member-
+      re-presentation-collapse.md (the 15:19 IST family member re-presented
+      the seventeenth member's already-reconciled §18-STEP-0/§17/§16 blocks
+      plus a fresh risk queue; containment 5/5 + 8/8 + 16/16 against the
+      15Sep source, risk queue 9/9 CONSISTENT against live state, STEP-0
+      drill re-run clean as the seventh consecutive verification at the
+      post-#102 HEAD; zero new findings, pool unchanged). Tree at ceiling
+      502 pre-wave (502 == 502), so +1 lands AT 503. Ceiling 502->503.
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 502
+TRACKED_FILE_CEILING = 503
