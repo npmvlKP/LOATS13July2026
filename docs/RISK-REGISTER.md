@@ -459,6 +459,34 @@ run `36403612800` success.
 | R-13 | P3-watch | Host maintenance/absence windows drove LOATS's breaker storms — SIX occurrences 25-28Sep, every one fail-closed and self-healed: Fri 25Sep ~10:56-14:12 IST (host-absent, ~14.8k breaker-open refusals across two rotated logs); Sat 26Sep 06:30-08:30 IST (rollover, ~4.3k); Sun 27Sep morning 06:46-06:58 IST (documented window: global OPEN, 351 refusals, 35 per-source cycles, 102 fallback-expiry 404s); Sun 27Sep EVENING 19:38-20:31 IST (85 OPENED events = 17 cycles x 5 breakers, 3,373 refusals, ZERO 404s — expiry-cache state differed, noise profile is not fixed; the 19:55 host restart landed mid-storm); Mon 28Sep morning 06:13-06:44 IST (145 OPENED events = 29 cycles x 5 breakers, 1,233 refusals, ZERO 404s, zero decisions, self-healed at the host's 06:44 broker login + master-contract rebuild completion); Mon 28Sep MIDDAY 12:14 IST (06:44:26-06:46:32Z, mid-session regular hours — first non-rollover occurrence: 5 OPENED events = 1 cycle x 5 breakers, 48 refusals, ZERO 404s, zero decisions, ~2-min self-heal) | OPEN — watch; hardening decision rides the 30Sep ops window | 2026-09-30 | Decide at the ops window alongside R-08: rollover-window synthetic-cycle grace vs rebuild-aware readiness probe vs accept-as-designed (fail-closed evidence stands, now six occurrences — the sixth hit MID-SESSION, so option (a)'s rollover-window grace alone cannot cover the class; see `28Sep2026-r13-sixth-occurrence.md` §6). ADR-0016 freeze binds. Evidence: `27Sep2026-p5-resume-counter-carry-reconciliation.md` §3, `27Sep2026-fr9-riskmatrix-reslice-reconciliation.md` §4, `28Sep2026-fr9-debtmatrix-reslice-reconciliation.md` §3, `28Sep2026-r13-sixth-occurrence.md` |
 | R-14 | P2-watch | Sentiment producer starvation via untimed article downloads: `parse_rss_feed` extracts up to ~60 article pages per sweep with newspaper4k (`Article.download()`, no timeout, sequential) inside the 8.0s producer window; measured live 28Sep: 4.3-5.7s economictimes, 16.6-26.6s moneycontrol, 5.9-19.3s livemint per article. Once cold-article churn pushed sweep cost past the window (28Sep 02:28:22Z = 07:58:22 IST, last persist; scores healthy 0.76-0.80, news_count 55, degraded=0 up to the stop), the window cancelled EVERY sweep — budget-warning median pinned 8,003-8,009ms from 03Z, zero persists thereafter, the 15-min freshness gate starved to 368+ min by 14:06 IST (1,587 alerts, zero recovery), zero audit rows on the day, while transport counters stayed green by design (breaker 8,009/8,009 successful — breakers count only raised exceptions; feeds themselves fetch <0.5s) | OPEN — mechanism root-caused by live probes 28Sep; fix rides the 30Sep window | 2026-09-30 | Decide fix shape at the ops window under the ADR-0016 freeze: (i) bound the download leg (per-download timeout + concurrency cap) vs (ii) defer cold downloads to the existing detached cache-only refresh (F9-H-03 mechanism) vs (iii) persist an analysis-liveness row per completed analysis independent of downstream signal gating; plus (iv) escalate sustained gate starvation to run health, not just log warnings. Evidence: erratum in `17Sep2026-p5-openalgo-auth-outage.md` (Continuation 5, 28Sep) |
 
+Updated 2026-09-28 (FR9 sixteenth paste member collapse, post-PR-#100
+main): the sixteenth family member is a fresh composition (consecutive-
+paste diff vs the 07:50 member: disjoint) of five PS 5.1 failure tails
+whose inline comments cite the s16 wave's OWN commands and SHAs (ratchet
+index check, `d0bfaf0`, the sep28-s16-module-table PR create, the
+GraphQL protection read-back, `git diff 54e5306 origin/main`), a 9-row
+risk table, and a verbatim §16 + §15 re-slice. Timestamp arithmetic: the
+paste (12:04 IST) predates the #100 merge (11:19:38Z = 16:49 IST) —
+mid-wave transcripts of operations since completed. Parse-death class:
+nothing in any tail executed; every intended operation re-proved green
+live (ceiling 500 blob+import+ls-files; `d0bfaf0` subject match; PR #100
+merged and branch purged; protection approving=1/dismiss_stale/
+enforce_admins/strict/10-contexts; `54e5306..origin/main` EMPTY with
+`37d9ad7^2 == 54e5306`). Risk table verified CONSISTENT row-by-row,
+incl. the kill-switch exercise still outstanding (rotation-mapped log
+scan: zero kill events in-span; snapshot `kill_switch_verified` is
+STATE, not the exercise) and the R-12 08Oct 08:02Z close (span
+started_at + 14d). Containment 15/15 (§16, lines 273-290) + 12/12 (§15,
+lines 255-271) against the 15Sep source; §16 identical to the
+#100-dispositioned slice, §15 carries #96. Post-merge main at the merge
+SHA: 16/16 check runs, 15 success + 1 by-design skip (Docker Build);
+`gh run list` stale-page pitfall hit twice in one session — check-runs
+API bypass pinned. Zero new findings. NOT-READY verdict stands;
+unre-sliced pool UNCHANGED (§1-8, §17-21, Appendix). Record:
+`docs/audit-history/28Sep2026-fr9-sixteenth-member-collapse-reconciliation.md`.
+Snapshot: HEAD `37d9ad7` (PR #100 merged 2026-09-28), post-merge main
+check-runs 15 success + 1 skipped at the merge SHA.
+
 ---
 
 ## R-01 [P1] Cycle-latency budget decision deferred to the 30Sep checkpoint (ADR-0016)
