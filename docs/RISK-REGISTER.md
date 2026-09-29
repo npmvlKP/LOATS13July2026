@@ -461,6 +461,42 @@ run `36403612800` success.
 | R-15 | P1-fixed | F9-M-01-R2: `scripts/repair_f9m01_chain_head.py` serialized the ALREADY re-anchored entry list to `*.f9m01r1-backup` (`main()` ran `reanchor_span` before `write_repaired_log`; c588be7 original) — the "backup" held repaired content, zero broken links, and could neither restore nor re-derive the pre-repair state. Fired on BOTH real runs (24Sep, 29Sep); docstring claim false for the JSONL leg (the SQLite DB snapshot was genuine both times — taken before `repair_db`). No production trail corrupted: the live chain was repaired correctly both times; only the restore artifact was degraded | FIXED same session (F9-M-01-R2): backup serialized from the PRE-repair list before mutation; repair-record reason now reports actual run/link counts (was a hardcoded "23 frozen runs" — false for the 1-run 29Sep repair); pinned by `tests/test_repair_backup_fidelity.py` (4 tests; RED proven against c588be7 before the fix). 24Sep-era JSONL/DB backups preserved under `*.20260924-preserved` before the 29Sep apply overwrote the fixed names. Evidence: `29Sep2026-f9m01r2-chain-reanchor-and-backup-fidelity.md` §3-4 | — | A future restore rehearsal (30Sep+ ops window) may validate the preserved backups end-to-end; NOT urgent — the DB backups are genuine and pre-repair state is reconstructible from them |
 | R-16 | P2-watch | Span governance: a HEALTHY P5 supervisor never picks up merged code (the watchdog is revive-only; LOATS_P5_Resume is disabled), and a graceful soft-stop CLOSES the running span (fresh span, day-0 reset of the 14d accumulation clock). The 13:37 IST paste assumed a scheduled restart task would deliver #109 to the runtime — false at probe time; the verification required the supervised soft-stop path executed manually | OPEN — mechanism understood and recorded; no code change pending. The 29Sep verification session itself is the worked example (gen11 soft-stop → gen12 verification → gen13 fresh span). The R-12 08Oct close arithmetic moves to the NEW span's `started_at 2026-09-29T13:48:05Z` → earliest valid close 13Oct 13:48Z | 2026-10-13 | If the wave roadmap requires a mid-span code pickup again, soft-stop is the only delivery path and resets the clock — schedule verification sessions at span boundaries where possible. Evidence: `29Sep2026-f9m01r2-chain-reanchor-and-backup-fidelity.md` §2, §5 |
 
+Updated 2026-09-29 (21:20 IST, collapse #15 — post-#110 member; SPAN
+ARITHMETIC MOVES TO GEN14): the 21:10 IST composer-paste member (eighth
+29Sep member, created AFTER the #110 merge landed at 20:42 IST) is the
+day's fifteenth collapse. PS-5.1-tail half: the parse-death
+(`The '<' operator is reserved for future use`) of the exact
+`gh pr create` line for #110 — a literal `<pr-body.md>` token
+transcribed from the report template dies at PARSE time, so NOTHING in
+that line executed; the intended operation verified live instead: PR
+#110 MERGED 15:12:37Z (F9-M-01-R2 backup fidelity; c5f118f fix,
+7b61eab register, 30eb72e tests), branch purged (ls-remote empty),
+local main at 185a982 with a clean tree. Prose half: containment 19/35
+lines inside the 15Sep FR9 source archive (§19 verdict + STEP-1-4
+roadmap re-slices), 0 novel finding lines; the standing-risks queue
+matched register rows row by row (R-12 13Oct arithmetic, 30Sep
+discharge list R-01/S-14/S-15/R-08/R-13, R-05 01Oct, R-15 optional
+restore rehearsal, gen13 cold-start watch) — register-sourced, zero
+fresh findings. The member's file-mutation-verifier warning is
+discharged: the refused scratch write (fix_register.py) was a repair
+script for a TRANSIENTLY mangled working-tree register draft (doubled
+`||` pipes, R-15 fused into the R-13 row, orphaned R-14 tail); the
+damage is ABSENT at HEAD — 16 single-pipe risk rows, zero `||` lines,
+no orphaned tail — and the post-merge 185a982 CI read 16 contexts
+green (Docker Build skipped by design). NEW LIVE FACT superseding the
+member's watch line: gen13 (`..._134805.json`) closed gracefully at
+14:11:43.942Z (294 cycles, 0 unhandled exceptions) and the watchdog
+fresh-started gen14 (`p5_forward_test_20260929_141804.json`,
+restarts=0, a fresh span, not a resume) at 14:18:04.991Z — LIVE and
+green at record time (snapshot mtime 0.28 min, `last_sampled_at`
+15:47:12Z, `kill_switch_verified:true`, `unhandled_exceptions:0`,
+`ended_at:null` = in-progress by design). R-12/R-16 close arithmetic
+MOVES AGAIN: the 14-day accumulation clock anchors to gen14
+`started_at 2026-09-29T14:18:04.991Z` → earliest valid span close
+2026-10-13 14:18Z; the real Telegram /kill→/resume exercise must land
+mid-span (30Sep ops window) or the span grades fail-closed. Ceiling
+stays 506, tree clean; register-append-only wave.
+
 Updated 2026-09-29 (EVENING — R-14 VERIFIED live; F9-M-01-R2 chain
 re-anchor; R-15 opened and fixed): gen11 (pre-#109 code in memory) was
 soft-stopped via the supervised path and gen12 verified the fix LIVE —
