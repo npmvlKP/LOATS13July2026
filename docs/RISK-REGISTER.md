@@ -968,3 +968,30 @@ src/loats/rules.py:513, `composite_strength_threshold` 0.6
 src/loats/config/settings.py:68), P5 span quartet green (mtime 0.8
 min, kill_switch_verified true, unhandled_exceptions 0). The 30Sep
 ops window remains operator-gated.
+
+Updated 2026-09-29 (12:10 IST, collapse #12 — roadmap re-slice, pool
+unchanged): the 06:20 IST composer-paste member (fifth 29Sep member,
+created AFTER the #104/#105 waves landed on main) is the day's twelfth
+collapse. Containment 16/23 lines inside the 15Sep FR9 source archive
+and 14/23 inside the 10:43 IST member; all 9 lines novel to the
+sibling are the standing-risks header plus the verbatim STEP-3 Wave-3
+block (F9-M-05, F9-M-01, F9-M-03, TODO-9) — ZERO novel finding lines;
+unre-sliced pool UNCHANGED (§1-8, §17-21, Appendix). Every roadmap
+item verified live at HEAD 44071c0 by two-sided sentinel grep:
+`composite_strength_threshold` 0.6 and `opposition_threshold` 0.4 in
+Settings (`src/loats/config/settings.py:68/78`); delta band
+[0.50, 0.60] (`DELTA_BAND_LOW/HIGH`), `two_sigma_sell_band` and
+`MIN_OI_CONFIRMATION` in `src/loats/strike_selection.py`;
+`previous_hash` chain + grandfathered migration + link-walking
+verifier (`verify_audit_log_integrity`, `src/loats/database.py:2731`)
+with tamper tests (`tests/test_audit_chain_f9m01*.py`); TODO-8
+answered by ADR-006 Amendment 7 (S-05 SUPERSEDED, no endpoint);
+TODO-9's loud `insufficient_history` inside the TODO-1 IV-rank rewrite
+(`src/loats/rules.py:513`; legacy silent 0.5 fallback absent from the
+rules path). Remaining-risks block matches the register rows row by row
+(R-01/R-05/R-08/R-12/R-13/R-14, 30Sep review, 08Oct span close; the
+symtoken-rebuild question rides #11's disposition behind R-14). P5
+span quartet green at record time (snapshot mtime 0.55 min,
+`last_sampled_at` 06:34:55Z, `kill_switch_verified:true`,
+`unhandled_exceptions:0`, `ended_at:null` = in-progress by design).
+Register-append-only wave; tree clean, ceiling stays 503.
