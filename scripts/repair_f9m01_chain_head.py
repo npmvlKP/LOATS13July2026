@@ -38,7 +38,10 @@ Fail-closed contract:
   hash; anything else looks like tamper -- abort).
 - Refuses if the file changes on disk between planning and the atomic
   replace (size guard); DB updates are guarded per-row.
-- Snapshots the audit log and the SQLite DB before mutating.
+- Snapshots the audit log and the SQLite DB before mutating: the JSONL
+  backup is serialized from the PRE-repair entry list before
+  ``reanchor_span`` runs (R-15, F9-M-01-R2), the DB snapshot is taken
+  before ``repair_db``.
 """
 
 from __future__ import annotations
@@ -195,12 +198,16 @@ def write_repaired_log(
     backup_path: Path,
     original_size: int,
 ) -> None:
-    """Snapshot the original, atomically replace the log, guard races."""
-    backup_path.write_text(
-        "".join(json.dumps(e, sort_keys=True) + "\n" for e in entries),
-        encoding="utf-8",
-        newline="\n",
-    )
+    """Atomically replace the log; guard races against the planned size.
+
+    F9-M-01-R2 (R-15): the caller snapshots the PRE-repair entries to
+    ``backup_path`` BEFORE ``reanchor_span`` mutates the list in place.
+    This function writes only the repaired log; the backup is no longer
+    (re)written here -- the previous order serialized the already
+    re-anchored list to the backup, so it held repaired content and could
+    neither restore nor re-derive the pre-repair state (observed on both
+    the 24Sep and 29Sep runs).
+    """
     if log_path.stat().st_size != original_size:
         raise ValueError(
             "audit log changed on disk since planning "
@@ -290,8 +297,9 @@ def append_repair_record(
             "frozen_runs": stats["runs"],
             "backup_sha256": backup_digest,
             "reason": (
-                "F9-M-01-R1: pooled async audit writer never advanced the "
-                "chain-head cache; 23 frozen runs re-anchored"
+                "F9-M-01-R1: chain-head freeze "
+                f"({stats['runs']} frozen writer lifetime(s), "
+                f"{stats['broken']} broken link(s)) re-anchored to EOF"
             ),
         },
         "previous_state": {},
@@ -379,6 +387,15 @@ def main() -> int:
 
     backup_log = args.audit_log.with_suffix(args.audit_log.suffix + ".f9m01r1-backup")
     original_size = args.audit_log.stat().st_size
+    # F9-M-01-R2 (R-15): snapshot the PRE-repair entries BEFORE
+    # reanchor_span mutates the list in place. The previous order passed
+    # the already-re-anchored list to the backup writer, so the backup
+    # held repaired content on both the 24Sep and 29Sep runs.
+    backup_log.write_text(
+        "".join(json.dumps(e, sort_keys=True) + "\n" for e in entries),
+        encoding="utf-8",
+        newline="\n",
+    )
     updates = reanchor_span(entries, span_start)
     write_repaired_log(entries, args.audit_log, backup_log, original_size)
     print(f"JSONL re-anchored ({len(updates)} entries); backup: {backup_log.name}")
