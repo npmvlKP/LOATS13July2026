@@ -1023,3 +1023,31 @@ span close verbatim). P5 span quartet green at record time (snapshot
 `last_sampled_at` 07:19:55Z, `kill_switch_verified:true`,
 `unhandled_exceptions:0`, `ended_at:null` = in-progress by design).
 Register-append-only wave; tree clean, ceiling stays 503.
+
+Updated 2026-09-29 (14:55 IST, collapse #14 — member-13 recomposition
+shape): the 09:15 IST composer-paste member (seventh 29Sep member,
+created AFTER the #107 register wave merged at 13:12 IST) is the day's
+fourteenth collapse. Containment 18/65 lines inside the 15Sep FR9
+source archive, 0/65 against this register (stub-shape); the novel
+delta is the member-13 standing-risks block verbatim (zero novel
+finding lines), the re-included STEP-1-4 roadmap, and the day's only
+LIVE evidence: pre-commit end-of-file + repo-hygiene (504 > 503)
+failures reproduced at HEAD f9177a5 with a foreign `snapshot.json`
+staged in the index — a UTF-16-LE PowerShell-redirect capture of the
+branch-protection GET (the `gh api .../protection > snapshot.json`
+verify-probe leg, mtime 14:43 IST, never committed, zero history).
+The member's three PS 5.1 tails remain parse-time artifacts; their
+intended operations verified live: PR #107 MERGED 07:42Z with the
+remote branch already purged (ls-remote empty), tracked count read
+504 explaining the hygiene tail, and a fresh protection GET
+re-verified the full contract field-by-field (10 pinned contexts,
+strict, approving=1, dismiss_stale=true, code_owner=false,
+last_push=false, enforce_admins=true, force-push/deletions false, no
+bypass key) — the parse-dead `verify-protection-contract` recipe's
+intent discharged on live state. Fix: `/snapshot.json` ignored in
+the quality-gate-output block (gitleaks-session precedent), index
+restored to 503. P5 span quartet green at record time (snapshot
+mtime 0.5 min, `last_sampled_at` 09:25:33Z,
+`kill_switch_verified:true`, `unhandled_exceptions:0`,
+`ended_at:null` = in-progress by design). Register-append-only wave;
+tree clean, ceiling stays 503.
