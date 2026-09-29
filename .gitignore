@@ -102,6 +102,11 @@ pip_audit_results.json
 # reports/health precedent.
 /pip_audit_*.json
 /pip-audit_*.json
+# Ad-hoc branch-protection GET capture at the repo root (staged 29Sep pushed
+# tracked count to 504 vs ceiling 503 and failed the repo-hygiene ceiling;
+# the capture is a local verify-probe artifact — the live contract of record
+# is re-derived fresh per restore, never tracked).
+/snapshot.json
 pytest_output.txt
 ruff_alerts.txt
 ruff_all_errors.txt
