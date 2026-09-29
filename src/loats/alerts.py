@@ -170,6 +170,13 @@ class AlertSystem:
                 polling_task = asyncio.create_task(
                     self.application.updater.start_polling()
                 )
+                # R-14 (29Sep zombie class): the polling task previously
+                # ran fire-and-forget -- a dead poller (409 conflict,
+                # revoked token, network death) left _running pinned True
+                # with ZERO log lines and every bot command silently dead.
+                # The done-callback makes the failure loud and re-arms
+                # the start guard.
+                polling_task.add_done_callback(self._on_polling_task_done)
                 # Store reference cleanup
                 self._polling_task = polling_task
             else:
@@ -181,6 +188,28 @@ class AlertSystem:
             logger.error(f"Failed start Telegram bot: {e}")
             self._running = False
             raise
+
+    def _on_polling_task_done(self, task: asyncio.Task[Any]) -> None:
+        """Dead-man switch for the polling task (R-14 zombie class).
+
+        A clean cancel resets ``_running`` without noise; an exception
+        logs at ERROR naming the cause and re-arms ``start()`` so a
+        subsequent start attempt is possible instead of being swallowed
+        by the ``_running`` guard.
+        """
+        if task.cancelled():
+            self._running = False
+            logger.warning("Telegram polling task cancelled; bot stopped.")
+            return
+        exc = task.exception()
+        if exc is not None:
+            self._running = False
+            logger.error(
+                "Telegram polling task DIED (%s: %s); bot commands are "
+                "down -- restart required to re-arm.",
+                type(exc).__name__,
+                exc,
+            )
 
     async def shutdown(self) -> None:
         """Shutdown Telegram bot gracefully.
@@ -215,7 +244,11 @@ class AlertSystem:
     async def _send_telegram_message(self, message: str) -> bool:
         """Send Telegram message using the bot."""
         if not self.bot or not settings.telegram_chat_id:
-            logger.debug("Telegram bot not configured, message not sent")
+            logger.warning(
+                "Telegram message not delivered: bot not initialized or "
+                "chat id not configured (suppression is now observable -- "
+                "was DEBUG-silent)."
+            )
             return False
 
         # Call _safe_send_message directly without catching exceptions
@@ -251,7 +284,12 @@ class AlertSystem:
     async def send_alert(self, message: str, alert_type: str = "info") -> bool:
         """Send alert Telegram circuit breaker protection."""
         if not self.bot or not settings.telegram_chat_id:
-            logger.debug(f"Alert not sent (bot not configured): {message}")
+            logger.warning(
+                "Alert not delivered: bot not initialized or chat id not "
+                "configured (alert_type=%s, message=%r).",
+                alert_type,
+                message[:200],
+            )
             return False
 
         # Check cooldown

@@ -216,6 +216,10 @@ class TradingOrchestrator:
         self.total_cycle_time = 0.0
         self._shutdown_event = asyncio.Event()
         self._cycle_task: asyncio.Task[None] | None = None
+        # R-14 / F9-H-03: once-per-episode flag for the sentiment liveness
+        # alert. Set when a starvation episode escalates to Telegram; a
+        # fresh (healthy) check resets it so the NEXT episode alerts again.
+        self._sentiment_liveness_alerted: bool = False
         self._last_alert_time = 0.0
         # CMP chain rejection tracking
         self._last_insufficient_signals_warning_time = 0.0
@@ -792,6 +796,16 @@ class TradingOrchestrator:
             if latest:
                 age_s = (now - latest[0].timestamp).total_seconds()
                 if age_s <= max_age_s:
+                    # R-14 / F9-H-03: recovery re-arms the starvation alert
+                    # so the NEXT episode is delivered again.
+                    if self._sentiment_liveness_alerted:
+                        logger.info(
+                            "Sentiment liveness RECOVERED: %s fresh again "
+                            "(< %.0f min); re-arming the starvation alert.",
+                            StrengthSource.SENTIMENT.value,
+                            cfg.sentiment_liveness_max_age_minutes,
+                        )
+                        self._sentiment_liveness_alerted = False
                     return True
                 age_text = f"{age_s / 60:.0f} min old"
             else:
@@ -804,6 +818,41 @@ class TradingOrchestrator:
                 age_text,
                 cfg.sentiment_liveness_max_age_minutes,
             )
+            # R-14 (fix shape (iv)): sustained starvation escalates to run
+            # health -- the log-only warning was invisible to the operator
+            # (49 warnings on 29Sep, zero delivered). Delivered once per
+            # episode; a failed dispatch retries on the next check so a
+            # dead Telegram leg cannot silently eat the escalation.
+            if not self._sentiment_liveness_alerted:
+                delivered = False
+                try:
+                    delivered = await alerts.send_system_alert(
+                        "Sentiment liveness ALERT: "
+                        f"{StrengthSource.SENTIMENT.value} ({age_text}) "
+                        "exceeds the "
+                        f"{cfg.sentiment_liveness_max_age_minutes} min "
+                        "freshness threshold during REGULAR session -- "
+                        "check RSS feeds and the broker login.",
+                        alert_type="warning",
+                    )
+                except Exception as alert_error:
+                    logger.error(
+                        "Sentiment liveness alert dispatch failed: %s",
+                        alert_error,
+                    )
+                if delivered:
+                    self._sentiment_liveness_alerted = True
+                    logger.warning(
+                        "Sentiment liveness alert DELIVERED via Telegram "
+                        "(episode flagged; no repeat until recovery)."
+                    )
+                else:
+                    logger.error(
+                        "Sentiment liveness alert NOT delivered via Telegram "
+                        "(send returned False -- bot uninitialized, "
+                        "suppressed, or transport failure); will retry next "
+                        "check."
+                    )
             return False
         except Exception as e:
             # The liveness check must never break the trading cycle.
