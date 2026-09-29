@@ -461,6 +461,37 @@ run `36403612800` success.
 | R-15 | P1-fixed | F9-M-01-R2: `scripts/repair_f9m01_chain_head.py` serialized the ALREADY re-anchored entry list to `*.f9m01r1-backup` (`main()` ran `reanchor_span` before `write_repaired_log`; c588be7 original) — the "backup" held repaired content, zero broken links, and could neither restore nor re-derive the pre-repair state. Fired on BOTH real runs (24Sep, 29Sep); docstring claim false for the JSONL leg (the SQLite DB snapshot was genuine both times — taken before `repair_db`). No production trail corrupted: the live chain was repaired correctly both times; only the restore artifact was degraded | FIXED same session (F9-M-01-R2): backup serialized from the PRE-repair list before mutation; repair-record reason now reports actual run/link counts (was a hardcoded "23 frozen runs" — false for the 1-run 29Sep repair); pinned by `tests/test_repair_backup_fidelity.py` (4 tests; RED proven against c588be7 before the fix). 24Sep-era JSONL/DB backups preserved under `*.20260924-preserved` before the 29Sep apply overwrote the fixed names. Evidence: `29Sep2026-f9m01r2-chain-reanchor-and-backup-fidelity.md` §3-4 | — | A future restore rehearsal (30Sep+ ops window) may validate the preserved backups end-to-end; NOT urgent — the DB backups are genuine and pre-repair state is reconstructible from them |
 | R-16 | P2-watch | Span governance: a HEALTHY P5 supervisor never picks up merged code (the watchdog is revive-only; LOATS_P5_Resume is disabled), and a graceful soft-stop CLOSES the running span (fresh span, day-0 reset of the 14d accumulation clock). The 13:37 IST paste assumed a scheduled restart task would deliver #109 to the runtime — false at probe time; the verification required the supervised soft-stop path executed manually | OPEN — mechanism understood and recorded; no code change pending. The 29Sep verification session itself is the worked example (gen11 soft-stop → gen12 verification → gen13 fresh span). The R-12 08Oct close arithmetic moves to the NEW span's `started_at 2026-09-29T13:48:05Z` → earliest valid close 13Oct 13:48Z | 2026-10-13 | If the wave roadmap requires a mid-span code pickup again, soft-stop is the only delivery path and resets the clock — schedule verification sessions at span boundaries where possible. Evidence: `29Sep2026-f9m01r2-chain-reanchor-and-backup-fidelity.md` §2, §5 |
 
+Updated 2026-09-29 (21:50 IST, collapse #16 — full re-slice of the FR9
+source; fifteenth record delivered with it): the 21:36 IST composer-paste
+member (ninth 29Sep member, created AFTER the fifteenth record was
+written at 21:22 IST) re-slices the ALREADY-DISPOSITIONED 15Sep FR9
+forensic source verbatim — containment 37/38 lines inside
+`docs/audit-history/15Sep2026-FR9-forensic-review-report.md`
+(§20 Architecture Overview + §19 Executive Summary + wave-deltas line);
+the sole novel line is the session footer. §20's live claims verified
+against the tree at record time: routing flag default OFF
+(`analyzer_routing_enabled: False`), ANALYZE default mode, producer
+window 8.0 s, lot 25, CMP 0.6/0.4 gates restored (S-03), VIX symmetric
+fail-safe, P5 scripts under their real names (`run_p5_forward_test.py`,
+`verify_p5_forward_test.py`, `fr7_health_check.py`,
+`check_per_module_coverage.py`, `benchmark_performance.py`);
+`src/loats` now holds 40 .py files — the pasted "38 files" figure
+predates the #109/#110 wave. Every §19 finding (IV-rank saturation,
+threshold drift, sentiment dead, `as_of_date`, self-hash chain,
+cycle-latency gate, P5 invalid evidence) is a dispositioned register
+row — S-02/S-03/S-13 all RESTORED (`previous_hash` link chain present
+in `database.py`; the pasted "self-hash only" verdict is stale) — zero
+fresh findings. NEW LIVE FACT: gen14 quartet green at record time
+(snapshot mtime 0.5 min, `last_sampled_at` 16:19:39Z,
+`kill_switch_verified:true`, `unhandled_exceptions:0`, `restarts:0`,
+`ended_at:null` = in-progress by design); R-12/R-16 arithmetic
+unchanged (gen14 `started_at` 14:18:04.991Z → earliest valid span close
+2026-10-13 14:18Z; the mid-span real Telegram exercise remains
+outstanding in the 30Sep window). LANDING GAP DISCHARGED: the fifteenth
+record (`27c0ee0`) was still unpushed at member-16 receipt (GitHub 422
+on the SHA — never landed); this register wave delivers BOTH records on
+one branch. Ceiling stays 506, tree clean; register-append-only wave.
+
 Updated 2026-09-29 (21:20 IST, collapse #15 — post-#110 member; SPAN
 ARITHMETIC MOVES TO GEN14): the 21:10 IST composer-paste member (eighth
 29Sep member, created AFTER the #110 merge landed at 20:42 IST) is the
