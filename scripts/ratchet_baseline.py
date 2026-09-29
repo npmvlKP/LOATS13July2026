@@ -849,8 +849,15 @@ History (most recent last):
       verifiers PASS; R-14 live verification outcome; R-15/R-16
       findings). Tree at ceiling 504 pre-wave (504 == 504), so +1
       lands AT 505. Ceiling 504->505.
+  506. 29Sep2026 (R-15 backup-fidelity fix):
+      +1 -- tests/test_repair_backup_fidelity.py (pins the repair
+      tool's pre-repair snapshot ordering: backup holds the broken
+      link, re-derives the repaired hashes, DB backup holds the
+      pre-repair hash, dry-run writes nothing). RED proven against
+      c588be7 before the fix; GREEN after. Tree at ceiling 505
+      pre-wave (505 == 505), so +1 lands AT 506. Ceiling 505->506.
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 505
+TRACKED_FILE_CEILING = 506
