@@ -995,3 +995,31 @@ span quartet green at record time (snapshot mtime 0.55 min,
 `last_sampled_at` 06:34:55Z, `kill_switch_verified:true`,
 `unhandled_exceptions:0`, `ended_at:null` = in-progress by design).
 Register-append-only wave; tree clean, ceiling stays 503.
+
+Updated 2026-09-29 (12:50 IST, collapse #13 — recomposition: risk
+header swapped, roadmap re-included): the 07:09 IST composer-paste
+member (sixth 29Sep member, created AFTER the #104/#105/#106 waves
+landed on main) is the day's thirteenth collapse. Containment 18/24
+lines inside the 15Sep FR9 source archive AND 18/24 inside the 10:43
+IST member-12 sibling; the 4 lines novel to the sibling are the
+recomposed standing-risks header (R-14 fix-shape + symtoken-rebuild
+question still operator-gated, 30Sep discharge list, 08Oct span
+deadline); the archive-novel delta is the re-included STEP-4 Wave-4
+block plus the P5-GATE line member 12 lacked — ZERO novel finding
+lines; unre-sliced pool UNCHANGED (§1-8, §17-21, Appendix). Wave-4
+TODO states verified live at HEAD 5ea064e by two-sided grep:
+TODO-10/S-14 and TODO-11/S-15 correctly OPEN (register-dated 30Sep,
+gated on the R-01 decision and a supervised run respectively);
+TODO-12 LANDED as F9-L-03 (`src/loats/signal_source_guard.py` +
+`tests/test_signal_source_guard.py`, insert-time enum-source provenance
+guard, fail-closed); TODO-16 answered by ADR-0020 (S-12 ACCEPTED,
+binary switch + OPS limiter for the ANALYZE horizon); TODO-17 answered
+by ADR-0019 (the CMP supersession register itself is the deliverable).
+Remaining-risks block matches the register rows row by row (R-01/R-05/
+R-08/R-12/R-13/R-14 with their dated due dates; "awaiting your word"
+matches R-14's operator-gated status; R-05 01Oct and R-12 08Oct 08:02Z
+span close verbatim). P5 span quartet green at record time (snapshot
+`reports/p5_forward_test_20260924_080208.json` mtime ~1 min,
+`last_sampled_at` 07:19:55Z, `kill_switch_verified:true`,
+`unhandled_exceptions:0`, `ended_at:null` = in-progress by design).
+Register-append-only wave; tree clean, ceiling stays 503.
