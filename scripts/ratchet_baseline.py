@@ -842,8 +842,15 @@ History (most recent last):
       falsified, 3 confirmed) and R-14 register row advanced to
       FIX IMPLEMENTED. Tree at ceiling 503 pre-wave (503 == 503), so +1
       lands AT 504. Ceiling 503->504.
+  505. 29Sep2026 (F9-M-01-R2 chain re-anchor evidence record):
+      +1 -- docs/audit-history/29Sep2026-f9m01r2-chain-reanchor-and-
+      backup-fidelity.md (25Sep frozen-writer repair record: 398
+      broken links re-anchored, 668/668 DB rows mirrored, three
+      verifiers PASS; R-14 live verification outcome; R-15/R-16
+      findings). Tree at ceiling 504 pre-wave (504 == 504), so +1
+      lands AT 505. Ceiling 504->505.
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 504
+TRACKED_FILE_CEILING = 505
