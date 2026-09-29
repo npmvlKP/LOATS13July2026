@@ -831,8 +831,19 @@ History (most recent last):
       drill re-run clean as the seventh consecutive verification at the
       post-#102 HEAD; zero new findings, pool unchanged). Tree at ceiling
       502 pre-wave (502 == 502), so +1 lands AT 503. Ceiling 502->503.
+  504. 29Sep2026 (R-14 fix implementation + F9-H-03 liveness delivery):
+      +1 -- tests/test_r14_bounds_and_liveness_alert.py (bounded sentiment
+      download leg per RISK-REGISTER R-14 shape (i)+(iv): socket timeout,
+      wait bound, concurrency cap, per-feed fetch timeout, per-feed sweep
+      budget with partial retention, failure negative-cache; liveness
+      alert now delivers via Telegram with episode dedupe and recovery
+      re-arm; polling-task dead-man switch). Foreign-edit reconciliation
+      on the 17Sep outage doc (29Sep Outcome paragraph: 2 claims
+      falsified, 3 confirmed) and R-14 register row advanced to
+      FIX IMPLEMENTED. Tree at ceiling 503 pre-wave (503 == 503), so +1
+      lands AT 504. Ceiling 503->504.
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 503
+TRACKED_FILE_CEILING = 504

@@ -9,6 +9,7 @@ import json
 import os
 import re
 import threading
+import time
 import warnings
 from datetime import UTC, datetime
 from typing import Any, cast
@@ -33,7 +34,7 @@ if os.environ.get("LOATS_SUPPRESS_NLTK_WARNING") == "1":
 
 import feedparser
 from cachetools import TTLCache
-from newspaper import Article
+from newspaper import Article, Config
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 
 from .lazy_settings import LazySettings
@@ -77,6 +78,56 @@ LKG_TTL_SECONDS = 900
 # window, leaving a 300 s band where stale-but-served LKG signals carry
 # the degraded audit tag before a true cold start.
 DEGRADED_THRESHOLD_SECONDS = 600
+
+# R-14 (29Sep, fix shape (i)+(iv) per docs/RISK-REGISTER.md): bounds INSIDE
+# the thread leg. The unbounded newspaper4k download leg let a single slow
+# host stall a feed beyond the 8 s producer window; every sweep then died
+# pre-aggregation and the freshness gate starved. Layered bounds:
+#
+# 1. ARTICLE_EXTRACT_SOCKET_TIMEOUT_SECONDS -- handed to newspaper4k's
+#    Config.request_timeout so the HTTP leg itself is socket-bounded
+#    (the library default was 7 s but live per-article wall cost measured
+#    4.3-26.6 s; the socket bound caps the tail at the HTTP layer).
+# 2. ARTICLE_EXTRACT_WAIT_SECONDS -- the async-side wait for the worker
+#    thread. Executor threads are not cancellable (deferred cancellation,
+#    loatsev-workflow/producer-window reference), so the only way to keep
+#    a sweep live is to stop waiting and skip the entry.
+# 3. ARTICLE_EXTRACT_CONCURRENCY -- a global semaphore across feeds so
+#    3 feeds x 20 entries cannot stampede 60 concurrent downloads.
+# 4. FEED_FETCH_TIMEOUT_SECONDS -- the feedparser leg (hot feeds < 0.5 s
+#    measured live) gets its own bound so a dead host cannot eat the
+#    whole sweep.
+# 5. FEED_SWEEP_BUDGET_SECONDS -- per-feed wall budget. Work completed
+#    before it fires is RETAINED (partial results, not all-or-nothing);
+#    timed-out entries are skipped.
+ARTICLE_EXTRACT_SOCKET_TIMEOUT_SECONDS = 6.0
+ARTICLE_EXTRACT_WAIT_SECONDS = 3.0
+ARTICLE_EXTRACT_CONCURRENCY = 4
+FEED_FETCH_TIMEOUT_SECONDS = 3.0
+FEED_SWEEP_BUDGET_SECONDS = 7.0
+
+# R-14: failed extracts are negative-cached so a dead URL does not
+# re-download EVERY cycle (the churn that never converged). Successes
+# stay in the positive article cache; this cache remembers failures
+# only, for a shorter TTL (a dead article may recover).
+ARTICLE_FAILURE_NEGATIVE_TTL_SECONDS = 120
+# Values are unread sentinels; membership IS the signal. mypy needs the
+# annotation (the constructor kwargs cannot bind the type params); the
+# float payload is the monotonic failure timestamp kept for forensics.
+_ARTICLE_FAILURE_CACHE: TTLCache[str, float] = TTLCache(
+    maxsize=512, ttl=ARTICLE_FAILURE_NEGATIVE_TTL_SECONDS
+)
+_ARTICLE_FAILURE_LOCK = threading.RLock()
+
+# R-14: extraction runs on worker threads; the cap is global to the
+# process (all feeds, all concurrent sweeps) to prevent stampedes.
+_extract_semaphore = threading.BoundedSemaphore(ARTICLE_EXTRACT_CONCURRENCY)
+
+# R-14: shared Config for Article construction; newspaper4k reads
+# request_timeout from the Config passed at construction time. The
+# socket bound caps the HTTP leg's tail (see the constant above).
+_news_config = Config()
+_news_config.request_timeout = ARTICLE_EXTRACT_SOCKET_TIMEOUT_SECONDS
 
 # F9-H-05 (TODO-14, ADR-0017): CMP P3 ensemble/decay/bounds delivery.
 # CMP P3: "RSS+VADER ensemble (news 70/social 30), decay. Gate: scores
@@ -159,42 +210,92 @@ class SentimentAnalyzer:
         return compound_score, label
 
     async def parse_rss_feed(self, url: str, max_items: int = 20) -> list[NewsItem]:
-        """Parse RSS feed extract news items asynchronously."""
-        try:
-            feed = await asyncio.to_thread(feedparser.parse, url)
-            news_items: list[NewsItem] = []
-            for entry in feed.entries[:max_items]:
-                try:
-                    content = await asyncio.to_thread(
-                        self._extract_article_content, entry.link
-                    )
-                    sentiment_score, sentiment_label = self.analyze_text(
-                        f"{entry.title}. {content}"
-                    )
-                    published_date = datetime.now(UTC)
-                    if hasattr(entry, "published_parsed") and entry.published_parsed:
-                        pp = entry.published_parsed
-                        published_date = datetime(
-                            pp[0], pp[1], pp[2], pp[3], pp[4], pp[5], tzinfo=UTC
-                        )
+        """Parse RSS feed extract news items asynchronously.
 
-                    news_item = NewsItem(
-                        title=entry.title,
-                        content=content,
-                        source=urlparse(url).netloc,
-                        url=entry.link,
-                        published_date=published_date,
-                        sentiment_score=sentiment_score,
-                        sentiment_label=sentiment_label,
-                    )
-                    news_items.append(news_item)
-                except Exception:
-                    logger.warning("Failed process RSS item %s", entry.link)
-                    continue
-            return news_items
+        R-14 (fix shape (i)+(iv)): every network leg of the sweep is
+        bounded so the 8 s producer window is respected by construction
+        rather than by cancellation. The per-feed wall budget
+        (FEED_SWEEP_BUDGET_SECONDS) covers the WHOLE sweep -- feed fetch
+        plus article extraction -- and starts at method entry, so the
+        worst-case per-feed cost (budget + fetch-timeout tail) stays
+        under the producer window even with all feeds gathered
+        concurrently:
+        - the feedparser fetch runs under min(FEED_FETCH_TIMEOUT_SECONDS,
+          remaining budget);
+        - each article extraction waits at most ARTICLE_EXTRACT_WAIT_SECONDS
+          for its worker thread (executor threads are not cancellable, so
+          the async side skips instead of blocking the sweep; a timed-out
+          thread still lands its result in the positive or negative cache
+          for the NEXT cycle -- convergence, not loss);
+        - items extracted before the budget fires are RETAINED (partial
+          results, not all-or-nothing); timed-out entries are skipped.
+        """
+        sweep_deadline = time.monotonic() + FEED_SWEEP_BUDGET_SECONDS
+        try:
+            feed = await asyncio.wait_for(
+                asyncio.to_thread(feedparser.parse, url),
+                timeout=min(
+                    FEED_FETCH_TIMEOUT_SECONDS,
+                    max(sweep_deadline - time.monotonic(), 0.1),
+                ),
+            )
+        except TimeoutError:
+            logger.warning(
+                "Feed fetch exceeded its budget, skipping sweep: %s",
+                url,
+            )
+            return []
         except Exception:
             logger.exception("Failed parse RSS feed %s", url)
             return []
+        news_items: list[NewsItem] = []
+        for entry in feed.entries[:max_items]:
+            remaining = sweep_deadline - time.monotonic()
+            if remaining <= 0:
+                logger.warning(
+                    "Feed sweep budget %.1fs exhausted after %d item(s), "
+                    "retaining partial result: %s",
+                    FEED_SWEEP_BUDGET_SECONDS,
+                    len(news_items),
+                    url,
+                )
+                break
+            try:
+                content = await asyncio.wait_for(
+                    asyncio.to_thread(self._extract_article_content, entry.link),
+                    timeout=min(ARTICLE_EXTRACT_WAIT_SECONDS, remaining),
+                )
+                sentiment_score, sentiment_label = self.analyze_text(
+                    f"{entry.title}. {content}"
+                )
+                published_date = datetime.now(UTC)
+                if hasattr(entry, "published_parsed") and entry.published_parsed:
+                    pp = entry.published_parsed
+                    published_date = datetime(
+                        pp[0], pp[1], pp[2], pp[3], pp[4], pp[5], tzinfo=UTC
+                    )
+
+                news_item = NewsItem(
+                    title=entry.title,
+                    content=content,
+                    source=urlparse(url).netloc,
+                    url=entry.link,
+                    published_date=published_date,
+                    sentiment_score=sentiment_score,
+                    sentiment_label=sentiment_label,
+                )
+                news_items.append(news_item)
+            except TimeoutError:
+                logger.warning(
+                    "Article extraction exceeded %.1fs bound, skipping: %s",
+                    ARTICLE_EXTRACT_WAIT_SECONDS,
+                    entry.link,
+                )
+                continue
+            except Exception:
+                logger.warning("Failed process RSS item %s", entry.link)
+                continue
+        return news_items
 
     def _extract_article_content(self, url: str) -> str:
         """Extract article content URL using newspaper4k.
@@ -203,19 +304,31 @@ class SentimentAnalyzer:
         5 min). A completed download survives producer cancellation, so
         every cycle re-downloads strictly less and cold analysis converges
         inside the producer window instead of timing out forever.
+
+        R-14: failures are negative-cached for a shorter TTL (a dead URL
+        previously re-downloaded EVERY cycle -- the churn that never
+        converged), the HTTP leg carries a socket timeout via the shared
+        Config, and the acquire is wrapped in the global concurrency
+        semaphore so concurrent feeds cannot stampede the executor.
         """
         key = _article_cache_key(url)
         with _article_cache_lock:
             cached: str | None = _article_cache.get(key)
         if cached is not None:
             return cached
+        with _ARTICLE_FAILURE_LOCK:
+            if key in _ARTICLE_FAILURE_CACHE:
+                return ""
         try:
-            article = Article(url)
-            article.download()
-            article.parse()
+            with _extract_semaphore:
+                article = Article(url, config=_news_config)
+                article.download()
+                article.parse()
             content = self.preprocess_text(article.text)
         except Exception:
             logger.warning("Failed extract article content %s", url)
+            with _ARTICLE_FAILURE_LOCK:
+                _ARTICLE_FAILURE_CACHE[key] = time.monotonic()
             return ""
         with _article_cache_lock:
             _article_cache[key] = content
