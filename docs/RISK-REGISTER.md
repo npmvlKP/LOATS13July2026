@@ -932,3 +932,39 @@ the DOWNLOAD leg (per-download timeout + concurrency cap), not just
 the sweep — (ii) cache-deferral narrows but cannot bound the in-flight
 leg; (iv) escalation should key on over-window maxima, which persist
 while the liveness row stays green.
+
+Updated 2026-09-29 (10:45 IST, collapse #11 — 08:53 member residual
+verdicts): the 05:43Z composer-paste member is the family's eleventh
+collapse — bulk is an OpenAlgo host-console log block (login → broker
+callback → master-contract rebuild → option-chain 500s) plus two
+parse-death PowerShell transcripts plus a verbatim re-slice of the
+08:57 member's risk tail. Containment 0/202 against RISK-REGISTER.md
+is the probe-target rule (log-block composition does not embed
+register prose): the tail verifies claim-by-claim, not literally.
+Both PS tails are parse-death by PS 5.1 semantics (literal
+`<placeholder>` argv → `The '<' operator is reserved for future use`;
+NOTHING on the line executed): intended operations verified live
+instead — PR #104 MERGED as a58d58c with all 15 check-runs green
+(Docker Build skipped by-design on a docs-only merge; advisory
+benchmark-perf green), wave branch purged (empty ls-remote), protection
+contract 0 divergences on BOTH surfaces (REST GET + GraphQL: 10
+contexts strict, count 1, dismiss-stale true, enforce-admins on), tree
+clean at ceiling 503/503. NEW live evidence: the host-console 500s
+have a LOATS-side footprint — 12 `Could not find instrument/exchange
+token for NSE_INDEX:NIFTY` API HTTP 500 events in LOATS structured
+logs, all 2026-09-29 with last at 03:24:38Z, zero after 03:30Z, with
+the `_fetch_history_bare` retry leg firing (Retry 1/3 after 1.02s);
+recurrence scan over all six rotations finds 27SepT01×14 and
+27SepT14×2 → defect CLASS: the host's delete-then-insert symtoken
+rebuild (~43 s, delete 03:24:06Z → bulk insert 03:24:49Z) 500s
+concurrent NSE_INDEX lookups and LOATS retry absorbs it (self-healed).
+Disposition: host-layer transient absorbed by design; queued as a
+30Sep ops-window question (defer analyzer data legs across the host
+master-contract rebuild window, or idempotent backoff) behind R-14 —
+not a new P1. All other tail claims verified live this session:
+R-01/R-05/R-08/R-12/R-13/R-14 rows present, ADR-0016 present, PR #73
+sentinels in the main tree (`insufficient_history`
+src/loats/rules.py:513, `composite_strength_threshold` 0.6
+src/loats/config/settings.py:68), P5 span quartet green (mtime 0.8
+min, kill_switch_verified true, unhandled_exceptions 0). The 30Sep
+ops window remains operator-gated.
