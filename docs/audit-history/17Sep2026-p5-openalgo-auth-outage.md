@@ -294,6 +294,43 @@ discriminated by the 30Sep fix landing — if rows flow Tuesday, R-14
 was the binding constraint and this section's gate explanation is
 downstream detail.
 
+**Outcome (29 Sep close): rows flowed — R-14 cleared.** 270 REJECT
+rows written today (`signal_batch` entities, composite_strength ~0.56
+declines — the prudence class, not starvation), sentiment recovered
+(15 marginal liveness alerts, max 17 min stale vs 279 the day before),
+zero ROUTE rows all session. The 29Sep close digest's "26–29Sep all
+zero" phrasing is true only for ROUTE rows; the REJECT stream is the
+recovery evidence. Day classification: **prudence day on fully
+restored machinery** — candidate formation works, the gate binds on
+signal strength (0.56 vs threshold), exactly the 23Sep-class regime.
+One consequence for grading: the zero-ROUTE streak (26, 28, 29 Sep)
+is a signal-strength drought on live machinery, distinct from the
+24–25Sep session-outage days — density-quality grading should weigh
+them differently.
+
+**Operator-adopted annotation (29Sep evening, keep+annotate verdict;
+live probes by the remediation session)**: the Outcome paragraph above
+is kept verbatim with two claim-level corrections pinned here, per the
+live evidence of the same day. (1) "R-14 cleared" is FALSIFIED — the
+deferred-cancellation signature ran all day: 23,945 producer
+budget-warning events with per-minute maxima up to 41.6 s (over the
+8.0 s window, 428 of 457 active minutes), sentiment staleness
+reaching 95+ min during REGULAR (49 `Sentiment source liveness ALERT`
+log warnings — none delivered, the F9-H-03 alert was log-only), and
+zero sentiment persists into the evening. The 270 REJECT count, the
+prudence-day classification, and the "zero-ROUTE = strength drought"
+distinction are CONFIRMED against `data/loats.db` (`audit_log`:
+270 `signal_batch`/REJECT rows 29Sep; `trade_decisions`: last row
+25Sep 09:59Z). (2) "15 marginal liveness alerts, max 17 min stale" is
+FALSIFIED on both counts (49 alerts; 95-min peak). Fix disposition:
+shape (i)+(iv) from the R-14 register row landed 29Sep evening
+(bounded download leg: socket timeout + wait bound + concurrency cap +
+per-feed fetch timeout + per-feed sweep budget with partial retention;
+failure negative-cache; liveness escalation now delivers to Telegram
+with once-per-episode dedupe and recovery re-arm; polling-task
+dead-man switch for the silent-bot class). Verification suite:
+`tests/test_r14_bounds_and_liveness_alert.py`.
+
 **Operator-adopted annotation (28Sep, keep+annotate verdict; live
 probes at HEAD `d0bfaf0`)**: the corrections block is kept with three
 claim-level fixes pinned here. (1) The 12:14 IST storm IS the SIXTH
