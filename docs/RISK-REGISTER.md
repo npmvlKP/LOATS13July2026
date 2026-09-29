@@ -891,3 +891,44 @@ review flags explicitly; derive keeps snapshot review flags verbatim;
 the read-back — never the PUT exit code — is the contract. Record:
 `28Sep2026-f9m02-restore-put-semantics-drift.md`. Snapshot: HEAD
 `8063380` (PR #101 merged 2026-09-28) + this wave.
+
+Updated 2026-09-29 (morning, R-14 live corroboration + R-13 seventh
+occurrence): the 29Sep 09:37 IST paste member is collapse #10 —
+containment 13/19 lines inside the 08:57 IST member, delta is the
+risk-prioritization tail itself (mid-wave transcript class: created
+before the 30Sep ops window it defers to). Tail claims verified live,
+row by row: register rows R-01/R-05/R-08/R-12/R-13/R-14 present with
+the cited due dates and fix-shape options (RISK-REGISTER.md:447-460);
+ADR-0016 present (`docs/adr/0016-defer-cycle-latency-budget-wire-benchmark-gate.md`)
+and TODO-3 answered by it; PR #73 MERGED 2026-09-25 (signal-outcome
+instrumentation landed); wave-1 sentinels live (`insufficient_history`
+in `src/loats/rules.py`, `composite_strength_threshold` 0.6 at
+`src/loats/config/settings.py:68` with pinned test); P5 span quartet
+green (snapshot mtime 1.0 min, `last_sampled_at` within a minute of
+the probe, `kill_switch_verified:true`, `unhandled_exceptions:0`,
+`ended_at:null` = in-progress by design). NEW live evidence for the
+R-14 fix shape (29Sep rotation scan, 01:28-04:23Z): 5,172 budget
+warnings, median 1,424 ms — the 28Sep total-cancellation regime (8 s
+pins only) is NOT reproduced, BUT from 03:26Z values pin at ~8,000 ms
+AND maxima run 9.2-12.6 s THROUGH the 03:45Z REGULAR open (155 lines
+exceed 8,000 ms; max 12,630 ms), proving DEFERRED cancellation:
+`asyncio.to_thread` executor futures cannot be cancelled mid-download,
+so the window closes only when the in-flight sync `Article.download()`
+returns (`sentiment.py:164,168-169` → `:214`). Sweep cost still
+degrades monotonically (300 ms → 1.6 s → 8 s pins → over-window),
+i.e. the 28Sep starvation curve re-forming with the article-TTL cache
+slowing it. Contrary observability finding: sentiment persistence is
+HEALTHY through the degradation (323 signals today, latest 04:15:00Z,
+`degraded:false`, score 0.707, news_count 55) — zero liveness alerts
+is CORRECT, so fix-shape option (iii) (analysis-liveness row) cannot
+discriminate this failure mode and must not be chosen on liveness
+grounds alone. Seventh R-13 occurrence: 08:45-08:55 IST pre-open
+host-unreachable storm (first refusal 03:15:46Z, last 03:25:37Z,
+4,699 quote refusals + 132 connection failures, zero after 03:45Z,
+all five breakers CLOSED after recovery) — self-healed; the
+sixth-occurrence conclusion (rollover-window grace alone cannot cover
+the class) is unchanged. Implication for 30Sep: bounds must apply to
+the DOWNLOAD leg (per-download timeout + concurrency cap), not just
+the sweep — (ii) cache-deferral narrows but cannot bound the in-flight
+leg; (iv) escalation should key on over-window maxima, which persist
+while the liveness row stays green.
