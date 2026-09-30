@@ -461,6 +461,58 @@ run `36403612800` success.
 | R-15 | P1-fixed | F9-M-01-R2: `scripts/repair_f9m01_chain_head.py` serialized the ALREADY re-anchored entry list to `*.f9m01r1-backup` (`main()` ran `reanchor_span` before `write_repaired_log`; c588be7 original) — the "backup" held repaired content, zero broken links, and could neither restore nor re-derive the pre-repair state. Fired on BOTH real runs (24Sep, 29Sep); docstring claim false for the JSONL leg (the SQLite DB snapshot was genuine both times — taken before `repair_db`). No production trail corrupted: the live chain was repaired correctly both times; only the restore artifact was degraded | FIXED same session (F9-M-01-R2): backup serialized from the PRE-repair list before mutation; repair-record reason now reports actual run/link counts (was a hardcoded "23 frozen runs" — false for the 1-run 29Sep repair); pinned by `tests/test_repair_backup_fidelity.py` (4 tests; RED proven against c588be7 before the fix). 24Sep-era JSONL/DB backups preserved under `*.20260924-preserved` before the 29Sep apply overwrote the fixed names. Evidence: `29Sep2026-f9m01r2-chain-reanchor-and-backup-fidelity.md` §3-4 | — | A future restore rehearsal (30Sep+ ops window) may validate the preserved backups end-to-end; NOT urgent — the DB backups are genuine and pre-repair state is reconstructible from them |
 | R-16 | P2-watch | Span governance: a HEALTHY P5 supervisor never picks up merged code (the watchdog is revive-only; LOATS_P5_Resume is disabled), and a graceful soft-stop CLOSES the running span (fresh span, day-0 reset of the 14d accumulation clock). The 13:37 IST paste assumed a scheduled restart task would deliver #109 to the runtime — false at probe time; the verification required the supervised soft-stop path executed manually | OPEN — mechanism understood and recorded; no code change pending. The 29Sep verification session itself is the worked example (gen11 soft-stop → gen12 verification → gen13 fresh span). The R-12 08Oct close arithmetic moves to the NEW span's `started_at 2026-09-29T13:48:05Z` → earliest valid close 13Oct 13:48Z | 2026-10-13 | If the wave roadmap requires a mid-span code pickup again, soft-stop is the only delivery path and resets the clock — schedule verification sessions at span boundaries where possible. Evidence: `29Sep2026-f9m01r2-chain-reanchor-and-backup-fidelity.md` §2, §5 |
 
+Updated 2026-09-30 (08:05 IST, collapse #17 — first member of the new
+day; §19/§20 pool section consumed): the 02:15 IST 30Sep composer-paste
+member (tenth consecutive collapse, created AFTER the #111 merge landed
+at 16:45:47Z 29Sep) carries three blocks. (1) An OpenAlgo HOST-log
+transcript 07:35:56-07:37:34 IST: startup errors on the stale broker
+token (`Incorrect api_key or access_token` in quotes/funds), the
+07:36:41 user re-login redirecting to /broker, the 07:37:12 broker
+callback, master-contract rebuild (107,756 records, 17s), WS/order-adapter
+connect and catch-up recovery — the arc completes INSIDE the paste
+(self-healed re-login); every emitter is host-checkout (`G:/.OA/OpenAlgo`):
+the pinned set (strategy_module_db, order_update_service, order_adapter,
+auth, brlogin, auth_db, auth_utils, master_contract_db) plus TWO newly
+pinned: `master_contract_cache_hook` -> host
+`database/master_contract_cache_hook.py`, `catch_up_processor` -> host
+`sandbox/catch_up_processor.py`. Zero LOATS-source lines; no post-relogin
+recurrence of the token signature inside the transcript (host `logs/`
+holds no 30Sep rotation, so the transcript itself is the evidence).
+(2) Two PS 5.1 tails, both parse-death class (`The '<' operator is
+reserved for future use` on literal `<abs-path>` and `<snapshot>
+<outdir>` template tokens) — NOTHING executed; intended operations
+verified live at record time: PR #111 MERGED 2026-09-29T16:45:47Z,
+merge commit ee47948 = local main HEAD, branch purged remote AND local
+(ls-remote empty); protection GET field-by-field green TODAY
+(approving=1, dismiss_stale=true, code_owner=false, last_push=false,
+strict=true, 10 contexts, enforce_admins=true, restrictions=null) —
+the derive recipe's 4-flag patch contract intact. The same PS session
+left the pinned junk signature at repo root: UTF-16LE `verify.json`
+holding a GitHub 404 JSON body (PS-redirect capture, never committed);
+deleted untracked — tree clean, ceiling stays 506. (3) A
+standing-risks queue plus a §19 Executive Summary / §20 Architecture
+Overview re-slice: containment 37/160 normalized lines inside the
+15Sep FR9 SOURCE archive (7/8 distinctive-phrase greps verbatim; miss
+= phrasing drift `saturated at 100.0`), 0/160 against the #16 record —
+a verbatim re-slice of the SOURCE sections, not of the member-16
+mirror, so §19/§20 join the consumed pool; every §19 finding remains a
+dispositioned register row (S-02/S-03/S-13 RESTORED; `previous_hash`
+link chain present; `src/loats` 40 .py files vs the pasted `38`) and
+§20's live claims carry over. Freshness delta, not a contradiction:
+the member's queue says R-13 `six occurrences` — the register (29Sep
+morning update) pins SEVEN (08:45-08:55 IST pre-open storm); all five
+queue rows otherwise matched register rows (R-14 standing confirmation,
+gen14 Telegram exercise, R-05 01Oct, R-12 13Oct, R-15 optional
+rehearsal). NEW LIVE FACTS at record time: gen14 quartet green
+(`p5_forward_test_20260929_141804.json`, mtime 0.3 min,
+`started_at 2026-09-29T14:18:04.991Z` unchanged, `ended_at:null`,
+`restarts:1` — up from 0 at the #16 record, i.e. ONE supervisor
+restart/resume event between 29Sep 21:50 IST and this probe; the span
+was NOT closed and re-started, so the 14-day clock is UNCHANGED —
+earliest valid close 2026-10-13 14:18Z; `kill_switch_verified:true`,
+`unhandled_exceptions:0`, `last_sampled_at 02:18:53Z` within sampler
+cadence of the probe). Zero fresh findings; register-append-only wave.
+
 Updated 2026-09-29 (21:50 IST, collapse #16 — full re-slice of the FR9
 source; fifteenth record delivered with it): the 21:36 IST composer-paste
 member (ninth 29Sep member, created AFTER the fifteenth record was
