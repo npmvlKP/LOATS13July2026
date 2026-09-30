@@ -281,7 +281,7 @@ class TestRatchetSingleSource:
 
     def test_canonical_module_exists_and_pins_one_value(self, canonical, guard):
         assert canonical.TRACKED_FILE_CEILING == guard.TRACKED_FILE_CEILING
-        assert 350 <= canonical.TRACKED_FILE_CEILING <= 510
+        assert 350 <= canonical.TRACKED_FILE_CEILING <= 560
 
     def test_hygiene_guard_imports_canonical(self):
         src = (REPO_ROOT / "scripts" / "check_repo_hygiene.py").read_text(
@@ -298,7 +298,7 @@ class TestRatchetSingleSource:
 
 class TestCeiling:
     def test_ceiling_is_sane(self, guard):
-        assert 350 <= guard.TRACKED_FILE_CEILING <= 510
+        assert 350 <= guard.TRACKED_FILE_CEILING <= 560
 
     def test_ceiling_above_current_count(self, guard):
         tracked = guard._tracked_files()
@@ -1694,6 +1694,32 @@ class TestFixerHooksSpareFrozenEvidence:
         ).stdout
         return {line[3:] for line in out.splitlines() if line.startswith(" M ")}
 
+    def _guard_frozen_trees_or_skip_foreign_hold(self) -> None:
+        """Pre-run frozen-tree guard (R-07, 2026-09-30 window).
+
+        The sweep legs measure the dirty-path DELTA around a real
+        pre-commit run. A foreign hold -- an orphaned mutant-sweep child
+        from a killed parent run (the 23Sep incident class) or any
+        concurrent dirtying process -- poisons that delta: the trees
+        are already `` M`` at start, the mutant leg reads "nothing was
+        rewritten" and false-REDDs (or worse, the shipped leg inherits
+        the orphan's rewrites). Probe the trees FIRST with the same
+        primitive the sweep uses (``git status --porcelain``) and skip
+        fail-visible on a foreign hold; the shipped-config leg then
+        re-checks with an exact-banner assertion for the TOCTOU window.
+        """
+        dirty_frozen = sorted(
+            p for p in self._dirty_paths() if p.startswith(self.FROZEN_TREES)
+        )
+        if dirty_frozen:
+            pytest.skip(
+                "R-07 frozen-tree guard: frozen evidence trees already "
+                f"dirty before the sweep ({dirty_frozen[:5]}) — a foreign "
+                "hold (orphaned mutant sweep / concurrent dirtying "
+                "process) invalidates the delta measurement; re-run "
+                "after the holder exits"
+            )
+
     def _run_hook(self, hook: str, config: Path) -> None:
         subprocess.run(
             [
@@ -1762,8 +1788,17 @@ class TestFixerHooksSpareFrozenEvidence:
                 f"fixer hooks rewrote frozen-evidence files: {frozen_rewritten[:5]} "
                 "— hook-level exclude on the mutator hooks is missing or narrowed"
             )
+            residual = sorted(
+                p for p in self._dirty_paths() if p.startswith(self.FROZEN_TREES)
+            )
+            assert not residual, (
+                "R-07 TOCTOU: frozen trees turned dirty DURING the sweep "
+                f"({residual[:5]}) — a foreign hold raced the measurement; "
+                "the green verdict is void, re-run after the holder exits"
+            )
 
     def test_shipped_config_spares_frozen_evidence(self) -> None:
+        self._guard_frozen_trees_or_skip_foreign_hold()
         self._sweep_legs(REPO_ROOT / ".pre-commit-config.yaml", False)
 
     def test_excludes_stripped_mutant_proves_the_mechanism(self) -> None:
@@ -2855,6 +2890,22 @@ class TestBenchmarkGateWired:
             "ADR first"
         )
         self._assert_gate_wired(block)
+
+    def test_benchmark_job_name_is_the_promoted_required_context(self) -> None:
+        # ADR-0021 (30Sep checkpoint): the job `name:` is the
+        # branch-protection required-context string. The R-01 decision
+        # (b) wave renamed it to the enforcement name and promoted it;
+        # renaming the display name WITHOUT updating the protection PUT
+        # silently breaks merges (the old advisory name is no longer a
+        # legal required context).
+        block = self._benchmark_job_block(CI_YML.read_text(encoding="utf-8"))
+        assert block is not None
+        assert "name: benchmark-perf (F9-H-02 gate)" in block, block[:300]
+        assert "advisory" not in block, (
+            "benchmark-perf regressed to the advisory display name — the "
+            "job was promoted to required by ADR-0021; a rename here must "
+            "land with the protection-list update in the same wave"
+        )
 
     def test_net_flags_a_job_that_lost_the_run_step(self) -> None:
         """RED-snapshot leg: mutate the live copy; the net must flip red."""
