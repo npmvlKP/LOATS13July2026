@@ -68,6 +68,7 @@ def test_minimum_authority_set_is_cited(register_text: str) -> None:
         "ADR-0017",
         "ADR-0019",
         "ADR-0020",
+        "ADR-0021",
     ):
         assert authority in register_text, authority
 
@@ -76,6 +77,19 @@ def test_pr_commits_are_cited_for_restored_rows(register_text: str) -> None:
     # Restored/conformed rows carry their merge evidence.
     for citation in ("9f82a21", "7014186", "5f634ba", "633daae"):
         assert citation in register_text, citation
+
+
+def test_s14_flipped_by_the_r01_decision_wave(
+    register_rows: list[str],
+) -> None:
+    # ADR-0021 (30Sep checkpoint): S-14's resolution derives from the
+    # decision — the row must cite the single enforcement source and
+    # its RED-proven net.
+    s14 = next(row for row in register_rows if row.startswith("| S-14 "))
+    assert "SUPERSEDED" in s14, s14
+    assert "ADR-0021" in s14, s14
+    assert "latency_budget.py" in s14, s14
+    assert "test_latency_budget_pins.py" in s14, s14
 
 
 def test_open_rows_name_their_resolution_slot(

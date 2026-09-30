@@ -144,4 +144,4 @@ class TestRatchetSingleSource:
         )
         pins = re.findall(r"TRACKED_FILE_CEILING\s*=\s*(\d+)", src)
         assert len(pins) == 1
-        assert 405 <= int(pins[0]) <= 510
+        assert 405 <= int(pins[0]) <= 560

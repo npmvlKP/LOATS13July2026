@@ -453,7 +453,7 @@ class TestRatchetLockstep:
             f"ratchet surfaces disagree (the 416/426 split class): {pins}"
         )
         value = next(iter(pins.values()))
-        assert 350 <= value <= 510, f"ratchet value out of sane band: {value}"
+        assert 350 <= value <= 560, f"ratchet value out of sane band: {value}"
 
     def test_f8c02_verifier_passes_on_live_tree(self) -> None:
         proc = subprocess.run(

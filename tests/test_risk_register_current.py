@@ -26,11 +26,10 @@ def register_text() -> str:
 
 
 def test_p1_items_carry_the_checkpoint_due_date(register_text: str) -> None:
-    # R-01 (ADR-0016 cycle decision) is the only P1 still OPEN at the
-    # 2026-09-30 checkpoint. R-02 (kill-switch span proof) carried the
-    # same due date until it closed same-day (ADR-0018, 2026-09-21 --
-    # the disclosure amendment landed BEFORE the span ended, per the
-    # register's sequencing rule), so its row now pins the closure.
+    # R-01 was the only P1 OPEN at the 2026-09-30 checkpoint and is now
+    # CLOSED by ADR-0021 (decision (b), the checkpoint wave). R-02
+    # (kill-switch span proof) closed same-day earlier (ADR-0018,
+    # 2026-09-21). Both P1 rows pin their closures.
     p1_rows = [
         line
         for line in register_text.splitlines()
@@ -39,7 +38,7 @@ def test_p1_items_carry_the_checkpoint_due_date(register_text: str) -> None:
     assert len(p1_rows) == 2, p1_rows
     r01 = next(row for row in p1_rows if row.startswith("| R-01 "))
     r02 = next(row for row in p1_rows if row.startswith("| R-02 "))
-    assert "2026-09-30" in r01 and "OPEN" in r01, r01
+    assert "CLOSED by ADR-0021" in r01, r01
     assert "CLOSED by ADR-0018" in r02, r02
 
 
@@ -47,6 +46,18 @@ def test_r01_cites_the_measured_cycle_population(register_text: str) -> None:
     # The live :8001/metrics scrape at the register's snapshot.
     assert "count=2183" in register_text
     assert "target_compliance_count=0" in register_text
+
+
+def test_r01_closure_names_the_decision_and_its_evidence(
+    register_text: str,
+) -> None:
+    # ADR-0021 (30Sep checkpoint): the register names the amended
+    # budget, the compliance populations the decision cited, and the
+    # same-wave enforcement deliverable.
+    assert "ADR-0021" in register_text
+    assert "0/26,413" in register_text
+    assert "0/1,278" in register_text
+    assert "latency_budget.py" in register_text
 
 
 def test_r02_closure_names_the_disclosure_and_its_bound(
