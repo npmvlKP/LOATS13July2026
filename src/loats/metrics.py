@@ -9,6 +9,7 @@ import time
 from collections.abc import Callable
 from typing import Any, TypeVar, cast
 
+from .latency_budget import CYCLE_COMPLIANCE_TARGET_SECONDS
 from .loats_logging import get_logger
 
 
@@ -357,8 +358,9 @@ def record_cycle_time(duration: float) -> None:
             metrics.cycle_time_stats["max_seconds"], duration
         )
 
-        # Track target compliance (<100ms)
-        if duration <= 0.1:  # 100ms target
+        # Track target compliance (ADR-0021: amended 1 s cycle budget;
+        # the constant is the single enforcement source).
+        if duration <= CYCLE_COMPLIANCE_TARGET_SECONDS:
             metrics.cycle_time_stats["target_compliance_count"] += 1
 
     except Exception:  # nosec B110

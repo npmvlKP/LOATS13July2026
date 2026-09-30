@@ -856,8 +856,20 @@ History (most recent last):
       pre-repair hash, dry-run writes nothing). RED proven against
       c588be7 before the fix; GREEN after. Tree at ceiling 505
       pre-wave (505 == 505), so +1 lands AT 506. Ceiling 505->506.
+  507. 30Sep2026 (R-01 checkpoint wave, ADR-0021):
+      +7 -- docs/adr/0021-cycle-latency-budget-measured-amendment.md
+      (R-01 decision (b) record), src/loats/latency_budget.py
+      (single enforcement source: cycle 1 s, producer warnings
+      80 ms), src/loats/preflight.py (R-08 bind-or-exit
+      duplicate-listener guard), tests/test_latency_budget_pins.py
+      (S-14 net, RED-proven), tests/test_preflight_r08.py (R-08 net,
+      faked transport), tests/test_trailing_stop_slm.py (S-15 SL-M
+      + Rule-7 fixture; found the refusal-aliasing bug, fixed),
+      docs/audit-history/30Sep2026-r01-checkpoint-wave-adr0021.md
+      (wave record). Tree at ceiling 506 pre-wave (506 == 506), so
+      +7 lands AT 513. Ceiling 506->513.
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 506
+TRACKED_FILE_CEILING = 513
