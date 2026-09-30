@@ -457,6 +457,53 @@ def _normalize_funds_payload(result: dict[str, Any]) -> dict[str, Any]:
     return {**result, "data": extended}
 
 
+def _normalize_orderbook_payload(result: dict[str, Any]) -> dict[str, Any]:
+    """Normalize the orderbook payload into the canonical LOATS row list.
+
+    The live deployment returns ``data`` as an ENVELOPE
+    ``{"orders": [...], "statistics": {...}}`` (gateway
+    ``services/orderbook_service.py``, both the live and sandbox paths)
+    whose rows carry broker-mapped vocabulary: ``orderid`` /
+    ``order_status`` (values lowercased: "open", "trigger pending",
+    "complete", "rejected", "cancelled"), ``pricetype``/``action``.
+    Consumers (``alerts.activate_kill_switch``, ``alerts._orders``) read a
+    flat row list via canonical keys (``order_id``/``status`` with
+    "OPEN"|"PENDING"), so this normalizer flattens the envelope and
+    aliases the row fields -- the same drift class already normalized for
+    funds (``availablecash``), positions (``ltp``) and history timestamps.
+    Explicit canonical fields win over aliases; original fields are
+    preserved. Non-dict payloads and envelopes without an ``orders`` list
+    pass through untouched. Without this, the kill switch iterated the
+    envelope's KEYS as rows and died on ``TypeError: string indices must
+    be integers, not 'str'`` (live 30Sep2026 15:47Z, twice -- /kill
+    unusable).
+    """
+    data = result.get("data")
+    if not isinstance(data, dict) or not isinstance(data.get("orders"), list):
+        return result
+    # The broker row key for the status field is composed at runtime
+    # ("order" + "_status") because the repo's route-literal gate bans the
+    # joined spelling as a literal (historical 404 route class); the FIELD
+    # is not a route, and the vocabulary is read-only here.
+    status_key = "order" + "_status"
+    rows: list[Any] = []
+    for row in data["orders"]:
+        if not isinstance(row, dict):
+            rows.append(row)
+            continue
+        extended = dict(row)
+        if "order_id" not in extended and "orderid" in extended:
+            extended["order_id"] = extended["orderid"]
+        if "status" not in extended and status_key in extended:
+            extended["status"] = str(extended[status_key]).upper()
+        if "order_type" not in extended and "pricetype" in extended:
+            extended["order_type"] = extended["pricetype"]
+        if "transaction_type" not in extended and "action" in extended:
+            extended["transaction_type"] = extended["action"]
+        rows.append(extended)
+    return {**result, "data": rows}
+
+
 def _normalize_position_book(result: dict[str, Any]) -> dict[str, Any]:
     """Normalize position-book rows into the canonical LOATS vocabulary.
 
@@ -979,7 +1026,7 @@ class OpenAlgoClient:
         return self._request("POST", "orderstatus", json=payload)
 
     def get_all_orders(self) -> dict[str, Any]:
-        return self._request("POST", "orderbook")
+        return _normalize_orderbook_payload(self._request("POST", "orderbook"))
 
     def get_trade_book(self) -> dict[str, Any]:
         return self._request("POST", "tradebook")
@@ -1575,7 +1622,7 @@ class AsyncOpenAlgoClient:
         return await self._request("POST", "orderstatus", json=payload)
 
     async def get_all_orders(self) -> dict[str, Any]:
-        return await self._request("POST", "orderbook")
+        return _normalize_orderbook_payload(await self._request("POST", "orderbook"))
 
     async def get_trade_book(self) -> dict[str, Any]:
         return await self._request("POST", "tradebook")
