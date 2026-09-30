@@ -17,7 +17,7 @@ State legend: **OPEN** (deviation live, resolution scheduled) ·
 
 | ID | CMP expectation | Delivered reality | Authority | State |
 |----|-----------------|-------------------|-----------|-------|
-| S-01 | Orchestrator cycle < 100 ms hot loop | 8.0 s producer window; budget decision deferred | ADR-0016; R-01 (`docs/RISK-REGISTER.md`) | OPEN — 30Sep checkpoint |
+| S-01 | Orchestrator cycle < 100 ms hot loop | 8.0 s producer window; CMP budget amended to the measured architecture (1 Hz / 1 s) | ADR-0021 (amends the ADR-0016 deferral); R-01 CLOSED (`docs/RISK-REGISTER.md`) | SUPERSEDED |
 | S-02 | IV-rank gate math (BUY < 30) | Chain-IV rank over 252-day series; loud `insufficient_history` fail-closed; silent 0.5 fallback killed | F9-C-01/F9-M-04 resolution (15Sep2026) | RESTORED |
 | S-03 | Composite 0.6 / opposition 0.4 | Restored after silent drift to 0.5/0.6 | F9-H-01, PRs #62/#63 (`9f82a21`) | RESTORED |
 | S-04 | P3 sentiment: RSS+VADER ensemble, 4 h half-life decay, scores bounded [-1,+1] | Delivered on the news leg; social 30 % leg deferred pending a real producer | ADR-0017, PR #66 (`633daae`); R-04 residual | OPEN — residual deferred (R-04) |
@@ -30,8 +30,8 @@ State legend: **OPEN** (deviation live, resolution scheduled) ·
 | S-11 | Repository layout | Flat `src/loats/` accepted | FR-wave acceptance records (01Sep matrix) | ACCEPTED |
 | S-12 | Kill switch: THROTTLE→PAUSE→KILL escalation | Binary switch + OPS limiter; 3-state machine deferred to the PRE-LIVE gate | ADR-0020 | ACCEPTED — ANALYZE horizon |
 | S-13 | Audit trail SHA-256 chaining | Restored (`previous_hash` link chain + walking verifier) | F9-M-01, PR #54 (`5f634ba`) | RESTORED |
-| S-14 | §1/§7 latency-gate enforcement surfaces | Producer budget warnings hardcoded at 30/40 ms while the design window is 8 s (noise class); resolution derives thresholds from the decision | FR9 F9-L-01; ADR-0016 freeze | OPEN — rides the R-01 decision wave |
-| S-15 | CMP Rule 12 trailing ratchet exercised | `enable_trailing_stops=False` default; ratchet implemented + 93 % covered but unexercised until a supervised run enables it | FR9 F9-L-02; ANALYZE has no positions | OPEN — rides the 30Sep wave (run-log pin + SL-M fixture test) |
+| S-14 | §1/§7 latency-gate enforcement surfaces | All seven enforcement surfaces derive from `src/loats/latency_budget.py` (cycle 1 s; producer warnings 80 ms = TA stage budget) — the 30/40 ms noise class and the legacy 100 ms compliance literals are gone; RED-proven net in `tests/test_latency_budget_pins.py` | FR9 F9-L-01; ADR-0021 | SUPERSEDED |
+| S-15 | CMP Rule 12 trailing ratchet exercised | SL-M fixture legs landed: monotonic advance to SL-M emission, Rule-7 `Rule7ModificationLimitError` degradation (stop state restored + audited refusal + driver continues), multi-position continuation (`tests/test_trailing_stop_slm.py`; fixture EXPOSED and the fix landed a latent aliasing bug — refusal branch now restores the pre-move config). Supervised `enable_trailing_stops` enablement remains a post-checkpoint supervisor touch on gen14+ | FR9 F9-L-02; ADR-0021 wave | OPEN — supervised enablement pending (fixture + fix landed) |
 
 ## Reconciliation protocol
 

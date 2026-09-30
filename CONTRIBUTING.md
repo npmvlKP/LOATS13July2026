@@ -97,19 +97,24 @@ All commits must pass the following quality gates:
   `docs/audit-history/24Sep2026-F9M02-branch-protection-closure.md`,
   `docs/audit-history/25Sep2026-f9m02-r1-protection-contract-drift.md`;
   `GET /repos/npmvlKP/LOATS13July2026/branches/main/protection`):
-  `required_status_checks.strict=true` with 10 required contexts
+  `required_status_checks.strict=true` with 11 required contexts
   (`deps-sync`, `ruff-lint`, `ruff-format`, `isort`, `flake8`, `bandit`,
-  `commit-lint`, `mypy`, `pytest-coverage`, `pip-audit`),
+  `commit-lint`, `mypy`, `pytest-coverage`, `pip-audit`,
+  `benchmark-perf (F9-H-02 gate)`),
   `required_pull_request_reviews.required_approving_review_count=1`,
   `enforce_admins=true`, `allow_force_pushes=false`,
   `allow_deletions=false`. Direct pushes are rejected (GH006); PRs and
   required status checks are mandatory. The repo-hygiene, rss-feeds,
-  ruff-repo-scope, gitleaks, docker and benchmark-perf jobs run on
+  ruff-repo-scope, gitleaks and docker jobs run on
   every push/PR but are intentionally NOT in the required-context list
   — they remain advisory signals on main; add a context there only when
-  a job must gate merges. benchmark-perf (ADR-0016) is promoted to a
-  required context in the same wave as the deferred F9-H-02
-  latency-budget decision. The rule lives server-side only and has now
+  a job must gate merges. benchmark-perf was promoted by the R-01
+  decision (b) wave (ADR-0021, 2026-09-30 checkpoint): the job renamed
+  to `benchmark-perf (F9-H-02 gate)` and added to the required list in
+  the same wave per ADR-0016 §Decision.2. The context string IS the
+  job's `name:` in ci.yml — renaming the job without updating the
+  protection list in the same wave silently breaks merges. The rule
+  lives server-side only and has now
   drifted twice without any commit noticing (15Sep absence; 25Sep
   contract drift): every review wave must re-probe it against this
   pinned contract and restore + record on divergence. Verification is
@@ -121,8 +126,8 @@ All commits must pass the following quality gates:
 
 The following safeguards are **not** enforceable by this codebase or by an agent; they require a maintainer with repository admin access to verify in the GitHub web UI:
 
-1. **Branch protection for `main`**: Enable "Require a pull request before merging" with at least one reviewer approval. *(RE-VERIFIED via API 2026-09-25 (F9-M-02-R1 drift wave): enabled, 1 approval, dismiss-stale, admin-enforced, 10 required contexts strict — found drifted (`strict=false`, 16 contexts incl. advisory jobs) and restored the same hour; see Quality Gates above and `docs/audit-history/25Sep2026-f9m02-r1-protection-contract-drift.md`. History: enabled 2026-09-07; found silently absent — 404 — at the 2026-09-15 FR9 review; re-enabled via the REST API 2026-09-24; found contract-drifted and re-restored 2026-09-25. The setting lives server-side only and can change without any commit touching this file — twice evidenced: re-verify the GET before trusting this text. No UI check outstanding.)*
-2. **Status checks**: Enable "Require status checks to pass before merging" and select the CI jobs that run Ruff, MyPy, Pytest, Bandit, and pip-audit. *(VERIFIED via API 2026-09-07: 10 required contexts, strict — see Quality Gates above.)*
+1. **Branch protection for `main`**: Enable "Require a pull request before merging" with at least one reviewer approval. *(RE-VERIFIED via API 2026-09-25 (F9-M-02-R1 drift wave): enabled, 1 approval, dismiss-stale, admin-enforced, 10 required contexts strict — found drifted (`strict=false`, 16 contexts incl. advisory jobs) and restored the same hour; see Quality Gates above and `docs/audit-history/25Sep2026-f9m02-r1-protection-contract-drift.md`. History: enabled 2026-09-07; found silently absent — 404 — at the 2026-09-15 FR9 review; re-enabled via the REST API 2026-09-24; found contract-drifted and re-restored 2026-09-25. 2026-09-30: promoted to 11 contexts by ADR-0021 (`benchmark-perf (F9-H-02 gate)` added — the promotion PUT must land in the wave that merged the ci.yml rename). The setting lives server-side only and can change without any commit touching this file — twice evidenced: re-verify the GET before trusting this text. No UI check outstanding.)*
+2. **Status checks**: Enable "Require status checks to pass before merging" and select the CI jobs that run Ruff, MyPy, Pytest, Bandit, and pip-audit. *(VERIFIED via API 2026-09-07: 10 required contexts, strict — see Quality Gates above. 2026-09-30: 11 required contexts after the ADR-0021 benchmark-perf promotion.)*
 3. **Pre-commit hooks as client-side guards**: The `.pre-commit-config.yaml` hooks run locally; they are not a server-side substitute for branch protection. Verify each contributor has run `pre-commit install` — since the ADR-0014 gitleaks pre-push net (2026-09-10), the config pins `default_install_hook_types: [pre-commit, commit-msg, pre-push]`, so a bare install also creates the pre-push shim; without it the pre-push inventory (pytest, per-module coverage, pip-audit, the gitleaks default-rules secret net) silently never fires. The secret net requires the gitleaks binary on PATH (or `GITLEAKS_BINARY` set) and **fails closed** when it is missing.
 4. **Review dismissal / admin enforcement**: Optionally enable "Dismiss stale pull request approvals when new commits are pushed" and "Include administrators". *(Empirically confirmed enforced as of 2026-09-04: a direct force-push to `main` was rejected with GH006 "Protected branch update failed" — PR-only, 10 required status checks, force-pushes forbidden. The probe commits that prompted TODO-5/TODO-6 landed before protection was enabled.)*
 

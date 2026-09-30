@@ -17,6 +17,10 @@ import numpy as np
 from .alerts import alerts
 from .config import get_settings
 from .database import db
+from .latency_budget import (
+    CYCLE_COMPLIANCE_TARGET_SECONDS,
+    PRODUCER_BUDGET_WARNING_SECONDS,
+)
 from .loats_logging import get_logger
 from .metrics import (
     record_cmp_chain_rejection,
@@ -548,8 +552,10 @@ class TradingOrchestrator:
             ).total_seconds()
             self._record_cycle_time(cycle_duration)
 
-            # Enforce 100ms cycle target with adaptive sleep
-            target_duration = 0.1  # 100ms
+            # Enforce the cycle cadence floor (ADR-0021: the 1 Hz
+            # cadence IS the amended budget; the legacy 100 ms floor
+            # contradicted the documented cadence).
+            target_duration = CYCLE_COMPLIANCE_TARGET_SECONDS
             sleep_time = max(0, target_duration - cycle_duration)
             await asyncio.sleep(sleep_time)
 
@@ -759,7 +765,7 @@ class TradingOrchestrator:
             duration = (
                 datetime.datetime.now(datetime.UTC) - start_time
             ).total_seconds()
-            if duration > 0.03:  # 30ms budget for TA analysis
+            if duration > PRODUCER_BUDGET_WARNING_SECONDS:  # ADR-0021 derivation
                 logger.warning(f"TA analysis exceeded budget: {duration * 1000:.2f}ms")
 
     @property
@@ -948,7 +954,7 @@ class TradingOrchestrator:
             duration = (
                 datetime.datetime.now(datetime.UTC) - start_time
             ).total_seconds()
-            if duration > 0.04:  # 40ms budget for sentiment analysis
+            if duration > PRODUCER_BUDGET_WARNING_SECONDS:  # ADR-0021 derivation
                 logger.warning(
                     f"Sentiment analysis exceeded budget: {duration * 1000:.2f}ms"
                 )
@@ -1091,7 +1097,7 @@ class TradingOrchestrator:
             duration = (
                 datetime.datetime.now(datetime.UTC) - start_time
             ).total_seconds()
-            if duration > 0.03:
+            if duration > PRODUCER_BUDGET_WARNING_SECONDS:  # ADR-0021 derivation
                 logger.warning(
                     f"Volatility analysis exceeded budget: {duration * 1000:.2f}ms"
                 )
@@ -1263,7 +1269,7 @@ class TradingOrchestrator:
             duration = (
                 datetime.datetime.now(datetime.UTC) - start_time
             ).total_seconds()
-            if duration > 0.03:
+            if duration > PRODUCER_BUDGET_WARNING_SECONDS:  # ADR-0021 derivation
                 logger.warning(
                     f"Price-action analysis exceeded budget: {duration * 1000:.2f}ms"
                 )
@@ -1415,7 +1421,7 @@ class TradingOrchestrator:
             duration = (
                 datetime.datetime.now(datetime.UTC) - start_time
             ).total_seconds()
-            if duration > 0.03:
+            if duration > PRODUCER_BUDGET_WARNING_SECONDS:  # ADR-0021 derivation
                 logger.warning(
                     f"Options-flow analysis exceeded budget: {duration * 1000:.2f}ms"
                 )
@@ -2013,9 +2019,13 @@ class TradingOrchestrator:
                 f"Max: {self.max_cycle_time * 1000:.2f}ms"
             )
 
-        # Alert if cycle time consistently exceeds target
-        if duration > 0.1:  # 100ms target
-            logger.warning(f"Cycle time exceeded 100ms target: {duration * 1000:.2f}ms")
+        # Alert if cycle time exceeds target (ADR-0021: amended 1 s
+        # cycle budget; full-window cycles warn by design -- fail-visible).
+        if duration > CYCLE_COMPLIANCE_TARGET_SECONDS:
+            logger.warning(
+                f"Cycle time exceeded {CYCLE_COMPLIANCE_TARGET_SECONDS:.1f}s "
+                f"target: {duration * 1000:.2f}ms"
+            )
 
     async def shutdown(self) -> None:
         """Shutdown the orchestrator gracefully."""
@@ -2182,7 +2192,13 @@ class TradingOrchestrator:
             "last_cycle_time_ms": self.last_cycle_time * 1000,
             "avg_cycle_time_ms": self.avg_cycle_time * 1000,
             "max_cycle_time_ms": self.max_cycle_time * 1000,
-            "target_compliance": "pass" if self.avg_cycle_time <= 0.1 else "fail",
+            # ADR-0021: compliance is graded against the amended 1 s
+            # cycle budget (single enforcement source).
+            "target_compliance": (
+                "pass"
+                if self.avg_cycle_time <= CYCLE_COMPLIANCE_TARGET_SECONDS
+                else "fail"
+            ),
         }
 
     def _handle_cycle_task_completion(self, task: asyncio.Task[None]) -> None:
@@ -2322,6 +2338,15 @@ async def update_trailing_stops() -> None:
                         logger.warning(
                             f"Rule-7 per-order budget exhausted for {order_id}: {r7}"
                         )
+                        # Restore the pre-move ratchet state:
+                        # update_trailing_stop mutated the config dict in
+                        # place and it ALIASES the stored metadata --
+                        # keeping the advanced stop in memory while the
+                        # broker (and the DB) still hold the last
+                        # successful level diverges the system's view of
+                        # the stop from the broker's (S-15 fixture
+                        # finding, 30Sep wave).
+                        db_position.metadata["trailing_config"] = old_config
                         await db.async_log_audit(
                             action="ratchet_refused_rule7",
                             entity_type="order",

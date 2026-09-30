@@ -46,6 +46,14 @@ class TradingSystem:
         """Initialize all system components."""
         try:
             logger.info("Initializing LOATS13July2026 trading system")
+            # R-08 pre-flight (bind-or-exit, 2026-09-30 ops window):
+            # refuse to boot when another live LOATS process already
+            # serves the OpenAlgo endpoint -- BEFORE any resource is
+            # initialized, so a refusal needs no compensating teardown.
+            # The probe is skipped under ENVIRONMENT=test.
+            from .preflight import check_duplicate_listener
+
+            check_duplicate_listener(settings.openalgo_base_url)
             await initialize_cache()
             await self.db.async_initialize()
             if not await self.db.async_verify_audit_log_integrity():

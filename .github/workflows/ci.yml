@@ -349,21 +349,24 @@ jobs:
         uses: gitleaks/gitleaks-action@v3
 
   # ----------------------------------------------------------------
-  # benchmark-perf (F9-H-02 prerequisite, 2026-09-17): runs the
-  # fail-closed performance benchmark (scripts/benchmark_performance.py,
-  # exit-code contract) so latency regressions fail CI instead of only
-  # printing a summary a caller can ignore. Adversary context: the gate
-  # was born-red until its stage-budget defect was fixed (ta_calculation
-  # graded against the 20ms DB budget); the job's green state is
-  # REACHABLE since that fix. Run-to-run latency noise on shared
-  # runners is expected: the verdict grades >=80% of samples within
-  # budget, not percentiles, and this job is ADVISORY (not a
-  # branch-protection required context) until the deferred F9-H-02
-  # latency-budget decision lands -- promotion is then a branch-
-  # protection context addition recorded in CONTRIBUTING.md (ADR-0016).
+  # benchmark-perf (F9-H-02, 2026-09-17; PROMOTED ADR-0021 2026-09-30):
+  # runs the fail-closed performance benchmark
+  # (scripts/benchmark_performance.py, exit-code contract) so latency
+  # regressions fail CI instead of only printing a summary a caller
+  # can ignore. Adversary context: the gate was born-red until its
+  # stage-budget defect was fixed (ta_calculation graded against the
+  # 20ms DB budget); the job's green state is REACHABLE since that
+  # fix. Run-to-run latency noise on shared runners is expected: the
+  # verdict grades >=80% of samples within budget, not percentiles.
+  # ADVISORY from 2026-09-17; the R-01 decision (b) wave (ADR-0021,
+  # 30Sep checkpoint) renamed the job to its enforcement name and
+  # promoted `benchmark-perf (F9-H-02 gate)` into the branch-
+  # protection required-context list (recorded in CONTRIBUTING.md).
+  # The job `name:` IS the required-context string -- renaming it
+  # without updating the protection list silently breaks merges.
   # ----------------------------------------------------------------
   benchmark-perf:
-    name: benchmark-perf (F9-H-02 prerequisite, advisory)
+    name: benchmark-perf (F9-H-02 gate)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
