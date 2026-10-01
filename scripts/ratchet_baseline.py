@@ -868,8 +868,20 @@ History (most recent last):
       docs/audit-history/30Sep2026-r01-checkpoint-wave-adr0021.md
       (wave record). Tree at ceiling 506 pre-wave (506 == 506), so
       +7 lands AT 513. Ceiling 506->513.
+  508. 01Oct2026 (MCX/CDS segment-enablement wave):
+      +2 -- src/loats/segments.py (per-segment session/holiday
+      registry: NSE 09:15-15:30 contract preserved, MCX 09:00-23:30,
+      CDS 09:00-17:00; 2026 holidays generated from OpenAlgo live
+      /api/v1/market/holidays -- MCX closed only 4 days/yr, trades
+      through Dussehra), tests/test_segments.py (12-case net:
+      boundaries, Dussehra NSE-shut/MCX-open, weekend, all-closed
+      holiday, enablement defaults/ordering/fallback).
+      settings.py gains ENABLED_SEGMENTS (comma env form validated,
+      default NSE-only, behavior-preserving); scheduler market-status
+      job logs per-segment state. Tree at ceiling 513 pre-wave
+      (513 == 513), so +2 lands AT 515. Ceiling 513->515.
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 513
+TRACKED_FILE_CEILING = 515
