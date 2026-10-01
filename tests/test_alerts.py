@@ -2,6 +2,7 @@
 
 import asyncio
 from datetime import UTC, datetime
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -23,6 +24,7 @@ from loats.models import (
     Trade,
     TransactionType,
 )
+from loats.openalgo import AsyncOpenAlgoClient
 
 
 class TestAlertSystem:
@@ -588,6 +590,71 @@ class TestAlertSystem:
         assert result is True
         assert alert_system.kill_switch_active is True
         assert mock_openalgo.cancel_order.call_count == 2  # Should cancel 2 orders
+
+    @pytest.mark.asyncio
+    async def test_activate_kill_switch_live_wire_envelope(
+        self, alert_system, mock_bot
+    ):
+        """Kill switch completes against the gateway's REAL orderbook envelope.
+
+        Regression for the 30Sep2026 live failure (15:47Z, twice): the wire
+        returns ``data`` as ``{"orders": [...], "statistics": {...}}`` with
+        broker vocabulary (orderid/order_status, lowercased values). The old
+        consumer iterated the envelope's keys as rows and died with
+        ``TypeError: string indices must be integers, not 'str'`` — /kill
+        unusable. This test runs the REAL client (only ``_request`` faked at
+        the HTTP boundary) so the client-layer normalizer is exercised
+        end-to-end into the consumer.
+        """
+        alert_system.bot = mock_bot
+        client = AsyncOpenAlgoClient(api_key="k", base_url="http://t")
+
+        async def fake_request(
+            method: str, endpoint: str, **kwargs: Any
+        ) -> dict[str, Any]:
+            assert endpoint == "orderbook"
+            return {
+                "status": "success",
+                "data": {
+                    "orders": [
+                        {"orderid": "o1", "order_status": "open", "symbol": "NIFTY"},
+                        {
+                            "orderid": "o2",
+                            "order_status": "trigger pending",
+                            "symbol": "NIFTY",
+                        },
+                        {
+                            "orderid": "o3",
+                            "order_status": "complete",
+                            "symbol": "NIFTY",
+                        },
+                        {
+                            "orderid": "o4",
+                            "order_status": "cancelled",
+                            "symbol": "NIFTY",
+                        },
+                    ],
+                    "statistics": {"total": 4},
+                },
+            }
+
+        client._request = fake_request  # type: ignore[method-assign]
+        client.cancel_order = AsyncMock(return_value={"status": "success"})
+
+        with (
+            patch("loats.alerts.settings") as mock_settings,
+            patch("loats.alerts.async_client", client),
+        ):
+            mock_settings.telegram_chat_id = "test_chat_id"
+            result = await alert_system.activate_kill_switch("gen14 span drill")
+
+        assert result is True
+        assert alert_system.kill_switch_active is True
+        # Only the genuinely-open order is cancelled; terminal states are
+        # skipped (current semantics pinned — "trigger pending" SL orders
+        # are a tracked follow-up question, not silently changed here).
+        cancelled = [c.args[0] for c in client.cancel_order.await_args_list]
+        assert cancelled == ["o1"]
 
     @pytest.mark.asyncio
     async def test_activate_kill_switch_exception(self, alert_system):

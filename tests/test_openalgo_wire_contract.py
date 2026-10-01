@@ -542,3 +542,141 @@ class TestFundsNormalization:
         model = orch._create_funds_model({})
         assert isinstance(model, FundsData)
         assert model.available_cash == 0 and model.total_equity == 0
+
+
+class TestOrderbookNormalization:
+    """Orderbook envelope normalized for the kill-switch and /orders consumers.
+
+    Live contract (gateway services/orderbook_service.py, both live and
+    sandbox paths): ``data`` is ``{"orders": [...], "statistics": {...}}``
+    with rows in broker-mapped vocabulary (orderid/order_status/symbol/
+    pricetype/action/quantity/price, status lowercased: "open",
+    "trigger pending", "complete", "rejected", "cancelled"). Consumers
+    (alerts.activate_kill_switch, alerts._orders) previously iterated
+    ``data`` directly, walked its KEYS as rows, and crashed with
+    ``TypeError: string indices must be integers, not 'str'`` — killing
+    the Telegram kill switch (live 30Sep2026 15:47Z, twice).
+    """
+
+    def test_orders_list_extracted_from_envelope(self) -> None:
+        live = {
+            "status": "success",
+            "data": {
+                "orders": [
+                    {
+                        "orderid": "2509300001",
+                        "order_status": "open",
+                        "symbol": "NIFTY",
+                        "exchange": "NFO",
+                        "pricetype": "LIMIT",
+                        "action": "BUY",
+                        "quantity": 25,
+                        "price": "25000.00",
+                    }
+                ],
+                "statistics": {"total": 1, "open": 1},
+            },
+        }
+        result = oa._normalize_orderbook_payload(live)
+        assert result["data"][0]["order_id"] == "2509300001"
+        assert result["data"][0]["status"] == "OPEN"
+        assert "statistics" not in result["data"]
+
+    def test_flat_legacy_list_promoted_to_envelope(self) -> None:
+        legacy = {
+            "status": "success",
+            "data": [{"orderid": "1", "order_status": "open"}],
+        }
+        result = oa._normalize_orderbook_payload(legacy)
+        assert result["data"] == legacy["data"]
+
+    def test_no_orders_key_is_no_op(self) -> None:
+        payload = {"status": "success", "data": {"foo": "bar"}}
+        assert oa._normalize_orderbook_payload(payload) is payload
+
+    def test_empty_orders_flatten_to_empty_list(self) -> None:
+        payload = {"status": "success", "data": {"orders": [], "statistics": {}}}
+        result = oa._normalize_orderbook_payload(payload)
+        assert result["data"] == []
+
+    def test_non_dict_payload_passes_through(self) -> None:
+        payload = {"status": "error", "message": "x"}
+        assert oa._normalize_orderbook_payload(payload) is payload
+
+    def test_non_list_orders_passes_through(self) -> None:
+        payload = {"status": "success", "data": {"orders": {"error": "upstream"}}}
+        assert oa._normalize_orderbook_payload(payload) is payload
+
+    def test_rows_alias_mapped_and_originals_preserved(self) -> None:
+        live = {
+            "status": "success",
+            "data": {
+                "orders": [
+                    {
+                        "orderid": "1",
+                        "order_status": "open",
+                        "symbol": "NIFTY",
+                        "pricetype": "LIMIT",
+                        "action": "BUY",
+                        "quantity": 25,
+                        "price": "25000.00",
+                    }
+                ],
+                "statistics": {},
+            },
+        }
+        row = oa._normalize_orderbook_payload(live)["data"][0]
+        assert row["order_id"] == "1"
+        assert row["status"] == "OPEN"
+        assert row["orderid"] == "1" and row["order_status"] == "open"
+        assert row["order_type"] == "LIMIT" and row["transaction_type"] == "BUY"
+
+    def test_explicit_canonical_fields_win(self) -> None:
+        live = {
+            "status": "success",
+            "data": {
+                "orders": [
+                    {
+                        "orderid": "2",
+                        "order_status": "trigger pending",
+                        "order_id": "legacy-2",
+                        "status": "PENDING",
+                        "product": "MIS",
+                    }
+                ],
+                "statistics": {},
+            },
+        }
+        row = oa._normalize_orderbook_payload(live)["data"][0]
+        assert row["order_id"] == "legacy-2"
+        assert row["status"] == "PENDING"
+
+    def test_non_dict_rows_pass_through(self) -> None:
+        live = {"status": "success", "data": {"orders": ["junk"], "statistics": {}}}
+        row = oa._normalize_orderbook_payload(live)["data"][0]
+        assert row == "junk"
+
+    @pytest.mark.asyncio
+    async def test_async_orderbook_normalized(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        client = AsyncOpenAlgoClient(api_key="k", base_url="http://t")
+
+        async def fake_request(
+            method: str, endpoint: str, **kwargs: Any
+        ) -> dict[str, Any]:
+            assert endpoint == "orderbook"
+            return {
+                "status": "success",
+                "data": {
+                    "orders": [{"orderid": "9", "order_status": "open"}],
+                    "statistics": {},
+                },
+            }
+
+        monkeypatch.setattr(client, "_request", fake_request)
+        result = await client.get_all_orders()
+        row = result["data"][0]
+        assert row["order_id"] == "9" and row["status"] == "OPEN"
+        # No cache on this path by design: the kill switch must see LIVE
+        # order state, never a stale cached book.
