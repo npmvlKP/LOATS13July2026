@@ -358,6 +358,82 @@ reachability (RSS), not the transport." Suspected trigger today:
 upstream RSS reachability from this host — broker-path transport
 unaffected, consistent with feed-side outage or egress filtering.
 
+## Continuation 6 (01 Oct): pre-band trap fires again; band fingerprint extended
+
+**Recurrence #3 of the pre-band login trap** (24Sep, 25Sep, 01Oct):
+automation oauth at 04:55:26 IST (row 133) — inside the band. The
+progressive sequence ran with **earlier hard-failure onset than
+previously documented**: precursor `Server disconnected` transients at
+04:57:51 and 05:26:13, a clean gap to 06:32, then hard `Incorrect
+api_key` quotes rejections from **06:33 IST steady at 2/min** (vs the
+06:19–07:49 quotes-stage range previously pinned). WS goodbye + 403 at
+07:05:39. No operator re-login as of 09:16 IST; open bell will fail
+hard without one. 91.5k breaker events burned by 09:10; all four
+broker-backed circuits OPEN, fail-closed (no order routing).
+
+**Extended fingerprint for the record**: the band's hard-rejection
+onset is variable (observed 06:19, 06:33, 06:35, 06:38 across days);
+its precursors (`Server disconnected` transients in the 04:57–05:26
+window) are now logged as early warning signs — a `Server disconnected`
+after a fresh pre-dawn oauth should trigger an immediate re-login
+attempt rather than a wait for hard failures.
+
+**Day classification pending re-auth**: if recovered pre-open or
+early, a partial evidence day; if absent-operator (25Sep pattern), a
+full loss. Gate mark for this run is 2026-10-13 19:48:04 IST (run
+141804's clock) — the reminder's "2026-10-08" reference was stale
+context from the superseded 080208 clock.
+
+**Operator annotation (01 Oct 2026, live probe verification at
+09:33–09:50 IST, LOATS rotations `logs/loats.log[.1-.3]`) — the
+transcript claims verify against instrumented evidence, with the
+source layer named per the pinned attribution set**: (1) the oauth
+04:55:26 IST row and the WS goodbye + 403 at 07:05:39 IST are
+OpenAlgo HOST-layer emitters (host `logs/` holds no 01 Oct rotation;
+not corroborable from LOATS-side instrumentation — transcript-sourced,
+consistent with the 30Sep collapse-#17 precedent); (2) the `Server
+disconnected` precursors are CORROBORATED at 23:27:52Z and 23:56:14Z
+(01 Oct 04:57:52 / 05:26:14 IST — the transcript's second-level
+04:57:51 / 05:26:13 stamps differ by ≤2 s, receipt-time skew;
+LOATS `loats.openalgo` HTTP-500 events, `.3`); (3) the hard
+`Incorrect api_key` quotes rejections are
+CORROBORATED: onset 01:03:09Z = 06:33:09 IST, steady exactly 2/min
+for every minute 01:03–01:53Z (`.2`), then silenced by the global
+`openalgo` breaker OPEN (fetch attempts suppressed — rejection
+silence is a breaker effect, not recovery); (4) the 91.5k breaker
+claim is CORROBORATED at order of magnitude: 99,642 breaker/degraded
+events 23:00Z–03:45Z across `.3/.2/.1` + live, same growth class as
+the 25Sep storm (~14.8k) at higher cycle cadence; (5) all four
+broker-backed circuits OPEN and fail-closed, zero `auth success` /
+re-login rows in the LOATS stream through 04:20Z — the day
+classifies FULL LOSS (25Sep pattern) unless the operator recovers
+late; the 13 Oct 19:48:04 IST gate mark on run 141804's clock is
+correct (29Sep 14:18:04Z + 14d).
+
+**Closing addendum (01 Oct, recovery verified 13:37 IST — LOATS-side,
+first-hand probes).** The operator re-auth landed 13:19:52 IST (host
+brlogin success; fresh master contract 106,187 symbols loaded
+13:20:22 IST). The global `openalgo` breaker CLOSED after recovery at
+07:50:21Z (13:20:21 IST — 29 s after re-auth, the designed
+HALF_OPEN→CLOSED arc) and all four source breakers by 07:50:52Z.
+Day classification per the pending clause above: **PARTIAL EVIDENCE
+DAY** — recovered mid-session (13:19:52 IST), producers starved from
+the 04:57 IST precursor through 13:20:52 IST (hard rejections
+06:33–07:23 IST, then suppression by the OPEN global breaker —
+rejection silence was a breaker effect, not recovery), evidence
+resumes from 13:20:52 IST. This is NOT the 25Sep absent-operator
+pattern: the operator re-authed, late. Two same-window control
+results: the 13:14 IST `/kill` attempt correctly REFUSED activation
+(`Failed fetch orders kill switch, rolled back` — the kill switch
+must reach the broker to cancel orders; fail-closed rollback proven),
+and the 13:33 IST re-drill PASSED on all legs (activation 08:03:04Z,
+122 orchestrator-blocked cycles, deactivation 08:05:12Z,
+`kill_switch_verified: true`) — the kill-switch live exercise
+landed inside the span despite the outage. The verifier's
+`DOCUMENTED_OUTAGE_WINDOWS` entry for this recurrence is now bounded
+(23:27:52Z → 02:50:21Z); grading against the bounded window is the
+grader's contract, not this addendum's.
+
 **Erratum (28Sep session, ~14:06 IST live probes — root cause
 corrected).** Continuation 4's anchors re-verified against live state
 and stand: 289 `trade_decisions` rows for 2026-09-25 (DB) = 289
