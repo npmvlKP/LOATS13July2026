@@ -880,8 +880,14 @@ History (most recent last):
       default NSE-only, behavior-preserving); scheduler market-status
       job logs per-segment state. Tree at ceiling 513 pre-wave
       (513 == 513), so +2 lands AT 515. Ceiling 513->515.
+  509. 01Oct2026 (MCX/CDS wave record):
+      +1 -- docs/audit-history/01Oct2026-mcx-cds-segment-enablement-
+      wave.md (live-evidence base, NoDecode comma-form fix, suite
+      ambient-env pin, verifier re-dating triangle, verification
+      totals, operational state). Tree at ceiling 515 pre-wave
+      (515 == 515), so +1 lands AT 516. Ceiling 515->516.
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 515
+TRACKED_FILE_CEILING = 516
