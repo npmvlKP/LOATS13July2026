@@ -314,9 +314,19 @@ class TradingScheduler:
         from the scheduler.  This method now only logs market state; signal
         producers live in the orchestrator's 100 ms cycle and are not dynamically
         added or removed here.
+
+        01Oct2026 segment wave: logs per-segment session state (NSE/MCX/CDS)
+        so operators get segment-level visibility before per-segment strategy
+        engines land in the follow-up wave.
         """
         try:
+            from .segments import SEGMENT_SESSIONS, enabled_segments, is_segment_open
+
             logger.debug("Checking market status")
+            for seg in enabled_segments():
+                state = "open" if is_segment_open(seg) else "closed"
+                window = "-".join(SEGMENT_SESSIONS[seg])
+                logger.info("Segment %s session %s (%s IST)", seg, state, window)
             if not self.is_market_open():
                 logger.debug("Market closed")
                 return

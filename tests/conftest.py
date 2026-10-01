@@ -27,6 +27,17 @@ os.environ.setdefault("TELEGRAM_CHAT_ID", "123456789")
 # regression tests copy os.environ and control the knob explicitly, so both
 # sides of their contract stay observable.
 os.environ.setdefault("LOATS_SUPPRESS_NLTK_WARNING", "1")
+# 01Oct2026 routing/segment wave: ANALYZER_ROUTING_ENABLED, ANALYZER_INTAKE_PATH
+# and ENABLED_SEGMENTS are real operator knobs (the untracked production .env
+# now carries ANALYZER_ROUTING_ENABLED=true for the Analyzer intake). The
+# suite's deterministic baseline is the factory default (routing DISABLED,
+# FR HC-19 "no default-on"); ambient operator env must not flip suite
+# behavior (01Oct: 13 factory/cycle tests failed on the ambient leak).
+# setdefault keeps an explicitly injected environment (CI matrices,
+# fresh-subprocess probes) winning.
+os.environ.setdefault("ANALYZER_ROUTING_ENABLED", "false")
+os.environ.setdefault("ANALYZER_INTAKE_PATH", "analyze")
+os.environ.setdefault("ENABLED_SEGMENTS", "NSE")
 
 # F8-H-01 test isolation (2026-09-07, hard fail-closed): the ``db`` singleton
 # inside the loats process under test binds ``Settings.sqlite_db_path`` /

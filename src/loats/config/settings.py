@@ -1,12 +1,13 @@
 """Pydantic settings for LOATS13July2026 configuration."""
 
+import json
 from decimal import Decimal
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import Field, SecretStr, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -116,6 +117,37 @@ class Settings(BaseSettings):
             "gateway's decision-intake route once it exists."
         ),
     )
+    # Segment enablement (01Oct2026 wave): NSE-only until an operator adds
+    # MCX/CDS via env (ENABLED_SEGMENTS=NSE,MCX,CDS). Behavior-preserving.
+    # NoDecode: complex fields are JSON-decoded by pydantic-settings before
+    # validators run, so the documented operator comma form would die with
+    # SettingsError ("Expecting value") -- proven 01Oct (185-test suite error
+    # cascade + direct probe). NoDecode delivers the raw string to the
+    # validator, which then accepts BOTH the comma form and JSON arrays.
+    enabled_segments: Annotated[list[str], NoDecode] = Field(
+        default=["NSE"],
+        description=(
+            "Trading segments whose sessions gate the scheduler. "
+            "Supported: NSE (09:15-15:30), MCX (09:00-23:30), CDS (09:00-17:00)."
+        ),
+    )
+
+    @field_validator("enabled_segments", mode="before")
+    @classmethod
+    def parse_enabled_segments(cls, v: object) -> object:
+        """Accept 'NSE,MCX,CDS' (operator) and '["NSE","MCX"]' (JSON) forms."""
+        if isinstance(v, str):
+            text = v.strip()
+            if text.startswith("["):
+                try:
+                    parsed = json.loads(text)
+                except json.JSONDecodeError:
+                    return [s.strip().upper() for s in text.split(",") if s.strip()]
+                if isinstance(parsed, list):
+                    return [str(s).strip().upper() for s in parsed]
+            return [s.strip().upper() for s in text.split(",") if s.strip()]
+        return v
+
     # F8-H-01: producer-window budget for the trading cycle. The legacy
     # hard-coded 80 ms window always expired mid-fetch under live feed
     # latencies (TA/sentiment take ~1.3 s), so every producer was
