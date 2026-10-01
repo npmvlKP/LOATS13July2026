@@ -782,15 +782,15 @@ DOCUMENTED_OUTAGE_WINDOWS: tuple[tuple[str, str | None, str], ...] = (
     # 04:55:26 IST oauth inside the band); hard `Incorrect api_key`
     # quotes rejections from 01:03:09Z = 06:33:09 IST steady 2/min;
     # global `openalgo` breaker OPEN, all four broker-backed circuits
-    # fail-closed. CLOSED: operator re-auth landed 02:19:52Z
+    # fail-closed. CLOSED: operator re-auth landed 07:49:52Z
     # (13:19:52 IST, host brlogin success) and the global breaker
-    # CLOSED after recovery at 02:50:21Z (LOATS rotation, first-hand
-    # grep); all four source breakers CLOSED by 02:50:52Z. Closing
+    # CLOSED after recovery at 07:50:21Z (LOATS rotation, first-hand
+    # grep); all four source breakers CLOSED by 07:50:52Z. Closing
     # addendum: docs/audit-history/
     # 17Sep2026-p5-openalgo-auth-outage.md (Continuation 6).
     (
         "2026-09-30T23:27:52+00:00",
-        "2026-10-01T02:50:21+00:00",
+        "2026-10-01T07:50:21+00:00",
         "01Oct pre-band login-trap recurrence: broker session invalidated "
         "by the pre-dawn automation oauth (04:55:26 IST, inside the "
         "collision band); hard api_key rejections from 06:33:09 IST, "
