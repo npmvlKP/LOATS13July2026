@@ -20,13 +20,19 @@ def scheduler():
 
 @pytest.mark.asyncio
 async def test_add_jobs_registers_support_jobs(scheduler):
-    """F8-H-03: only market-status, data-cleanup and backtest-sanity jobs are registered."""
+    """F8-H-03: no signal-emitting jobs; support jobs only.
+
+    02Oct2026: ``market_activation_check`` joins the support set (operator
+    mandate: per-segment session activation + Telegram availability
+    report). Signal production stays with the orchestrator.
+    """
     mock_add_job = MagicMock()
     scheduler.scheduler.add_job = mock_add_job
     await scheduler._add_jobs()
     ids = {call.kwargs["id"] for call in mock_add_job.call_args_list}
     assert ids == {
         "market_status_check",
+        "market_activation_check",
         "data_cleanup",
         "backtest_sanity_check",
     }

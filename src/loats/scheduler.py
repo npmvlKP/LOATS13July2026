@@ -21,6 +21,7 @@ from .alerts import alerts
 from .database import db
 from .lazy_settings import LazySettings
 from .loats_logging import get_logger
+from .market_status import market_status_service
 from .openalgo import KillSwitchError, async_client
 from .utils.circuit_breaker import (
     OPENALGO_CIRCUIT_BREAKER,
@@ -140,7 +141,7 @@ class TradingScheduler:
         """Initialize TradingScheduler."""
         self.scheduler = AsyncIOScheduler()
         self.running = False
-        self.scan_tasks: dict[str, asyncio.Task[dict[str, Any] | None]] = {}
+        self.scan_tasks: dict[str, asyncio.Task[Any]] = {}
         # Use shared module-level db singleton to avoid resource leaks on shutdown
         self.db = db
 
@@ -167,7 +168,7 @@ class TradingScheduler:
         orchestrator's 100 ms cycle, which is the sole engine of record for CMP
         decisions.  The scheduler therefore does NOT register ta_scan or
         sentiment_scan signal-emitting jobs; it keeps market-status,
-        data-cleanup and backtest-sanity support jobs.
+        session-activation, data-cleanup and backtest-sanity support jobs.
         """
         # Market status checks (every 1 minute)
         self.scheduler.add_job(
@@ -175,6 +176,18 @@ class TradingScheduler:
             IntervalTrigger(minutes=1),
             id="market_status_check",
             name="Market Status Check",
+            replace_existing=True,
+        )
+        # 02Oct2026 operator mandate: per-segment session activation --
+        # the first open transition of any enabled segment announces
+        # login + market-data availability + per-market regime over
+        # Telegram (market_status_service keeps per-process announce
+        # state; the alerts cooldown bounds cadence).
+        self.scheduler.add_job(
+            self.run_market_activation,
+            IntervalTrigger(minutes=1),
+            id="market_activation_check",
+            name="Market Session Activation Report",
             replace_existing=True,
         )
         # Data cleanup (daily at 3 AM)
@@ -335,6 +348,28 @@ class TradingScheduler:
         except Exception:
             logger.exception("Market status check failed")
 
+    async def run_market_activation(self) -> None:
+        """02Oct2026 operator mandate [1]: per-segment session activation.
+
+        Delegates to the market-status service: builds the consolidated
+        per-segment report (availability, BULL/BEAR/NEUTRAL regime,
+        candidate instruments) and announces over Telegram the first
+        time any enabled segment transitions into its open session.
+        Every external leg degrades independently -- the duty must never
+        crash the scheduler.
+        """
+        task_id = f"market_activation_{datetime.datetime.now(datetime.UTC).isoformat()}"
+        try:
+            task = asyncio.create_task(market_status_service.run_activation_check())
+            self.scan_tasks[task_id] = task
+            await task
+        except asyncio.CancelledError:
+            logger.info("Market activation task cancelled: %s", task_id)
+        except Exception:
+            logger.exception("Market activation task failed: %s", task_id)
+        finally:
+            self.scan_tasks.pop(task_id, None)
+
     async def run_data_cleanup(self) -> None:
         """Run data cleanup task."""
         task_id = f"data_cleanup_{datetime.datetime.now(datetime.UTC).isoformat()}"
@@ -449,7 +484,8 @@ class TradingScheduler:
 
         F8-H-03: ``ta_scan`` and ``sentiment_scan`` are no longer supported;
         they are retired with the dual-engine consolidation.  Only support jobs
-        (market_status_check, data_cleanup, backtest_sanity_check) remain.
+        (market_status_check, market_activation_check, data_cleanup,
+        backtest_sanity_check) remain.
         """
         try:
             if job_id in {"ta_scan", "sentiment_scan"}:
@@ -461,6 +497,8 @@ class TradingScheduler:
                 return
             if job_id == "market_status_check":
                 await self.check_market_status()
+            elif job_id == "market_activation_check":
+                await self.run_market_activation()
             elif job_id == "data_cleanup":
                 await self.run_data_cleanup()
             elif job_id == "backtest_sanity_check":
