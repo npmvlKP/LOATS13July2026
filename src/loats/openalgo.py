@@ -144,16 +144,22 @@ _INDEX_EXCHANGES = frozenset(
 )
 
 
-def _quote_request_shape(symbol: str) -> dict[str, str]:
+def _quote_request_shape(symbol: str, exchange: str | None = None) -> dict[str, str]:
     """Route a symbol to the exchange segment the deployment can quote.
 
     Index symbols must go to ``NSE_INDEX``; everything else stays on the
     cash segment. Verified live 08Sep2026 against the running OpenAlgo
     deployment (RELIANCE -> 200 on NSE, NIFTY -> 200 on NSE_INDEX / 400
-    on NSE).
+    on NSE). Callers that KNOW the segment (per-segment market status)
+    pass ``exchange`` explicitly -- MCX/CDS symbols do not exist on NSE
+    and an explicit exchange overrides the index heuristic.
     """
-    exchange = "NSE_INDEX" if symbol.strip().upper() in _INDEX_EXCHANGES else "NSE"
-    return {"exchange": exchange, "symbol": symbol}
+    resolved = (
+        exchange
+        if exchange is not None
+        else ("NSE_INDEX" if symbol.strip().upper() in _INDEX_EXCHANGES else "NSE")
+    )
+    return {"exchange": resolved, "symbol": symbol}
 
 
 def _normalize_interval(interval: str) -> str:
@@ -784,15 +790,32 @@ class OpenAlgoClient:
             trailing_stop_loss=data.get("trailing_stop_loss"),
         )
 
-    def get_quotes(self, symbols: list[str]) -> dict[str, Any]:
+    def get_quotes(
+        self, symbols: list[str], exchanges: list[str] | None = None
+    ) -> dict[str, Any]:
         # Deployment contract (verified live, F8-L-03): POST /quotes accepts a
         # SINGLE {apikey, exchange, symbol} body -- batch quotes belong to
         # /multiquotes. Fan out sequentially and reshape into the canonical
         # {"data": {symbol: {...}}} form every caller parses.
-        return _normalize_flat_quotes(symbols, self._request_quotes_single)
+        # ``exchanges`` (when given) is position-aligned with ``symbols``:
+        # per-segment callers quote MCX/CDS symbols that do not exist on
+        # the default NSE cash segment.
+        if exchanges is not None and len(exchanges) != len(symbols):
+            raise ValueError("exchanges must align 1:1 with symbols")
+        exchange_by_symbol = (
+            dict(zip(symbols, exchanges, strict=True)) if exchanges is not None else {}
+        )
+        return _normalize_flat_quotes(
+            symbols,
+            lambda s: self._request_quotes_single(s, exchange_by_symbol.get(s)),
+        )
 
-    def _request_quotes_single(self, symbol: str) -> dict[str, Any]:
-        return self._request("POST", "quotes", json=_quote_request_shape(symbol))
+    def _request_quotes_single(
+        self, symbol: str, exchange: str | None = None
+    ) -> dict[str, Any]:
+        return self._request(
+            "POST", "quotes", json=_quote_request_shape(symbol, exchange)
+        )
 
     def get_history(
         self,
@@ -1115,16 +1138,34 @@ class AsyncOpenAlgoClient:
             logger.error(f"Request failed: {e}")
             raise OpenAlgoError(f"Request failed: {e}") from e
 
-    async def get_quotes(self, symbols: list[str]) -> dict[str, Any]:
+    async def get_quotes(
+        self, symbols: list[str], exchanges: list[str] | None = None
+    ) -> dict[str, Any]:
         # Deployment contract (verified live, F8-L-03): POST /quotes accepts a
         # SINGLE {apikey, exchange, symbol} body -- batch quotes belong to
         # /multiquotes. Fan out per symbol and reshape into the canonical
         # {"data": {symbol: {...}}} form every caller parses. The synthesized
         # result is cached under the pre-existing digest key (60s TTL).
+        # ``exchanges`` (when given) is position-aligned with ``symbols``:
+        # per-segment callers quote MCX/CDS symbols that do not exist on
+        # the default NSE cash segment; the digest bakes the exchange list
+        # in so NSE and explicit-exchange variants never share a cache key.
+        if exchanges is not None and len(exchanges) != len(symbols):
+            raise ValueError("exchanges must align 1:1 with symbols")
+        exchange_by_symbol = (
+            dict(zip(symbols, exchanges, strict=True)) if exchanges is not None else {}
+        )
         symbols_sorted = sorted(symbols)
-        symbols_digest = hashlib.sha256(
-            ",".join(symbols_sorted).encode("utf-8")
-        ).hexdigest()
+        if exchange_by_symbol:
+            exchanges_digest = ",".join(
+                exchange_by_symbol.get(s, "") for s in symbols_sorted
+            )
+            digest_payload = f"{','.join(symbols_sorted)}|{exchanges_digest}"
+        else:
+            # Byte-identical to the pre-02Oct key: a no-exchange call must
+            # never fork the deployed cache namespace.
+            digest_payload = ",".join(symbols_sorted)
+        symbols_digest = hashlib.sha256(digest_payload.encode("utf-8")).hexdigest()
         cache_key = f"quotes:{symbols_digest}"
         cached_result = await cache_manager.get(cache_key)
         if cached_result:
@@ -1140,7 +1181,9 @@ class AsyncOpenAlgoClient:
         for symbol in symbols_sorted:
             try:
                 result = await self._request(
-                    "POST", "quotes", json=_quote_request_shape(symbol)
+                    "POST",
+                    "quotes",
+                    json=_quote_request_shape(symbol, exchange_by_symbol.get(symbol)),
                 )
             except Exception as exc:
                 errors.append((symbol, exc))

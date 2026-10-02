@@ -195,6 +195,7 @@ class TestSchedulerDoesNotEmitSignals:
         ids = {call.kwargs["id"] for call in mock_add_job.call_args_list}
         assert ids == {
             "market_status_check",
+            "market_activation_check",
             "data_cleanup",
             "backtest_sanity_check",
         }

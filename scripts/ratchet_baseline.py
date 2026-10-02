@@ -886,8 +886,25 @@ History (most recent last):
       ambient-env pin, verifier re-dating triangle, verification
       totals, operational state). Tree at ceiling 515 pre-wave
       (515 == 515), so +1 lands AT 516. Ceiling 515->516.
+  510. 02Oct2026 (operator-mandate wave: session activation, market
+      regime, instrument identification):
+      +3 -- src/loats/market_status.py (MarketStatusService:
+      per-segment session activation with delivery-confirmed Telegram
+      announce, deterministic price-confirmed BULL/BEAR/NEUTRAL regime
+      classification with volume-participation veto, report-only
+      instrument identification; benchmark pool NSE NIFTY via
+      NSE_INDEX, MCX GOLD/SILVER/CRUDEOIL, CDS USDINR),
+      tests/test_market_status.py (40-case net: classifier branches,
+      ranking caps, announce-once/retry semantics, HTML escaping,
+      holiday phases incl. 02Oct Gandhi Jayanti halted, per-segment
+      routing, async-cache byte-compat guard),
+      docs/audit-history/02Oct2026-market-activation-regime-wave.md
+      (wave record). openalgo.py get_quotes gains explicit ``exchanges``
+      (default byte-identical, cache namespace preserved); scheduler
+      gains support job market_activation_check. Tree at ceiling 516
+      pre-wave (516 == 516), so +3 lands AT 519. Ceiling 516->519.
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 516
+TRACKED_FILE_CEILING = 519
