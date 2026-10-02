@@ -87,6 +87,53 @@ the ten observable behaviors from the finding (before: 4/10 → after:
 10/10), and the external verifier `scripts/verify_f8h01_external.py`
 re-checks the same facts from a clean process without the test suite.
 
+## Amendment 8 (2026-10-02, host decision-telemetry intake is LIVE: routed decisions record receipts)
+
+Amendments 4 and 5 recorded the gateway-side decision-telemetry intake as
+deferred: every routed decision resolved as an honestly-counted HTTP-404
+``error`` outcome under the read-only semantic, and
+``Settings.analyzer_intake_path`` shipped (Amendment 5) so the future
+intake would activate as one config value with no code change and no
+restart of the accruing P5 span.
+
+**The intake is now live on the deployed host gateway** (OpenAlgo
+``restx_api/analyze.py``, ``POST /api/v1/analyze`` — "Decision-telemetry
+intake endpoint"; it accepts the routed TradeDecision payload, records
+it, and acknowledges receipt).
+
+1. **Live evidence (2026-10-01 P5 span, routing enabled for the
+   supervised run only):** ``data/audit.log`` ROUTE rows — 95/95 on
+   2026-10-01 carry ``metadata.routing_outcome.status = "success"`` with
+   ``analyzer_response.data.recorded = true``; the rotated LOATS logs
+   show the matching "Routing TradeDecision to Analyzer" /
+   "Successfully routed decision" pairs. The ``"analyze"`` default path
+   required no change (Amendment 5's per-call resolution delivered the
+   activation exactly as designed).
+2. **Semantics unchanged where they matter:** the intake is read-only
+   telemetry (Amendment 4) — it records suggestions, it places no
+   orders. Audited-attempt semantics (Amendment 7) are unchanged; while
+   routing is enabled, routed decisions now accrue as ``success``
+   (recorded receipt) instead of ``error`` (404).
+   ``analyzer_routing_enabled`` remains default-OFF in code (F8-H-01 /
+   HC-19); the ON state is the supervised P5 activation only.
+3. **Doc sync (this wave):** present-tense "gateway 404s it by design"
+   / "read-only semantic is live" prose in ``config/settings.py``,
+   ``openalgo.py``, ``trade_decision.py`` and the Amendment-5-era test
+   docstrings is re-dated as history. Zero behavior change.
+4. **Not a fabrication class:** receipts are real HTTP responses from
+   the real intake endpoint, persisted in the dual-write audit trail.
+
+### Consequences
+
+- ``analyzer_intake_path`` default ``"analyze"`` now names a live
+  endpoint; the setting stays operator-flippable (per-call resolution
+  preserved).
+- The P5 grader (``verify_p5_forward_test.py``) grades outcomes and
+  needs no change; spans accrue decisional ``success`` outcomes while
+  routing is enabled.
+- Historical runs whose ``error`` outcomes were 404s remain valid
+  audited-attempt evidence under Amendment 7.
+
 ## Amendment 7 (2026-09-18, F9-M-03 resolved: audited-attempt semantics for P5 decisional evidence)
 
 Operator decision 2026-09-18: **option (a), audited-attempt semantics.**

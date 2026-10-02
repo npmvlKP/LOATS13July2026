@@ -1,17 +1,19 @@
-"""Analyzer intake-contract pinning (ADR-006 Amendment 5).
+"""Analyzer intake-contract pinning (ADR-006 Amendments 5+8).
 
 Amendment 4 deferred the gateway-side decision-telemetry intake as a P5
-follow-up. Until that endpoint exists, every routed decision resolves as
-an honestly-counted HTTP-404 ``error`` outcome, and the intake path lived
+follow-up. While it was absent, every routed decision resolved as an
+honestly-counted HTTP-404 ``error`` outcome, and the intake path lived
 as a hard-coded literal inside ``place_analyzer_request`` — so activating
 the future endpoint would have required a code change and, with it, a
-restart of the accruing 14-day P5 span.
+restart of the accruing 14-day P5 span. Amendment 8 (2026-10-02) records
+the intake LIVE on the host gateway; the contract below is unchanged.
 
 The contract pinned here (Amendment 5):
 
 1. The intake path is a real settings field: ``analyzer_intake_path``.
-2. The default is exactly ``"analyze"`` — zero behaviour change while the
-   read-only semantic is live (the gateway 404s it by design).
+2. The default is exactly ``"analyze"`` — which (since Amendment 8)
+   targets the host gateway's live decision-telemetry intake; pre-intake
+   it resolved under the Amendment 5 read-only 404 semantic.
 3. The client resolves the field per call via ``get_settings()`` — no
    constructor-time capture, so an operator can flip the route without
    touching the supervised run.

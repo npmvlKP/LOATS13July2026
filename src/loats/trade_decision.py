@@ -87,8 +87,9 @@ class TradeDecisionEngine:
             # ADR-006 Amendment 7 (F9-M-03): audited-attempt total. Every
             # ENABLED route increments exactly once -- before any outcome
             # exists -- regardless of how the attempt resolves (success,
-            # or the designed gateway 404 error under the read-only
-            # semantic). The attempt itself is the P5 decisional evidence.
+            # disabled, or error -- before ADR-006 Amendment 8 the gateway
+            # had no decision intake and answered 404). The attempt itself
+            # is the P5 decisional evidence.
             # Sampled by the P5 supervisor like every other counter (the
             # delta-fold unions counter keys, so resumed runs carry it).
             "routed_decisions": 0,
