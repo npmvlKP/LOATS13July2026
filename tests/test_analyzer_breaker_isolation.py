@@ -17,8 +17,9 @@ The isolation contract (mirrors the F8-L-01 per-source fleet rules):
    (one opens, others pass).
 4. The operator status surface exposes the analyzer member.
 5. The dedicated breaker's posture tolerates an error BUDGET (threshold 5,
-   timeout 120 s): under the read-only semantic, routing 404s are expected
-   telemetry, not a gateway-outage signal.
+   timeout 120 s): analyzer-routing errors stay isolated telemetry within
+   budget, not a gateway-outage signal (pre-Amendment-8 the expected
+   errors were 404s from the then-absent decision intake).
 """
 
 from __future__ import annotations
@@ -159,9 +160,10 @@ def test_analyzer_breaker_member_in_alert_status_surface() -> None:
 
 def test_analyzer_breaker_posture_tolerates_expected_error_budget() -> None:
     """The dedicated breaker tolerates an error BUDGET, not 3 strikes:
-    threshold 5 (> shared breaker's 3) and timeout 120 s (> 60 s) — under
-    the Am4 read-only semantic, routing 404s are expected telemetry, not a
-    gateway-outage signal."""
+    threshold 5 (> shared breaker's 3) and timeout 120 s (> 60 s) —
+    analyzer-routing errors stay isolated telemetry within budget, not a
+    gateway-outage signal (pre-Amendment-8: 404s from the then-absent
+    intake)."""
     assert ANALYZER_CIRCUIT_BREAKER.name == "analyzer"
     assert ANALYZER_CIRCUIT_BREAKER.config.failure_threshold == 5
     assert ANALYZER_CIRCUIT_BREAKER.config.timeout == 120.0

@@ -1644,15 +1644,15 @@ class AsyncOpenAlgoClient:
 
         # Analyzer requests don't require kill switch check (analysis-only, not trading)
         # Use the DEDICATED analyzer circuit breaker (ADR-006 Amendment 4):
-        # routing failures (e.g. the gateway's absent /analyze intake, an
-        # expected 404 under the read-only semantic) must never open the
+        # routing failures (e.g. pre-Amendment-8, when the gateway had no
+        # /analyze decision intake and answered 404) must never open the
         # shared OpenAlgo breaker that market data depends on.
         # (idempotent GET-like behavior)
         #
-        # ADR-006 Amendment 5: the intake path is a settings field resolved
-        # PER CALL -- flipping analyzer_intake_path redirects routing to the
-        # gateway's future decision-intake endpoint without a code deploy or
-        # a restart of the supervised run.
+        # ADR-006 Amendments 5+8: the intake path is a settings field
+        # resolved PER CALL -- routing POSTs to the gateway's live
+        # decision-telemetry intake (POST /api/v1/analyze) without a code
+        # deploy or a restart of the supervised run.
         intake_path = get_settings().analyzer_intake_path
 
         async def _analyze_impl() -> dict[str, Any]:

@@ -903,8 +903,24 @@ History (most recent last):
       (default byte-identical, cache namespace preserved); scheduler
       gains support job market_activation_check. Tree at ceiling 516
       pre-wave (516 == 516), so +3 lands AT 519. Ceiling 516->519.
+  520  ADR-006 Amendment 8 wave (2026-10-02): +1
+       docs/audit-history/02Oct2026-adr006-am8-host-intake-live.md
+       (host decision-telemetry intake recorded LIVE, POST /api/v1/analyze;
+       404-era prose re-dated as history in settings.py, openalgo.py,
+       trade_decision.py + Amendment-5-era test docstrings; zero
+       behavior change).
+  521  02Oct compliance-evidence wave (2026-10-02): +2
+       docs/COMPLIANCE-MATRIX.md (evidence-based posture: applicability
+       assessment first — paper-trading system, SEBI/NSE live-path
+       obligations operator/broker-owned — then S1-S8 / NIST / ISO
+       matrices with control, evidence, owner, gap),
+       docs/audit-history/02Oct2026-compliance-evidence-wave.md (wave
+       record). README + docs/README compliance bullets re-pointed at the
+       matrix; register R-18 row appended. Zero behavior change (docs +
+       ratchet only). Tree at ceiling 520 pre-wave (520 == 520), so +2
+       lands AT 522. Ceiling 520->522.
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 519
+TRACKED_FILE_CEILING = 522

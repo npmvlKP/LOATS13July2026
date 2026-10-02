@@ -102,19 +102,22 @@ class Settings(BaseSettings):
             "(default False to prevent default-on fabrication)"
         ),
     )
-    # ADR-006 Amendment 5: the decision-intake endpoint is deferred on the
-    # gateway side (read-only semantic: every routed decision resolves as an
-    # honest 404 "error" outcome until the gateway ships an intake). The
-    # path is a real setting resolved per call, so activating the future
-    # intake is one config value -- no code change, no restart of the
-    # accruing 14-day P5 span. Default is exactly today's behaviour.
+    # ADR-006 Amendments 5+8: the intake path is a real setting resolved
+    # per call. Under Amendment 5 the gateway had no decision intake and
+    # every routed decision resolved as an honest 404 "error" outcome;
+    # Amendment 8 (2026-10-02) records the host intake LIVE (the gateway's
+    # POST /api/v1/analyze decision-telemetry endpoint): routed decisions
+    # now resolve as recorded receipts -- no code change, no restart of
+    # the accruing 14-day P5 span. Default is exactly today's path.
     analyzer_intake_path: str = Field(
         "analyze",
         description=(
             "Endpoint path (relative to /api/v1/) that receives routed "
-            "TradeDecision payloads. Default 'analyze' matches the current "
-            "read-only semantic (gateway 404s it by design); set to the "
-            "gateway's decision-intake route once it exists."
+            "TradeDecision payloads. Default 'analyze' targets the host "
+            "gateway's decision-telemetry intake (ADR-006 Amendment 8, "
+            "live 2026-10-02); before that intake existed the route "
+            "resolved as an honest 404 error (Amendment 5 read-only "
+            "semantic)."
         ),
     )
     # Segment enablement (01Oct2026 wave): NSE-only until an operator adds
