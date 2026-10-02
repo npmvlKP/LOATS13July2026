@@ -919,8 +919,17 @@ History (most recent last):
        matrix; register R-18 row appended. Zero behavior change (docs +
        ratchet only). Tree at ceiling 520 pre-wave (520 == 520), so +2
        lands AT 522. Ceiling 520->522.
+  524  03Oct alert-bot revival wave (2026-10-03): +2
+       reports/ai-generated/TELEGRAM-BOT-BEGINNERS-GUIDE.md,
+       reports/ai-generated/WHATSAPP-BOT-BEGINNERS-GUIDE.md (operator
+       onboarding guides; zero secret material — example tokens only).
+       The same wave unstaged/removed the UTF-16 protection-snapshot.json
+       PS-redirect capture before commit (never entered history) and
+       widened .gitignore to the /protection-snapshot.json spelling.
+       Tree at ceiling 522 pre-wave (522 == 522), so +2 lands AT 524.
+       Ceiling 522->524.
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 522
+TRACKED_FILE_CEILING = 524
