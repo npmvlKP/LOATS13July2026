@@ -909,8 +909,18 @@ History (most recent last):
        404-era prose re-dated as history in settings.py, openalgo.py,
        trade_decision.py + Amendment-5-era test docstrings; zero
        behavior change).
+  521  02Oct compliance-evidence wave (2026-10-02): +2
+       docs/COMPLIANCE-MATRIX.md (evidence-based posture: applicability
+       assessment first — paper-trading system, SEBI/NSE live-path
+       obligations operator/broker-owned — then S1-S8 / NIST / ISO
+       matrices with control, evidence, owner, gap),
+       docs/audit-history/02Oct2026-compliance-evidence-wave.md (wave
+       record). README + docs/README compliance bullets re-pointed at the
+       matrix; register R-18 row appended. Zero behavior change (docs +
+       ratchet only). Tree at ceiling 520 pre-wave (520 == 520), so +2
+       lands AT 522. Ceiling 520->522.
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 520
+TRACKED_FILE_CEILING = 522

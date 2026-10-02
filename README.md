@@ -19,7 +19,11 @@ Designed for **ANALYZE mode only** via OpenAlgo REST API integration.
 
 ## Key Features
 
-- **Strict Compliance**: SEBI algo regulations, NIST 800-53, ISO 27001:2022
+- **Evidence-Based Compliance Posture**: applicability assessment with
+  per-requirement controls, evidence, owners, and gaps in
+  [docs/COMPLIANCE-MATRIX.md](docs/COMPLIANCE-MATRIX.md) (paper-trading
+  system; SEBI/NSE live-path obligations are operator/broker-owned; no
+  NIST/ISO certification claimed)
 - **Rate Limited**: Conservative NVIDIA NIM API usage (≤20 req/min, ≥3s gap)
 - **Type Safe**: Full mypy --strict compliance
 - **Security Focused**: Bandit, gitleaks, and comprehensive security scanning
@@ -157,10 +161,25 @@ python scripts/check_per_module_coverage.py
 
 ## Compliance
 
-- **SEBI Algo Regulations**: Full compliance with Indian algorithmic trading regulations.
-- **NIST 800-53**: Security and privacy controls.
-- **ISO 27001:2022**: Information security management.
-- **Audit Trail**: 7-year retention, append-only, SHA-256 chained.
+No regulator- or certification-facing compliance determination is claimed
+by this repository. The evidence-based posture lives in
+[docs/COMPLIANCE-MATRIX.md](docs/COMPLIANCE-MATRIX.md): applicability
+assessment first (paper-trading system; the SEBI/NSE live order-path
+obligations — registration, static IP, API keys, algo-ID tagging — are
+operator/broker-owned and open until live trading is ever enabled), then
+per-requirement matrices for the SEBI/NSE retail-algo framework
+(SEBI/HO/MIRSD/MIRSD-PoD/P/CIR/2025/0000013; NSE INVG/67858), selected
+NIST SP 800-53 families, and the ISO 27001 posture, each with control,
+evidence, owner, and gap. In-repo design controls that are evidenced today:
+
+- **OPS cap ≤ 3/s**: shared `RateLimiter`, `max_ops=3` below the SEBI/NSE
+  10-OPS threshold with headroom; regression nets HC-14/F6-C-01.
+- **Kill switch**: emergency halt primitive with a live drill record
+  (01Oct2026, 122 blocked cycles audited) and fail-closed refusal.
+- **Audit Trail**: 7-year retention default (`retention_days=2555`),
+  append-only, SHA-256-chained (`src/loats/database.py`).
+- **Decimal-only finance**: Decimal fields with 0.01 quantization
+  validators; **IST-aware datetime** (`Asia/Kolkata`).
 
 ## Known Deviations (CMP Phase Gates)
 
