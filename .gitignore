@@ -98,10 +98,14 @@ pip_audit_out.txt
 pip_audit_results.json
 # Ad-hoc pip-audit invocation output at the repo root (staged 12Sep pushed
 # tracked count 409 -> 411 and failed the repo-hygiene ceiling; evidence of
-# record stays reports/security/pip-audit-*.json). Both spellings, per the
-# reports/health precedent.
+# record stays reports/security/pip-audit-*.json). All separator spellings,
+# per the reports/health precedent: underscore-suffixed (12Sep) and
+# dash-suffixed (02Oct: pip-audit-wave02oct.json was staged, pushed tracked
+# count 519 -> 520 past the repo-hygiene ceiling and failed both ratchet
+# lockstep verifiers on an otherwise clean tree).
 /pip_audit_*.json
 /pip-audit_*.json
+/pip-audit-*.json
 # Ad-hoc branch-protection GET capture at the repo root (staged 29Sep pushed
 # tracked count to 504 vs ceiling 503 and failed the repo-hygiene ceiling;
 # the capture is a local verify-probe artifact — the live contract of record
