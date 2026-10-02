@@ -94,8 +94,9 @@ class TestSchedulerCoverage:
     async def test_add_jobs_method(self, scheduler_instance):
         """Test _add_jobs method.
 
-        F8-H-03: only support jobs (market_status_check, data_cleanup,
-        backtest_sanity_check) are registered.
+        F8-H-03: only support jobs are registered. 02Oct2026:
+        market_activation_check joins the support set (operator mandate:
+        session activation + availability reporting over Telegram).
         """
         # Mock the add_job method
         mock_add_job = MagicMock()
@@ -103,9 +104,9 @@ class TestSchedulerCoverage:
 
         await scheduler_instance._add_jobs()
 
-        # _add_jobs registers market_status_check, data_cleanup, and
-        # backtest_sanity_check only.
-        assert mock_add_job.call_count == 3
+        # _add_jobs registers market_status_check, market_activation_check,
+        # data_cleanup, and backtest_sanity_check only.
+        assert mock_add_job.call_count == 4
 
         # Check that each job was added with correct parameters
         calls = mock_add_job.call_args_list
@@ -117,6 +118,7 @@ class TestSchedulerCoverage:
 
         job_ids = {kwargs["id"] for _, kwargs in calls}
         assert "market_status_check" in job_ids
+        assert "market_activation_check" in job_ids
         assert "data_cleanup" in job_ids
         assert "backtest_sanity_check" in job_ids
         assert "ta_scan" not in job_ids
