@@ -1366,3 +1366,40 @@ mtime 03Oct 14:38:25 IST == the 14:38 pin instant. Flagged for the NEXT
 register append (frozen entry untouched by design): the 01Oct entry's
 "(16 Oct, 02:08 IST)" paren is a UTC-offset conversion slip -- IST of
 2026-10-16T20:08:05Z is 17Oct 01:38 IST (+5:30, not +6:00).
+
+Updated 2026-10-03 (22:09 IST, post-#127 evening reconciliation: capture
+residue sweep + run-record re-sourcing + queued paren correction): (1)
+Staged junk capture found at session start: `post-put-get-127.json` (UTF-16
+404 body from a wrong-URL protection GET, staged 21:08 during the #127
+delivery) held tracked count 525 -> 526 vs ceiling 525; capture deleted
+(never committed, zero git history), spelling covered root-anchored as
+`/post-put-get-*.json` with both-ways `git check-ignore` probes green (junk
+variant rc=0; nested canonical `tests/fixtures/p5_run_log_*.json` still
+rc=1); count restored 525 == ceiling on an otherwise clean tree. The
+omitted post-#127 restore read-back was EXECUTED live as the omitted step:
+protection GET 200 -- approving 1, dismiss-stale true, code-owner false,
+last-push false, strict true, 11 contract contexts, enforce_admins enabled,
+restrictions null. (2) Numbers directive closed by re-sourcing, not doc
+edits: the answer doc's figures are artifact-backed -- local full suite at
+`8f365b1` (03Oct 14:01-14:09 IST, 8m04s, RC=0): 2,402 passed / 2 skipped,
+89.41% branch coverage, artifacts `coverage.xml`/`pytest-report.xml`
+(mtimes 14:09); arithmetic cross-check local 2,402+2 == CI 2,394+10 ==
+2,404 collected (8 platform-conditional skips); CI corroboration at the
+same tip family: job 111234746143 (merge `2498d537`): 2,394 passed /
+10 skipped, 89.33%. A FRESH full suite at THIS tip post-sweep re-verified:
+2,402 passed / 2 skipped, 89.41%, RC=0 in 566.90s (03Oct ~21:54-22:03
+IST), artifacts regenerated at repo root. The paste's own citations
+(2,397 / 89.22%) remain unsourced in the repo and its docs (whole-tree
+grep empty); the earlier 1,800+ / 89.45% figures stay withdrawn. Answer
+doc untouched this session (mtime 14:38:25 IST == the 14:38 pin instant;
+re-audit NOT triggered). (3) Segments directive re-verified discharged
+(S-16 row verbatim posture, `.env.example:148` NSE default,
+`scheduler.py:339` + `market_status.py:410` consume `enabled_segments()`);
+nothing to change. (4) Safety-claims directive discharged by PR #127
+(`5f8f3b6`): the matrix carries the call-site boundary proof; the
+`openalgo_mode` consumer gap = next build wave (R-19 genre; R-16 freeze
+holds). (5) Queued paren correction EXECUTED per the 20:47 entry's own
+instruction (frozen text untouched): IST of 2026-10-16T20:08:05Z is
+01:38 IST 17Oct (+5:30); every future R-12 close arithmetic reads
+17Oct 01:38 IST. First real evidence window for the in-span kill drill =
+the Mon 05Oct session; drill due before the span close 16Oct 20:08:05Z.
