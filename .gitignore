@@ -124,6 +124,13 @@ pip_audit_results.json
 # the bare spelling proved the family still had an uncovered member).
 /live.json
 /*-live.json
+# Post-PUT-GET protection-verify capture spelling (03Oct: post-put-get-127.json,
+# a UTF-16 404 body from a wrong-URL protection GET, was staged and pushed
+# tracked count 525 -> 526 vs ceiling 525 on an otherwise clean tree; same
+# artifact class as the snapshot and live.json capture families above -- the
+# capture is a local verify-probe artifact, the live contract of record is the
+# protection GET re-run, never a tracked file).
+/post-put-get-*.json
 pytest_output.txt
 ruff_alerts.txt
 ruff_all_errors.txt
