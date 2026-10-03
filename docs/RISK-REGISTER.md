@@ -1247,3 +1247,42 @@ the graded span is the next healthy one. Same wave: the compliance posture
 moved from bulk assertions to `docs/COMPLIANCE-MATRIX.md` (R-18 row above);
 PR #118 (hygiene pip-audit ignore, `53e194e`) still OPEN and untouched;
 tree clean, ceiling 520->522 this wave.
+
+Updated 2026-10-03 (01:5x IST, alert-bot revival + hygiene wave at HEAD
+8edfc32, local): the alert-bot wedge is CLOSED and the third rotation is
+LIVE. Evidence chain, each link live-probed this session: (1) at probe
+time the live `.env` already carried the new bot's working value — masked
+getMe returned ok:true (bot id 8256799829, username OA_Oct2026_bot, value
+never printed); the env files were last re-touched 01:03-01:04 IST per
+mtime, so the applying actor sits outside this session's evidence — the
+02Oct "blocked on the operator's BotFather value" row is superseded by
+live state, not by an in-session patch. (2) Delivery had still been
+impossible: `TELEGRAM_CHAT_ID` / `TELEGRAM_ADMIN_IDS` were wired to the
+BOT's own numeric id 8256799829 (a bot cannot message itself); repaired
+to the operator's id 694928527 (key-prefix rewrite, backup
+.env.bak-20261003-013319, masked read-back verified). (3) End-to-end
+delivery proven through the app's own AlertSystem sender (send_alert ->
+True; the operator's /START was already on file, chat 694928527).
+(4) The stale holder (pids 10396/9324, born 18:58 IST pre-patch; its run
+had already died 13:28:27Z with unhandled_exceptions=1) was stopped; the
+every-5-min watchdog fresh-started p5_forward_test_20261002_200805.json
+at 20:08:05Z — LIVE with a green quartet (ended_at:null,
+unhandled_exceptions:0, kill_switch_verified:true, snapshot mtime <1 min).
+Per R-16 the 14-day accumulation clock re-anchors to
+2026-10-02T20:08:05Z -> R-12 close due 2026-10-16 20:08:05Z (16 Oct,
+02:08 IST); the kill-switch IN-SPAN EXERCISE remains outstanding on the
+new span (the snapshot flag is state, not the exercise). Git-side, same
+wave: PR #118 merged (4976d44) via relax->merge->restore with the pinned
+four-flag pre-PUT patch applied — the derive gap recurred a SIXTH time;
+post-restore read-back DIVERGENCES: 0, branch purged remote+local,
+post-merge main CI 15/15 success + 1 by-design Docker skip. The 69
+frozen-evidence files a 02Oct end-of-file-fixer sweep had STAGED (never
+committed) were restored to HEAD: the mutation net
+(TestFixerHooksSpareFrozenEvidence) false-REDDed on the already-clean
+tree, proving the staged sweep collateral was unauthorized mutation of
+point-in-time evidence, now reverted. +2 operator bot guides landed
+(example-shaped token strings only, no live material) with the ratchet
+re-pinned 522->524 (06b9e25, 8edfc32); the UTF-16
+protection-snapshot.json PS-redirect capture was unstaged/removed (never
+in history) and `/protection-snapshot.json` added to .gitignore per the
+spelling-family precedent. Tree clean, ceiling 522->524 this wave.

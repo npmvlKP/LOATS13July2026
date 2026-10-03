@@ -111,6 +111,10 @@ pip_audit_results.json
 # the capture is a local verify-probe artifact — the live contract of record
 # is re-derived fresh per restore, never tracked).
 /snapshot.json
+# Hyphen-prefixed capture spelling (03Oct: protection-snapshot.json was
+# staged by a PS 5.1 gh-api redirect; same artifact class, different
+# spelling — per the pip-audit family precedent, cover the spelling).
+/protection-snapshot.json
 pytest_output.txt
 ruff_alerts.txt
 ruff_all_errors.txt
