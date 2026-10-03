@@ -24,8 +24,8 @@ the trading cycle is actively polling while you exercise the halt.
 Sent from your Telegram client, the `/kill` command:
 
 1. flips an in-memory halt flag in the running LOATS process (`alerts.py`,
-   module-level singleton — the same flag every gate in the orchestrator,
-   scheduler, and OpenAlgo adapter reads);
+   module-level singleton — the same flag the trading-cycle gate and the
+   OpenAlgo order-placement gates read);
 2. fetches the broker order book through OpenAlgo and cancels every
    OPEN/PENDING order it finds (in the current ANALYZE posture there are
    none — the safety loop runs and finds zero);
@@ -33,8 +33,10 @@ Sent from your Telegram client, the `/kill` command:
 
 While the flag is up, every trading cycle raises `KillSwitchError` at the
 gate; the orchestrator logs `Kill switch active - trading cycle paused` and
-idles on a 1-second poll. Nothing schedules, nothing orders. `/resume`
-clears the flag and normal operation returns.
+idles on a 1-second poll. No trading cycle runs and no order is placed.
+Background support jobs (market-status refresh, data cleanup) keep running
+— they place no orders. `/resume` clears the flag and normal operation
+returns.
 
 The flag lives in the running process: if the LOATS process restarts while
 engaged, it comes back disengaged (and the supervisor re-verifies the halt
@@ -62,12 +64,15 @@ Send exactly:
 /status
 ```
 
-Expected: a status card ending with `🟢 ACTIVE`.
+Expected: a status card whose Status line reads `🟢 ACTIVE` (the card
+continues with a `Source breakers` block after that line — that is
+normal). `/status` is read-only and open to any chat member; the admin
+allow-list gates `/kill` and `/resume`, which you exercise at Steps 2
+and 4.
 
 | If you see | It means | Do this |
 |---|---|---|
-| Status card, `🟢 ACTIVE` | Channel + process healthy | Continue to Step 2 |
-| `Unauthorized: You are not authorized...` | Your user ID is not in `TELEGRAM_ADMIN_IDS` | Stop; ask the assistant to fix the config, retry another day |
+| Status card, Status line `🟢 ACTIVE` | Channel + process healthy | Continue to Step 2 |
 | Nothing at all (60+ s) | Bot polling down, or chat never STARTed | Stop; ask the assistant to check the span and the bot polling task |
 | An error mentioning Telegram | Transient network/API fault | Wait 2 minutes, resend once; if it repeats, stop and report |
 
@@ -90,8 +95,8 @@ Expected, in this order:
 |---|---|---|
 | Both messages above | Halt engaged, orders loop ran clean | Go to Step 3 within a few minutes |
 | `⚠️ Kill switch already active.` | The halt was ALREADY engaged | Do NOT proceed blindly; ask the assistant to read the logs first, then decide |
-| `Unauthorized...` | Same as Step 1 | See Step 1 |
-| `Failed to activate kill switch.` | The order-book fetch failed, so the flag rolled itself back (safe failure) | Note the time; ask the assistant to check `logs/loats.log`; retry once after 5 minutes |
+| `Unauthorized...` | Your user ID is not in `TELEGRAM_ADMIN_IDS` | Stop; ask the assistant to fix the config, retry another day |
+| `Failed to activate kill switch.` | AMBIGUOUS — either the order-book fetch failed and the flag rolled back (safe), OR the alert channel's 5-minute cooldown suppressed the confirmation while the halt IS engaged | **Send `/status` immediately.** Status line `🔴 KILL SWITCH ACTIVE` = the halt IS engaged: continue to Step 3 and finish the drill normally. Status line `🟢 ACTIVE` = the flag really rolled back: wait at least 6 minutes (cooldown margin), then retry Step 2 once |
 | `❌ Error: ...` | An exception inside the handler; flag rolled back | Copy the exact text and report it; do not retry until explained |
 
 ### Step 3 — Observe the engaged state (stay here 1–2 minutes)
@@ -127,7 +132,7 @@ Expected:
 
 ### Step 5 — Confirm restoration
 
-Send `/status` one last time. Expected: `🟢 ACTIVE`.
+Send `/status` one last time. Expected: Status line `🟢 ACTIVE`.
 
 ### Step 6 — Evidence capture (PowerShell 5.1)
 
@@ -142,19 +147,22 @@ Select-String -Path "G:\.OA\LOATS-13July2026\LOATS13July2026\logs\loats.log*" -P
 
 Expect the activation pair (`Kill switch activated: In-span drill
 activation before 16Oct close`) and the deactivation line, timestamps a few
-minutes apart, both inside the live span window. Paste those lines back to
-the assistant (they contain no secrets) so the exercise is filed against
-the span record before the 16 Oct close.
+minutes apart, both inside the live span window. You will also see extra
+matched lines (`Alert sent: [error] 🚨 <b>KILL SWITCH ACTIVATED</b>...` and
+their JSON error copies) — those are the alert-dispatch confirmations of
+the same events, not anomalies. Paste what you get back to the assistant
+(the lines contain no secrets) so the exercise is filed against the span
+record before the 16 Oct close.
 
 ## Troubleshooting summary
 
 | Symptom | Meaning | Action |
 |---|---|---|
 | Bot silent | Polling down / chat not STARTed | Assistant checks span + bot task |
-| `Unauthorized...` | Admin allow-list mismatch | Assistant fixes `TELEGRAM_ADMIN_IDS` |
-| `Failed to activate...` | Order-book fetch failed; flag rolled back (safe) | Wait 5 min, retry once, then investigate |
+| `Unauthorized...` (Steps 2/4) | Admin allow-list mismatch | Assistant fixes `TELEGRAM_ADMIN_IDS` |
+| `Failed to activate...` | AMBIGUOUS (rollback OR cooldown suppression with halt engaged) | `/status` immediately: 🔴 = engaged, continue Step 3; 🟢 = rolled back, wait 6 min, retry once |
 | `Failed to deactivate...` | Alert dispatch failed after release | Harmless; verify `/status`, report |
-| Card stays `🟢` after `/kill` | Halt did not stick | Stop; assistant reads logs before anything else |
+| Card Status line stays `🟢` after `/kill` | Halt did not stick | Stop; assistant reads logs before anything else |
 | Process restart mid-drill | In-memory flag reset to disengaged | Re-run from Step 2; report the restart |
 
 ## After the drill
