@@ -1286,3 +1286,36 @@ re-pinned 522->524 (06b9e25, 8edfc32); the UTF-16
 protection-snapshot.json PS-redirect capture was unstaged/removed (never
 in history) and `/protection-snapshot.json` added to .gitignore per the
 spelling-family precedent. Tree clean, ceiling 522->524 this wave.
+
+Updated 2026-10-03 (07:35 IST, compliance-matrix evidence-cell
+reconciliation, pre-commit at working tree): the 02Oct external-review
+directive (item 4 — evidence-based compliance, not "yes, it complies") was
+re-audited claim-by-claim against the landed matrix. Two live defects found
+in `docs/COMPLIANCE-MATRIX.md` evidence cells, both fixed this session:
+(1) S1 cited "8 files" for `tests/test_rate_limiter*.py` — glob-verified 7
+both at HEAD and at the matrix's own introducing commit 8a46498 (no
+rename/delete history) — a birth miscount, corrected 8 -> 7, with the
+HC-14 probe re-run clean through the repo venv ("3 of 10 acquires
+accepted", `singleton_ok=True`); (2) S6's gap cell "No live span currently
+exists" was falsified by span succession — the healthy revival span
+`p5_forward_test_20261002_200805` (started_at 2026-10-02T20:08:05Z,
+restarts:1) probes green on the machine-verified quartet (ended_at null,
+unhandled_exceptions 0, kill_switch_verified true, last_sampled_at within
+38s of probe, snapshot mtime == sample write), 14-day clock to
+2026-10-16T20:08:05Z per R-16; cell superseded inline with the falsified
+claim retained and annotated (falsification-lesson discipline). Span-family
+count in S6 evidence updated 13 -> 14 (07Sep-02Oct). All other matrix
+citations verified live this pass: settings.py:221 `max_ops=3`,
+settings.py:33 `retention_days: 2555`, Decimal quantize validators
+(settings.py:297-301), verify_hc_registry.py:576 HC-14 registration, all
+five cited audit/preflight test files, ADR-0018/0020, README and
+docs/README re-point bullets, and the R-18 closure row. Register rows left
+untouched by design: dated entries supersede (the 01:5x entry already
+re-anchors the R-12 clock); matrix evidence cells are the live-truth
+surface. Sources re-read: SEBI/HO/MIRSD/MIRSD-PoD/P/CIR/2025/0000013
+(04Feb2025) via the circular's direct PDF; NSE retail-algo FAQ 03Nov2025
+(inline-files URL — the paste's /content/circulars/ link is dead, 404);
+paste PS tails (`wc`, `<wave-paths>`) confirmed parse-death, intended
+operations probed live instead: `git ls-files | wc -l` = 524 == ceiling;
+`git diff --stat 5443716 4924ef6` empty = identity (5443716 is the direct
+parent of merge 4924ef6).
