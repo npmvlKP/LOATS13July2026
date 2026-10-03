@@ -924,13 +924,19 @@ class TestAlertSystem:
     @pytest.mark.asyncio
     async def test_resume_command_handler_not_active(self, alert_system):
         """Test /resume command when kill switch is not active."""
+        alert_system.kill_switch_active = False
         mock_update = MagicMock(spec=Update)
         mock_update.message = MagicMock()
         mock_update.message.reply_text = AsyncMock()
+        mock_update.effective_user.id = "123456789"
         mock_context = MagicMock()
 
-        await alert_system._resume(mock_update, mock_context)
+        with patch("loats.alerts.settings") as mock_settings:
+            mock_settings.telegram_admin_ids = ["123456789"]
+            await alert_system._resume(mock_update, mock_context)
         mock_update.message.reply_text.assert_called_once()
+        reply = mock_update.message.reply_text.call_args.args[0]
+        assert reply == "\u2139\ufe0f Kill switch not active."
 
     @pytest.mark.asyncio
     async def test_resume_command_handler_unauthorized(self, alert_system):
@@ -1004,6 +1010,8 @@ class TestAlertSystem:
             mock_openalgo.get_all_orders = AsyncMock(return_value={"data": None})
             await alert_system._orders(mock_update, mock_context)
         mock_update.message.reply_text.assert_called_once()
+        reply = mock_update.message.reply_text.call_args.args[0]
+        assert reply == "\u2139\ufe0f No open orders found."
 
     @pytest.mark.asyncio
     async def test_orders_command_handler_with_orders(self, alert_system):
@@ -1041,9 +1049,11 @@ class TestAlertSystem:
         mock_context = MagicMock()
 
         with patch("loats.alerts.db") as mock_db:
-            mock_db.get_latest_signals.return_value = []
+            mock_db.async_get_latest_signals = AsyncMock(return_value=[])
             await alert_system._signals(mock_update, mock_context)
         mock_update.message.reply_text.assert_called_once()
+        reply = mock_update.message.reply_text.call_args.args[0]
+        assert reply == "\u2139\ufe0f No recent signals found."
 
     @pytest.mark.asyncio
     async def test_signals_command_handler_with_signals(

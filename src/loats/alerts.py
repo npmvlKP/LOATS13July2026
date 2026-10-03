@@ -787,7 +787,9 @@ class AlertSystem:
 
             if not self.kill_switch_active:
                 if update.message:
-                    await update.message.reply_text("i Kill switch not active.")
+                    await update.message.reply_text(
+                        "\u2139\ufe0f Kill switch not active."
+                    )
                 return
 
             reason = (
@@ -828,7 +830,9 @@ class AlertSystem:
             orders_data = await self._safe_get_all_orders()
             if not orders_data or not orders_data.get("data"):
                 if update.message:
-                    await update.message.reply_text("i No open orders found.")
+                    await update.message.reply_text(
+                        "\u2139\ufe0f No open orders found."
+                    )
                 return
 
             orders = orders_data["data"]
@@ -872,7 +876,9 @@ class AlertSystem:
 
             if not signals:
                 if update.message:
-                    await update.message.reply_text("i No recent signals found.")
+                    await update.message.reply_text(
+                        "\u2139\ufe0f No recent signals found."
+                    )
                 return
 
             message = "📈 <b>RECENT SIGNALS</b>\n\n"
