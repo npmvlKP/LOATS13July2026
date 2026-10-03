@@ -1320,3 +1320,49 @@ paste PS tails (`wc`, `<wave-paths>`) confirmed parse-death, intended
 operations probed live instead: `git ls-files | wc -l` = 524 == ceiling;
 `git diff --stat 5443716 4924ef6` empty = identity (5443716 is the direct
 parent of merge 4924ef6).
+
+Updated 2026-10-03 (20:47 IST, 03Oct afternoon paste-tail reconciliation +
+boundary-evidence wave, pre-commit at working tree): the 03Oct afternoon
+composite (five PS tails + Segments/Safety directives + risk register) was
+reconciled claim-by-claim against live state; every failure tail resolved
+to parse-death or wrong-invocation, with all five intended operations
+verified green: (1) `derive-protection-bodies.py` / (2)
+`verify-protection-contract.py` ENOENT = wrong-cwd invocation -- both
+scripts live in the git-protected-main skill dir, never at repo root; the
+post-#126 restore read-back was then executed as the omitted step:
+protection GET 200, contract verifier DIVERGENCES: 0 across all ten fields
+(strict, approving 1, dismiss-stale true, code-owner false, enforce_admins,
+restrictions none, conversation-resolution/force-push/deletions false,
+context set equal). (3) `gh pr create --head <real-branch>` died at PS 5.1
+PARSE time on the literal angle-bracket placeholder (template residue,
+nothing executed, no operation intended). (4) `git push origin --delete
+docs/s16-mcx-cds-register-row` returned "remote ref does not exist" =
+already-purged GREEN: `git ls-remote --heads origin` lists main only.
+(5) `git ls-files | wc -l` = 525 == ceiling, tree clean at session start.
+Directives: Segments (PR #116, merged 01Oct2026 17:37Z) discharged -- the
+S-16 row already states the required posture verbatim and
+`.env.example:148` pins `ENABLED_SEGMENTS=NSE` default (verified live).
+Safety-claims directive discharged by evidence, not prose: the matrix
+applicability section now carries the call-site boundary proof --
+`place_order`/`place_smart_order` (openalgo.py:858,1384) have ZERO
+production call sites (whole-tree grep empty outside openalgo.py and
+tests/); the only wired order-mutation paths are closure-only
+(`modify_order` CMP Rule-7 SL-M ratchet at orchestrator.py:2330,
+`cancel_order` kill-switch escalation at alerts.py:573 per ADR-0020), and
+the pre-existing bulk negative ("not through this repository's code paths")
+was falsified as a claim-shape and replaced with the evidenced statement.
+One live defect fixed in this wave: the fresh S-16 row (01fc9bf, PR #126)
+mis-cited the 02Oct market-activation wave as PR #118 (the pip-audit
+hygiene PR); corrected to PR #117 (title-matched, merged 02Oct2026
+04:34Z). One consumer gap RECORDED, not wired: `openalgo_mode` (settings
+Literal ANALYZE/LIVE, default ANALYZE, `.env` ANALYZE) has no enforcement
+consumer in src/ or tests/ -- same genre as R-19; wiring decision belongs
+to the next build wave per the R-16 mid-span freeze. Span health
+re-probed this session: revival span `20261002_200805` green quartet
+(ended_at null, unhandled_exceptions 0, kill_switch_verified true,
+last_sampled_at within 2 min of probe, restarts 2); routed_decisions 0 is
+calendar-consistent (03Oct Saturday). Answer-doc re-audit NOT triggered:
+mtime 03Oct 14:38:25 IST == the 14:38 pin instant. Flagged for the NEXT
+register append (frozen entry untouched by design): the 01Oct entry's
+"(16 Oct, 02:08 IST)" paren is a UTC-offset conversion slip -- IST of
+2026-10-16T20:08:05Z is 17Oct 01:38 IST (+5:30, not +6:00).
