@@ -928,8 +928,14 @@ History (most recent last):
        widened .gitignore to the /protection-snapshot.json spelling.
        Tree at ceiling 522 pre-wave (522 == 522), so +2 lands AT 524.
        Ceiling 522->524.
+  525  03Oct kill-drill wave (2026-10-03): +1
+       reports/ai-generated/KILL-SWITCH-DRILL-RUNBOOK.md (operator in-span
+       kill-switch exercise runbook: beginner-sequential steps, per-step
+       outcomes, evidence capture; zero secret material — user IDs only).
+       Tree at ceiling 524 pre-wave (524 == 524), so +1 lands AT 525.
+       Ceiling 524->525.
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 524
+TRACKED_FILE_CEILING = 525
