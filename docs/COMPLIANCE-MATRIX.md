@@ -33,7 +33,24 @@ figures, routes TradeDecisions to a local Analyzer endpoint, and emits
 alerts. It does **not** place live orders. The order path to any exchange
 runs — when a user configures it — through the separately deployed OpenAlgo
 host and the user's own broker account, not through this repository's code
-paths.
+paths. Boundary evidence (03Oct2026): the only position-opening methods,
+`place_order`/`place_smart_order` (`src/loats/openalgo.py:858,1384`), have
+**zero production call sites** — a whole-tree grep outside
+`src/loats/openalgo.py` and `tests/` is empty. The wired order-mutation
+paths are closure-only: `modify_order` ratchets the SL-M trigger of orders
+that already exist on the host (CMP Rule-7 boundary, `orchestrator.py:2330`,
+fail-closed) and `cancel_order` runs inside kill-switch escalation only
+(`alerts.py:573`, ADR-0020); neither can open a position. `openalgo_mode`
+defaults to `"ANALYZE"` (`settings.py:95`); its LIVE branch has no
+enforcement consumer yet, so mode is a declared deployment knob, not a
+verified runtime gate — recorded for the next build wave (same genre as
+R-19; wiring decision deferred per the R-16 mid-span freeze, evidenced
+against the live `.env` where `OPENALGO_MODE=ANALYZE`). Pre-03Oct the
+sentence above ended at "code paths" and carried no call-site evidence;
+that bulk phrasing was falsified as a *claim-shape* (an unproven negative)
+by the 03Oct external-review directive, not as an operation — the methods
+exist, the call-site absence is the proof, and it is now stated with its
+evidence instead of asserted.
 
 Consequences, per the Feb-2025 framework:
 
