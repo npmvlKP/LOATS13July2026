@@ -115,6 +115,15 @@ pip_audit_results.json
 # staged by a PS 5.1 gh-api redirect; same artifact class, different
 # spelling — per the pip-audit family precedent, cover the spelling).
 /protection-snapshot.json
+# Bare "live.json" capture spelling (03Oct: a UTF-16 gh-api 404 capture was
+# staged at the repo root, pushed tracked count 525 vs ceiling 524 and failed
+# both ratchet-lockstep verifiers on an otherwise clean tree; same artifact
+# class as the snapshot captures above). The hyphen-suffixed sibling covers
+# the 28Sep protection-live.json class member (documented in the R-13
+# sixth-occurrence record; never staged, so it never needed the entry until
+# the bare spelling proved the family still had an uncovered member).
+/live.json
+/*-live.json
 pytest_output.txt
 ruff_alerts.txt
 ruff_all_errors.txt
