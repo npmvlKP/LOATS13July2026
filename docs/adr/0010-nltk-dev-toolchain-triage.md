@@ -4,7 +4,8 @@
 
 Accepted — 2026-09-06 (amended 2026-09-09: waiver surface lockstep;
 re-affirmed 2026-09-12: live currency re-check, see the closing
-section)
+section; re-affirmed 2026-10-04: OSV events-block false-fix triage,
+see the closing section)
 
 ## Context
 
@@ -81,3 +82,31 @@ scan carrying `--ignore-vuln PYSEC-2026-3740` exits 0 ("No known
 vulnerabilities found, 1 ignored"). The waiver remains required and
 current; the surface lockstep and the currency pin
 (tests/test_format_surface_contract.py) stay as decided above.
+
+## Currency re-check (2026-10-04)
+
+Both removal triggers verified UNLIFTED against live sources on
+2026-10-04 (repo venv + fresh venv, Windows host):
+
+* PyPI JSON API: latest nltk release is still 3.10.3 — no 3.11 and no
+  patched 3.10.x exists upstream (3.10.3 uploaded 2026-08-12, still
+  the latest release).
+* GitHub Advisory GHSA-8mgp-746c-j5xp (the authoritative record for
+  this advisory): vulnerable range `<= 3.10.3`, `first_patched` null —
+  no fixed release exists. The OSV record for PYSEC-2026-3740 carries
+  a self-contradictory events block (`fixed: 3.10.3` alongside details
+  text "through 3.10.3"); the events block is a database encoding
+  artifact, not a fix release, and does not lift trigger A.
+* Fresh-venv CI-exact replication (venv from project-floor Python
+  3.12, `pip install .`, no safety): unwaived `pip-audit` exits 0 —
+  "No known vulnerabilities found" (the advisory cannot fire where
+  safety is absent; the waived flag is a no-op there by design).
+* Repo `.venv` full dev environment (safety 3.8.1 + nltk 3.10.3):
+  unwaived `pip-audit` exits 1 with PYSEC-2026-3740 as the ONLY
+  finding and an EMPTY Fix-Versions column — the audit database
+  itself confirms no fix exists. The identical scan carrying
+  `--ignore-vuln PYSEC-2026-3740` remains the enforced gate posture.
+
+The waiver remains required and current; the surface lockstep and the
+currency pin (tests/test_format_surface_contract.py) stay as decided
+above.
