@@ -934,8 +934,16 @@ History (most recent last):
        outcomes, evidence capture; zero secret material — user IDs only).
        Tree at ceiling 524 pre-wave (524 == 524), so +1 lands AT 525.
        Ceiling 524->525.
+  526  04Oct C-01 audit-integrity boot-gate wave (2026-10-04): +1
+       docs/audit-history/04Oct2026-C01-audit-integrity-boot-gate.md (wave
+       record: boot refuses on failed audit-chain verification; break-glass
+       knob documented; register rows R-20 + S-17 landed in the same
+       wave — both existing files, no new tracked docs). All other wave
+       files modified in place; new tests live in existing test files.
+       Tree at ceiling 525 pre-wave (525 == 525), so +1 lands AT 526.
+       Ceiling 525->526.
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 525
+TRACKED_FILE_CEILING = 526
