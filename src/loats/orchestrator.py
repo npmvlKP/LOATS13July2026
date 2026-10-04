@@ -2249,7 +2249,11 @@ async def update_trailing_stops() -> None:
 
     Enforces Rule-7: <=25 modifications per cycle (secondary guard). The
     primary CMP Rule-7 control (F8-H-02) is per-order and persisted --
-    enforced inside ``AsyncOpenAlgoClient.modify_order``.
+    enforced inside ``AsyncOpenAlgoClient.modify_order``. The client
+    additionally hard-refuses ALL order emission (modify included,
+    H-01 armed-refusal) unless ``OPENALGO_MODE=LIVE`` and
+    ``OPENALGO_ARMING`` are both set (C-02 order-mode gate, 04Oct2026):
+    a supervisor mode flip alone cannot reach the broker.
     Runs as part of the orchestrator risk step with <1ms budget.
     """
     try:

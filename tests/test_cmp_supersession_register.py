@@ -54,9 +54,10 @@ def test_every_row_is_well_formed_with_a_known_state(
 def test_row_count_floor(register_rows: list[str]) -> None:
     # The inventory landed with 15 rows (S-01..S-15); S-16 (MCX/CDS
     # segment-universe supersession) added 03Oct2026; S-17 (C-01
-    # audit-integrity boot gate) added 04Oct2026. A row may be
+    # audit-integrity boot gate) added 04Oct2026; S-18 (C-02+H-01
+    # order-mode gate supersession) added 04Oct2026. A row may be
     # retired only with its evidence in the closing PR.
-    assert len(register_rows) >= 17, len(register_rows)
+    assert len(register_rows) >= 18, len(register_rows)
 
 
 def test_minimum_authority_set_is_cited(register_text: str) -> None:

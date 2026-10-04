@@ -21,6 +21,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 import loats.openalgo as oa
+from loats.config import get_settings
 from loats.database import Database, Rule7StateError
 from loats.models import (
     Order,
@@ -53,6 +54,20 @@ def _make_db(tmp_path: Path) -> Database:
         db_path=tmp_path / "rule7.db",
         audit_log_path=tmp_path / "audit.jsonl",
     )
+
+
+def _arm_live(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Arm LIVE for boundary tests that call ``modify_order`` for real.
+
+    The C-02/H-01 order-mode gate (04Oct2026) refuses order emission
+    before the Rule-7 boundary unless the deployment is LIVE + armed;
+    these tests pin the Rule-7 contract, so they arm explicitly.
+    monkeypatch undoes the env at teardown; ``get_settings`` is
+    lru_cached and must be rebuilt after the env lands.
+    """
+    monkeypatch.setenv("OPENALGO_MODE", "LIVE")
+    monkeypatch.setenv("OPENALGO_ARMING", "true")
+    get_settings.cache_clear()
 
 
 def _patch_db(database: Database):
@@ -245,7 +260,10 @@ class TestFailClosed:
             with pytest.raises(Rule7StateError):
                 rules_engine.reserve_modification("ORD-G")
 
-    def test_sync_modify_order_fails_closed_on_counter_error(self) -> None:
+    def test_sync_modify_order_fails_closed_on_counter_error(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _arm_live(monkeypatch)
         c = _sync_client(_mock_response({"status": "success", "data": {}}))
         with (
             patch("loats.openalgo._get_alerts", return_value=_alerts_ok()),
@@ -256,7 +274,10 @@ class TestFailClosed:
                 c.modify_order("ORD-H", quantity=20)
         c.client.post.assert_not_called()
 
-    def test_async_modify_order_fails_closed_on_counter_error(self) -> None:
+    def test_async_modify_order_fails_closed_on_counter_error(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _arm_live(monkeypatch)
         import asyncio
 
         c = _async_client(_mock_response({"status": "success", "data": {}}))
@@ -276,7 +297,10 @@ class TestFailClosed:
 
 
 class TestBoundaryEnforcement:
-    def test_26th_sync_modify_raises(self, tmp_path: Path) -> None:
+    def test_26th_sync_modify_raises(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _arm_live(monkeypatch)
         db = _make_db(tmp_path)
         try:
             ok = _mock_response({"status": "success", "data": {}})
@@ -293,7 +317,10 @@ class TestBoundaryEnforcement:
         finally:
             db.close()
 
-    def test_26th_async_modify_raises(self, tmp_path: Path) -> None:
+    def test_26th_async_modify_raises(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _arm_live(monkeypatch)
         import asyncio
 
         db = _make_db(tmp_path)
@@ -318,7 +345,10 @@ class TestBoundaryEnforcement:
 
 
 class TestReleaseOnBrokerFailure:
-    def test_sync_failed_broker_call_releases_slot(self, tmp_path: Path) -> None:
+    def test_sync_failed_broker_call_releases_slot(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _arm_live(monkeypatch)
         db = _make_db(tmp_path)
         try:
             import httpx

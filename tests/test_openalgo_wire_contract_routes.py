@@ -26,6 +26,7 @@ from typing import Any
 
 import pytest
 
+from loats.config import get_settings
 from loats.openalgo import AsyncOpenAlgoClient, OpenAlgoClient
 
 _SRC = Path(__file__).resolve().parents[1] / "src" / "loats" / "openalgo.py"
@@ -50,6 +51,19 @@ def _patch_async_request(
 
 def _make_async_client() -> AsyncOpenAlgoClient:
     return AsyncOpenAlgoClient(api_key="k", base_url="http://t")
+
+
+def _arm_live(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Arm LIVE for transport-mechanics tests (route-name regression).
+
+    Refusal coverage for the C-02/H-01 order-mode gate lives in
+    tests/test_order_mode_gate.py; monkeypatch undoes the env teardown.
+    ``get_settings`` is lru_cached, so the cache must be rebuilt AFTER
+    the env lands or the gate would keep seeing the stale cached mode.
+    """
+    monkeypatch.setenv("OPENALGO_MODE", "LIVE")
+    monkeypatch.setenv("OPENALGO_ARMING", "true")
+    get_settings.cache_clear()
 
 
 class TestAsyncUnderscoreFreeRoutes:
@@ -84,6 +98,7 @@ class TestAsyncUnderscoreFreeRoutes:
         assert calls[0][2] == {"order_id": "ORD1"}
 
     def test_place_order_hits_placeorder(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        _arm_live(monkeypatch)
         calls = _patch_async_request(monkeypatch, {"status": "success", "data": []})
         asyncio.run(_make_async_client().place_order("NIFTY", 25, "LIMIT", price=100.0))
         assert calls[0][1] == "placeorder"
@@ -91,6 +106,7 @@ class TestAsyncUnderscoreFreeRoutes:
     def test_place_smart_order_hits_placesmartorder(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
+        _arm_live(monkeypatch)
         calls = _patch_async_request(monkeypatch, {"status": "success", "data": []})
         asyncio.run(
             _make_async_client().place_smart_order("NIFTY", 25, "LIMIT", price=100.0)
@@ -100,6 +116,7 @@ class TestAsyncUnderscoreFreeRoutes:
     def test_modify_order_hits_modifyorder(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
+        _arm_live(monkeypatch)
         calls = _patch_async_request(monkeypatch, {"status": "success", "data": []})
         asyncio.run(
             _make_async_client().modify_order("ORD1", order_type="LIMIT", price=101.0)

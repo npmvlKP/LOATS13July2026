@@ -16,6 +16,7 @@ import httpx
 import pytest
 
 import loats.openalgo as oa
+from loats.config import get_settings
 from loats.openalgo import (
     AsyncOpenAlgoClient,
     KillSwitchError,
@@ -84,6 +85,21 @@ def _async_http(response: MagicMock) -> AsyncMock:
 
 def _alerts_mock(active: bool) -> MagicMock:
     return MagicMock(is_kill_switch_active=MagicMock(return_value=active))
+
+
+def _arm_live(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Arm LIVE ordering for tests exercising transport-level mechanics.
+
+    The C-02/H-01 order-mode gate owns refusal coverage
+    (tests/test_order_mode_gate.py); these tests pin idempotency,
+    rate-limit and circuit-breaker mechanics on the armed path.
+    monkeypatch undoes the env at teardown, so arming never leaks.
+    ``get_settings`` is lru_cached, so the cache must be rebuilt AFTER
+    the env lands or the gate would keep seeing the stale cached mode.
+    """
+    monkeypatch.setenv("OPENALGO_MODE", "LIVE")
+    monkeypatch.setenv("OPENALGO_ARMING", "true")
+    get_settings.cache_clear()
 
 
 class TestIdempotencyKeys:
@@ -330,7 +346,10 @@ class TestSyncClientEndpoints:
     def test_get_trade_book(self) -> None:
         assert self._client().get_trade_book()["status"] == "success"
 
-    def test_place_order_sends_idempotency_header(self) -> None:
+    def test_place_order_sends_idempotency_header(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _arm_live(monkeypatch)
         c = self._client()
         with (
             patch("loats.openalgo._get_alerts", return_value=_alerts_mock(False)),
@@ -343,7 +362,8 @@ class TestSyncClientEndpoints:
         headers = c.client.post.call_args.kwargs["headers"]
         assert "Idempotency-Key" in headers
 
-    def test_place_smart_order_success(self) -> None:
+    def test_place_smart_order_success(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        _arm_live(monkeypatch)
         c = self._client()
         with (
             patch("loats.openalgo._get_alerts", return_value=_alerts_mock(False)),
@@ -357,7 +377,8 @@ class TestSyncClientEndpoints:
         payload = c.client.post.call_args.kwargs["json"]
         assert payload["price"] == 1.0
 
-    def test_modify_order_success(self) -> None:
+    def test_modify_order_success(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        _arm_live(monkeypatch)
         c = self._client()
         with (
             patch("loats.openalgo._get_alerts", return_value=_alerts_mock(False)),
@@ -388,7 +409,8 @@ class TestSyncClientEndpoints:
                 c.place_order("X", 1, "MARKET")
         c.client.post.assert_not_called()
 
-    def test_place_order_rate_limited(self) -> None:
+    def test_place_order_rate_limited(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        _arm_live(monkeypatch)
         c = self._client()
         with (
             patch("loats.openalgo._get_alerts", return_value=_alerts_mock(False)),
@@ -401,7 +423,10 @@ class TestSyncClientEndpoints:
                 c.place_order("X", 1, "MARKET")
         c.client.post.assert_not_called()
 
-    def test_place_smart_order_rate_limited(self) -> None:
+    def test_place_smart_order_rate_limited(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _arm_live(monkeypatch)
         c = self._client()
         with (
             patch("loats.openalgo._get_alerts", return_value=_alerts_mock(False)),
@@ -413,7 +438,10 @@ class TestSyncClientEndpoints:
             with pytest.raises(RateLimitExceededError):
                 c.place_smart_order("X", 1, "MARKET")
 
-    def test_order_methods_fail_fast_when_circuit_open(self) -> None:
+    def test_order_methods_fail_fast_when_circuit_open(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _arm_live(monkeypatch)
         c = self._client()
         breaker = MagicMock()
         breaker.call.side_effect = CircuitBreakerOpenError("openalgo", 5.0)
@@ -594,7 +622,10 @@ class TestAsyncClientOrders:
         return c
 
     @pytest.mark.asyncio
-    async def test_place_order_success_sends_idempotency(self) -> None:
+    async def test_place_order_success_sends_idempotency(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _arm_live(monkeypatch)
         c = self._client()
         with (
             patch("loats.openalgo._get_alerts", return_value=_alerts_mock(False)),
@@ -619,7 +650,10 @@ class TestAsyncClientOrders:
         c.client.post.assert_not_awaited()
 
     @pytest.mark.asyncio
-    async def test_place_order_rate_limited(self) -> None:
+    async def test_place_order_rate_limited(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _arm_live(monkeypatch)
         c = self._client()
         with (
             patch("loats.openalgo._get_alerts", return_value=_alerts_mock(False)),
@@ -632,7 +666,10 @@ class TestAsyncClientOrders:
                 await c.place_order("X", 1, "MARKET")
 
     @pytest.mark.asyncio
-    async def test_place_smart_order_success_and_metadata(self) -> None:
+    async def test_place_smart_order_success_and_metadata(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _arm_live(monkeypatch)
         c = self._client()
         with (
             patch("loats.openalgo._get_alerts", return_value=_alerts_mock(False)),
@@ -647,7 +684,10 @@ class TestAsyncClientOrders:
         assert payload["price"] == 2.0
 
     @pytest.mark.asyncio
-    async def test_place_smart_order_rate_limited(self) -> None:
+    async def test_place_smart_order_rate_limited(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _arm_live(monkeypatch)
         c = self._client()
         with (
             patch("loats.openalgo._get_alerts", return_value=_alerts_mock(False)),
@@ -660,7 +700,8 @@ class TestAsyncClientOrders:
                 await c.place_smart_order("X", 1, "MARKET")
 
     @pytest.mark.asyncio
-    async def test_modify_order_success(self) -> None:
+    async def test_modify_order_success(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        _arm_live(monkeypatch)
         c = self._client()
         with (
             patch("loats.openalgo._get_alerts", return_value=_alerts_mock(False)),
@@ -682,7 +723,10 @@ class TestAsyncClientOrders:
         assert payload == {"order_id": "o1", "apikey": "k"}
 
     @pytest.mark.asyncio
-    async def test_order_fail_fast_when_circuit_open(self) -> None:
+    async def test_order_fail_fast_when_circuit_open(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _arm_live(monkeypatch)
         c = self._client()
         breaker = MagicMock()
         breaker.call_async = AsyncMock(

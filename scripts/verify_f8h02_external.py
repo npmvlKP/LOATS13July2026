@@ -50,6 +50,13 @@ sys.path.insert(0, str(REPO_ROOT / "src"))
 os.environ.setdefault("OPENALGO_API_KEY", "verify_dummy")
 os.environ.setdefault("OPENALGO_BASE_URL", "https://verify.invalid")
 os.environ.setdefault("ENVIRONMENT", "test")
+# C-02/H-01 order-mode gate (04Oct2026): checks 3-6 exercise
+# modify_order's Rule-7 boundary for real, which now requires the armed
+# LIVE posture. Direct assignment (not setdefault) keeps the verifier's
+# synthetic environment deterministic; check 7's snapshot re-run inherits
+# this because the env is built inside the script itself.
+os.environ["OPENALGO_MODE"] = "LIVE"
+os.environ["OPENALGO_ARMING"] = "true"
 
 PASS_SYM, FAIL_SYM = "[PASS]", "[FAIL]"
 

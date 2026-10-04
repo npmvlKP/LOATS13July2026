@@ -1493,3 +1493,38 @@ unhandled_exceptions 0; close arithmetic unchanged 16Oct 20:08:05Z),
 P1 in-span kill drill window opens Mon 05Oct, R-19/C-02 wiring and
 break-glass/nltk rows unchanged. Docs-only, ratchet-neutral
 (526 == 526 pre/post).
+
+Updated 2026-10-04 (19:23 IST, C-02+H-01 order-mode gate wave): the 13:13
+paste's P2-wave line EXECUTED as ONE atomic commit per its own contract:
+`OPENALGO_MODE` is now enforced at the order-client boundary —
+`place_order`/`place_smart_order`/`modify_order` (sync AND async)
+hard-refuse (`OpenAlgoModeBlockedError` / `OpenAlgoModeArmingError`)
+unless mode is LIVE and the `OPENALGO_ARMING` process-env gesture is set
+(`src/loats/openalgo.py` `_enforce_order_mode_gate`, AFTER the
+kill-switch check so the emergency stop keeps priority; a refusal writes
+a `BLOCK` audit row). H-01's armed-refusal ask lands on `modify_order`
+in the same gate; the driver's default-off `enable_trailing_stops` and
+the persisted per-order Rule-7 budget stay the primary
+per-cycle/per-order controls. Default-path behavior is unchanged:
+nothing in production called the place paths before this wave (the
+03Oct zero-call-site evidence) and nothing does now — the killed risk is
+the future-caller class (script, REPL, or new module holding the key on
+an ANALYZE deployment, even with a direct client import). RED-proven net
+`tests/test_order_mode_gate.py` (15 tests; the pre-gate run failed on
+collection as designed); armed-path updates in `test_openalgo.py`
+(12 tests), `test_openalgo_wire_contract_routes.py` (3 tests),
+`test_rule7_modification_limit.py` (5 boundary tests that call
+`modify_order` for real) and `scripts/verify_f8h02_external.py`
+(synthetic-env arming; 7/7 checks re-proven live incl. the mutation
+net); full affected set green on the repo venv and the complete suite
+re-verified post-fix. Register row S-18 +
+floor flip 17->18 and ceiling re-pin 526->527 land in the SAME commit
+(binding rule). Docs: COMPLIANCE-MATRIX boundary cell amended
+keep+annotate (the "declared deployment knob" claim retained inline as
+pre-04Oct history; cites re-pointed to `openalgo.py:964,1493` /
+`orchestrator.py:2334` / `settings.py:116` for this wave's own shift),
+`.env.example` arming-gesture note (the client reads the PROCESS
+ENVIRONMENT for arming, not the .env file). Remaining OPEN queue
+unchanged: S-15 supervised enablement (post-checkpoint), R-19 decision
+(next wave), P1 in-span kill drill (window opens Mon 05Oct), nltk
+waiver + break-glass standing rows.

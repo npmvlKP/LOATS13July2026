@@ -129,8 +129,14 @@ pip_audit_results.json
 # tracked count 525 -> 526 vs ceiling 525 on an otherwise clean tree; same
 # artifact class as the snapshot and live.json capture families above -- the
 # capture is a local verify-probe artifact, the live contract of record is the
-# protection GET re-run, never a tracked file).
+# protection GET re-run, never a tracked file). 04Oct: the family widens to
+# the underscore spelling (post_put_get_131.json surfaced from the #131
+# delivery -- separator variant of the same artifact class; canonical
+# tests/fixtures/p5_run_log_*.json stays NOT ignored, probe both ways).
 /post-put-get-*.json
+/post_put_get-*.json
+/post-put_get-*.json
+/post_put_get_*.json
 pytest_output.txt
 ruff_alerts.txt
 ruff_all_errors.txt

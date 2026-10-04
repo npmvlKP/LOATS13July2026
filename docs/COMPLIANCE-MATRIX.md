@@ -44,18 +44,26 @@ alerts. It does **not** place live orders. The order path to any exchange
 runs — when a user configures it — through the separately deployed OpenAlgo
 host and the user's own broker account, not through this repository's code
 paths. Boundary evidence (03Oct2026): the only position-opening methods,
-`place_order`/`place_smart_order` (`src/loats/openalgo.py:858,1384`), have
+`place_order`/`place_smart_order` (`src/loats/openalgo.py:964,1493`), have
 **zero production call sites** — a whole-tree grep outside
 `src/loats/openalgo.py` and `tests/` is empty. The wired order-mutation
 paths are closure-only: `modify_order` ratchets the SL-M trigger of orders
-that already exist on the host (CMP Rule-7 boundary, `orchestrator.py:2330`,
+that already exist on the host (CMP Rule-7 boundary, `orchestrator.py:2334`,
 fail-closed) and `cancel_order` runs inside kill-switch escalation only
 (`alerts.py:573`, ADR-0020); neither can open a position. `openalgo_mode`
-defaults to `"ANALYZE"` (`settings.py:110`); its LIVE branch has no
-enforcement consumer yet, so mode is a declared deployment knob, not a
-verified runtime gate — recorded for the next build wave (same genre as
-R-19; wiring decision deferred per the R-16 mid-span freeze, evidenced
-against the live `.env` where `OPENALGO_MODE=ANALYZE`). Pre-03Oct the
+defaults to `"ANALYZE"` (`settings.py:116`) and is now **enforced**:
+`place_order`/`place_smart_order`/`modify_order` hard-refuse
+(`OpenAlgoModeBlockedError` / `OpenAlgoModeArmingError`) unless mode is
+LIVE and the separate `OPENALGO_ARMING` process-environment gesture is
+set (`src/loats/openalgo.py:640`; the gate runs AFTER the kill-switch
+check so the emergency stop keeps priority, and a refusal writes a
+`BLOCK` audit row). Pre-04Oct this cell said the LIVE branch had no
+enforcement consumer yet — mode was then a declared deployment knob, a
+verified runtime gate deferred to the next build wave (R-19 genre;
+R-16 mid-span freeze held; live `.env` read `OPENALGO_MODE=ANALYZE`).
+Superseded by the 04Oct2026 C-02+H-01 atomic wave
+(`tests/test_order_mode_gate.py`, RED-proven; H-01's armed-refusal ask
+lands on `modify_order` in the same gate). Pre-03Oct the
 sentence above ended at "code paths" and carried no call-site evidence;
 that bulk phrasing was falsified as a *claim-shape* (an unproven negative)
 by the 03Oct external-review directive, not as an operation — the methods
