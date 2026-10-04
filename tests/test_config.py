@@ -134,6 +134,21 @@ class TestConfig:
             assert "environment=" in str_str
             assert "openalgo_api_key=SecretStr('**********')" in str_str
 
+    def test_audit_integrity_break_glass_defaults_false(self) -> None:
+        """C-01: the break-glass knob defaults OFF (gate enforced by default)."""
+        with patch.dict(os.environ, {"OPENALGO_API_KEY": "test_key"}):
+            test_settings = Settings()
+        assert test_settings.audit_integrity_break_glass is False
+
+    def test_audit_integrity_break_glass_env_mapping(self) -> None:
+        """C-01: AUDIT_INTEGRITY_BREAK_GLASS maps onto the Settings knob."""
+        with patch.dict(
+            os.environ,
+            {"OPENALGO_API_KEY": "test_key", "AUDIT_INTEGRITY_BREAK_GLASS": "true"},
+        ):
+            test_settings = Settings()
+        assert test_settings.audit_integrity_break_glass is True
+
 
 # ---------------------------------------------------------------------------
 # TODO-13 / F9-H-01: CMP section 4 gate thresholds are Settings-conformant

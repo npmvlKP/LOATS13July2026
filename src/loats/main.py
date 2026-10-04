@@ -2,6 +2,7 @@
 
 import argparse
 import asyncio
+import os
 import signal
 import sys
 from collections.abc import Callable
@@ -30,7 +31,27 @@ settings: Any = LazySettings()
 # OPENALGO_API_KEY, because reading ``settings.sqlite_db_path`` built
 # Settings() immediately). Bind the shared lazy singleton instead; the
 # real Database() is constructed on first attribute access at runtime.
-__all__ = ["TradingSystem", "db", "settings"]
+__all__ = ["AuditIntegrityGateError", "TradingSystem", "db", "settings"]
+
+
+class AuditIntegrityGateError(RuntimeError):
+    """C-01 boot gate: the audit chain failed verification at boot.
+
+    Raised by ``TradingSystem.initialize`` BEFORE the alerts and
+    orchestrator legs start, so a broken/truncated/reordered SHA-256
+    chain can never carry new evidence rows (CMP rule + S-13: the
+    audit trail hash chain is non-negotiable).
+    """
+
+
+def _load_settings() -> Any:
+    """Read the live settings proxy at call time (C-01 test seam).
+
+    The gate consults ``audit_integrity_break_glass`` through this
+    indirection so per-test ``patch`` of ``loats.main.settings``
+    attributes is honored instead of a value captured at import time.
+    """
+    return settings
 
 
 class TradingSystem:
@@ -56,8 +77,59 @@ class TradingSystem:
             check_duplicate_listener(settings.openalgo_base_url)
             await initialize_cache()
             await self.db.async_initialize()
+            # C-01 (04Oct2026): audit-chain integrity is a BOOT GATE, not
+            # an observation. A failed verification refuses the boot BEFORE
+            # the alerts and orchestrator legs start, so a broken chain can
+            # never carry new evidence rows (the S-13/CMP non-negotiable
+            # 7-year claim). ``AUDIT_INTEGRITY_BREAK_GLASS=true`` is the
+            # operator's TEMPORARY forensic continue: the break-glass boot
+            # is audited on the broken trail and must be followed by
+            # scripts/repair_f9m01_chain_head.py and a clean reboot;
+            # ENVIRONMENT=test skips the refusal so test suites exercise
+            # all paths freely.
             if not await self.db.async_verify_audit_log_integrity():
-                logger.warning("Audit log integrity check failed during initialization")
+                env = os.environ.get("ENVIRONMENT")
+                break_glass = bool(
+                    getattr(_load_settings(), "audit_integrity_break_glass", False)
+                )
+                if env == "test":
+                    logger.warning(
+                        "Audit log integrity check failed during initialization "
+                        "(ENVIRONMENT=test -- gate skipped, boot continues)"
+                    )
+                elif break_glass:
+                    await alerts.send_alert(
+                        "AUDIT INTEGRITY BREAK-GLASS: continuing boot on a "
+                        "FAILED audit-chain verification (operator override). "
+                        "Evidence after this point chains onto a broken head; "
+                        "run scripts/repair_f9m01_chain_head.py and reboot.",
+                        alert_type="error",
+                    )
+                    await self.db.async_log_audit(
+                        action="AUDIT_INTEGRITY_BREAK_GLASS",
+                        entity_type="AUDIT_LOG",
+                        entity_id="audit.log",
+                        user="operator",
+                        metadata={
+                            "environment": str(env),
+                            "verifier": "verify_audit_log_integrity",
+                        },
+                    )
+                    logger.error(
+                        "Audit log integrity check failed during initialization "
+                        "-- break-glass continue (AUDIT_INTEGRITY_BREAK_GLASS)"
+                    )
+                else:
+                    raise AuditIntegrityGateError(
+                        "C-01: audit-chain integrity verification FAILED at "
+                        "boot -- refusing to start so the broken chain cannot "
+                        "carry new evidence rows (CMP rule + S-13). The "
+                        "verifier CRITICAL logs name the first broken entry. "
+                        "Remediation: scripts/repair_f9m01_chain_head.py, "
+                        "then reboot; AUDIT_INTEGRITY_BREAK_GLASS=true is the "
+                        "TEMPORARY forensic-continue override for incident "
+                        "response."
+                    )
             await alerts.initialize()
             await scheduler.initialize()
             # Start metrics server after cache initialization (R5-2 fix).

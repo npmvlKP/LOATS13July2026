@@ -33,6 +33,21 @@ class Settings(BaseSettings):
     retention_days: int = Field(
         2555, description="Number of days to retain data (7 years)"
     )
+    # C-01 (04Oct2026): audit-chain integrity is a boot gate, not an
+    # observation. When ``verify_audit_log_integrity()`` fails at boot the
+    # system refuses to start unless the operator sets this flag -- a
+    # TEMPORARY forensic continue for evidence preservation during
+    # incident response. Break-glass boots are audited on the (broken)
+    # trail and must be followed by the chain repair script; see
+    # docs/CMP-SUPERSESSION-REGISTER.md S-17 and the R-20 register row.
+    audit_integrity_break_glass: bool = Field(
+        False,
+        description=(
+            "Break-glass: continue boot despite a failed audit-log "
+            "integrity verification (temporary forensic continue; "
+            "audited and must be followed by repair)"
+        ),
+    )
 
     # Scan Intervals
     ta_scan_interval: int = Field(
