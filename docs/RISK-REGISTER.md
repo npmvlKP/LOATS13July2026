@@ -1447,3 +1447,49 @@ semantics), kill-drill runbook tracked (KILL-SWITCH-DRILL-RUNBOOK.md,
 #124), R-19/C-02 wiring = next-wave decisions, break-glass posture
 unchanged (#129 boot gate). All work docs-only + ratchet-neutral
 (526 == 526 pre/post).
+
+Updated 2026-10-04 (14:49 IST, 08:57 paste H-01 reconciliation wave):
+the 08:57 paste is the third 04Oct family member (10:43 and 12:13 IST
+predecessors). Mechanized containment probe (normalized per-line): 9/20
+lines contained in BOTH predecessors -- the C-02 block, verbatim --
+with 11 novel lines: the H-01 block (5) plus the risk queue re-worded
+from the 12:13 member's table into prose (same five rows, priorities
+and deadlines intact); 0/20 across all 179 parent-dir archive +
+audit-history haystacks, so the H-01 content has no archive precedent
+(note: its H-01 identifier collides with the archived F9-H-01 composite
+weights finding, S-03; they are unrelated -- this block is tracked here
+under the paste's own numbering). The H-01 block is this member's fresh
+verdict work; the C-02 block and the risk queue remain governed by the
+13:00 IST entry above. H-01 verified claim-by-claim at HEAD 93e63ec:
+`enable_trailing_stops` defaults False (settings.py:187-192; the paste
+cited 172-175 -- pre-#129 cite, same +15 succession shift #130
+recorded); the SL-M modify call sits at orchestrator.py:2330 with the
+per-cycle counter at 2272-2330, exactly as pasted. The paste's "one
+budget owner (persisted per-order count)" demand is ALREADY the shipped
+design -- F8-H-02's reserve/release protocol (rules.py:718-762)
+increments the persisted DB counter inside BEGIN IMMEDIATE BEFORE the
+broker call, rolls the reservation back and raises
+Rule7ModificationLimitError on limit breach, and refunds via
+release_modification when the broker request fails, so failed attempts
+never consume budget; orchestrator.py:2378-2379 documents the cycle
+counter as the per-cycle SECONDARY guard, and the two counters cannot
+over-modify in either direction (per-cycle exhaustion only defers the
+ratchet to the next cycle; per-order exhaustion fails closed and
+restores). The demanded alias-restore re-test landed in the 30Sep S-15
+wave: orchestrator.py:2349 restores the pre-move config and
+test_rule7_refusal_keeps_stop_and_position_protected
+(tests/test_trailing_stop_slm.py:177-202) pins the exact demanded
+contract -- 26th-modify error, exactly one broker call, pre-move
+trigger 22400.0 restored ACTIVE, refusal audited as
+ratchet_refused_rule7, no exception escapes the driver; re-ran live on
+the repo venv this wave: 7/7 passed in 3.62s. H-01's remaining ask
+("refuse modify unless mode is explicitly armed") IS C-02's hard-refuse
+contract and resolves into the next-build-wave atomic commit with it
+(R-16 freeze holds; no separate mechanism). S-15 supervised enablement
+stays OPEN by design; zero code change this wave. Risk queue
+re-verified at probe 2026-10-04T09:19:02Z: span quartet green
+(restarts 3, cycles 5080 / baseline 1945, kill_switch_verified true,
+unhandled_exceptions 0; close arithmetic unchanged 16Oct 20:08:05Z),
+P1 in-span kill drill window opens Mon 05Oct, R-19/C-02 wiring and
+break-glass/nltk rows unchanged. Docs-only, ratchet-neutral
+(526 == 526 pre/post).
