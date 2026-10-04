@@ -107,8 +107,15 @@ class Settings(BaseSettings):
     openalgo_base_url: str = Field(
         "http://127.0.0.1:5000", description="Base URL for OpenAlgo REST API"
     )
+    # C-02 (04Oct2026): enforced at the order-client boundary --
+    # place_order / place_smart_order / modify_order hard-refuse unless
+    # this is LIVE and the OPENALGO_ARMING gesture is set
+    # (src/loats/openalgo.py _enforce_order_mode_gate). ANALYZE remains
+    # the only operator posture until the PRE-LIVE checkpoint flips both
+    # deliberately.
     openalgo_mode: Literal["ANALYZE", "LIVE"] = Field(
-        "ANALYZE", description="OpenAlgo mode (ANALYZE only until all gates pass)"
+        "ANALYZE",
+        description="OpenAlgo mode (order paths hard-refuse unless LIVE + armed)",
     )
     analyzer_routing_enabled: bool = Field(
         False,

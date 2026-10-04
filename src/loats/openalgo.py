@@ -38,6 +38,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import os
 import re
 import threading
 import time
@@ -131,6 +132,40 @@ class KillSwitchError(OpenAlgoError):
         self, message: str = "Kill switch active, order placement blocked"
     ) -> None:
         self.message = message
+        super().__init__(self.message)
+
+
+class OpenAlgoModeBlockedError(OpenAlgoError):
+    """Order attempted while ``OPENALGO_MODE`` is not ``LIVE``.
+
+    C-02 (04Oct2026): the mode knob is a runtime gate, not a label --
+    position-opening calls hard-refuse unless the operator has
+    deliberately switched the deployment to LIVE.
+    """
+
+    def __init__(self, mode: str) -> None:
+        self.mode = mode
+        self.message = (
+            f"Order refused: OPENALGO_MODE={mode!r} is not LIVE (C-02 order-mode gate)"
+        )
+        super().__init__(self.message)
+
+
+class OpenAlgoModeArmingError(OpenAlgoError):
+    """Order attempted while ``OPENALGO_MODE=LIVE`` but not armed.
+
+    H-01 armed-refusal: arming is the deliberate second condition that
+    separates flipping the mode knob from authorizing order emission;
+    ``modify_order`` carries the same refusal so a supervisor flip alone
+    can never reach the broker.
+    """
+
+    def __init__(self, mode: str) -> None:
+        self.mode = mode
+        self.message = (
+            "Order refused: OPENALGO_MODE=LIVE requires OPENALGO_ARMING=true "
+            "(H-01 armed-refusal gate)"
+        )
         super().__init__(self.message)
 
 
@@ -582,11 +617,81 @@ class OpenAlgoAPIError(OpenAlgoError):
         super().__init__(f"API Error {status_code}: {message}")
 
 
+def _openalgo_mode() -> str:
+    """Resolve ``OPENALGO_MODE`` through cached Settings, env-overridable."""
+    return get_settings().openalgo_mode
+
+
+def _openalgo_arming() -> bool:
+    """Resolve ``OPENALGO_ARMING`` from the process environment.
+
+    Deliberately NOT a Settings field: arming is an operator gesture, not
+    configuration the app may supply from a file the app also reads.
+    """
+    return os.environ.get("OPENALGO_ARMING", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
+
+
+def _enforce_order_mode_gate(method: str) -> None:
+    """C-02/H-01 boundary: refuse order emission unless LIVE and armed.
+
+    Kills the declared-knob gap: ``place_order``/``place_smart_order``
+    (position-opening) and ``modify_order`` (order mutation, H-01) call
+    this AFTER the kill-switch check so the emergency stop stays the
+    highest-priority refusal. ANALYZE deployments cannot order even if a
+    caller imports the client directly; LIVE requires the separate
+    ``OPENALGO_ARMING`` gesture.
+    """
+    mode = _openalgo_mode()
+    if mode != "LIVE":
+        logger.error(
+            "Order emission refused by mode gate (method=%s mode=%s)",
+            method,
+            mode,
+        )
+        _log_mode_gate_block(method, mode, "order_mode_gate")
+        raise OpenAlgoModeBlockedError(mode)
+    if not _openalgo_arming():
+        logger.error(
+            "Order emission refused: LIVE mode without arming (method=%s)",
+            method,
+        )
+        _log_mode_gate_block(method, mode, "order_arming_gate")
+        raise OpenAlgoModeArmingError(mode)
+
+
+async def _async_enforce_order_mode_gate(method: str) -> None:
+    """Async twin of :func:`_enforce_order_mode_gate` (identical semantics)."""
+    _enforce_order_mode_gate(method)
+
+
 def _get_alerts() -> AlertSystem:
     """Lazy import alerts avoid circular import."""
     from .alerts import alerts
 
     return alerts
+
+
+def _log_mode_gate_block(method: str, mode: str, reason: str) -> None:
+    """Audit-log a mode-gate refusal (best-effort, never masks the raise)."""
+    try:
+        from .database import db
+
+        db._log_audit(
+            action="BLOCK",
+            entity_type="order",
+            entity_id=f"mode_gate_{method}",
+            user="system",
+            metadata={"reason": reason, "mode": mode, "method": method},
+            previous_state=None,
+            new_state={"status": "blocked", "reason": reason},
+        )
+    except Exception as e:
+        logger.error(f"Failed to write audit log for mode-gate block: {e}")
 
 
 def _check_kill_switch() -> None:
@@ -876,6 +981,7 @@ class OpenAlgoClient:
         When the circuit is open, this method fails fast with CircuitBreakerOpenError.
         """
         _check_kill_switch()
+        _enforce_order_mode_gate("openalgo.place_order")
         # Use configured rate limits for order operations
         if not get_sync_order_rate_limiter().acquire():
             logger.warning("Rate limit exceeded order placement")
@@ -930,6 +1036,7 @@ class OpenAlgoClient:
         When the circuit is open, this method fails fast with CircuitBreakerOpenError.
         """
         _check_kill_switch()
+        _enforce_order_mode_gate("openalgo.place_smart_order")
         # Use configured rate limits for smart order operations
         if not get_sync_smart_order_rate_limiter().acquire():
             logger.warning("Rate limit exceeded smart order placement")
@@ -989,6 +1096,7 @@ class OpenAlgoClient:
         counter DB failure fails closed (modification refused).
         """
         _check_kill_switch()
+        _enforce_order_mode_gate("openalgo.modify_order")
         payload = build_modify_order_payload(
             order_id=order_id,
             quantity=quantity,
@@ -1402,6 +1510,7 @@ class AsyncOpenAlgoClient:
         When the circuit is open, this method fails fast with CircuitBreakerOpenError.
         """
         await _async_check_kill_switch()
+        await _async_enforce_order_mode_gate("openalgo.place_order")
         # Use configured rate limits for order operations
         if not await get_order_rate_limiter().acquire():
             logger.warning("Rate limit exceeded order placement")
@@ -1479,6 +1588,7 @@ class AsyncOpenAlgoClient:
         When the circuit is open, this method fails fast with CircuitBreakerOpenError.
         """
         await _async_check_kill_switch()
+        await _async_enforce_order_mode_gate("openalgo.place_smart_order")
         # Use configured rate limits for smart order operations
         if not await get_smart_order_rate_limiter().acquire():
             logger.warning("Rate limit exceeded smart order placement")
@@ -1551,6 +1661,7 @@ class AsyncOpenAlgoClient:
         When the circuit is open, this method fails fast with CircuitBreakerOpenError.
         """
         await _async_check_kill_switch()
+        await _async_enforce_order_mode_gate("openalgo.modify_order")
 
         # CMP Rule 7 (F8-H-02): reserve budget before touching the broker.
         # Raises Rule7ModificationLimitError (refuse) or Rule7StateError

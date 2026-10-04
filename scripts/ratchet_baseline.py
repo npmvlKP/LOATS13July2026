@@ -942,8 +942,21 @@ History (most recent last):
        files modified in place; new tests live in existing test files.
        Tree at ceiling 525 pre-wave (525 == 525), so +1 lands AT 526.
        Ceiling 525->526.
+  527  04Oct C-02+H-01 order-mode gate wave (2026-10-04): +1
+       tests/test_order_mode_gate.py (RED-proven net for the C-02
+       OPENALGO_MODE enforcement gap + H-01 armed-refusal on
+       modify_order; gate lives in src/loats/openalgo.py, existing
+       files). All other wave files modified in place: settings.py
+       declaration comment, orchestrator.py driver docstring,
+       COMPLIANCE-MATRIX boundary cell (keep+annotate),
+       CMP-SUPERSESSION-REGISTER S-18 row + floor flip (same atomic
+       commit per the register's binding rule), RISK-REGISTER updated
+       entry, .env.example arming-gesture note, armed-path updates in
+       test_openalgo.py / test_openalgo_wire_contract_routes.py.
+       Tree at ceiling 526 pre-wave (526 == 526), so +1 lands AT 527.
+       Ceiling 526->527.
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 526
+TRACKED_FILE_CEILING = 527
