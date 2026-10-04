@@ -1404,3 +1404,46 @@ instruction (frozen text untouched): IST of 2026-10-16T20:08:05Z is
 01:38 IST 17Oct (+5:30); every future R-12 close arithmetic reads
 17Oct 01:38 IST. First real evidence window for the in-span kill drill =
 the Mon 05Oct session; drill due before the span close 16Oct 20:08:05Z.
+
+Updated 2026-10-04 (13:00 IST, post-#129 paste reconciliation + ADR-0010
+currency re-check wave): (1) The 04Oct morning paste is a FRESH
+COMPOSITION (containment 0/47 against every parent-dir archive, the
+register, and the 02Oct answer doc). Its five PS 5.1 failure tails carry
+literal `<placeholder>` argv (`<wave-branch>`, `<explicit-file-list>`,
+`<body.md>`) -- parse-time deaths under PS 5.1 semantics, nothing in
+those lines executed; live state re-proves every intended operation
+landed already: `main` == `origin/main` == `efb26d5` (#129, merged 04Oct
+04:53:28Z), zero open PRs, sole remote head `main`, tree clean, ceiling
+526 == 526. (2) The paste's C-02 block reconciled row-by-row against
+HEAD: `openalgo_mode` decl at settings.py:110 (not 95 -- the paste
+re-ships the #129-shifted cite), zero `openalgo_mode` consumers in
+src/, place_order/place_smart_order (openalgo.py:858/911/1384/1460)
+still have zero production call sites, .env override OPENALGO_MODE=
+ANALYZE live-read -- gap remains OPEN by design, C-02 wiring stays the
+next-build-wave decision, R-16 freeze holds. (3) Real defect from the
+paste's evidence block: the matrix's `settings.py:95` cite is
+succession drift -- birth-exact at `5f8f3b6`, shifted +15 by `945155a`
+(#129); all four settings cites re-pointed to HEAD (95->110, 193->208,
+217-231->232-245, 221->236, 299-301->314-316) with a dated matrix
+amendment. (4) The 02Oct answer doc re-audit TRIGGERED by its own pin
+(mtime 07:45 IST > the 14:38 instant): verdict = snapshot claims remain
+correct under dated-snapshot discipline -- its settings cites (95/98/
+130) verified EXACT at its pinned SHA `307bec5` (pre-#129); zero
+boot/audit-chain/C-01 claims anywhere in the doc; the post-pin 10-
+question layer is the grader loop's own output, already self-
+consistent. Nothing to falsify; doc untouched. (5) Risk-4 action
+trigger RE-PROBED and STILL CLOSED: PyPI latest nltk 3.10.3 (no
+3.10.4+, no 3.11); GitHub advisory GHSA-8mgp-746c-j5xp vulnerable
+`<= 3.10.3`, first_patched null; OSV's `fixed: 3.10.3` events-block
+triaged as a DB encoding artifact contradicting its own details text;
+fresh-venv CI-exact unwaived scan rc=0 (no safety -> advisory cannot
+fire), repo `.venv` (safety 3.8.1 + nltk 3.10.3) unwaived scan rc=1
+with PYSEC-2026-3740 as the ONLY finding and an EMPTY fix-version
+column -- waiver REQUIRED and current; ADR-0010 amended NEWEST-FIRST
+(04Oct closing section + Status line). Paste risk rows 0/1/2/3/5
+verified: span quartet green (restarts 3, cycles 3085/base 1945,
+routed_decisions null=not-yet-dispositioned per carried-counter
+semantics), kill-drill runbook tracked (KILL-SWITCH-DRILL-RUNBOOK.md,
+#124), R-19/C-02 wiring = next-wave decisions, break-glass posture
+unchanged (#129 boot gate). All work docs-only + ratchet-neutral
+(526 == 526 pre/post).
