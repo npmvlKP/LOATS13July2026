@@ -390,8 +390,19 @@ class TradingScheduler:
         logger.info("Starting data cleanup")
         try:
             await self.db.async_cleanup()
-            await self.db.async_verify_audit_log_integrity()
-            logger.info("Audit log integrity verified")
+            # C-01 (04Oct2026): grade the verifier result. The old code
+            # discarded it and logged "verified" unconditionally -- a false
+            # evidence line on exactly the pass meant to certify the trail.
+            # A failed pass is now loudly logged; the next BOOT refuses
+            # unless the operator sets AUDIT_INTEGRITY_BREAK_GLASS.
+            if await self.db.async_verify_audit_log_integrity():
+                logger.info("Audit log integrity verified")
+            else:
+                logger.error(
+                    "Audit log integrity FAILED during data cleanup -- "
+                    "see verifier CRITICAL logs; the next boot will refuse "
+                    "unless AUDIT_INTEGRITY_BREAK_GLASS is set (C-01)"
+                )
             await self.db.async_vacuum()
         except Exception:
             logger.exception("Data cleanup failed")

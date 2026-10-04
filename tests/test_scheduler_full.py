@@ -95,6 +95,38 @@ async def test_data_cleanup_task_invokes_db_cleanup(scheduler):
 
 
 @pytest.mark.asyncio
+async def test_data_cleanup_task_logs_failure_when_integrity_fails(scheduler):
+    """C-01: a failed cleanup-time verify logs an ERROR, never 'verified'."""
+    db_instance = MagicMock()
+    db_instance.async_cleanup = AsyncMock(return_value=True)
+    db_instance.async_verify_audit_log_integrity = AsyncMock(return_value=False)
+    db_instance.async_vacuum = AsyncMock(return_value=True)
+    scheduler.db = db_instance
+    with patch("loats.scheduler.logger") as mock_logger:
+        await scheduler._data_cleanup_task()
+    db_instance.async_vacuum.assert_awaited_once()
+    logged = " ".join(str(call.args) for call in mock_logger.error.call_args_list)
+    assert "Audit log integrity FAILED" in logged
+    never_logged = " ".join(str(call.args) for call in mock_logger.info.call_args_list)
+    assert "Audit log integrity verified" not in never_logged
+
+
+@pytest.mark.asyncio
+async def test_data_cleanup_task_logs_verified_when_integrity_passes(scheduler):
+    """C-01: the 'verified' evidence line fires only on a passing pass."""
+    db_instance = MagicMock()
+    db_instance.async_cleanup = AsyncMock(return_value=True)
+    db_instance.async_verify_audit_log_integrity = AsyncMock(return_value=True)
+    db_instance.async_vacuum = AsyncMock(return_value=True)
+    scheduler.db = db_instance
+    with patch("loats.scheduler.logger") as mock_logger:
+        await scheduler._data_cleanup_task()
+    logged = " ".join(str(call.args) for call in mock_logger.info.call_args_list)
+    assert "Audit log integrity verified" in logged
+    assert mock_logger.error.call_count == 0
+
+
+@pytest.mark.asyncio
 async def test_backtest_sanity_task_logs_when_gate_passes(scheduler):
     """Backtest sanity task should call the sanity module and log a pass."""
     db_instance = MagicMock()
