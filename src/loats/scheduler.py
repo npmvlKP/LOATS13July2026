@@ -306,6 +306,12 @@ class TradingScheduler:
 
     async def check_market_status(self) -> None:
         """Check market status handle open/close events."""
+        # R-19/H-02 (05Oct2026): every scheduled support job gates on the
+        # halt flag exactly where APScheduler enters -- BEFORE the wrapper's
+        # try (which would otherwise swallow KillSwitchError). An engaged
+        # halt refuses the body; APScheduler logs the error and keeps the
+        # schedule alive, mirroring the orchestrator's halt semantics.
+        self._check_kill_switch()
         task_id = (
             f"market_status_check_{datetime.datetime.now(datetime.UTC).isoformat()}"
         )
@@ -358,6 +364,8 @@ class TradingScheduler:
         Every external leg degrades independently -- the duty must never
         crash the scheduler.
         """
+        # R-19/H-02 (05Oct2026): halt gate before the wrapper's try block.
+        self._check_kill_switch()
         task_id = f"market_activation_{datetime.datetime.now(datetime.UTC).isoformat()}"
         try:
             task = asyncio.create_task(market_status_service.run_activation_check())
@@ -372,6 +380,9 @@ class TradingScheduler:
 
     async def run_data_cleanup(self) -> None:
         """Run data cleanup task."""
+        # R-19/H-02 (05Oct2026): halt gate -- cleanup writes/vacuum must not
+        # run while the halt is engaged.
+        self._check_kill_switch()
         task_id = f"data_cleanup_{datetime.datetime.now(datetime.UTC).isoformat()}"
         try:
             task = asyncio.create_task(self._data_cleanup_task())
@@ -415,6 +426,9 @@ class TradingScheduler:
 
     async def run_backtest_sanity_check(self) -> None:
         """Run backtest sanity check task (CMP P4 exit gate)."""
+        # R-19/H-02 (05Oct2026): halt gate -- sanity fetches/alerts must not
+        # run while the halt is engaged.
+        self._check_kill_switch()
         task_id = f"backtest_sanity_{datetime.datetime.now(datetime.UTC).isoformat()}"
         try:
             task = asyncio.create_task(self._backtest_sanity_task())
