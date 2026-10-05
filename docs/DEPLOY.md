@@ -139,6 +139,13 @@ python -m src.loats.main
 
 ## Docker Deployment
 
+> **CI-only (S-19, `docs/CMP-SUPERSESSION-REGISTER.md`):** the Docker image
+> exists to prove the packaged tree builds and its HC-01 structural probe
+> passes in CI. It is not a live deployment surface — the CMP LITE mandate
+> is pip-only, and the image's default CMD runs the probe and exits. Live
+> deployment is the bare-metal pip path (Development Setup above, systemd
+> service below).
+
 ### Quick Start
 
 ```bash
@@ -156,7 +163,7 @@ docker run -d \
 docker logs loats13july2026
 
 # Run health check
-docker exec loats13july2026 python quick_health_check.py
+docker exec loats13july2026 python scripts/fr7_health_check.py --only HC-01
 ```
 
 ### Using Docker Compose
@@ -188,7 +195,10 @@ The Docker deployment includes:
 
 ## Production Deployment
 
-> **IMPORTANT**: For production deployments, use cloud-native services instead of Docker.
+> **IMPORTANT**: For live deployments use the bare-metal pip path (the
+> systemd service below). Docker is CI-only in this repository (S-19,
+> `docs/CMP-SUPERSESSION-REGISTER.md`); cloud platforms remain an
+> alternative for hosted operation.
 
 ### Cloud Platform Recommendations
 

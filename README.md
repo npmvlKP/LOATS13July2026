@@ -83,24 +83,33 @@ OPENALGO_MODE=ANALYZE
 
 ### Docker Deployment
 
-**Three Docker Compose configurations are available:**
+**CMP posture (S-19, `docs/CMP-SUPERSESSION-REGISTER.md`):** Docker in this
+repository is **CI-only**. The CMP LITE mandate is pip-only, no Docker, and
+no compose file is sanctioned for live deployment — including
+`docker-compose.prod.yml`. The three Docker variants exist only to build
+and smoke-test the image in CI. Live deployment is the bare-metal pip path
+(`docs/DEPLOY.md`, systemd unit included). A bare `docker run` of the image
+executes the HC-01 structural health probe and exits; the engine
+(`python -m loats.main`) starts only via the compose `command:` overrides,
+which remain CI-only evidence.
+
+The three variants:
 
 1. **CI/CD Testing**: `docker-compose.yml`
-   - Runs quick health check on startup
+   - Runs the packaged HC-01 health probe on startup (`Dockerfile` CMD)
    - Includes development volume mounts for hot-reload
    - For testing and validation only
-   - Health check: `python quick_health_check.py`
 
-2. **Production Deployment**: `docker-compose.prod.yml`
-   - Starts the actual trading system using `python -m loats.main`
-   - No development mounts (production-ready)
-   - For actual production deployment
+2. **CI-only prod-compose variant**: `docker-compose.prod.yml`
+   - Overrides the CMD to `python -m loats.main`, but the file is NOT a
+     sanctioned live deployment path (CMP LITE mandate; S-19 in
+     `docs/CMP-SUPERSESSION-REGISTER.md`)
    - Health check: `curl http://localhost:8001/` (metrics endpoint)
    - Higher resource limits (2 CPU, 1GB RAM)
 
 3. **Development Runtime**: `docker-compose.runtime.yml`
-   - Starts the trading system with development features
-   - For development with runtime testing
+   - Overrides the CMD to `python -m loats.main` with development features
+   - CI-only posture (S-19): not a live deployment path
 
 **Usage:**
 
@@ -108,7 +117,7 @@ OPENALGO_MODE=ANALYZE
 # For CI/CD testing
 docker compose -f docker-compose.yml up
 
-# For production deployment (RECOMMENDED for live deployment)
+# CI-only variant - NOT for live deployment (CMP LITE mandate, see S-19)
 docker compose -f docker-compose.prod.yml up -d
 
 # For development runtime
@@ -116,9 +125,15 @@ docker compose -f docker-compose.runtime.yml up
 ```
 
 **Important:**
-- The default `Dockerfile` uses `quick_health_check.py` as CMD for CI/CD purposes
-- For production deployment, use `docker-compose.prod.yml` which overrides the command
-- Production deployment uses `python -m loats.main` as the entry point
+- The default `Dockerfile` CMD is the HC-01 structural health probe
+  (`scripts/fr7_health_check.py --only HC-01`) for CI/CD purposes;
+  `quick_health_check.py` does not exist in this tree
+- `docker-compose.prod.yml` / `docker-compose.runtime.yml` override the
+  command to the engine (`python -m loats.main`); Docker stays CI-only
+  under the CMP LITE mandate (S-19) — live deployment is the pip path in
+  `docs/DEPLOY.md`
+- A bare `docker run` of the image runs the HC-01 probe and exits; only
+  the compose overrides start the engine
 - Metrics endpoint is available at `http://localhost:8001/`
 
 ### Quality Gates
