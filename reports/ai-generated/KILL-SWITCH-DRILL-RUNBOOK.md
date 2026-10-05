@@ -192,9 +192,12 @@ the pre-#136 supervisor generation was soft-stopped at 18:45 IST
 `p5_forward_test_20261005_131805.json` at 13:18:05Z (18:48 IST) on the
 merged code (recorded `kill_switch_active_at_start: false` — the stuck
 09:24:21Z activation cleared with the process). The command-only
-routing and the R-19 scheduler-halt gate are live in this generation.
-The paragraph above stands as the until-restart record; the bare-command
-discipline remains the standing rule.
+routing is live from this generation; the R-19 scheduler-halt gate and
+the S-15 flip are live from the NEXT one (span
+`p5_forward_test_20261005_145804.json`, started 14:58:04Z after the
+#137 merge — the 18:48 process predated that merge and could not run
+it). The paragraph above stands as the until-restart record; the
+bare-command discipline remains the standing rule.
 
 Engaged-state truth (R-19): support jobs (market-status refresh, session
 activation, data cleanup, backtest sanity) kept running during the
