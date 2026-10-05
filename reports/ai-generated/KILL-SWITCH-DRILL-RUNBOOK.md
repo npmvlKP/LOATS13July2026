@@ -99,6 +99,14 @@ Expected, in this order:
 | `Failed to activate kill switch.` | AMBIGUOUS — either the order-book fetch failed and the flag rolled back (safe), OR the alert channel's 5-minute cooldown suppressed the confirmation while the halt IS engaged | **Send `/status` immediately.** Status line `🔴 KILL SWITCH ACTIVE` = the halt IS engaged: continue to Step 3 and finish the drill normally. Status line `🟢 ACTIVE` = the flag really rolled back: wait at least 6 minutes (cooldown margin), then retry Step 2 once |
 | `❌ Error: ...` | An exception inside the handler; flag rolled back | Copy the exact text and report it; do not retry until explained |
 
+> **Never paste shell or log text into the chat.** Type `/kill`, `/resume`,
+> and `/status` as bare commands only. Until the 05-Oct fix the bot also
+> matched *free text*: any message merely containing the word "kill" (or
+> "resume"/"start") engaged or released the halt — on 05 Oct a pasted
+> log-verification line mentioning "Kill switch" was executed as a real
+> activation. A command with a trailing paste can still mis-fire if the
+> paste rides along in the same message.
+
 ### Step 3 — Observe the engaged state (stay here 1–2 minutes)
 
 Send `/status` again.
@@ -161,6 +169,7 @@ record before the 16 Oct close.
 | Bot silent | Polling down / chat not STARTed | Assistant checks span + bot task |
 | `Unauthorized...` (Steps 2/4) | Admin allow-list mismatch | Assistant fixes `TELEGRAM_ADMIN_IDS` |
 | `Failed to activate...` | AMBIGUOUS (rollback OR cooldown suppression with halt engaged) | `/status` immediately: 🔴 = engaged, continue Step 3; 🟢 = rolled back, wait 6 min, retry once |
+| Halt engaged with no `/kill` sent | Free text containing "kill" was pasted as a message (pre-05-Oct-fix routing) | Send `/resume` as a bare command, verify with `/status` |
 | `Failed to deactivate...` | Alert dispatch failed after release | Harmless; verify `/status`, report |
 | Card Status line stays `🟢` after `/kill` | Halt did not stick | Stop; assistant reads logs before anything else |
 | Process restart mid-drill | In-memory flag reset to disengaged | Re-run from Step 2; report the restart |
