@@ -482,8 +482,6 @@ class TestTelegramCommandHandlers:
             ("my positions", "_positions"),
             ("open orders", "_orders"),
             ("latest signal", "_signals"),
-            ("kill it", "_kill_switch"),
-            ("resume trading", "_resume"),
         ],
     )
     async def test_handle_message_routes_by_keyword(self, alert_system, text, handler):
@@ -492,6 +490,30 @@ class TestTelegramCommandHandlers:
         with patch.object(AlertSystem, handler, target):
             await alert_system._handle_message(update, _make_context())
         target.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("text", "handler"),
+        [
+            ("kill it", "_kill_switch"),
+            ("resume trading", "_resume"),
+            ("just start", "_resume"),
+        ],
+    )
+    async def test_handle_message_never_routes_state_actions(
+        self, alert_system, text, handler
+    ):
+        """State changes are command-only: free text must not trigger them.
+
+        Regression (2026-10-05): a pasted verification line containing
+        'Kill switch' was executed as a real halt via this router.
+        """
+        target = AsyncMock()
+        update = self._make_update(text=text)
+        with patch.object(AlertSystem, handler, target):
+            await alert_system._handle_message(update, _make_context())
+        target.assert_not_awaited()
+        assert "Didn't understand" in update.message.reply_text.call_args.args[0]
 
     @pytest.mark.asyncio
     async def test_handle_message_unknown_replies_fallback(self, alert_system):

@@ -1135,28 +1135,63 @@ class TestAlertSystem:
         mock_signals.assert_called_once_with(mock_update, mock_context)
 
     @pytest.mark.asyncio
-    async def test_handle_message_kill(self, alert_system):
-        """Test handling message with 'kill' keyword."""
+    async def test_handle_message_kill_does_not_route(self, alert_system):
+        """Free text containing 'kill' must NOT engage the halt.
+
+        Regression (2026-10-05): an operator pasted a log-verification
+        line containing the word 'kill' into the chat; the old keyword
+        router executed it as a real kill switch activation. State
+        changes are command-only.
+        """
         mock_update = MagicMock(spec=Update)
         mock_update.message = MagicMock()
-        mock_update.message.text = "Kill trading now"
+        mock_update.message.text = 'Select-String -Pattern "Kill switch activated"'
+        mock_update.message.reply_text = AsyncMock()
         mock_context = MagicMock()
 
         with patch.object(alert_system, "_kill_switch") as mock_kill:
             await alert_system._handle_message(mock_update, mock_context)
-        mock_kill.assert_called_once_with(mock_update, mock_context)
+        mock_kill.assert_not_called()
+        mock_update.message.reply_text.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_handle_message_resume(self, alert_system):
-        """Test handling message with 'resume' keyword."""
+    async def test_handle_message_resume_does_not_route(self, alert_system):
+        """Free text containing 'resume'/'start' must NOT release the halt."""
         mock_update = MagicMock(spec=Update)
         mock_update.message = MagicMock()
-        mock_update.message.text = "Resume trading"
+        mock_update.message.text = "Cannot resume the download, it failed to start"
+        mock_update.message.reply_text = AsyncMock()
         mock_context = MagicMock()
 
         with patch.object(alert_system, "_resume") as mock_resume:
             await alert_system._handle_message(mock_update, mock_context)
-        mock_resume.assert_called_once_with(mock_update, mock_context)
+        mock_resume.assert_not_called()
+        mock_update.message.reply_text.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_handle_message_state_actions_are_command_only(self, alert_system):
+        """No free-text keyword may reach kill/resume handlers (incident net)."""
+        for text in (
+            "kill",
+            "KILL",
+            "please kill the switch",
+            "resume",
+            "start trading again",
+            "restart and resume now",
+        ):
+            mock_update = MagicMock(spec=Update)
+            mock_update.message = MagicMock()
+            mock_update.message.text = text
+            mock_update.message.reply_text = AsyncMock()
+            mock_context = MagicMock()
+
+            with (
+                patch.object(alert_system, "_kill_switch") as mock_kill,
+                patch.object(alert_system, "_resume") as mock_resume,
+            ):
+                await alert_system._handle_message(mock_update, mock_context)
+            mock_kill.assert_not_called()
+            mock_resume.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_handle_message_unknown(self, alert_system):

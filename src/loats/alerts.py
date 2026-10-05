@@ -930,11 +930,14 @@ class AlertSystem:
                     await self._orders(update, context)
                 elif "signal" in message_text:
                     await self._signals(update, context)
-                elif "kill" in message_text:
-                    await self._kill_switch(update, context)
-                elif "resume" in message_text or "start" in message_text:
-                    await self._resume(update, context)
                 else:
+                    # State-changing actions (kill / resume) are reachable
+                    # ONLY via their /kill and /resume commands. The former
+                    # keyword router here executed any message merely
+                    # CONTAINING 'kill' (or 'resume'/'start') as a real
+                    # halt / release - on 2026-10-05 an operator's pasted
+                    # log-verification line mentioning "Kill switch" was
+                    # parsed as a kill command and engaged the halt.
                     if update.message:
                         await update.message.reply_text(
                             "i Didn't understand that. "
