@@ -955,8 +955,17 @@ History (most recent last):
        test_openalgo.py / test_openalgo_wire_contract_routes.py.
        Tree at ceiling 526 pre-wave (526 == 526), so +1 lands AT 527.
        Ceiling 526->527.
+  528  05Oct H-03 secret-redaction wave (2026-10-05): +2
+       src/loats/log_redaction.py (the defense-in-depth redaction
+       processor wired into loats_logging.shared_processors) and
+       tests/test_log_redaction.py (its net: keyed semantics, chain +
+       both formatter pre-chain wiring, failed-POST caplog surface,
+       payload-emitter keyless pins, JSON file-line sentinel). Same
+       wave, in place: RISK-REGISTER R-19 cite re-point keep+annotate
+       + dated 05Oct reconciliation entry. Tree at ceiling 527
+       pre-wave (527 == 527), so +2 lands AT 529. Ceiling 527->529.
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 527
+TRACKED_FILE_CEILING = 529
