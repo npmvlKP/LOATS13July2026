@@ -19,6 +19,7 @@ from .config import get_settings
 from .database import db
 from .latency_budget import (
     CYCLE_COMPLIANCE_TARGET_SECONDS,
+    CYCLE_FAILURE_BUDGET,
     PRODUCER_BUDGET_WARNING_SECONDS,
 )
 from .loats_logging import get_logger
@@ -225,6 +226,13 @@ class TradingOrchestrator:
         # fresh (healthy) check resets it so the NEXT episode alerts again.
         self._sentiment_liveness_alerted: bool = False
         self._last_alert_time = 0.0
+        # M-01: consecutive trading-cycle failure budget. A persistent
+        # fault must fail VISIBLE (kill-switch escalation after
+        # CYCLE_FAILURE_BUDGET consecutive failures), not silently at 1 Hz
+        # forever. Reset on every successful cycle; re-armed after an
+        # escalation (the activation can be refused when the broker is
+        # unreachable).
+        self._consecutive_cycle_failures = 0
         # CMP chain rejection tracking
         self._last_insufficient_signals_warning_time = 0.0
         self._insufficient_signals_count = 0
@@ -533,13 +541,47 @@ class TradingOrchestrator:
             try:
                 await self._check_kill_switch()
                 await self._execute_trading_cycle()
+                # A successful cycle re-arms the budget: only CONSECUTIVE
+                # failures escalate (a self-healing breaker burst must
+                # never trip the halt).
+                self._consecutive_cycle_failures = 0
 
             except KillSwitchError:
                 logger.warning("Kill switch active - trading cycle paused")
+                # Halted cycles are operator intent, not faults: they
+                # consume none of the consecutive-failure budget (M-01).
                 await asyncio.sleep(1.0)  # Reduced polling during kill switch
                 continue
             except Exception as e:
+                self._consecutive_cycle_failures += 1
                 logger.error(f"Trading cycle error: {e}")
+                # M-01: a persistent producer fault used to be swallowed
+                # here forever (log + at most one alert per minute, loop
+                # resumes). After CYCLE_FAILURE_BUDGET consecutive
+                # failures the loop escalates to a kill-switch activation
+                # instead of another silent continue. The activation can
+                # be refused (fail-closed rollback when the broker is
+                # unreachable) -- the streak then re-arms from zero so a
+                # still-persistent fault re-escalates after another full
+                # budget, keeping the loop alive for the next /kill.
+                if self._consecutive_cycle_failures >= CYCLE_FAILURE_BUDGET:
+                    reason = (
+                        f"M-01 cycle-failure budget exhausted: "
+                        f"{self._consecutive_cycle_failures} consecutive "
+                        f"trading-cycle failures; last error: {e}"[:300]
+                    )
+                    logger.error(
+                        "Cycle failure budget exhausted (%d consecutive); "
+                        "escalating to kill switch activation",
+                        self._consecutive_cycle_failures,
+                    )
+                    self._consecutive_cycle_failures = 0
+                    try:
+                        await alerts.activate_kill_switch(reason=reason)
+                    except Exception:
+                        logger.exception(
+                            "Cycle-failure-budget kill switch activation failed"
+                        )
                 # Add alert backoff to prevent alert floods
                 current_time = datetime.datetime.now(datetime.UTC).timestamp()
                 if current_time - self._last_alert_time > 60:  # Max 1 alert per minute
