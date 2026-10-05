@@ -162,6 +162,33 @@ the same events, not anomalies. Paste what you get back to the assistant
 (the lines contain no secrets) so the exercise is filed against the span
 record before the 16 Oct close.
 
+## 05 Oct 2026 in-span exercise — filed record
+
+P1 kill-switch drill executed in-span on 05 Oct 2026:
+
+- **Activation** `Kill switch activated: In-span drill activation before
+  16Oct close` at `2026-10-05T05:57:18Z`, confirmation alert 05:57:18Z.
+- **Enforcement** the cycle loop logged `Kill switch active - trading
+  cycle paused` pairs through the whole window until release (JSON lines,
+  1 Hz).
+- **Deactivation** `Kill switch deactivated: In-span drill deactivation`
+  at `2026-10-05T06:00:54Z`, confirmation alert 06:00:56Z. The graded leg
+  passed; `kill_switch_verified: true` on the live span snapshot.
+
+Free-text misroute recurrence (documented, pre-#134 host): after the
+graded leg, a pasted log-verification line mentioning "Kill switch"
+engaged the halt twice more — `2026-10-05T06:01:59Z` and
+`2026-10-05T09:24:21Z`. The routing fix (commit `8dc850b`, PR #134,
+merged 07:06:19Z) is on `main` but the host process predates it; the fix
+loads only on restart. Until then: bare `/kill`, `/resume`, `/status`
+only, never a paste riding after a command. The kill flag is in-memory
+(`src/loats/alerts.py`), so the pending restart — or a bare `/resume` —
+clears the 09:24:21Z activation.
+
+Engaged-state truth (R-19): support jobs (market-status refresh, session
+activation, data cleanup, backtest sanity) kept running during the halt;
+the scheduler-scope wiring decision belongs to the next build wave.
+
 ## Troubleshooting summary
 
 | Symptom | Meaning | Action |
