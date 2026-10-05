@@ -11,6 +11,8 @@ from typing import Any
 import structlog
 from structlog.types import Processor
 
+from . import log_redaction
+
 # Repo root anchor for file logging: src/loats/loats_logging.py -> parents[2].
 # Never resolve log paths against the CWD: scheduled tasks (LOATS_P5_Watchdog
 # -> p5_resume_wrapper.cmd) run with System32 as CWD, and the previous
@@ -67,6 +69,15 @@ def configure_logging(test_mode: bool = False) -> None:
         structlog.processors.TimeStamper(fmt="iso"),
         structlog.processors.StackInfoRenderer(),
         structlog.processors.format_exc_info,
+        # H-03 defense-in-depth (05Oct2026): the OpenAlgo transport
+        # injects the API key into every POST body, so ANY future emitter
+        # that renders a request payload would leak the credential into
+        # the rendered log line. Scrub it at the one chokepoint every
+        # line passes -- this shared chain, which is also both
+        # formatters' foreign_pre_chain. Keyed redaction never breaks
+        # logging (non-failing by contract); pinned by
+        # tests/test_log_redaction.py.
+        log_redaction.redact_secrets,
     ]
 
     # Configure structlog FIRST (before dictConfig).
