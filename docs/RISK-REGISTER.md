@@ -1680,3 +1680,33 @@ re-engaged 06:01:59Z, released 09:23:44Z; zero sentiment persists while
 halted — by-design halt silence, the alert was fail-visible and
 correct). The P1 in-span kill drill on the NEW span remains OWED: zero
 kill events in the logs after the 14:58:04Z span birth at probe time.
+
+Addendum 2026-10-05 (23:0x IST, store-truth correction to the 22:1x
+addendum above): the "staleness window is the kill-halt itself" clause
+is NARROWED by the persist-truth probe. `signals`
+(`json_extract(metadata,'$.scan_type')='sentiment'`) shows ZERO rows
+from 2026-10-05T05:57Z (last pre-halt persist, 5 s before the halt
+engaged) to 13:24:05Z (first post-halt persist), then dense per-cycle
+persists through 16:54Z (1,245 rows in the probe window; fresh at
+probe time). The halt (05:57:18Z-09:23:44Z) accounts for the freeze;
+the remaining ~3.9h is the post-halt budget-bounded sweep DRAIN of the
+halt-created mid-session backlog ("Feed sweep budget 7.0s exhausted
+after 0 item(s), retaining partial result" plus 3s article-bound skips
+from 09:20:41Z, 0-1 items retained per sweep) — the documented #109
+producer-budget tradeoff, NOT the 28Sep cancellation class (retention
+present, sweeps complete bounded). The liveness gate was CORRECT
+through the episode: it flagged at 09:24:13Z and no RECOVERED line
+exists because freshness genuinely returned only post-close (13:24Z is
+after the 15:30 IST close; the recovery branch at orchestrator.py:849
+is reachable only in REGULAR session — the non-REGULAR early return at
+:835 precedes it), so the flag re-arm never fired. Narrow defect
+recorded for the NEXT build wave (R-16 mid-span freeze: no code change
+ships now): a post-close recovery leaves
+`_sentiment_liveness_alerted` armed for the life of the process, which
+would swallow the FIRST delivered alert of a subsequent in-session
+episode in a process that spans the close boundary; the 14:58:04Z
+restart reset the flag (145804 starts disarmed), so the live span is
+not exposed. Grading: the episode was fail-visible end to end; the
+paste-era "session-closed gap" attribution remains falsified (the
+alert fired in-session; the stall was halt + drain, not
+feeds-idle-by-design).
