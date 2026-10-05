@@ -100,3 +100,30 @@ evidence stream and the checkpoint-time state:
 - `scripts/collect_p1_phase_gate_evidence.py` — the authoritative stage
   budgets (TA 80 / DB 20 / round trip 100 ms)
 - `docs/CMP-SUPERSESSION-REGISTER.md` — S-14/S-15 rows
+
+## Amendment (2026-10-05): cycle-FAILURE budget joins the single-source module (M-01)
+
+Audit finding M-01 (05Oct2026): the trading-cycle loop caught every
+non-`KillSwitchError` exception, logged it, alerted at most once per
+minute, and resumed — a persistent producer fault never failed the
+process. Resolution (branch `fix/m01-cycle-failure-budget-05oct`):
+`CYCLE_FAILURE_BUDGET` (int, 500) joins this module as the second
+single-source enforcement constant, and
+`TradingOrchestrator._run_cycle_loop` counts CONSECUTIVE cycle
+failures — success re-arms, halted (`KillSwitchError`) cycles consume
+nothing — and escalates to a kill-switch activation (the existing
+`alerts.activate_kill_switch` primitive: open-orders cancellation +
+halt + alert) when the budget is exhausted, instead of another silent
+continue. The activation can be refused (fail-closed rollback when the
+broker session is dead); the streak then re-arms so a still-persistent
+fault re-escalates after another full budget and the loop stays alive
+for the operator's own `/kill`. Calibration is evidence-backed: 500
+sits ABOVE the largest observed self-healing recovery burst (~350
+consecutive breaker-open cycle errors across the 04/05Oct logs —
+05Oct 03:00–03:09Z peaked at 46/min, window ~294 total; 04Oct
+17:04–17:10Z ~225) so routine circuit-breaker recoveries never trip
+the halt, while a genuinely persistent fault escalates in ~8.3 minutes
+at the 1 Hz cadence. RED-proven net:
+`tests/test_cycle_failure_budget.py` (9 tests). The F9-C-02 routing
+divergence counter is untouched — it remains the divergence-path
+enforcement that survives the loop.

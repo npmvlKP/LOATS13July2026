@@ -28,7 +28,18 @@ CYCLE_COMPLIANCE_TARGET_SECONDS: float = 1.0
 # breach instead of on every producer execution (S-14 resolution).
 PRODUCER_BUDGET_WARNING_SECONDS: float = 0.080
 
+# M-01 (2026-10-05): consecutive trading-cycle failures tolerated before
+# the loop escalates to a kill-switch activation instead of another
+# silent continue. Single enforcement source per ADR-0021 doctrine -- no
+# enforcement surface hardcodes a budget number. Calibrated ABOVE the
+# largest observed self-healing recovery burst (~350 consecutive
+# breaker-open cycle errors in the 04/05Oct logs) so routine circuit-
+# breaker recoveries never escalate; a PERSISTENT fault keeps failing
+# cycles until the budget trips the halt (fail-visible, not fail-silent).
+CYCLE_FAILURE_BUDGET: int = 500
+
 __all__ = [
     "CYCLE_COMPLIANCE_TARGET_SECONDS",
+    "CYCLE_FAILURE_BUDGET",
     "PRODUCER_BUDGET_WARNING_SECONDS",
 ]

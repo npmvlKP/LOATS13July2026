@@ -964,8 +964,19 @@ History (most recent last):
        wave, in place: RISK-REGISTER R-19 cite re-point keep+annotate
        + dated 05Oct reconciliation entry. Tree at ceiling 527
        pre-wave (527 == 527), so +2 lands AT 529. Ceiling 527->529.
+  530  05Oct M-01 cycle-failure budget wave (2026-10-05): +1
+       tests/test_cycle_failure_budget.py (RED-proven net for the M-01
+       finding: consecutive cycle failures escalate to a kill-switch
+       activation; the budget constant lives in
+       src/loats/latency_budget.py per the ADR-0021 single-source
+       doctrine, S-14 cell amended). All other wave files modified in
+       place: orchestrator.py (budget counter + escalation in
+       _run_cycle_loop), CMP-SUPERSESSION-REGISTER S-14 annotation,
+       ADR-0021 amendment section, RISK-REGISTER R-21 row + dated
+       05Oct entry. Tree at ceiling 529 pre-wave (529 == 529), so +1
+       lands AT 530. Ceiling 529->530.
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 529
+TRACKED_FILE_CEILING = 530
