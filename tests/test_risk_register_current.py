@@ -82,3 +82,24 @@ def test_snapshot_identity_is_recorded(register_text: str) -> None:
     # post-merge CI run its statuses were reconciled against.
     assert "633daae" in register_text
     assert "35571352961" in register_text
+
+
+def test_r19_closure_gates_every_support_job(register_text: str) -> None:
+    # R-19 (H-02) closed 05Oct2026: the row must name the gating call in
+    # all four public job-entry methods and the RED-proven test net —
+    # a row that claims the fix without naming the mechanism drifts
+    # silently the next time scheduler.py is refactored.
+    r19 = next(
+        line for line in register_text.splitlines() if line.startswith("| R-19 ")
+    )
+    assert "| P2-fixed |" in r19, r19
+    assert "_check_kill_switch()" in r19, r19
+    for method in (
+        "check_market_status",
+        "run_market_activation",
+        "run_data_cleanup",
+        "run_backtest_sanity_check",
+    ):
+        assert method in r19, (method, r19)
+    assert "tests/test_scheduler_kill_switch_gate.py" in r19, r19
+    assert "fix/r19-scheduler-halt-gate-05oct" in r19, r19

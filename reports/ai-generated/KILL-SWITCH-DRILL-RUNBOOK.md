@@ -179,15 +179,30 @@ Free-text misroute recurrence (documented, pre-#134 host): after the
 graded leg, a pasted log-verification line mentioning "Kill switch"
 engaged the halt twice more — `2026-10-05T06:01:59Z` and
 `2026-10-05T09:24:21Z`. The routing fix (commit `8dc850b`, PR #134,
-merged 07:06:19Z) is on `main` but the host process predates it; the fix
+merged 07:06:19Z) was on `main` but the host process predated it; the fix
 loads only on restart. Until then: bare `/kill`, `/resume`, `/status`
 only, never a paste riding after a command. The kill flag is in-memory
 (`src/loats/alerts.py`), so the pending restart — or a bare `/resume` —
 clears the 09:24:21Z activation.
 
+Amended 05Oct2026 (evening, post-drill restart): the restart LANDED —
+the pre-#136 supervisor generation was soft-stopped at 18:45 IST
+(span `p5_forward_test_20261002_200805.json` closed gracefully,
+`unhandled_exceptions: 0`) and the watchdog fresh-started
+`p5_forward_test_20261005_131805.json` at 13:18:05Z (18:48 IST) on the
+merged code (recorded `kill_switch_active_at_start: false` — the stuck
+09:24:21Z activation cleared with the process). The command-only
+routing and the R-19 scheduler-halt gate are live in this generation.
+The paragraph above stands as the until-restart record; the bare-command
+discipline remains the standing rule.
+
 Engaged-state truth (R-19): support jobs (market-status refresh, session
-activation, data cleanup, backtest sanity) kept running during the halt;
-the scheduler-scope wiring decision belongs to the next build wave.
+activation, data cleanup, backtest sanity) kept running during the
+05Oct halt — true for THAT generation, which predated the gate; the
+scheduler-scope wiring (gate every job entry on `_check_kill_switch`)
+landed in `fix/r19-scheduler-halt-gate-05oct` and is effective from the
+same 05Oct restart, so a future engaged halt now refuses every scheduled
+job body.
 
 ## Troubleshooting summary
 

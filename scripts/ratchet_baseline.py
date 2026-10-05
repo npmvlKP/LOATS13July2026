@@ -975,8 +975,19 @@ History (most recent last):
        ADR-0021 amendment section, RISK-REGISTER R-21 row + dated
        05Oct entry. Tree at ceiling 529 pre-wave (529 == 529), so +1
        lands AT 530. Ceiling 529->530.
+  531  05Oct R-19/H-02 scheduler-halt gate wave (2026-10-05): +1
+       tests/test_scheduler_kill_switch_gate.py (RED-proven net for the
+       R-19/H-02 finding: all four APScheduler support-job entry
+       methods gate on _check_kill_switch BEFORE their exception-
+       swallowing wrappers, so an engaged halt refuses every scheduled
+       job body). All other wave files modified in place: scheduler.py
+       (the four gates), RISK-REGISTER R-19 row closure + R-16
+       live-span re-point + dated 05Oct entry,
+       CMP-SUPERSESSION-REGISTER S-15 enablement cell, drill-runbook
+       restart amendment, register closure test. Tree at ceiling 530
+       pre-wave (530 == 530), so +1 lands AT 531. Ceiling 530->531.
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 530
+TRACKED_FILE_CEILING = 531
