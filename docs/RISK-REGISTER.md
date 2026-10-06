@@ -1880,3 +1880,72 @@ secret shapes in the tracked example file, `.gitignore:6-7` ignores
 `.env` and `.env.*`. No code, config, or protection change ships in this
 addendum; the L-03 constant edit rides the next operator-gated build
 wave with its own choreography.
+
+Addendum 2026-10-06 (22:12 IST, 16:29-composer-paste reconciliation - the
+pre-L-02 evening family member): the paste is timestamped ~16:29 IST
+(10:59Z), BEFORE the 17:47-IST (#143, 12:44Z merge) and 21:20-IST (#144,
+16:13Z merge) addenda landed its L-item verdicts, so it grades as a
+mid-wave transcript of the same fresh-composition family - structurally
+unable to indict the verdicts those addenda recorded. Composition probe
+re-run live: paste_containment_probe 0/24 against both
+CMP-SUPERSESSION-REGISTER.md and COMPLIANCE-MATRIX.md (fresh composition,
+confirmed). Per-item verdicts, the delta vs the 17:47/21:20 addenda:
+(0) GATE TAIL (novel this member): the pasted 'mypy: error: Missing
+target module' usage error and 'No module named pip-audit' are
+invocation-class, not gate failures - ruff check passed ('All checks
+passed!'), ruff format --check passed (308 files already formatted), and
+bandit printed nothing under -q (clean exit); a bare 'python -m mypy'
+with no target cannot run by design (canonical form is mypy src/
+--strict --config-file pyproject.toml, the ci.yml mypy job), and
+pip-audit is deliberately ABSENT from the shared repo venv (R-05
+posture): the required pip-audit context runs in CI as 'pip install .'
+plus pip-audit==2.10.1 --ignore-vuln PYSEC-2026-3740 against the
+production closure. Nothing in the tail executed that could fail the
+tree; working tree clean at e800a5d (the #144 merge commit).
+(1) L-01: VERIFIED OPEN for the next build wave - exactly the 17:47
+addendum verdict stands; the paste's 638/1061 cites are succession drift
+(the duplicated classes sit at openalgo.py:743/1166 at HEAD), the
+substantive duplication claim is live-true.
+(2) L-03: the paste's decline-to-verdict ('not enough evidence') is
+STALE - FLIPPED by the 21:20 addendum via the primary circular
+NSE/FAOP/70616: nifty_lot_size 25 at settings.py:221 (the paste's :199
+cite is succession drift) is two revision cycles stale; the settings
+line was re-probed live this pass and reads Field(25, ...) still;
+the operator-gated constant correction (NIFTY 65, BANKNIFTY 30) is
+unchanged and stays on the next build wave with its choreography.
+(3) L-04: RE-CONFIRMED ADR-0020-accepted maintainability debt, not a
+functional bug - live counts this pass: database.py 3,164 lines,
+orchestrator.py 2,442, openalgo.py 1,791; the paste's 2,396/1,680
+orchestrator/openalgo figures are birth-wrong per the 21:20 addendum's
+three-generation probe.
+(4) L-05: RE-CONFIRMED CLOSED-as-clean (ADR-0019 posture holding) -
+live probe this pass: .env.example placeholders only (your_*_here at
+lines 13/26/27), .gitignore:6-7 ignores .env and .env.* with the
+!.env.example negation; no live secret in the tracked example.
+(5) M-02: NOT COMPLETED, OPEN - the database.py:655-659 evidence
+cluster re-verified exact at HEAD this pass (timeout=30.0,
+isolation_level IMMEDIATE, check_same_thread=False); the one-writer
+remediation is operator-gated next-wave work.
+(6) M-03: NOT COMPLETED, OPEN - the orchestrator.py:484-514 RSS gate
+cluster re-verified (logs, alerts, returns; sentiment then runs on the
+unvalidated manifest on gate failure); the fail-closed sentiment
+producer is operator-gated next-wave work.
+(7) SECTION 5 Performance Review: every claim verified live-true with
+cite drift only - producer_window_seconds default 8.0 sits at
+settings.py:185 (the paste's :163-168 cite predates the #129-generation
+insertions), the cycle sleep targets CYCLE_COMPLIANCE_TARGET_SECONDS at
+orchestrator.py:600 with the 1.0 s constant at latency_budget.py:24
+(ADR-0021), numba is best-effort (ta.py NUMBA_AVAILABLE guards; the
+pure-Python Supertrend fallback IS the tested production path per the
+17:47 addendum), and the strike/trail gates derive per S-14; the
+not-re-benchmarked note stands, no runtime change.
+(8) P-block re-anchored live at 16:37:09Z (22:07 IST, AFTER the
+paste's composition): live-span snapshot quartet green (ended_at null,
+kill_switch_verified true, unhandled_exceptions 0, last_sampled_at
+16:37:09Z), routed_decisions 63; the P1 kill drill remains OPEN and
+UNDISCHARGED (refused auto-escalations never discharge it; operator
+bare /kill then /resume in-session before 19 Oct 20:28:04 IST); the
+Sun 11 Oct Sun-Scan exit-64 re-check remains operator-side with no
+in-repo record; P3 (M-02, M-03, session-gated re-arm, R-05 shared-venv
+rebuild) OPEN next build wave. No code, config, or protection change
+ships in this addendum.
