@@ -1837,3 +1837,46 @@ kill_switch_verified true, unhandled_exceptions 0, restarts 4, ended_at
 null). The paste's Sun 11 Oct Sun-Scan exit-64 re-check has NO in-repo
 record (zero hits for sun_scan/exit-64 across docs/) — operator-side
 item, not register-tracked. P3 unchanged (next build wave).
+Addendum 2026-10-06 (21:20 IST, evening-paste L-03/L-04/L-05 verdicts —
+the delta vs the 17:47 addendum, which dispositioned L-01/L-02/M-02/M-03
+and the P-block only): (1) L-03 lot-size currency FLIPPED to VERIFIED
+STALE by primary-source probe: NSE circular NSE/FAOP/70616 (ref 176/2025,
+dated 2025-10-03; the paste's "NSE Nov 2021" era note is superseded
+twice over), issued under SEBI/HO/MRD-PoD2/CIR/P/2024/00181 (2024-12-30)
+periodic-revision
+authority, revised NIFTY 75->65 and BANKNIFTY 35->30, effective for all
+contracts from 2025-12-30 EOD — corroborated by current 2026 broker
+references (NIFTY 65, BANKNIFTY 30). The repo pins
+`nifty_lot_size: int = Field(25, ...)` at `settings.py:221`
+(`src/loats/config/settings.py`), the Apr-2024-era value (50->25), which
+the prior 17:2x paste's own probe correctly declined to verdict for lack
+of a primary cite; that cite now exists and the constant is two revision
+cycles stale. Exposure math: `rules.py:599-601` derives the CMP Rule-11
+envelopes from `nifty_lot_size` for BOTH indices — 5x25=125 units for
+NIFTY (true 65-lot units at 5 lots = 325, a 2.6x under-count) and 3x25=75
+for BANKNIFTY (true 30-lot units at 3 lots = 90, 1.2x under-count) — so
+the envelope guard under-counts true exposure 2.6x (NIFTY) / 1.2x
+(BANKNIFTY) and sizing (`sizing.py:87/90/124/312`) sizes in stale lots.
+The count-vs-envelope defect class is the reason L-03 must stay OPEN
+operator-gated: the numeric change is an enforcement-constant edit, held
+by the ADR-0016 mid-span freeze alongside S-14/S-15. Also explicit
+correction of the 21:0x transcript's failed PS 5.1 census/verify lines
+(wc, backslash continuation, angle-bracket placeholder — all parse-death,
+nothing in those lines executed): the live census is 531 == ceiling
+TRACKED_FILE_CEILING, protection verified DIVERGENCES: 0 across all 11
+pinned contexts, and the L-04 line counts moved this wave (paste cited
+orchestrator 2,396 / openalgo 1,680 — birth-wrong figures; live counts
+database.py 3,164 (paste-exact), orchestrator.py 2,442, openalgo.py
+1,791 at both a2e461c and HEAD 0c25110). (2) L-04 god-module size is
+RE-CONFIRMED as ADR-0020-accepted maintainability debt, not a functional
+bug: live counts at HEAD 0c25110 are database.py 3,164 (paste-exact),
+orchestrator.py 2,442, openalgo.py 1,791 — the paste's 2,396/1,680
+orchestrator/openalgo figures are birth-wrong, absent at every 2026
+generation probed (a2e461c 2,442/1,791, 8dc850b 2,400/1,791,
+a01e31c 2,322/1,590). (3) L-05 .env.example hygiene RE-CONFIRMED
+CLOSED-as-clean (ADR-0019 posture, still holding): live probe found
+placeholders only (`.env.example:13/26/27` your_*_here forms), no live
+secret shapes in the tracked example file, `.gitignore:6-7` ignores
+`.env` and `.env.*`. No code, config, or protection change ships in this
+addendum; the L-03 constant edit rides the next operator-gated build
+wave with its own choreography.
