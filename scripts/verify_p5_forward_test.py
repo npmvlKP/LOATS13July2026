@@ -800,6 +800,33 @@ DOCUMENTED_OUTAGE_WINDOWS: tuple[tuple[str, str | None, str], ...] = (
         "see docs/audit-history/17Sep2026-p5-openalgo-auth-outage.md "
         "(Continuation 6)",
     ),
+    # 06Oct2026 Kite Connect APP-KEY rejection (subscription lapse;
+    # fourth credential-adjacent class and the first with the OAuth
+    # entry point itself dead). First LOATS-observed failure
+    # 2026-10-06T01:18:46Z = 06:48:46 IST (global openalgo breaker OPEN;
+    # hard `Incorrect api_key` rejections from 01:29:08Z as the stale
+    # 05Oct session hit the daily expiry wall). The app-level block made
+    # every recovery path impossible (kite connect/login renders
+    # Invalid api_key; OAuth unreachable for anyone) until the operator
+    # renewed the app and re-logged in the OpenAlgo UI at 13:00:29 IST.
+    # CLOSED: global breaker CLOSED after recovery 07:31:19Z
+    # (13:01:19 IST, 50 s after re-auth); all four source breakers by
+    # 07:32:06Z; zero OPENED transitions after 07:30:19.606Z. Closing
+    # addendum: docs/audit-history/
+    # 17Sep2026-p5-openalgo-auth-outage.md (Continuation 7 closure).
+    (
+        "2026-10-06T01:18:46+00:00",
+        "2026-10-06T07:31:19+00:00",
+        "06Oct Kite Connect app-key rejection (subscription lapse): "
+        "OAuth entry point dead -- no re-auth path existed for anyone "
+        "until the operator renewed the app; stale-session daily "
+        "rejections from 06:48:46 IST, global openalgo breaker OPEN, "
+        "all broker-backed circuits fail-closed; recovery: operator "
+        "re-auth 13:00:29 IST, breaker CLOSED 07:31:19Z, sources "
+        "closed by 07:32:06Z; "
+        "see docs/audit-history/17Sep2026-p5-openalgo-auth-outage.md "
+        "(Continuation 7 closure)",
+    ),
 )
 
 

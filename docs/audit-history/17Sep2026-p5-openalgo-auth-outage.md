@@ -480,3 +480,71 @@ survive probing:
   persist a liveness row per completed analysis independent of
   downstream signal gating. Pinned as R-14 in the risk register; the
   decision rides the 30Sep window under the ADR-0016 freeze.
+
+## Continuation 7 (06 Oct): NEW failure class — Kite Connect APP-KEY rejection (subscription lapse)
+
+**Distinct from every prior class**: Zerodha rejects OpenAlgo's
+configured `BROKER_API_KEY` at the OAuth ENTRY POINT —
+`kite.zerodha.com/connect/login?api_key=…` renders
+`{"status":"error","message":"Invalid api_key.","error_type":"InputException"}`
+byte-identical twice. The same key produced a successful oauth at
+05Oct 08:39:59 IST, so this is an **app-level revocation or Kite
+Connect subscription lapse**, not the daily token band (whose
+rejections come from the quotes API after a formerly-valid login).
+
+**Consequence**: NO OAuth is possible for anyone — the Kite login page
+never loads, so password/TOTP are unreachable and neither the operator
+nor any agent flow can refresh the session until the app is renewed or
+a new key+secret is issued at developers.kite.trade and installed in
+`G:/.OA/OpenAlgo/.env` (`BROKER_API_KEY`/`BROKER_API_SECRET`; current
+`*_MARKET` fields are still placeholders). Automated re-login job
+verified the block 08:35–08:47 IST and correctly escalated.
+
+**Impact**: LOATS breaker storm 305 opens with zero recoveries (last
+07:43 IST UTC stamps) [FALSIFIED at the 06Oct reconciliation: the live
+rotations carry 79,023 breaker-open log lines (degraded-fetch +
+open-state) and 3,389 OPENED/HALF_OPEN state transitions for the day —
+14 global `openalgo` OPENED events cycling against 338 HALF_OPEN
+recovery probes, last OPENED transition 07:30:19.606Z = 13:00:19 IST]; run
+200805 decisional counters frozen at 74 (Monday's burst) [run 200805
+closed gracefully 2026-10-05T13:15:22Z — the LIVE span at writing was
+`p5_forward_test_20261005_145804.json`, whose decisional counters read
+0 through the outage and 2 after recovery (both DB-corroborated in
+`trade_decisions`)] — evidence accrual halted for the day unless the key
+is fixed intraday. Day cost at 09:30 IST: full open lost. This is the
+fourth credential-adjacent outage class of the span (band expiry,
+pre-band login, host-reboot token loss, now app-key rejection) and the
+first that is **not self-healing by any local action**.
+
+**Remediation (operator-only, credentials out of bounds by policy)**:
+developers.kite.trade → app `r6ybr72h46z9uxqh` subscription status →
+renew or rotate → update `.env` → restart OpenAlgo → OpenAlgo UI
+re-login (password + TOTP) → LOATS breakers close within ~90 s
+(standard recovery). The pending P1 in-span kill drill remains owed
+after session restoration (before 19 Oct 20:28 IST).
+
+## Continuation 7 closure (06 Oct, recovery verified ~13:20 IST —
+LOATS-side, first-hand probes)
+
+The operator remediation landed: OpenAlgo broker callback success
+13:00:29 IST, session login time stamped 13:00:29.882+05:30; master
+contract refreshed (108,566 symbols loaded by 13:01:13 IST). The global
+`openalgo` breaker CLOSED after recovery at `2026-10-06T07:31:19Z`
+(13:01:19 IST — 50 s after re-auth, the designed HALF_OPEN→CLOSED arc)
+with all four source breakers CLOSED by 07:32:05.55Z (13:02:05 IST).
+Zero breaker OPENED transitions after 07:30:19.606Z (day total 3,389
+OPENED/HALF_OPEN transitions; window bounded below). Verified
+consequences on the live 145804 span: zero
+M-01 cycle-failure budget escalations after 07:07:35.64Z (day total
+28, every activation refused fail-closed by the open breaker — the
+documented refuse-and-rearm degradation loop, never a real halt; zero
+in-memory kill-switch halts engaged all day), decisional leg resumed
+07:37:07Z — decisions `decision_20261006073706863317_66763040` and
+`decision_20261006073714830930_11043b59` routed and persisted
+(`trade_decisions`, `as_of_date` 2026-10-06, counters 0 → 2), and the
+sentiment leg resumed persisting from 07:31:57Z (1,268 rows 13:02 IST
+onward; exactly 4 rows in the 05:15–07:32Z stall window — consistent
+with the #140 session-gated-drain disposition). The P1 in-span kill
+drill is NOT discharged by this recovery or by the refused
+auto-escalations; it remains owed inside 09:15–15:30 IST before
+19 Oct 20:28 IST.

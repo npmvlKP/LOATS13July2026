@@ -1755,3 +1755,40 @@ drill remains the operator's bare /kill → /resume exercise inside
 09:15-15:30 IST before 19 Oct 20:28:04 IST). Standing watch: if this
 signature recurs WITH a live broker session, that instance is a
 defect, not machinery.
+
+Addendum 2026-10-06 (13:49 IST, Continuation 7 closure — operator
+remediation landed and verified LOATS-side, first-hand probes): the
+Kite Connect app-key block was cleared by the operator; OpenAlgo
+broker callback success 13:00:29 IST (session login time
+13:00:29.882+05:30, master contract 108,566 symbols by 13:01:13 IST)
+and the LOATS global `openalgo` breaker CLOSED after recovery at
+07:31:19Z = 13:01:19 IST (50 s after re-auth, the designed
+HALF_OPEN→CLOSED arc), all four source breakers by 07:32:05.55Z, zero
+OPENED transitions after 07:30:19.606Z. Verified consequences: (a) the
+M-01 refuse-and-rearm loop ENDED with the outage — day total 28
+escalations (01:36:09–07:07:35Z), every activation refused fail-closed
+by the open breaker, ZERO after recovery, zero in-memory kill-switch
+halts engaged all day; (b) the decisional leg RESUMED — first post-out
+routings 07:37:07/07:37:14Z, both persisted in `trade_decisions`
+(`as_of_date` 2026-10-06), live-span counters 0 → 2, so the paste-era
+P2 "counters still all-zero in-span" premise is stale as of this
+addendum (the graded attempt population is now nonzero inside the live
+span; the P2 close arithmetic still rides the 19 Oct 20:28:04 IST
+span-close grade); (c) the sentiment leg resumed persisting from
+07:31:57Z (1,268 rows through the probe; exactly 4 rows inside the
+05:15–07:32Z stall window — the #140 session-gated-drain disposition
+stands). The outage window is PINNED in the P5 grader's
+`DOCUMENTED_OUTAGE_WINDOWS` as
+2026-10-06T01:18:46Z → 2026-10-06T07:31:19Z (first LOATS-observed
+failure = global breaker OPEN, closed = global breaker CLOSED), entry
+plus closure bound in one wave; day classified PARTIAL EVIDENCE DAY —
+lost 06:48–13:01 IST (the full open through early afternoon),
+recovered mid-session with ~2.5 trading hours banked (routed decisions
+07:37Z, post-recovery cycles green). The full day's record lives in
+`docs/audit-history/17Sep2026-p5-openalgo-auth-outage.md` (Continuation
+7 + closure); the COMPLIANCE-MATRIX S6 cells were re-pointed from the
+closed 200805 span to the live 145804 span in the same wave (succession
+drift — the 05Oct #138 register re-point had not reached the matrix).
+The P1 in-span kill drill remains OPEN and UNDISCHARGED (the refused
+auto-escalations never engaged the halt; the drill must land inside
+09:15–15:30 IST before 19 Oct 20:28:04 IST).
