@@ -27,8 +27,11 @@ Designed for **ANALYZE mode only** via OpenAlgo REST API integration.
 - **Rate Limited**: Conservative NVIDIA NIM API usage (≤20 req/min, ≥3s gap)
 - **Type Safe**: Full mypy --strict compliance
 - **Security Focused**: Bandit, gitleaks, and comprehensive security scanning
-- **Test Coverage**: 88.74% branch coverage with pytest (1805 tests passing;
-  per-module floors enforced by `scripts/check_per_module_coverage.py`)
+- **Test Coverage**: 89.43% combined coverage (91.08% lines / 83.38%
+  branches) with pytest — 2457 passed / 10 skipped at HEAD `0077352`
+  (stamped 06Oct2026 from the last green CI artifact, run 37347647186,
+  05Oct2026; supersedes the 13Sep2026 88.74% / 1805-test figures);
+  per-module floors enforced by `scripts/check_per_module_coverage.py`
 
 ## Project Structure
 

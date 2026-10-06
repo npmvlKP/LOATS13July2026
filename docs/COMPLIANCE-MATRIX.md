@@ -16,7 +16,14 @@ implementation standards (NSE `INVG/67858`, 05May2025; NSE retail-algo FAQ
 03Nov2025). NIST SP 800-53 Rev.5 and ISO/IEC 27001:2022 are voluntary
 frameworks; nothing in this repository constitutes certification.
 
-Snapshot: HEAD `6c8cf81` (PR #119 merged 02Oct2026), tree clean, ceiling 520.
+Snapshot (06Oct2026 stamp from the last green CI artifact, run 37347647186):
+HEAD `0077352` (PR #140 merged 05Oct2026), tree clean, ceiling 531.
+CMP-departing decisions are adjudicated in
+`docs/CMP-SUPERSESSION-REGISTER.md` (S-01..S-19) — that register, not
+this snapshot line, is the first reconciliation surface. Prior snapshot:
+HEAD `6c8cf81` (PR #119 merged 02Oct2026), tree clean, ceiling 520 —
+superseded by the amendment trail below (03Oct reconciliation, 04Oct
+citation-drift re-point, 05Oct waves).
 
 03Oct2026 amendment (evidence-cell reconciliation pass): S1 file count
 corrected 8 -> 7 (glob-verified at this file's own introducing commit —
