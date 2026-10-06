@@ -1792,3 +1792,48 @@ drift — the 05Oct #138 register re-point had not reached the matrix).
 The P1 in-span kill drill remains OPEN and UNDISCHARGED (the refused
 auto-escalations never engaged the halt; the drill must land inside
 09:15–15:30 IST before 19 Oct 20:28:04 IST).
+Addendum 2026-10-06 (17:47 IST, evening paste reconciliation — L-01/L-02
+verdicts are the delta vs the 07:5x addendum): the 17:2x paste re-listed
+M-02/M-03 plus new L-01/L-02 findings and the standing P-block; probed as
+a FRESH COMPOSITION (all six distinctive fragments zero-hit docs/ and
+audit-history). Verdicts: (1) L-01 (dual sync/async client duplication)
+VERIFIED as a live drift class, OPEN for the next build wave under the
+R-16 mid-span freeze: the pasted 638/1061 cites are succession drift
+(the classes sit at openalgo.py:743/1166 at HEAD), but the substantive
+claim holds — _check_kill_switch/_async_check_kill_switch (:697/:720)
+are body-identical, the async mode-gate twin already delegates to the
+sync twin (:667-669, the in-repo dedup pattern), and the drift has
+ALREADY MANIFESTED: sync place_order/place_smart_order/modify_order/
+cancel_order build payloads via utils/payload_builder.py helpers while
+the async twins hand-build the same payloads inline (the exact
+body-key/payload divergence the paste flags). CMP Rule-7
+reserve/release IS present in both twins (:1115/:1131 sync,
+:1671/:1708 async) — no budget-gate gap. (2) L-02 (numba optional,
+absent from pyproject) CLOSED — not a defect by the paste's own
+criterion: the fallback IS tested
+(tests/test_ta_comprehensive_coverage.py::test_supertrend_fallback_implementation
+patches NUMBA_AVAILABLE=False and asserts valid supertrend/direction
+output); numba is absent from pyproject.toml dependencies, uv.lock
+(zero hits) and the repo venv (import probe ModuleNotFoundError), so
+the pure-Python Supertrend IS the live production path exercised every
+cycle; README carries zero numba/supertrend performance claims to
+correct; ADR-0003 dispositions the ta-dependency question. (3) M-02/M-03
+NOT COMPLETED — remain OPEN exactly as the 07:5x addendum recorded:
+evidence clusters re-verified exact at HEAD (database.py:655-659
+check_same_thread=False connect cluster; orchestrator.py:484-514 RSS
+gate logs, alerts, returns and sentiment runs on the unvalidated
+manifest on gate failure); the M-03 fail-closed sentiment producer and
+the M-02 one-writer + check_same_thread=True + boot-lock-gate
+remediation are operator-gated next-build-wave work. Explicit: neither
+fix has shipped. (4) P-block: P1 drill OPEN and UNDISCHARGED — today's 16
+in-rotation kill-switch activated lines (01:36:09Z first, 07:07:35Z
+last) were ALL M-01 auto-escalations REFUSED by the open breaker during
+the app-key outage; zero after 07:07:35Z, 24 minutes before the
+07:31:19Z recovery; the drill remains the operator's bare /kill ->
+/resume inside 09:15-15:30 IST before 19 Oct 20:28:04 IST. P2
+decisional leg healthy at probe: live-span routed_decisions 63 (matches
+the paste), snapshot quartet green (last_sampled_at 2026-10-06T12:09:37Z,
+kill_switch_verified true, unhandled_exceptions 0, restarts 4, ended_at
+null). The paste's Sun 11 Oct Sun-Scan exit-64 re-check has NO in-repo
+record (zero hits for sun_scan/exit-64 across docs/) — operator-side
+item, not register-tracked. P3 unchanged (next build wave).
