@@ -1710,3 +1710,48 @@ not exposed. Grading: the episode was fail-visible end to end; the
 paste-era "session-closed gap" attribution remains falsified (the
 alert fired in-session; the stall was halt + drain, not
 feeds-idle-by-design).
+
+Addendum 2026-10-06 (07:5x IST, 06Oct composite reconciliation — M-04
+executed; M-02/M-03/P-block dispositions re-verified live): the 06Oct
+paste was probed as a FRESH COMPOSITION (three distinctive fragments
+zero-hit docs/ and audit-history — not an archived re-slice) and
+reconciled claim-by-claim. (1) M-04 EXECUTED: README:30-34 and the
+COMPLIANCE-MATRIX snapshot line were stamped from the last green CI
+artifact (run 37347647186 at HEAD 0077352: 2457 passed / 10 skipped,
+89.43% combined = 91.08% lines / 83.38% branches, coverage.xml parsed
+from the coverage-report artifact); branch `docs/m04-readme-cmp-stamp-06oct`,
+commit 0cb9dfc, no register row (no CMP expectation changes state).
+(2) M-02/M-03 remain OPEN, operator-gated under the R-16 mid-span
+freeze; the cited evidence clusters were re-verified exact at HEAD
+(database.py:655-659 `check_same_thread=False` connect cluster,
+677-line database_async_additions.py, main.py:71-81 preflight guard,
+orchestrator.py:484-514 RSS startup gate) — nothing to correct in the
+findings themselves. (3) The P3 session-gated re-arm wiring is already
+recorded by the 05Oct #140 addendum (recovery branch
+orchestrator.py:849 unreachable outside REGULAR; narrow defect rides
+the next build wave) — unchanged. (4) NEW first-occurrence episode,
+watch-class: with the operator's Zerodha session dead (host log:
+"Incorrect api_key or access_token" from 06:58 IST), every trading
+cycle failed and the M-01 budget escalated at ~11-min intervals
+(01:36:09Z, 01:47:20Z, 01:58:35Z, 02:10:09Z — first occurrences in the
+entire rotation; zero hits in any older log file), and EVERY
+escalation's kill-switch activation was REFUSED fail-closed
+("Failed activate kill switch: Circuit breaker 'openalgo' is open" —
+alerts.py:591-595 rollback after the orderbook fetch fails through the
+open breaker, utils/circuit_breaker.py:70), flag rolled back, streak
+re-armed from zero, loop repeating — the exact documented degradation
+path (orchestrator.py:558-566: "The activation can be refused ...
+the streak then re-arms from zero so a still-persistent fault
+re-escalates after another full budget, keeping the loop alive for the
+next /kill"). Span quartet stayed green through the episode
+(last_sampled_at 02:12:29Z fresh, kill_switch_active False,
+unhandled_exceptions 0, cycles_completed 578; supervisor resumed
+01:18:27Z, writer PID 18944, kill primitive verified INACTIVE at
+supervision start). Disposition: designed degradation, not a defect —
+root cause is the dead broker session (operator: re-login); no code
+change under the mid-span freeze. The refused auto-escalations do NOT
+discharge the P1 in-span kill drill (they never engage the halt; the
+drill remains the operator's bare /kill → /resume exercise inside
+09:15-15:30 IST before 19 Oct 20:28:04 IST). Standing watch: if this
+signature recurs WITH a live broker session, that instance is a
+defect, not machinery.
