@@ -2375,3 +2375,48 @@ budgets) is operator-side documentation of the out-of-repo deployment, not a
 LOATS code item.
 
 No code, config, or protection change ships in this wave.
+
+(8) 07Oct OUTAGE CLOSURE + STORM-SETTLED GATE STATE (written 07 Oct
+2026, ~08:45Z = 14:15 IST): the fifth credential-adjacent outage
+(2026-10-06T23:40:20Z -> 2026-10-07T08:09:29Z; transport-then-token
+pre-band login trap) is CLOSED with a verified recovery hold - operator
+re-auth 08:09:03Z (13:39:03 IST, first attempt, no lockout burn), global
+breaker CLOSED after recovery 08:09:29Z, all four source breakers by
+08:10:11.656Z, zero OPENED transitions after, zero word-boundary
+auth-class lines after 08:09:03Z, decisional leg resumed 08:10:08Z
+(139 trade_decisions rows as_of 2026-10-07 by 08:30:50Z). The
+DOCUMENTED_OUTAGE_WINDOWS pin (scripts/verify_p5_forward_test.py, 4th
+tuple entry, annotation-only semantics unchanged) and the dated record
+(docs/audit-history/17Sep2026-p5-openalgo-auth-outage.md, Continuation
+8) land in this same wave. The paste's PowerShell tails (`git commit -F
+<placeholder>` / `gh pr create --body-file <placeholder>` dying on `The
+'<' operator is reserved for future use`) are parse-class parse-deaths
+of template-transcribed commands - NOTHING executed in those lines; the
+intended operations are live-verified landed (edcb1cc and 76b09d9
+committed; PR #148 merged 06:42:43Z, b478bbc).
+
+Updated queue (supersedes the deferred states recorded above):
+1 P0-now broker-session re-login RESOLVED THIS CYCLE - the one-attempt
+re-login landed 13:39:03 IST; whether a TOTP resync preceded it is
+operator-side (out of repo), and the P0 blocker is cleared by the
+verified recovery either way. 2 P1 bare /kill drill UNCHANGED-OPEN,
+deadline 19 Oct 20:28:04 IST; the manual path was breaker-bound through
+the storm (the 13:31:20 IST attempt was the 51st refused activation of
+the window) and is dischargeable NOW in a healthy in-span session
+inside 09:15-15:30 IST. 3 P1 L-03 constant correction (NIFTY 25 -> 65,
+BANKNIFTY 30 at settings.py:221): the storm-settled gate condition is
+NOW MET - operator-gated next build wave. 4 P2 breaker-episode closure
+addendum + DOCUMENTED_OUTAGE_WINDOWS pin: DISCHARGED THIS WAVE. 5 P2
+Sun 11 Oct Sun-Scan exit-64 re-check operator-side, no in-repo record.
+6 P3 cluster (M-02 one-writer SQLite, M-03 fail-closed RSS gate,
+session-gated re-arm, R-05 shared-venv rebuild, L-01 sync/async dedup)
+UNCHANGED-OPEN next build wave - explicitly NOT completed as of this
+wave; the paste's completion-conditional asks for M-02, M-03 and L-01
+are answered NO (all three remain open), and the paste's Code Quality
+Review posture (typed package, ruff/mypy pins) remains a standing gate,
+not a completed task.
+
+No code, config, or protection change ships in this wave: the registry
+pin is a documentation-of-runtime tuple on the validator's disclosure
+surface (annotation-only semantics unchanged), and both doc edits grade
+through the coupled doc test classes run on the repo venv.

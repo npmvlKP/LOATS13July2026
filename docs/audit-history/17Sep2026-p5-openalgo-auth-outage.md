@@ -548,3 +548,88 @@ with the #140 session-gated-drain disposition). The P1 in-span kill
 drill is NOT discharged by this recovery or by the refused
 auto-escalations; it remains owed inside 09:15–15:30 IST before
 19 Oct 20:28 IST.
+
+
+## Continuation 8 (07 Oct): fifth credential-adjacent outage - pre-band
+login trap, transport-then-token shape (recovery verified 13:40 IST -
+LOATS-side, first-hand probes)
+
+Classified at the broker's OAuth ENTRY POINT: the operator's host re-auth
+succeeded on the FIRST attempt (brlogin callback success
+2026-10-07T08:09:03Z = 13:39:03 IST; session login stamped 13:39:03 IST;
+app key healthy throughout - no app-level `Invalid api_key` at OAuth,
+unlike 06Oct). This is therefore the daily-band/stale-session class
+(24Sep, 01Oct, 07Oct fingerprint), and it arrived in a NEW two-phase
+shape: transport-dead first, token-wall second.
+
+### Phases (all stamps UTC; IST = +5:30)
+
+- Phase 1 - transport-dead: first LOATS-observed failure
+  2026-10-06T23:40:20Z (05:10:20 IST 07Oct; global `openalgo` breaker
+  OPENED after 30 consecutive failures; `All connection attempts
+  failed`). The rotation boundary falls at 23:40:15Z, so onset is
+  bounded to [23:40:15Z, 23:40:20Z]; the previous rotation ends
+  mid-storm with no retained evidence of earlier trouble. 58
+  transport-class lines retained, 56 of them in the 00Z hour.
+- Phase 2 - token-wall: first hard `Incorrect api_key or access_token`
+  rejection 2026-10-07T00:09:01Z (05:39:01 IST), steady ~2/min for
+  ~8h15m (921 token-class lines; hourly bands 116-127/h). The 06:00:10
+  IST automation oauth fired INSIDE the storm and did not heal it
+  (broker-side invalidation is progressive; the new token died like its
+  predecessor).
+- Remission: exactly one breaker CLOSE/recovery arc
+  00:30:48Z-00:41:07Z (06:00:48-06:11:07 IST) straddling that oauth;
+  the global breaker re-OPENED at 00:41:07Z and the token wall resumed -
+  one continuous failure state, not two episodes.
+- Recovery: operator re-auth 08:09:03Z (13:39:03 IST, ONE attempt - no
+  lockout burn this cycle); master contract refreshed (108,383 symbols;
+  cache loaded in 3.67 s); `openalgo` transitioning to HALF_OPEN
+  08:09:27Z, CLOSED after recovery 08:09:29Z (13:39:29 IST); all four
+  source breakers CLOSED by 08:10:11.656Z (13:40:11 IST).
+
+### Storm totals (07Oct LOATS rotations; window 23:40:20Z-08:09:29Z)
+
+- Breaker transitions: 2,425 OPENED across the five breakers inside the
+  window; day totals 466 OPENED per breaker (466 OPENED + 467
+  HALF_OPEN-transition lines each) - far denser than the 06Oct app-key
+  day (3,389 transitions of which this window alone carries 2,425).
+- Escalation/kill loop: 51 `Kill switch activated` lines in-window,
+  EVERY one the attempted-then-rolled-back signature: 50 M-01
+  cycle-failure budget escalations (first 2026-10-06T23:49:15.515Z =
+  05:19:15 IST, nine minutes after onset - the 500-consecutive budget
+  re-arms after each half-open probe, so escalations repeat through the
+  storm; last 2026-10-07T08:07:59.115Z) + 1 operator drill attempt
+  (`In-span drill activation before 16Oct close`, 08:01:20Z =
+  13:31:20 IST, refused by the open breaker 54.2 s). Zero engagements:
+  `kill_switch_active_at_start` false on the live span; zero
+  kill/auth-class lines after 08:09:03Z.
+- Sentiment leg: exactly 4 rows inside the storm window
+  (00:04:07Z-08:01:52Z), consistent with the #140 session-gated-drain
+  posture; write-through resumed 08:09:53Z (1,596 further rows by day
+  end; day total 2,864).
+- Decisional leg: ZERO routing log lines and ZERO `trade_decisions`
+  rows in-window - the cycle-failure budget (500 consecutive) exhausted
+  long before the decisional leg could fire; the documented outage
+  window therefore bounds a full decisional-evidence hole.
+- Paste-vs-log note: the operator console showed red breakers at the
+  13:30-13:35 IST /status probes and the 13:31 IST /kill refusal; the
+  13:35 IST /resume correctly reported the switch not active (it never
+  engaged). All consistent with the rotations above (last pre-recovery
+  OPEN 08:08:28Z, drill refusal 08:01:20Z, M-01 escalation 08:07:59Z).
+
+### Verified consequences on the live 20261005_145804 span (post-recovery)
+
+Routing resumed 08:10:08Z (first post-recovery line; 136 routings by
+08:30:17Z); `trade_decisions` accumulated 139 rows with `as_of_date`
+2026-10-07 (created 08:10:08Z-08:30:50Z; in-span counters 0 -> 139);
+the 08:29:38Z snapshot reads all five breakers closed (consecutive
+successes 186-375 broker-backed, 2,260 sentiment; `last_failure` null)
+with zero OPENED transitions after 08:10:11.656Z and zero
+word-boundary auth-class lines after 08:09:03Z (a 08:24:10Z apparent
+hit was a scan artifact - the substring `403` inside `3403.64ms`; the
+recovery held). The P1 in-span kill drill is NOT discharged by this
+recovery or by the 51 refused activations; it remains owed inside
+09:15-15:30 IST before 19 Oct 20:28 IST. The storm-settled gate
+condition for the operator-gated L-03 lot-size constant correction
+(register entry 3) is now MET: the correction may proceed on the next
+build wave.
