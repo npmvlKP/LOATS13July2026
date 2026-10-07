@@ -2273,3 +2273,88 @@ L-01 sync/async dedup) UNCHANGED-OPEN next build wave - cites re-verified
 exact this pass.
 
 No code, config, or protection change ships in this addendum.
+
+Addendum 2026-10-07 (11:43 IST, 05:59-paste reconciliation - subset re-slice of
+the 04:00 composition; first verdicts for the section-9 maintainability block):
+
+CLASSIFICATION: SUBSET RE-SLICE, not a fresh audit. The 05:59 paste (20 content
+lines) is line-for-line identical to the 04:00 family member except that it DROPS
+the two cache-benchmark failure tails and the coverage table; a byte-level diff
+of the two composer files at 11:29 IST (before the 04:00 file was pruned from the
+composer directory) proved the identity. The 04:00 file's deletion after the
+10:08 IST reconciliation limits the mechanized containment probe to the surviving
+siblings: 10/20 lines contained vs each of the 00:31 and 02:06 members, and the
+10 "novel" lines are exactly the blocks the 09:57 IST addendum (PR #147) already
+graded. Sections 8, L-01, M-03, M-02 and the risk table therefore carry
+POINTER-CONFIRMED verdicts from that addendum (same pasted texts), each re-probed
+live this pass; the only first-verdict content this pass is the section-9
+maintainability block.
+
+(4) SECTION 9 (MAINTAINABILITY) EXPLICIT VERDICTS - so the completed items can
+be ignored further:
+- "Supersession register is the right control and is being used": CONFIRMED,
+and the register now spans S-01..S-19 (S-17/S-18/S-19 landed after the paste's
+S-01..S-16 inventory) - docs/CMP-SUPERSESSION-REGISTER.md at HEAD 5462857.
+- "Flat src/loats/ is accepted (S-11)": CONFIRMED (S-11 ACCEPTED).
+- "Three files over 1,500 lines": SUCCESSION-STALE COUNTS - live at HEAD:
+database.py 3,164 / orchestrator.py 2,442 / openalgo.py 1,791 lines; the
+parallel module database_async_additions.py reads 677 lines EXACT as pasted.
+The accepted posture is unchanged (S-11); the paste's figures are a
+point-in-time inventory and the files have grown since.
+- "TODO markers mostly closed-wave IDs, not open work": CONFIRMED - 53 TODO
+comments in src/loats/; spot reads all bind closed waves (TODO-18/HC-21 lazy
+settings binding, TODO-4/F9-H-03 per-source liveness, TODO-13/F9-H-01 strength
+thresholds, TODO-27c bounded queue); none marks open work.
+- "mods and max_modifications both default 25 need a single owner": ALREADY
+ADDRESSED - the single owner EXISTS at HEAD and the alias is contract-pinned,
+not dead weight: max_modifications is the sole production owner
+(settings.py:225; consumers rules.py:714/734, orchestrator.py:2317, and the
+modify-order boundary openalgo.py:1091); mods (settings.py:229, same default
+25) is the documented "backward compatibility alias retained in HC-23 external
+verification" and its ONLY consumer is the verifier pin
+scripts/verify_hc_registry.py:468 ("mods", 25); a src/ consumer sweep for the
+bare alias returns EMPTY. The pasted cite settings.py:203-207 is
+succession-stale (the fields sit at 221-229 at HEAD). Owner for the next rule
+change: max_modifications - flipping its default must update the
+verify_hc_registry.py:468 pin in the same wave. No code change sanctioned by
+this addendum (operator-gated next build wave, same posture as L-03).
+
+(5) RELIABILITY-BLOCK POINTER-CONFIRMATIONS (same pasted texts re-probed
+live): C-01 FALSIFIED at HEAD re-verified - AuditIntegrityGateError raised at
+src/loats/main.py:123 before the alerts/scheduler/orchestrator legs (S-17);
+H-02 FALSIFIED re-verified - scheduler.py _check_kill_switch at 314/368/385/431
+(R-19, P2-fixed); M-01 FALSIFIED re-verified - CYCLE_FAILURE_BUDGET at
+latency_budget.py:39 with the live consumer at orchestrator.py:567. Present
+claims symbol-swept and confirmed: idempotency keys (openalgo.py:89-93),
+duplicate-listener preflight (preflight.py R-08, wired at main.py:76), audit
+hash chain (previous_hash schema plus the S-17 boot gate), trailing-stop alias
+restore on Rule-7 refusal (orchestrator.py:2381-2399 restores the pre-move
+config and writes the ratchet_refused_rule7 audit row; net
+tests/test_trailing_stop_slm.py). L-01 OPEN (classes at openalgo.py:743/1166),
+M-03 OPEN (gate path at orchestrator.py:492-514), M-02 OPEN
+(database.py:655-659 exact) - unchanged per the 09:57 addendum, cites re-read
+live this pass.
+
+(6) RISK TABLE REGRADE (updated state, strict order preserved): 1 P0-now
+UNCHANGED-OPEN and WORSE: storm CONTINUOUS at this pass's probe - 1,730 OPENED
+/ 5 CLOSED transitions in the 2026-10-07 rotations, last transition 06:07:14Z
+(rotation coverage mapped contiguous: loats.log.5 starts 2026-10-06 23:39Z
+through loats.log ending 06:07:17Z), +520 OPENED in the ~109 minutes since the
+prior addendum's 1,210 / 5 at 04:18:21Z - consistent with the observed storm
+rate, zero new CLOSEs, no recovery hold. P5 span 20261005_145804 quartet GREEN
+at the 06:06:52Z probe (ended_at null, kill_switch_verified true,
+unhandled_exceptions 0, last_sampled_at 06:06:52Z; routed_decisions 0 in-span
+against counters_baseline 63 - carried-counter semantics, not regression).
+Operator-only; one-attempt re-login after the TOTP resync stands. 2 P1 bare
+/kill drill UNCHANGED-OPEN, deadline 19 Oct 20:28:04 IST; the manual path
+remains breaker-bound during the storm. 3 P1 L-03 UNCHANGED-OPEN:
+nifty_lot_size default 25 re-read at settings.py:221 (NIFTY 65 / BANKNIFTY 30,
+operator-gated next wave). 4 P2 breaker-episode closure addendum
+UNCHANGED-DEFERRED - the episode is still open at write time;
+liveness-at-write-time is recorded above, pin waits for a verified recovery
+hold. 5 P2 Sun 11 Oct Sun-Scan exit-64 re-check operator-side, no in-repo
+record. 6 P3 cluster (M-02 one-writer SQLite, M-03 fail-closed RSS gate,
+session-gated re-arm, R-05 shared-venv rebuild, L-01 sync/async dedup)
+UNCHANGED-OPEN next build wave.
+
+No code, config, or protection change ships in this reconciliation pass.
