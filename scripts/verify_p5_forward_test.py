@@ -827,6 +827,34 @@ DOCUMENTED_OUTAGE_WINDOWS: tuple[tuple[str, str | None, str], ...] = (
         "see docs/audit-history/17Sep2026-p5-openalgo-auth-outage.md "
         "(Continuation 7 closure)",
     ),
+    # 07Oct2026 recurrence of the pre-band login trap (fifth
+    # credential-adjacent outage; transport-then-token shape). First
+    # LOATS-observed failure 2026-10-06T23:40:20Z = 05:10:20 IST 07Oct
+    # (`All connection attempts failed`, transport phase), token-wall
+    # `Incorrect api_key` rejections from 00:09:01Z = 05:39:01 IST
+    # steady ~2/min; one remission 00:30:48-00:41:07Z straddling the
+    # 06:00:10 IST oauth; global openalgo breaker OPEN, all four
+    # broker-backed circuits fail-closed; 51 refused M-01/drill kill
+    # activations, zero engagements. CLOSED: operator re-auth landed
+    # 08:09:03Z (13:39:03 IST, host brlogin success, first attempt) and
+    # the global breaker CLOSED after recovery at 08:09:29Z (13:39:29
+    # IST); all four source breakers CLOSED by 08:10:11.656Z; zero
+    # OPENED transitions after. Closing addendum: docs/audit-history/
+    # 17Sep2026-p5-openalgo-auth-outage.md (Continuation 8 closure).
+    (
+        "2026-10-06T23:40:20+00:00",
+        "2026-10-07T08:09:29+00:00",
+        "07Oct pre-band login-trap recurrence (transport-then-token): "
+        "host unreachable from 2026-10-06T23:40:20Z (05:10:20 IST), "
+        "token-wall Incorrect api_key rejections from 00:09:01Z "
+        "(05:39:01 IST) steady ~2/min; one remission 00:30:48-00:41:07Z "
+        "straddling the 06:00:10 IST oauth; global openalgo breaker "
+        "OPEN, all broker-backed circuits fail-closed, 51 refused "
+        "kill-switch escalations; recovery: operator re-auth 08:09:03Z "
+        "(13:39:03 IST), breaker CLOSED 08:09:29Z, sources closed by "
+        "08:10:11Z; see docs/audit-history/"
+        "17Sep2026-p5-openalgo-auth-outage.md (Continuation 8 closure)",
+    ),
 )
 
 
