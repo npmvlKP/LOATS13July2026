@@ -2574,3 +2574,69 @@ mandated hardening is landed; the watch converts to post-landing observation.
 Wave shape: one code commit (benchmark sample-basis hardening, thresholds
 untouched) plus this docs addendum; no production source changed; no threshold
 moved.
+Addendum 2026-10-07 (20:0x IST, the 14:10Z paste reconciliation - first
+post-landing benchmark observation under the converted watch; a fresh
+composition whose sections 10-13 re-slice a stale external review, not any
+tracked document - distinctive-phrase grep is empty across docs/ and the
+parent folder):
+
+(1) 14:01:25Z failure tail (1,695.13 writes/s; passes [1695, 2000, 1730,
+1555, 1685]): VERIFIED as a genuine run of THIS tree - junit parity exact
+(2,467 testcases in pytest-report.xml, mtime 19:36 IST = 1 failed + 2,464
+passed + 2 by-design skips) and the traceback embeds the landed median-of-5
+code from PR #152. VERDICT: load-not-code, CONVERGING with the five-probe
+record - all five passes sit below the 2,000 gate in a narrow band (the
+sustained-load shape, not the one-preempted-pass shape the sample basis
+absorbs), while the fresh-process A/B through the module singleton
+re-measured 10,095 writes/s / 333,278 reads/s (5x-6x the graded rates), the
+isolation re-run of test_cache_latency alone PASSED in 3.22 s under the same
+co-tenancy (P5 engine PIDs 13108/19368 since 04:58 IST + OpenAlgo host PIDs
+32832/29868 since 13:37 IST, both alive through the window; ZERO breaker
+OPEN/CLOSE transitions 13:53Z-14:07Z across all rotations - load, not a
+storm), and CI on the identical merge SHA 72a3b3c is 15/15 success including
+pytest-coverage (which runs these benchmarks) and benchmark-perf. NO
+threshold spend (a third cut stays forbidden), NO code change - the doctrine
+holds and the observation is recorded.
+
+(2) The two PS 5.1 tails (gh pr create with a literal body-file placeholder;
+git diff with a literal paths placeholder) are PARSE-DEATH: nothing on
+either line executed. Intended operations verified live instead: PR #152
+state MERGED (mergedAt 2026-10-07T13:26:16Z, mergeCommit 72a3b3c) and
+git diff b096a4f..origin/main EMPTY rc=0 (content verified). The
+file-mutation tail's named target (a Replacement-prefixed
+test_performance_benchmarks.py path) is a PHANTOM: no such artifact exists
+anywhere under the project root (find probe) and no stray no-dot tree
+exists; nothing was owed a patch by this paste - the hardening already
+landed through #152.
+
+(3) Sections 10-13 graded claim-by-claim (not located in any tracked doc;
+stale external re-slice): 136 test modules FALSE at HEAD (live count 140 by
+git ls-files); "no test can be cited that place_order refuses in ANALYZE"
+FALSE (15 tests in tests/test_order_mode_gate.py, register S-18); the audit-chain boot-refusal gap is
+STALE (closed 04Oct2026: AuditIntegrityGateError refusal, S-17,
+tests/test_audit_chain_f9m01.py); M-02/M-03/L-01 all remain OPEN UNCHANGED
+(check_same_thread=False at database.py:659; RSS gate logs-and-returns at
+orchestrator.py:484-516; dual clients openalgo.py:743/1166); the metrics
+port 8001 cite at settings.py:246 is SUCCESSION-DRIFTED (live line
+268); README-vs-operator-note count divergence: NEITHER count
+adopted (register convention, unchanged).
+
+(4) Queue re-probe: L-03 NOT executed (nifty_lot_size Field(25) live-exact
+at settings.py:221 - operator-gated, correctly frozen mid-span); bare /kill
+drill UNDISCHARGED (next eligible 08 Oct 09:15 IST, deadline 19 Oct
+20:28:04 IST unchanged); TOTP-desync remediation, Sun-Scan exit-64 re-check
+(11 Oct) and the P3 build-wave cluster (M-02 one-writer SQLite, M-03
+fail-closed RSS gate, session-gated re-arm, R-05 shared-venv rebuild, L-01
+sync/async dedup) all UNCHANGED-OPEN - explicitly NOT completed.
+
+(5) Watch bookkeeping: the post-landing observation leg has received its
+first datum and it converges with the five-probe record (load-not-code).
+The leg stays OPEN; a future recurrence self-diagnoses via the printed
+per-pass spreads (narrow all-below band = sustained-load class; one isolated
+wide spread = preempted-pass class the basis absorbs). No further register
+action is owed unless a code-correlated signature appears (isolation runs
+slow too, or CI reddens on the same gate).
+
+No code, config, or protection change ships in this wave: docs-only
+reconciliation addendum, graded through the coupled doc test classes on the
+repo venv.
