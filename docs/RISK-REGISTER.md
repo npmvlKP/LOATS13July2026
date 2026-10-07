@@ -2358,3 +2358,20 @@ session-gated re-arm, R-05 shared-venv rebuild, L-01 sync/async dedup)
 UNCHANGED-OPEN next build wave.
 
 No code, config, or protection change ships in this reconciliation pass.
+
+(7) RETRY-BUDGET CLAUSE EXPLICIT VERDICT (the one reliability-block clause the
+09:57 addendum left ungraded): "no in-repo proof of retry budgets on the host"
+is TRUE AND CORRECTLY SCOPED - the "host" is the separately deployed OpenAlgo
+checkout, so its retry configuration is out-of-repo BY CONSTRUCTION and no
+in-repo proof can exist. LOATS' own retry posture IS in-repo and deliberate:
+order placement and modification run the circuit breaker WITHOUT retry to make
+duplicate orders impossible (src/loats/openalgo.py module docstring and the
+wrap sites at 980-1004/1035), cancel_order carries a 3-attempt budget, read-only
+operations use circuit_breaker_retry_async, and the shared budgets live in
+src/loats/utils/retry.py (RetryConfig.max_attempts default 3) with consumers in
+alerts.py, market_status.py, orchestrator.py and scheduler.py. Verdict: clause
+CONFIRMED AS WRITTEN, no defect; the residual ask (documenting the HOST's retry
+budgets) is operator-side documentation of the out-of-repo deployment, not a
+LOATS code item.
+
+No code, config, or protection change ships in this wave.
