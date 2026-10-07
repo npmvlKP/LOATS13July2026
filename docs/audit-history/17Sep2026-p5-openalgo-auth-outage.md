@@ -523,6 +523,7 @@ re-login (password + TOTP) → LOATS breakers close within ~90 s
 (standard recovery). The pending P1 in-span kill drill remains owed
 after session restoration (before 19 Oct 20:28 IST).
 
+
 ## Continuation 7 closure (06 Oct, recovery verified ~13:20 IST —
 LOATS-side, first-hand probes)
 
@@ -549,6 +550,15 @@ drill is NOT discharged by this recovery or by the refused
 auto-escalations; it remains owed inside 09:15–15:30 IST before
 19 Oct 20:28 IST.
 
+
+**Outcome (06Oct close, 07Oct digest corroboration)**: operator
+renewed the subscription and re-logged — oauth 13:00:29 IST (row 162),
+openalgo CLOSED 13:01:19, all sources by 13:02:05 (registry pin
+PR #149: CLOSE 08:09:29.7Z / 08:10:01–11Z); zero breaker transitions
+after; 63/63 rows==counters banked in the recovered window. Day cost:
+~3h46m in-session (~60%). The registry pin for this window is PAID
+(PR #149), unlike the 21/23–25Sep pins still pending with the F9-C-02
+owner.
 
 ## Continuation 8 (07 Oct): fifth credential-adjacent outage - pre-band
 login trap, transport-then-token shape (recovery verified 13:40 IST -
@@ -633,3 +643,34 @@ recovery or by the 51 refused activations; it remains owed inside
 condition for the operator-gated L-03 lot-size constant correction
 (register entry 3) is now MET: the correction may proceed on the next
 build wave.
+
+
+## Continuation 9 (07 Oct): recovery-path forensics - vault TOTP desync; interactive recovery only
+
+*Reconciled 07Oct ~16:5x IST: this section arrived as a foreign draft inserted ahead of the Continuation 7 closure under a duplicate Continuation 8 ordinal; it is retained here with chronology restored. Every probed figure verified against the LOATS rotations and store: 1,285 in-session breaker opens, 212 counted routings (span counter, 10:17Z probe), 63/275 trade_decisions rows (as_of 2026-10-06/07), breaker closes 13:39:29-13:40:11 IST.*
+
+**Sequence**: operator oauth 06:00:10 IST landed mid-band and bought
+only ~10 minutes before progressive re-invalidation (clean gap then
+continuous 2/min auth errors from 06:11). The 08:35 automated
+re-login then hit a NEW block: the Hermes vault's stored Kite TOTP
+secret is **deterministically desynced** — 2 in-window `Invalid TOTP`
+rejections (fresh-30s-window submission each time); the job stopped
+at 2 to protect the account's 3 remaining lockout attempts. With the
+vault path dead, NO oauth was possible until the operator logged in
+interactively at 13:39:03 IST (rows 166/167) — probe HTTP 200,
+breakers closed 13:39:29–13:40:11, zero events after.
+
+**Day cost**: session dead 05:59→13:39 IST (~4h25m in-session, ~71%);
+storm 1,285 in-session opens; recovered window banked 275 rows / 212
+counted routings in ~80 min (~2.6/min). The 63-row vs 212-counter
+delta at close is an emitter-vs-disposition scoping question (digest
+§3) — probe scheduled next session, not a divergence (flag = 0).
+
+**Two lessons banked**: (1) mid-band logins are worse than none — a
+fresh token burned inside the band buys ~10 minutes then dies, and
+the operator believes they logged in successfully; (2) the TOTP
+desync means the credential chain now has THREE independent single
+points of failure (app key subscription, daily token, vault TOTP
+secret) — only the token self-heals locally. The post-market fix is
+operator re-enrollment of Zerodha 2FA + vault item update; until
+then, every band-trap morning requires interactive recovery.
