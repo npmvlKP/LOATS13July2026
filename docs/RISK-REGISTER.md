@@ -2082,3 +2082,107 @@ system is 'Failed activate kill switch' (alerts.py:615), NOT the word
 'refused' - a refusal-vocabulary grep returns a false zero and cost one
 re-scan this pass. No code, config, or protection change ships in this
 addendum.
+
+Addendum 2026-10-07 (07:50 IST, 02:06-paste reconciliation - FR9-family
+section-7 scalability block + remaining-risks table + four PS 5.1
+parse-death tails): the 02:06 paste is a FRESH COMPOSITION within the
+00:31 member's family, not a wholesale re-slice - the mechanized
+containment probe scores 29/68 lines against the 00:31 paste (git-log
+scaffolding + risk-table rows) and 6/68 against the external GFR-04Oct2026
+report (G:/.OA/LWOATS/GFR-04Oct2026.txt, line 204), leaving a DISJOINT
+section-7 Scalability Review block that no repo archive contains (grep
+zero across docs/audit-history incl. the 15Sep FR9 report) and no prior
+register disposition covers - first verdict below. Per-item live verdicts,
+every pasted item graded explicitly:
+(1) SECTION 7 SCALABILITY REVIEW: VERIFIED LIVE-TRUE AT HEAD, cites
+ACCURATE (source: GFR-04Oct2026 line 204, verbatim in the paste). Probes
+this pass: single SQLite file with check_same_thread=False +
+isolation_level=IMMEDIATE + timeout=30 at database.py:655-659; single
+asyncio loop (asyncio.run, main.py:300); APScheduler in-process
+(AsyncIOScheduler, scheduler.py:142); the second-instance guard the paste
+cites as main.py:64-81 IS the R-08 preflight duplicate-listener bind
+(main.py:71-77 inside the cited span), reinforced by the F9-C-02
+metrics-port raise at main.py:144-156 - both guards re-read live; bounded
+queue decision_queue_maxsize at config/settings.py:290 with validator
+:405-412; cycle sleep targets CYCLE_COMPLIANCE_TARGET_SECONDS (1.0 s,
+latency_budget.py:24) at orchestrator.py:600 - the amended budget, not the
+CMP 100 ms loop, is the one the code enforces (ADR-0021/S-01), and the
+paste's not-re-benchmarked clause stands as written. The one supervised
+ANALYZE process per OpenAlgo host is confirmed as the design shape;
+horizontal scale is out of design; the CMP millions-of-users bar does not
+apply to this architecture. GRADED CORRECT-AT-HEAD - no register row, no
+code change; this paragraph is the verdict of record and the item is
+COMPLETED (ignorable further).
+(2) REMAINING-RISKS TABLE re-graded live, scan edge 02:18:35Z (clock
+anchored 2026-10-07T02:11:24Z UTC, IST +5:30 derived arithmetically).
+P0-now row REMAINS OPEN - the broker session is STILL broken: global
+openalgo breaker OPENED 01:24:09Z after 44 consecutive failures, Incorrect
+api_key/access_token signatures continue (54 API HTTP 500 hits, last
+02:18:21Z), all four per-source breakers (ta/volatility/price_action/
+options_flow) OPEN at 94 consecutive failures (last cluster 02:14:17Z),
+trading cycles failing continuously to the scan edge; the current rotation
+(01:24:01Z onward) carries ZERO CLOSED transitions and ZERO recovery
+signatures (password-auth / cache-clear / WS-connected greps, both cases,
+rotation-mapped) - operator-only re-login still required. P1 kill drill:
+UNDISCHARGED, deadline 19 Oct 20:28:04 IST, healthy session required
+(breaker-bound caveat as recorded 00:31). P1 L-03 lot-size correction:
+operator-gated next build wave, unchanged - config/settings.py:221 still
+pins nifty_lot_size=25 (read live this pass; true lots NIFTY 65 /
+BANKNIFTY 30 per the 21:20 Oct 6 addendum's primary circular NSE
+FAOP70616). P2 breaker-episode closure + DOCUMENTED_OUTAGE_WINDOWS pin:
+STILL DEFERRED - the episode is OPEN and UNSETTLED (recovery-1 00:30:48Z
+held ~10 min, re-opened 00:41:07Z, storm continuous at the 02:18:35Z
+edge), so no window pin ships; liveness-at-write-time is the record. P2
+Sun 11 Oct Sun-Scan exit-64 re-check: operator-side, NO in-repo record
+(sun_scan/exit-64 grep across docs/ re-run this pass, zero hits). P3
+(M-02 one-writer SQLite, M-03 fail-closed RSS sentiment gate,
+session-gated re-arm, R-05 shared-venv rebuild, L-01 sync/async dedup):
+ALL OPEN next build wave - clusters re-verified exact this pass: M-02 at
+database.py:655-659; M-03 gate-failure path orchestrator.py:492-514 (log
++ alert + return, sentiment continues on an unvalidated list; the CI
+rss-feeds offline job sits at ci.yml:62-81); L-01 sync OpenAlgoClient
+(openalgo.py:743) vs async AsyncOpenAlgoClient (:1166) dual classes
+unchanged.
+(3) PARSE-DEATH TAILS re-verified ALL FOUR as parse-class, not
+environment state (by PS 5.1 semantics nothing in those lines executed;
+each INTENDED operation probed live instead): (a) wc CommandNotFound -
+PS 5.1 lacks the POSIX wc utility; live git ls-files piped through git-bash
+counts 531 tracked files. (b) src refspec does-not-match on a push of
+docs/paste-1629-reconciliation-06oct - that branch was never cut locally
+and needs no push: PR #145 is MERGED (01:13:47Z, merge sha 3895217, gh pr
+view read-back this pass), ls-remote for the branch returns EMPTY, zero
+open PRs remain, and the lingering local merged branch from PR #144 was
+purged this pass - tail fully retired. (c) gh pr create parse-death - a
+literal angle-bracket placeholder token transcribed from a template dies
+at PS 5.1 parse time; the intended PR exists and is merged, operation
+retired. (d) python placeholder-skill-path parse-death - same class; the
+derive/verify scripts live in the git-protected-main skill, and the
+intended verification was executed live this pass: the protection GET
+read back field-by-field clean - 11 required contexts (isort, flake8,
+bandit, deps-sync, ruff-lint, ruff-format, commit-lint, mypy,
+pytest-coverage, pip-audit, benchmark-perf (F9-H-02 gate)), strict true,
+enforce_admins enabled, dismiss_stale_reviews true, approving count 1,
+code-owner false, last-push false, force-push false, deletions false,
+conversation-resolution false - 9th consecutive clean field-by-field
+read-back, NO derive-gap repair needed.
+(4) COMPLETION MARKERS for the standing convention (explicit verdicts so
+completed items can be ignored further): section 7 scalability -
+COMPLETED THIS PASS (verdict (1)). Section 6 security-table rows -
+ALREADY COMPLETED in the 00:31 addendum (5): H-03 and H-02 FALSIFIED at
+HEAD (scrubber live at log_redaction.py, wired via loats_logging.py:80;
+scheduler kill gate at scheduler.py:314/368/385/431), eval/pickle/
+shell=True re-grepped clean this pass. SSRF paragraph - ALREADY COMPLETED
+(00:31 (6): runtime guard rss_validation.py:205-243, env-parsed pydantic
+field settings.py:310, validator :415-418). Section 5 performance -
+ALREADY COMPLETED (00:31 (7); cites re-verified: settings.py:185,
+orchestrator.py:600, latency_budget.py:24). L-03/L-04/L-05 verdicts -
+ALREADY COMPLETED (06Oct evening addenda; L-04 ADR-0020-accepted debt;
+L-05 posture re-confirmed via .env.example placeholder lines this pass).
+M-02/M-03 - NOT COMPLETED, OPEN next build wave. P-block re-anchored at
+the 02:18:35Z edge: quartet GREEN on span 20261005_145804 (ended_at null,
+kill_switch_verified true, unhandled_exceptions 0, last_sampled_at
+02:12:39Z - 6.0 min before the scan edge; routed_decisions 0 in-span
+against counters_baseline success 63 / routed_decisions 63 /
+divergence 0 - carried-counter semantics, not regression). P1
+UNDISCHARGED. Sun 11 Oct re-check operator-side. P3 all OPEN. No code,
+config, or protection change ships in this addendum.
