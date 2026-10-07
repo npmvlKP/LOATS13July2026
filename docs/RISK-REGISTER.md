@@ -2186,3 +2186,90 @@ against counters_baseline success 63 / routed_decisions 63 /
 divergence 0 - carried-counter semantics, not regression). P1
 UNDISCHARGED. Sun 11 Oct re-check operator-side. P3 all OPEN. No code,
 config, or protection change ships in this addendum.
+
+Addendum 2026-10-07 (09:57 IST, 04:00-paste reconciliation - two cache-benchmark
+failure tails + reliability-review block + remaining-risks table): the 04:00
+paste (failing-tail stamps 03:31:05Z/03:31:15Z = 09:01 IST) is a FRESH COMPOSITION
+within the 07Oct family - the mechanized containment probe scores 10/121 lines
+against BOTH prior members (00:31, 02:06; shared lines are risk-table scaffolding
+only), so its disjoint blocks get first verdicts below, every pasted item graded
+explicitly:
+(1) PYTEST FAILURE TAILS (2 cache benchmarks, 1,770.83 writes/s < 2,000 and
+2,719.80 ops/sec < 3,000): STALE EVIDENCE OF LOAD, NOT OF CODE - the enforced CI
+gate is green on the identical commit. Probes this pass: (a) suite/commit parity -
+pytest --collect-only at HEAD 5ec50b2 collects 2,467 = 2,463 passed + 2 failed +
+2 skipped, the paste ran THIS tree; (b) CI pytest-coverage on this exact HEAD is
+GREEN (run 37565454571, started 03:09:45Z, 4m46s, all 11 required contexts
+success) - 21 minutes BEFORE the local failure stamps, with the fail-closed
+benchmark-perf gate green on idle 2-core runners; (c) co-tenancy - the local run
+(08:53-09:11 IST) executed inside the openalgo breaker storm (1,210 OPENED /
+5 CLOSED transitions in the 2026-10-07 LOATS rotations as of the 04:18:21Z last
+transition) with the supervised P5 span 20261005_145804 running (one core pegged
+continuously, PID 19368 from 04:58 IST) and the OpenAlgo host alongside (PID
+12832 from 05:58 IST) - the codified advisory-gate-flake precedent applies: a red
+wall-clock benchmark under load with all required contexts green is the gate
+grading its environment, not a regression, until proven on idle; (d) isolation -
+both tests PASS in 0.79 s on THIS box at 09:26 IST under the same co-tenancy via
+the repo venv; (e) fresh-process micro-bench (2,000 ops, repo venv, same box,
+same co-tenancy): the HEAD write path measures 10,097-10,368 writes/s (5x the
+2,000/s gate) and 310,270-313,450 reads/s, while the immediate pre-tier code
+(aae0621~1, BG-1 landed 21Sep) measures 3,881-4,229 writes/s under the identical
+harness - HEAD is 2.6x FASTER than pre-refactor; the 21Sep per-TTL refactor
+improved the hot path, and no HEAD regression exists. The measured 1,770 and
+2,720 figures are 6.4x / 3.2x under the isolated fresh-process baselines on
+identical code - evidence of load in the ADR-0021 R-11 regime, not of a slower
+build. NO code change, NO threshold change: two threshold relaxations were
+already spent on this class (5,000->2,000 and 7,000-9,000->3,000 per the in-file
+calibration comments); a third would spend the gate's discriminating power with
+zero evidence of code slowness. If the storm persists into the next P3 wave, the
+sanctioned lever is suite-context isolation (dedicated short job or marker for
+the wall-clock benchmarks), operator-gated, never another threshold cut.
+(2) RELIABILITY-REVIEW EXPLICIT VERDICTS (so completed items can be ignored
+further): C-01 COMPLETED 04Oct (P0) - S-17 SUPERSEDED: boot REFUSES on a
+failed audit-chain verification via AuditIntegrityGateError, break-glass
+AUDIT_INTEGRITY_BREAK_GLASS default-false, record
+docs/audit-history/04Oct2026-C01-audit-integrity-boot-gate.md; the paste's
+"audit verify is non-blocking" is FALSIFIED at HEAD. H-02 COMPLETED (R-19
+closed 05Oct, P2-fixed row): scheduler kill gate at scheduler.py:314 / 368 / 385 /
+431 with RED net tests/test_scheduler_kill_switch_gate.py; the paste's
+"scheduler not halted" is FALSIFIED at HEAD. M-01 COMPLETED 05Oct:
+CYCLE_FAILURE_BUDGET = 500 at latency_budget.py:39 with live consumers at
+orchestrator.py:22 / 231 / 560 (S-14 05Oct amendment); the paste's "cycle
+exceptions swallowed" is FALSIFIED at HEAD - the 06Oct storm addendum graded
+1,830 M-01 auto-escalation ATTEMPTS, all REFUSED by the open breaker
+(attempted-then-rolled-back activations per the alerts.py:615 vocabulary),
+zero engagements. L-01 OPEN exactly as pasted, cites succession-shifted:
+the sync class sits at openalgo.py:743 and the async at 1166 at HEAD (the
+pasted 638/1061 predate the upstream class insertions incl. the C-02 mode
+gate; drift species 2, shift mechanism recorded) - re-verified OPEN next
+build wave. M-03 OPEN exactly as pasted: gate-failure path re-read at
+orchestrator.py:492-514 (log + alert + return; sentiment runs unvalidated on
+gate failure), offline manifest job at ci.yml - OPEN next build wave.
+M-02 OPEN exactly as pasted: database.py:655-659 re-read EXACT (timeout=30,
+isolation_level IMMEDIATE, check_same_thread=False) - OPEN next build wave.
+The paste's graceful-shutdown cite orchestrator.py:2040-2048 is
+SUCCESSION-STALE at HEAD: the shutdown lives at orchestrator.py:2073-2115
+(same 5 s wait-then-cancel semantics and best-effort outcome flush) - the
+behavior claim is TRUE, the line cite moved.
+(3) RISK TABLE REGRADE (updated state, strict order preserved): 1 P0-now
+UNCHANGED-OPEN and WORSE: the storm is CONTINUOUS at this pass's probe -
+1,210 OPENED / 5 CLOSED transitions in the 2026-10-07 rotations, last transition
+04:18:21Z (21 minutes AFTER the paste's 03:16:43Z claim); P5 span
+20261005_145804 quartet GREEN at the 04:18:30Z probe (ended_at null,
+kill_switch_verified true, unhandled_exceptions 0, last_sampled_at
+04:18:30Z; routed_decisions 0 in-span against counters_baseline 63 -
+carried-counter semantics, not regression). Operator-only; one-attempt
+re-login after the TOTP resync stands. 2 P1 bare /kill drill UNCHANGED-OPEN,
+deadline 19 Oct 20:28:04 IST; the manual path remains breaker-bound during the
+storm and cannot discharge. 3 P1 L-03 UNCHANGED-OPEN: nifty_lot_size Field
+default 25 re-read at settings.py:221 at HEAD (operator-gated next wave;
+NIFTY 65 / BANKNIFTY 30 per the 21:20 Oct 6 primary circular). 4 P2
+breaker-episode closure addendum UNCHANGED-DEFERRED - the episode is still
+open at write time; liveness-at-write-time is recorded here instead, pin
+waits for a verified recovery hold. 5 P2 Sun 11 Oct Sun-Scan exit-64 re-check
+operator-side, no in-repo record. 6 P3 cluster (M-02 one-writer SQLite,
+M-03 fail-closed RSS gate, session-gated re-arm, R-05 shared-venv rebuild,
+L-01 sync/async dedup) UNCHANGED-OPEN next build wave - cites re-verified
+exact this pass.
+
+No code, config, or protection change ships in this addendum.
