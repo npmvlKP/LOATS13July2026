@@ -9,6 +9,7 @@ This module provides comprehensive performance benchmarks for:
 """
 
 import asyncio
+import statistics
 import threading
 import time
 from collections.abc import Generator
@@ -214,35 +215,56 @@ class TestCachePerformance:
         """Benchmark cache read/write latency."""
         await cache_manager.initialize()
 
-        # Test write performance
-        start_time = time.time()
-        for i in range(1000):
-            await cache_manager.set(f"test_key_{i}", {"value": i}, ttl=60)
-        end_time = time.time()
+        # Median-of-5 sample basis (R-01 sample-basis hardening, 07Oct): each
+        # pass is a fresh 1000-key sweep; the verdict grades the median pass
+        # so one scheduler-preempted pass (co-tenancy: the supervised P5
+        # engine + OpenAlgo host share this box) cannot fail the gate. The
+        # threshold is UNCHANGED by design: two relaxations were already
+        # spent on this flake class (5,000->2,000 writes/s here and
+        # 7,000-9,000->3,000 ops/s on the concurrent stage per its in-file
+        # calibration comment) - the lever is the sample basis, never a
+        # third threshold cut. Wall-clock per-pass measurement, no
+        # perf_counter swap: keeps the CI-comparable basis (CI
+        # pytest-coverage and benchmark-perf grades stay comparable to
+        # history).
+        write_rates: list[float] = []
+        read_rates: list[float] = []
+        for _pass in range(5):
+            start_time = time.time()
+            for i in range(1000):
+                await cache_manager.set(f"test_key_{_pass}_{i}", {"value": i}, ttl=60)
+            end_time = time.time()
 
-        write_time = max(end_time - start_time, 0.001)  # Ensure minimum measurable time
-        writes_per_second = 1000 / write_time
+            write_time = max(end_time - start_time, 0.001)
+            write_rates.append(1000 / write_time)
 
-        print(f"Cache write performance: {writes_per_second:.2f} writes/sec")
+            start_time = time.time()
+            for i in range(1000):
+                await cache_manager.get(f"test_key_{_pass}_{i}")
+            end_time = time.time()
 
-        # Test read performance
-        start_time = time.time()
-        for i in range(1000):
-            await cache_manager.get(f"test_key_{i}")
-        end_time = time.time()
+            read_time = max(end_time - start_time, 0.001)
+            read_rates.append(1000 / read_time)
 
-        read_time = max(end_time - start_time, 0.001)  # Ensure minimum measurable time
-        reads_per_second = 1000 / read_time
+        writes_per_second = statistics.median(write_rates)
+        reads_per_second = statistics.median(read_rates)
 
-        print(f"Cache read performance: {reads_per_second:.2f} reads/sec")
+        print(
+            "Cache write performance (median of 5 passes): "
+            f"{writes_per_second:.2f} writes/sec "
+            f"(passes: {[round(r) for r in write_rates]})"
+        )
+        print(
+            "Cache read performance (median of 5 passes): "
+            f"{reads_per_second:.2f} reads/sec "
+            f"(passes: {[round(r) for r in read_rates]})"
+        )
 
         # Cleanup
-        for i in range(1000):
-            await cache_manager.delete(f"test_key_{i}")
+        for _pass in range(5):
+            for i in range(1000):
+                await cache_manager.delete(f"test_key_{_pass}_{i}")
 
-        # Thresholds calibrated for load-robust CI: measured perf on this host is
-        # ~5000 writes/sec and ~77000 reads/sec; thresholds keep >2x margin so
-        # wall-clock variance under parallel load cannot flake the gate.
         assert writes_per_second > 2000, (
             f"Cache write performance too slow: {writes_per_second:.2f} writes/sec (expected > 2000)"
         )
@@ -308,29 +330,47 @@ class TestConcurrentPerformance:
                 await cache_manager.set(f"concurrent_key_{i}", {"value": i}, ttl=60)
                 await cache_manager.get(f"concurrent_key_{i}")
 
-        # Run concurrent cache operations
-        tasks = []
-        start_time = time.time()
+        # Median-of-5 sample basis (R-01 sample-basis hardening, 07Oct): five
+        # back-to-back gather rounds; each round returns per-round ops/sec
+        # (1000 writes + 1000 reads / round wall-clock). The verdict grades
+        # the median round, so one round preempted by co-tenant load (the
+        # supervised P5 engine + OpenAlgo host share this box) cannot fail
+        # the gate while four healthy rounds ran clean. Threshold unchanged
+        # by design (two relaxations already spent on this class:
+        # 7000-9000->3000 per the calibration comment below) - the lever is
+        # the sample basis, never a third threshold cut.
+        round_rates: list[float] = []
+        for _round in range(5):
+            tasks = []
+            start_time = time.time()
 
-        for task_id in range(4):
-            task = asyncio.create_task(cache_operations(task_id * 250, 250))
-            tasks.append(task)
+            for task_id in range(4):
+                task = asyncio.create_task(cache_operations(task_id * 250, 250))
+                tasks.append(task)
 
-        await asyncio.gather(*tasks)
-        end_time = time.time()
+            await asyncio.gather(*tasks)
+            end_time = time.time()
 
-        concurrent_time = end_time - start_time
-        total_operations = 2000  # 1000 writes + 1000 reads
-        operations_per_second = total_operations / concurrent_time
+            concurrent_time = end_time - start_time
+            round_rates.append(2000 / concurrent_time)
 
-        print(f"Concurrent cache operations: {operations_per_second:.2f} ops/sec")
+        operations_per_second = statistics.median(round_rates)
+
+        print(
+            "Concurrent cache operations (median of 5 rounds): "
+            f"{operations_per_second:.2f} ops/sec "
+            f"(rounds: {[round(r) for r in round_rates]})"
+        )
 
         # Cleanup
         for i in range(1000):
             await cache_manager.delete(f"concurrent_key_{i}")
 
-        # Mixed read/write concurrent workload: measured ~7000-9000 ops/sec;
-        # threshold keeps >2x margin for wall-clock variance under CI load.
+        # Mixed read/write concurrent workload: measured ~7000-9000 ops/sec
+        # fresh-process; threshold keeps >2x margin so wall-clock variance
+        # under CI/co-tenant load cannot flake the gate. Combined with the
+        # median-of-5 basis above, two relaxations (5,000->2,000 and
+        # 7,000-9,000->3,000) remain the only threshold spend on this class.
         assert operations_per_second > 3000, (
             f"Concurrent cache performance too slow: {operations_per_second:.2f} ops/sec (expected > 3000)"
         )
