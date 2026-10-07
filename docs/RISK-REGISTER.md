@@ -1949,3 +1949,136 @@ Sun 11 Oct Sun-Scan exit-64 re-check remains operator-side with no
 in-repo record; P3 (M-02, M-03, session-gated re-arm, R-05 shared-venv
 rebuild) OPEN next build wave. No code, config, or protection change
 ships in this addendum.
+
+Addendum 2026-10-07 (06:23 IST, 00:31-composer-paste reconciliation - the
+overnight fresh-composition member): the paste (composer mtime 00:31:21
+Oct 7) carries a NEW-TO-FAMILY section-6 Security Audit table and SSRF
+paragraph on top of the standing L/M/P blocks, plus a host-console
+recovery log and two PS 5.1 parse-death tails. Consecutive-file diff vs
+the 16:29 member shows exactly that delta; the mechanized containment
+probe re-run live this pass returns 0/114 lines against RISK-REGISTER,
+COMPLIANCE-MATRIX and CMP-SUPERSESSION-REGISTER - fresh composition
+confirmed, per-item verdicts follow.
+(0) GATE TAILS: both PS 5.1 failures ('git -C <repo> status ...' char 8,
+'git commit -F <scratch>/commit_msg_1629.txt ...' char 15) are
+RedirectionNotSupported parse deaths on literal placeholder tokens -
+NOTHING executed, so neither tail is evidence about the tree. The
+intended operations verify live: the working tree at this addendum's
+staging is CLEAN at the branch tip e7dc26e (docs/paste-1629-
+reconciliation-06oct, one commit ahead of main at e800a5d), and the
+commit the second tail intended EXISTS - e7dc26e, guard, 22:13:37 IST
++0530, hook net green per its message. The GH006 remote refusal
+('Changes must be made through a pull request', '11 of 11 required
+status checks are expected') is branch protection working as designed
+on a direct main push; e7dc26e delivers PR-only per the standing
+procedure. No remediation, no protection change.
+(1) HOST LOG TAIL: attributed to the OpenAlgo host checkout by the
+pinned 27Sep signature set (Initializing Strategy Module DB,
+Order-update WS connected, Password auth success, Smart download check,
+Downloading Master Contract, cache load, catch-up). Narrative: the
+stored broker token was stale since rollover (resume False, redirect to
+/broker at 05:59:35 IST); the operator re-logged in at 06:00:10 IST
+(callback, session stamp, auth caches cleared); master contract
+download ran 06:00:10-21 IST (11 s, 108915 symbols, cache load 3.19 s,
+no pending strategies to restore) and catch-up completed. Host-side
+housekeeping around a token window, NOT a LOATS defect; the 05:59:35/44
+IST Incorrect api_key / access_token errors are the same host session.
+(2) LOATS-SIDE BREAKER EPISODE (the tail's real system content): the
+daily stale-session band again (23Oct precedent). Onset 23:28:38Z Oct 6
+(04:58:38 IST) first OPEN of the new episode, after a SELF-RESOLVED
+16:53-16:59Z transport precursor (Connection error: All connection
+attempts failed on the VIX fetch; 7 OPENED cycles, no escalation, no
+registry change). Escalation storm 23:39:44Z-00:20:41Z; recovery at
+00:30:48Z Oct 7 (06:00:48 IST), 38 s after the host re-login; all five
+breakers (openalgo + source:ta/volatility/price_action/options_flow)
+closed by 00:31:12Z.
+(3) REFUSED AUTO-ESCALATION STORM, five attempts: 23:39:44, 23:49:15,
+23:58:55 Oct 6 and 00:09:38, 00:20:41 Oct 7. Every attempt shows the
+pair (a) Kill switch activated: M-01 cycle-failure budget exhausted: 500
+consecutive trading-cycle failures, then (b) Failed activate kill
+switch: Circuit breaker 'openalgo' is open - alerts.activate_kill_switch
+(alerts.py:579-616) rolled the flag back to False because the
+order-cancel protocol's broker fetch is breaker-gated. ZERO engagements,
+ZERO deactivations, ZERO resumes; cycles continued through the storm.
+The ~10-11 min re-escalation cadence matches CYCLE_FAILURE_BUDGET 500
+(latency_budget.py:39) at the observed failed-cycle rate, and the
+refuse-then-re-arm loop is DOCUMENTED in-source (orchestrator.py:560-
+583: the streak resets to zero on refusal so a persistent fault
+re-escalates after another full budget, keeping the loop alive for the
+next /kill). Classification: BY-DESIGN fail-closed, consistent with the
+standing note that refused auto-escalations never discharge the P1
+drill. NEWLY PROVEN this pass: the manual path shares the same gate -
+activate_kill_switch's order-cancel protocol runs through the same
+breaker - so a bare /kill DURING a breaker-open window also refuses.
+The P1 drill must run in a healthy session; deadline unchanged (19 Oct
+20:28:04 IST), still OPEN and UNDISCHARGED.
+(4) LIVENESS AT WRITE TIME, NOT CLOSURE: at the 00:46:47Z probe the
+breaker was OPEN AGAIN (recovery 1 held only ~10 min; fresh Incorrect
+api_key / access_token HTTP 500s from 00:41:07Z; OPEN-counter 7 at
+00:46:19Z). The episode is NOT closed at write time, recovery-2
+evidence does not exist, so NO DOCUMENTED_OUTAGE_WINDOWS registry pin
+ships in this addendum - the window pin rides the closure addendum once
+the operator's session settles (grader tests are shape pins, so a later
+bounded entry needs no test edits; run the outage-window and
+register-structure classes on the repo venv at closure).
+(5) SECTION-6 SECURITY AUDIT TABLE verdicts. C-02 row: ALREADY-GOVERNED
+- C-02 wiring is the standing next-wave decision (the 1418-1494
+register cluster; the refuse-unless-armed core exists via F8-H-02's
+reserve/release protocol, rules.py:718-762); OPEN next wave, nothing
+new. H-03 row: FALSIFIED at HEAD - the scrubber EXISTS
+(src/loats/log_redaction.py, H-03 defense-in-depth processor) and is
+wired into the render chain (loats_logging.py:80, redact_secrets in the
+formatters' foreign_pre_chain); closed 20Sep (PR #65, 07ab8ae) plus the
+05Oct redaction-reconciliation wave; the paste's row predates the
+closes. H-02 row: FALSIFIED at HEAD - R-19 closed 05Oct (P2-fixed):
+_check_kill_switch() is the first statement of all four public
+scheduler job-entry methods (scheduler.py:314/368/385/431) with the
+RED-proven net tests/test_scheduler_kill_switch_gate.py; the halt DOES
+cover the scheduler. Eval/pickle/shell=True row: RE-CONFIRMED clean
+(grep zero hits in src/loats this pass). Secrets-in-git row:
+RE-CONFIRMED (L-05 posture; placeholders at .env.example:13/26/27,
+.gitignore:6-9). Telegram-admin note: cite drift only - the admin-ids
+field sits at config/settings.py:215 (the paste's settings.py:189-193
+predates the #129-generation insertions). Dependency-CVE row: STALE -
+pip-audit runs as a required CI context (the GH006 tail's own '11 of
+11 required status checks' implies it); the ambient-venv limitation is
+R-05, unchanged.
+(6) SSRF PARAGRAPH: PARTIALLY SUPERSEDED - the runtime feed-list guard
+EXISTS at HEAD: rss_validation.check_effective_feed_settings
+(rss_validation.py:205-243, H2 adversarial review) rejects non-http(s)
+and defunct-marker URLs from the EFFECTIVE settings.rss_feeds at the
+startup gate (run_startup_gate, :246-298, fails closed on guard
+problems), and non-manifest extra feeds still pass through the
+per-cycle runtime filtering. rss_feeds is an env-parsed pydantic field
+(config/settings.py:310, validator :415-418), so changing it requires
+a process env change plus restart, not a live edit - the
+operator-editable-at-runtime premise is NOT met; residual exposure is
+a poisoned OPERATOR-configured feed (outside the trust boundary,
+unproven). Disposition: keep the medium-if-editable note as
+ALREADY-MITIGATED-BEYOND-DECLINE; no new register row; the M-03
+fail-closed sentiment ask remains the open item, unchanged, next wave.
+(7) STANDING BLOCKS (completion-marker rewrite of the convention): the
+'=> If this task is completed...' suffixes ask for explicit verdicts.
+Section 5 Performance: VERIFIED live-true with cite drift only per the
+22:12 Oct 6 addendum (settings.py:185, orchestrator.py:600,
+latency_budget.py:24; not re-benchmarked). L-03: the decline is STALE -
+FLIPPED by the 21:20 Oct 6 addendum via the primary circular NSE
+FAOP70616 (NIFTY true lot 65, BANKNIFTY 30; config/settings.py:221
+still pins 25); the operator-gated constant correction is unchanged,
+next build wave. L-04: ADR-0020-accepted maintainability debt, not a
+functional bug. L-05: closed-as-clean, posture re-confirmed this pass.
+M-02 / M-03: NOT COMPLETED, OPEN, next build wave (evidence clusters
+database.py:655-659 and orchestrator.py:484-514 re-verified exact).
+P-block re-anchored at the 00:36:21Z probe: quartet green (ended_at
+null, kill_switch_verified true, unhandled_exceptions 0,
+last_sampled_at 00:35:30Z, 51 s before the probe), routed_decisions 0
+in-span against counters_baseline 63 - carried-counter semantics, not
+regression. P1 UNDISCHARGED (deadline 19 Oct 20:28:04 IST, healthy
+session required per (3)); Sun 11 Oct Sun-Scan exit-64 re-check stays
+operator-side with no in-repo record; P3 (M-02, M-03, session-gated
+re-arm, R-05 shared-venv rebuild) OPEN next build wave.
+Attribution note for future readers: the refusal signature on this
+system is 'Failed activate kill switch' (alerts.py:615), NOT the word
+'refused' - a refusal-vocabulary grep returns a false zero and cost one
+re-scan this pass. No code, config, or protection change ships in this
+addendum.
