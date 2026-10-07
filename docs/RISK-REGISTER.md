@@ -2491,3 +2491,86 @@ placeholder for the context-name list, not a count.
 No code, config, or protection change ships in this reconciliation wave:
 docs-only addendum, graded through the coupled doc test classes on the
 repo venv.
+
+
+## Addendum 2026-10-07 (18:4x IST, 12:30-paste reconciliation - third cache-benchmark failure tail; sample-basis hardening landed)
+
+The 12:30 paste is a FRESH COMPOSITION within the 07Oct family (mechanized
+containment probe: 14/97 lines vs the 10:07 member, 11/97 vs the 08:10 member,
+10/97 vs the 05:59 member; the novel lines are exactly the new failure tail plus
+its coverage table). Its failure tail (TestCachePerformance.test_cache_latency,
+1,922.46 writes/s < 2,000, stamps 12:18:15Z = 17:48 IST) is the THIRD 07Oct
+occurrence of the benchmark-perf flake class. Every pasted item graded
+explicitly:
+
+(1) FAILURE-TAIL VERDICT - LOAD, NOT CODE; all five recipe probes executed this
+pass: (a) suite/commit parity - HEAD 62d1728 collects 2,467 tests = the pasted
+2,464 passed + 1 failed + 2 skipped, and pytest-report.xml (mtime 17:52 IST)
+holds exactly this tail with these figures - the paste ran THIS tree; (b) the
+enforced CI on the identical commit is GREEN (merge run 37614745474, 11:32Z: all
+14 required contexts success, including pytest-coverage and benchmark-perf
+(F9-H-02 gate)); (c) co-tenancy - the local run executed beside TWO supervised
+P5 resume processes (PIDs 13108/19368, the latter at 47,700 CPU-seconds) and TWO
+app.py host processes (PIDs 29868/32832); (d) isolation - TestCachePerformance
+PASSES in 0.75 s on this box at 17:5x IST under the same co-tenancy via the repo
+venv; (e) fresh-process micro-bench (2,000 ops, repo venv, same co-tenancy):
+9,949-10,231 writes/s and 321,007-333,979 reads/s, so the pasted write figure is
+5.3x under the fresh baseline on identical code (the reads figure, 47,226/s,
+passed its 5,000 gate by 9.4x and was never the failing leg). The failure is the
+gate grading its environment in the load regime, not a regression: NO production
+code change is owed and none ships.
+
+(2) RECURRENCE TRIGGER FIRED - SAMPLE-BASIS HARDENING LANDED (the sanctioned
+lever; the operator gate is this paste itself, presenting the third tail under
+the standing fix-loop directive): the load regime persisted all day - 2,430
+breaker OPENED transitions across the retained six-rotation set, last arc
+10:48:46-10:49:53Z, self-healed, zero OPENED after 10:49:53Z at the 13:03Z probe
+- and this is the second local tail today (1,770.83 at 03:31Z, 1,922.46 at
+12:18Z). tests/test_performance_benchmarks.py now grades BOTH cache wall-clock
+stages on a median-of-5 basis (5x1000-key passes / 5 gather rounds,
+statistics.median of per-pass rates); THRESHOLDS UNCHANGED (2,000 writes/s,
+5,000 reads/s, 3,000 ops/s) - zero threshold spend, per the doctrine that the
+two earlier relaxations already consumed this class's cut budget. Wall-clock
+per-pass time.time() basis retained deliberately so CI grades stay comparable
+to history. Verified under live co-tenancy: 3 benchmark tests passed in 9.45 s,
+medians 10,024 writes/s / 284,437 reads/s / 18,478 ops/s with tight pass
+spreads.
+
+(3) EXPLICIT COMPLETION VERDICTS (so completed items can be ignored further):
+Section 12 (DevOps Review) - NOT ADOPTED AS A TASK: its own text defers
+deployment facts to the operator note (out-of-repo by construction); the CI
+topology prose re-verified live (parallel jobs; benchmark-perf required since
+ADR-0021; metrics port 8001 re-confirmed in settings.py). Section 11 (Testing
+Review) - NOT ADOPTED, NO TASK EXISTS: the 136 figure matches no probed
+generation (127 at 2b56246, 138 at HEAD, probed 04Oct); its cited gaps STAY
+CLOSED upstream (broken-chain boot refusal graded in tests/test_main_coverage.py
+via the main.py audit-integrity gate; place_order ANALYZE refusal graded
+sync+async in tests/test_order_mode_gate.py). Section 10 (Code Quality Review) -
+NOT ADOPTED, standing-gate posture unchanged. L-01 OPEN next wave, re-verified
+live this pass: sync client class at openalgo.py:743, async at 1166 (the
+paste's 638/1061 cites are succession-stale; the register rows already carry
+the corrected cites). M-03 OPEN next wave: gate-failure path re-read at
+orchestrator.py:492-514 (logs, alerts, returns; sentiment then runs
+unvalidated). M-02 OPEN next wave: database.py:655-659 re-read EXACT
+(timeout=30, isolation_level IMMEDIATE, check_same_thread=False). L-03 OPEN,
+operator-gated next build wave: nifty_lot_size Field(25) live-exact at
+settings.py:221, consumers confirmed at rules.py:599/601 and sizing.py:87/90.
+
+(4) RISK-QUEUE REPROBE (18:4x IST 07 Oct): the bare /kill drill remains
+UNDISCHARGED - a rotation-mapped, JSON-parsed scan over all six retained files
+finds ZERO kill transitions after the 08:10Z recovery (152 kill-transition
+lines today, all stamped inside the storm window, last 08:07:59Z); today's
+09:15-15:30 IST in-span window closed before the drill fired; next eligible 08
+Oct (Thu) 09:15 IST; the 19 Oct 20:28:04 IST deadline is unchanged. Live span
+145804 quartet GREEN at the 12:49Z probe (ended_at null, restarts 5,
+kill_switch_verified true, unhandled_exceptions 0, last_sampled_at
+12:49:30Z; counters.routed_decisions 212 in-span). Queue order unchanged:
+P1 drill, P1 L-03 constant correction, P2 TOTP-desync remediation, P2 Sun-Scan
+re-check 11 Oct, P3 build-wave cluster (M-02 one-writer, M-03 fail-closed RSS
+gate, session-gated re-arm, R-05 shared-venv rebuild, L-01 sync/async dedup).
+The benchmark-flake P3-watch recurrence clause is DISCHARGED by (2): the
+mandated hardening is landed; the watch converts to post-landing observation.
+
+Wave shape: one code commit (benchmark sample-basis hardening, thresholds
+untouched) plus this docs addendum; no production source changed; no threshold
+moved.
