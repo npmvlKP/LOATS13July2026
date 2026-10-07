@@ -2163,7 +2163,7 @@ bandit, deps-sync, ruff-lint, ruff-format, commit-lint, mypy,
 pytest-coverage, pip-audit, benchmark-perf (F9-H-02 gate)), strict true,
 enforce_admins enabled, dismiss_stale_reviews true, approving count 1,
 code-owner false, last-push false, force-push false, deletions false,
-conversation-resolution false - 9th consecutive clean field-by-field
+conversation-resolution false - clean field-by-field
 read-back, NO derive-gap repair needed.
 (4) COMPLETION MARKERS for the standing convention (explicit verdicts so
 completed items can be ignored further): section 7 scalability -
