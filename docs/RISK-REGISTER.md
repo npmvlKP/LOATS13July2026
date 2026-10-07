@@ -2420,3 +2420,74 @@ No code, config, or protection change ships in this wave: the registry
 pin is a documentation-of-runtime tuple on the validator's disclosure
 surface (annotation-only semantics unchanged), and both doc edits grade
 through the coupled doc test classes run on the repo venv.
+
+Addendum 2026-10-07 (16:1x IST, the 10:07Z paste reconciliation - a fresh
+mid-wave composition, not an archive re-slice): containment 5/43 against
+the 28Sep sections-11/12 archive and 0/43 against the 15Sep FR9 source;
+the 38 novel lines are exactly this pass's graded surfaces (the coverage
+failure tail, three PR-#149-session PowerShell parse-deaths, the re-sliced
+review sections and the risk queue). The tails are mid-wave transcripts:
+the paste was cut 15:37 IST, AFTER #149 merged (09:49:21Z = 15:19 IST) and
+after the post-merge main run went green (37603238116), so every intended
+operation is live-verified landed and nothing re-runs.
+
+(1) COVERAGE-TAIL VERDICT - FALSIFIED AT HEAD: the CI-exact invocation
+(pytest tests/ --cov=src --cov-branch --cov-fail-under=80 --cov-report=xml
+--cov-report=term-missing --cov-report=json:coverage.json
+--junitxml=pytest-report.xml) on the repo venv this pass returned 2465
+passed / 2 skipped (the known by-design set), rc=0, TOTAL 8558 statements,
+89.56 percent (gate 80), and the per-module floor gate rc=0. The pasted
+11.64 percent is the subset-invocation signature: pyproject pins
+fail_under = 80 under [tool.coverage.report], so ANY partial pytest
+invocation that measures a fraction of src fails the gate by
+construction; no CI leg failed (PR run 37602502382 and merge run
+37603238116 both success).
+
+(2) SECTION 11 (Testing Review) - NOT ADOPTED, NO TASK EXISTS: the "136
+test modules" figure matches no probed generation (127 tests/test_*.py at
+the 28Sep tip 2b56246; 138 at HEAD) - recorded with both probes. Both
+named gaps are closed upstream (the 04Oct wave, after this paste's source
+generation): a broken-chain boot refusal is graded (corrupt-chain leg in
+tests/test_main_coverage.py; the C-01 boot gate at src/loats/main.py:37-44
+raising AuditIntegrityGateError BEFORE the alerts/orchestrator legs
+start), and place_order refusing in ANALYZE is graded sync+async
+(tests/test_order_mode_gate.py, landed 9158f72).
+
+(3) SECTION 10 (Code Quality Review) - NOT ADOPTED, NO TASK EXISTS: the
+tooling claim re-verified live ([tool.ruff]/[tool.mypy]/[tool.bandit]/
+[tool.isort]/[tool.coverage] in pyproject.toml; requires-python >= 3.12);
+the posture remains a standing gate, not a completed task.
+
+(4) FINDING CITES RE-VERIFIED AT HEAD: M-03 orchestrator.py:488-514
+live-exact (logs, alerts, returns; sentiment then proceeds unvalidated) -
+OPEN. M-02 database.py:655-659 live-exact, database_async_additions.py at
+677 lines, main.py:71-81 preflight - OPEN. L-01 classes at
+openalgo.py:743/1166 (the paste's 638/1061 is stale; the register row
+already carries the corrected cites) - OPEN. L-03 nifty_lot_size
+Field(25) live-exact at src/loats/config/settings.py:221 - OPEN,
+operator-gated next wave. Completion-conditional answers, stated
+explicitly: Sections 10 and 11, L-01, M-03 and M-02 - NO, none completed
+this wave; they can be ignored further until a build wave opens.
+
+(5) RISK-QUEUE REPROBE (~16:1x IST 07 Oct): the bare /kill drill remains
+UNDISCHARGED - zero kill-transition lines after the 08:09:29Z recovery in
+a rotation-mapped scan (last kill line anywhere 08:07:59Z; 51 attempts /
+51 refused, all inside the storm window), and today's 09:15-15:30 IST
+in-span window closed before the drill fired; next eligible session
+08 Oct (Thu) 09:15 IST; the 19 Oct 20:28:04 IST deadline is unchanged.
+Live span 145804 quartet GREEN at the 10:17:02Z probe (ended_at null,
+kill_switch_verified true, unhandled_exceptions 0, last_sampled_at
+10:17:02Z; routed_decisions 212 in-span against counters_baseline 63).
+Recovery hold re-proven: zero breaker OPENED transitions after 08:09:29Z
+(only the five CLOSED transitions 08:09:29-08:10:11Z). L-03, M-02, M-03,
+L-01, the P2 Sun-Scan re-check and the P3 cluster stand as the queue
+records them; the drill row moves with the next healthy in-span session.
+
+(6) PROTECTION CONTRACT: a fresh GET ~15:57 IST graded DIVERGENCES: 0
+(all ten fields, required-contexts set-equal to the pinned 11). The
+paste's parse-dead verify invocation is discharged; its `<11>` was a
+placeholder for the context-name list, not a count.
+
+No code, config, or protection change ships in this reconciliation wave:
+docs-only addendum, graded through the coupled doc test classes on the
+repo venv.
