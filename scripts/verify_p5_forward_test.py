@@ -855,6 +855,40 @@ DOCUMENTED_OUTAGE_WINDOWS: tuple[tuple[str, str | None, str], ...] = (
         "08:10:11Z; see docs/audit-history/"
         "17Sep2026-p5-openalgo-auth-outage.md (Continuation 8 closure)",
     ),
+    # 08Oct2026 recurrence of the daily-band class with a host-reboot
+    # onset (sixth credential-adjacent outage; transport-then-token
+    # shape). Host rebooted 2026-10-07T23:27:57Z (04:57:57 IST);
+    # first LOATS-observed failure 2026-10-08T00:00:09Z = 05:30:09 IST
+    # (`All connection attempts failed`, transport-dead phase to
+    # 03:11:37Z; agent relaunch 03:10:50Z = 08:40:50 IST), token-wall
+    # `Incorrect api_key` rejections 03:12:38Z-08:31:33Z (654, ~2/min);
+    # 2,730 OPENED transitions in-window; 50 M-01 activation attempts
+    # ALL refused (100 CYCLE_FAILURE_BUDGET exhaustions), zero
+    # engagements; zero oauth rows on 08Oct across all six rotations.
+    # CLOSED: global breaker CLOSED after recovery 08:32:36Z
+    # (14:02:36 IST, host-side re-auth on the operator's return --
+    # inferred, no oauth row in any rotation); all four source
+    # breakers by 08:33:09Z; zero OPENED transitions after 08:32:36Z.
+    # Closing addendum: docs/audit-history/
+    # 17Sep2026-p5-openalgo-auth-outage.md (Continuation 10).
+    (
+        "2026-10-08T00:00:09+00:00",
+        "2026-10-08T08:32:36+00:00",
+        "08Oct host-reboot + stale-session outage (transport-then-token): "
+        "host down from the 2026-10-07T23:27:57Z reboot (04:57:57 IST), "
+        "transport-dead from 00:00:09Z (05:30:09 IST), auth-wall "
+        "Incorrect api_key 03:12:38Z-08:31:33Z (654 rejections), global "
+        "openalgo breaker OPEN, all broker-backed circuits fail-closed, "
+        "2,730 OPENED transitions, 50 refused kill-switch escalations "
+        "(zero engagements; totals measured over the then-retained "
+        "rotations, post-00:42:56Z remainder re-derived exactly); "
+        "recovery: host-side re-auth on the "
+        "operator's return (inferred), breaker CLOSED 08:32:36Z "
+        "(14:02:36 IST), sources closed by 08:33:09Z; the P1 in-span "
+        "kill drill discharged 08:34:26-08:37:21Z inside this recovered "
+        "window; see docs/audit-history/"
+        "17Sep2026-p5-openalgo-auth-outage.md (Continuation 10)",
+    ),
 )
 
 

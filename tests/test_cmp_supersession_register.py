@@ -56,9 +56,11 @@ def test_row_count_floor(register_rows: list[str]) -> None:
     # segment-universe supersession) added 03Oct2026; S-17 (C-01
     # audit-integrity boot gate) added 04Oct2026; S-18 (C-02+H-01
     # order-mode gate supersession) added 04Oct2026; S-19 (H-04: Docker
-    # demarcated CI-only) added 05Oct2026. A row may be
+    # demarcated CI-only) added 05Oct2026; S-20 (body-API-key wire
+    # contract, exposure chain falsified + redact_secrets defense)
+    # added 08Oct2026. A row may be
     # retired only with its evidence in the closing PR.
-    assert len(register_rows) >= 19, len(register_rows)
+    assert len(register_rows) >= 20, len(register_rows)
 
 
 def test_minimum_authority_set_is_cited(register_text: str) -> None:

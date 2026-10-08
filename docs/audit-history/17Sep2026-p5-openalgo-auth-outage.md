@@ -674,3 +674,70 @@ points of failure (app key subscription, daily token, vault TOTP
 secret) — only the token self-heals locally. The post-market fix is
 operator re-enrollment of Zerodha 2FA + vault item update; until
 then, every band-trap morning requires interactive recovery.
+
+**Continuation (08 Oct): TOTP desync, day 2 — still unfixed.** Host
+rebooted 04:57:57 IST (boot-auto-start gap class, 2nd occurrence —
+OpenAlgo down until the agent relaunched it 08:40, listener ~50 s);
+overnight oauth (07Oct 13:39) externally invalidated as every day;
+Kite app key confirmed HEALTHY (login form renders — 06Oct wall
+gone); vault TOTP rejected again in-window (deterministic, "4
+attempts remain") — agent stopped per the lockout-protection rule.
+**Zero oauth rows today as of 08:44 IST.** The blocker is unchanged
+and operator-only: re-enroll Zerodha 2FA, re-save the vault Kite
+TOTP, then any login path works. Until then each trading day loses
+its morning to the interactive-recovery cadence (~13:00 based on
+06–07Oct). Boot auto-start for OpenAlgo (VBS + scheduled task)
+remains the standing infra recommendation (2 occurrences).
+
+## Continuation 10 (08 Oct): host-reboot + stale-session outage; P1 drill discharged mid-recovery
+
+*Closed 08Oct 15:04 IST. Sixth credential-adjacent outage; transport-then-token
+shape with a host-reboot onset (boot-auto-start gap, 2nd occurrence).*
+
+**Onset and phases (all from the LOATS rotations, first-hand greps).**
+Host rebooted 2026-10-07T23:27:57Z (04:57:57 IST; Win32 LastBootUpTime).
+First LOATS-observed failure 2026-10-08T00:00:09.868Z (05:30:09 IST):
+"All connection attempts failed" (transport-dead phase; 366 such lines
+to 03:11:37Z). The OpenAlgo agent relaunched it 03:10:50Z (08:40:50
+IST, PID 29148; creation date probed). Auth-wall phase: hard
+"Incorrect api_key or access_token" quote rejections 03:12:38Z-08:31:33Z
+(654 lines, steady ~2/min). Day totals inside the pinned window
+[00:00, 08:32:40]Z: 2,730 breaker OPENED transitions; 100
+CYCLE_FAILURE_BUDGET exhaustions pairing to 50 M-01 activation
+attempts, ALL refused by the open global breaker (50 paired refusal
+emissions; zero engagements). Measured ~14:2x IST over the
+then-retained six rotations; the 00:00:09-00:42:56Z chunk rotated out
+of retention ~15:10 IST and the retained-set re-derivation reproduces
+the post-00:42:56Z remainder exactly (2,525 / 92 / 46 / 46). Zero oauth/login-success rows on 08Oct
+across all six rotations (auth-vocabulary sweep with or-fallback read;
+the 08:44 IST draft's write-time view survives the full sweep).
+
+**Recovery.** Global breaker CLOSED after recovery 08:32:36Z (14:02:36
+IST); source breakers by 08:33:09Z; telegram 08:34:27Z. Mechanism:
+host-side re-auth on the operator's return - INFERRED, not probed (no
+oauth row exists in any LOATS rotation; the host DB is exclusively
+locked; timing coincides with the operator's Telegram activity from
+14:03 IST). Held at write time: zero OPENED transitions after 08:32:36Z,
+log live to 14:50 IST. Decisional leg resumed 08:32:58Z (756 evaluation
+lines to 14:50 IST, all insufficient_strength). The 08:44 IST draft's
+"~13:00 cadence" projection is superseded by the 14:02:36 IST recovery;
+"relaunched 08:40" is corrected to the probed 08:40:50 IST. The second
+OpenAlgo instance born 14:05:46 IST (PID 28488) is a separate operator
+hygiene item: its WebSocket thread died on the 8765 conflict at
+14:06:00 while the process stays dual-listening 5000 beside PID 29148.
+
+**The P1 in-span kill drill DISCHARGED for the live span during this
+recovered window.** Bare /kill engaged the halt 08:34:26.744887Z
+(14:04:26 IST, in-session Thursday), alert delivered, 173 consecutive
+1 Hz orchestrator-blocked lines to 08:37:21Z, deactivation 08:37:21.145Z
+with alert; duration ~2m54s; zero refusal emissions; quoting healthy
+throughout (breaker closed 08:32:36Z, zero quote-failure signatures
+08:33:20-08:34:26). Full evidence and the section-14/15 dispositions:
+docs/RISK-REGISTER.md addendum 08Oct 14:52 IST.
+
+**Day cost:** session dead 05:30-14:02 IST (~8h32m; in-session from
+09:15, so ~4h47m in-session, ~70% of the trading day); storm 2,730
+in-window opens; the drill consumed 173 blocked cycles inside the
+recovered window; recovered window banked zero new decisions so far
+(all evaluations insufficient_strength - graded accumulation deficit,
+not a routing defect).

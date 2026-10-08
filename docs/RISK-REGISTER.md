@@ -2640,3 +2640,152 @@ slow too, or CI reddens on the same gate).
 No code, config, or protection change ships in this wave: docs-only
 reconciliation addendum, graded through the coupled doc test classes on the
 repo venv.
+
+Addendum 08Oct 15:04 IST (LOATSEV wave, paste pasted_content_2026-10-08_08-38-49):
+the paste is a FRESH COMPOSITE, not a re-slice (containment 1/109 across
+this register, the compliance matrix and the supersession register; the
+one contained line is the standing P-block header). Its sections split
+four ways. (a) An OpenAlgo host tail (14:05:57-14:06:00 IST "Initializing
+Strategy Module DB" / "port 8765 already in use"): host-checkout
+emitters, not LOATS source; it evidences a SECOND OpenAlgo instance born
+14:05:46 IST (PID 28488, creation date probed) whose WebSocket thread
+died on the 8765 conflict at 14:06:00 while the process stayed alive
+dual-listening 5000 beside PID 29148 (08:40:50 IST). (b) The Telegram
+drill transcript (verdict below). (c) Five PowerShell 5.1 tails: every
+one dies at PARSE time on a literal <placeholder> token ("The '<'
+operator is reserved for future use") or a redirection without a target,
+so nothing in those lines executed; each intended operation is closed
+below by a live read-back. (d) Sections 14/15 plus M-02/M-03/L-01/P-block
+prose re-slicing the 06Oct addenda; re-dispositioned explicitly below.
+
+(1) P1 IN-SPAN KILL DRILL DISCHARGED for the live span
+p5_forward_test_20261005_145804 (started_at 2026-10-05T14:58:04Z). The
+operator's bare /kill engaged the halt at 2026-10-08T08:34:26.744887Z
+(14:04:26 IST, Thursday, inside 09:15-15:30) with reason "In-span drill
+activation before 16Oct close": Telegram KILL SWITCH ACTIVATED alert
+delivered 08:34:27Z; 173 consecutive 1 Hz orchestrator-blocked lines
+"Kill switch active - trading cycle paused" 08:34:27.414-08:37:21Z;
+deactivation 08:37:21.145Z (14:07 IST) with the DEACTIVATED alert
+delivered 08:37:22Z; duration ~2m54s; zero "Failed activate kill switch"
+emissions in the window (a true engagement, not the breaker-bound
+refusal class). Session-health gates all held: quoting had RECOVERED
+BEFORE the drill (global openalgo breaker CLOSED after recovery
+08:32:36Z, all four source breakers by 08:33:09Z, zero quote-failure
+signatures 08:33:20-08:34:26), so the order-cancel protocol completed
+against a reachable broker. The three "Job raised an exception" errors
+inside the halt window are the accepted M-15/section-15 posture
+(APScheduler keeps running under the halt; R-19 gates the four public
+job bodies; zero order effect). Snapshot quartet green at the 14:47 IST
+probe (last_sampled_at 08:47:35Z fresh, kill_switch_verified true,
+unhandled_exceptions 0, ended_at null). The 19 Oct 20:28:04 IST deadline
+no longer binds THIS span; the per-span obligation rides span succession
+(a future healthy span owes its own exercise). This task is COMPLETED
+for the current span; the drill item may be ignored further until the
+next span succession.
+
+(2) 08Oct outage episode recorded (sixth credential-adjacent outage;
+transport-then-token shape, host-reboot onset). Host rebooted
+2026-10-07T23:27:57Z (04:57:57 IST; Win32 LastBootUpTime probe;
+boot-auto-start gap, 2nd occurrence). First LOATS-observed failure
+2026-10-08T00:00:09.868Z (05:30:09 IST, "All connection attempts
+failed"). Transport-dead phase to 03:11:37Z (366 connection-failure
+lines); OpenAlgo agent-relaunched 03:10:50Z (08:40:50 IST, PID 29148);
+auth-wall phase "Incorrect api_key or access_token" 03:12:38Z-08:31:33Z
+(654 rejections, steady ~2/min). Day totals inside the pinned window
+[00:00, 08:32:40]Z: 2,730 breaker OPENED transitions; 100
+CYCLE_FAILURE_BUDGET exhaustion emissions pairing to 50 M-01 activation
+attempts, ALL refused by the open global breaker (50 paired refusal
+emissions; zero engagements - refused escalations never discharge the
+drill). Count coverage: those totals were measured ~14:2x IST over the
+then-retained six rotations; the 00:00:09-00:42:56Z chunk (~205 OPENED
+transitions, 8 exhaustion emissions, 4 activation attempts + 4
+refusals) rotated out of retention at ~15:10 IST, and the retained-set
+re-derivation reproduces the post-00:42:56Z remainder exactly
+(2,525 / 92 / 46 / 46; independent verifier, same session). Zero oauth/login-success rows on 08Oct across all six log
+rotations (auth-vocabulary sweep, or-fallback read). CLOSED: global
+breaker CLOSED after recovery 08:32:36Z (14:02:36 IST), source breakers
+by 08:33:09Z, telegram 08:34:27Z. Recovery mechanism: host-side re-auth
+on the operator's return - INFERRED, not probed (no oauth row exists in
+any LOATS rotation; the host DB is exclusively locked; the timing
+coincides with the operator's Telegram activity from 14:03 IST).
+Recovery HELD at write time: zero OPENED transitions after 08:32:36Z,
+log live to 14:50 IST. Decisional leg resumed 08:32:58Z (756 evaluation
+lines to 14:50 IST, all insufficient_strength - graded accumulation
+deficit, not a routing defect). The bounded window
+[2026-10-08T00:00:09Z, 2026-10-08T08:32:36Z] is pinned in the P5
+validator's DOCUMENTED_OUTAGE_WINDOWS in this wave, citing the record's
+Continuation 10; the validator re-run annotates the overlapping live
+span without flipping its verdict.
+
+(3) Foreign working-tree drafts reconciled (keep+annotate): the staged
+08Oct continuation block at the end of
+docs/audit-history/17Sep2026-p5-openalgo-auth-outage.md is internally
+consistent with the probes (boot stamp exact, healthy Kite login page,
+in-window vault-TOTP rejection "4 attempts remain", zero oauth rows -
+re-swept across ALL six rotations, not only the write-time view) and is
+KEPT; its "~13:00 cadence" projection is superseded by today's 14:02:36
+IST recovery and "relaunched 08:40" is corrected to the probed
+08:40:50 IST; the closure is appended as Continuation 10. The unstaged
+mechanized reformat of reports/ai-generated/KILL-SWITCH-DRILL-RUNBOOK.md
+(bold-marker spacing artifacts inside tables) is REVERTED to the tracked
+byte state - content role unchanged, formatting noise would degrade
+future containment probes.
+
+(4) Section-14 accepted-debt list: EXPLICIT DISPOSITIONS. The eight
+accepted items are registered exactly as the paste lists them (S-01,
+S-08, S-09, S-10, S-11, S-12, S-04/R-04, S-16). The four "unregistered"
+items: mode-as-label REGISTERED as S-18 (SUPERSEDED 04Oct - the C-02
+runtime order-mode gate with its RED net); audit-verify-as-warning
+FALSIFIED at HEAD (S-17/C-01 boot refusal since 04Oct; this register's
+04Oct block); Docker REGISTERED as S-19 (ACCEPTED - CI-only demarcation,
+H-04); body-API-key REGISTERED THIS WAVE as S-20 (ACCEPTED): the host
+wire contract requires apikey as a JSON body field (openalgo.py:791 sync
+/ :1214 async injection; the host validates it as required), the
+exposure chain was FALSIFIED 05Oct (H-03: payload debug emitters log the
+keyless analyzer payload BEFORE transport injection; httpx exception
+reprs do not embed request bodies) and the redact_secrets defense is
+wired into both formatters' pre-chains (19-test net); the sync/async
+duplication itself remains L-01's OPEN next-wave dedup. No section-14
+item is register-absent any further; the paste's section-14 list is
+fully dispositioned and may be ignored further.
+
+(5) Section-15 production-readiness: EXPLICIT DISPOSITIONS. Of the four
+named blockers: C-01 COMPLETED 04Oct (S-17 boot refusal), C-02 COMPLETED
+04Oct (S-18 gate), H-02 COMPLETED 05Oct (R-19 scheduler kill gate, RED
+net), H-03 CLOSED 05Oct (exposure falsified + redaction defense). The
+four stated conditionals: audit-verify warning-only FALSIFIED at HEAD
+(C-01); halt-does-not-stop-APScheduler TRUE and ACCEPTED (M-15 posture,
+re-evidenced by the in-window job errors during today's drill);
+mode-not-a-code-gate FALSIFIED at HEAD (S-18 runtime gate);
+trailing-stops-off is the supervised-enablement leg recorded at S-15.
+The no-go-for-live-order-routing posture itself REMAINS (zero live
+order path; nothing in this wave changes it). The 04Oct "P5 span
+healthy" claim stays outside the inspected tree (operator-side, no
+in-repo evidence either way). These section-15 blockers are COMPLETED
+as stated and may be ignored further.
+
+(6) Queue re-probe: L-03 NOT executed (nifty_lot_size Field(25)
+live-exact at src/loats/config/settings.py:221; consumer comments
+rules.py:599/601, sizing sizing.py:87/90 and the mods owner pin
+verify_hc_registry.py:468 all probed exact this session) - the
+storm-settled gate stays MET and the operator-gated flip (NIFTY 25->65,
+BANKNIFTY 30, all four cites in one wave) remains NEXT build wave.
+M-02/M-03/L-01 re-probed exact at HEAD today (database.py:655-659;
+orchestrator.py:484-522 logs-alerts-returns; dual twins
+openalgo.py:743/:1166) and remain UNCHANGED-OPEN next build wave -
+explicitly NOT completed. P2 operator items unchanged: TOTP-desync
+remediation (post-market; day 2 consumed - the credential chain holds
+three single points of failure) and the Sun 11 Oct Sun-Scan exit-64
+re-check.
+
+(7) Instrument note (watch-class, no code action): the P5 snapshot
+decision counters reset to zero across the 06Oct-08Oct supervisor
+generations (restarts 4 -> 7 between the 06Oct and 08Oct probes;
+routed_decisions 63 -> 0) while the decisional leg demonstrably
+evaluated (756 lines today). Carry semantics for the post-#90 counter
+restore need one look the next time span grading reads those counters;
+routing_divergence_detected stays 0 and this is NOT a divergence flag.
+
+No code, config, or protection change ships in this wave beyond the
+grader registry pin: docs-only reconciliation addendum plus the S-20
+row, graded through the coupled doc test classes on the repo venv.
