@@ -2789,3 +2789,108 @@ routing_divergence_detected stays 0 and this is NOT a divergence flag.
 No code, config, or protection change ships in this wave beyond the
 grader registry pin: docs-only reconciliation addendum plus the S-20
 row, graded through the coupled doc test classes on the repo venv.
+
+
+## Addendum 2026-10-08 (20:3x IST, 14:38 evening-paste reconciliation - fresh composition; section-16 module verdicts; host-hygiene row resolved by events; P1 non-rearm)
+
+(1) Composition and delta. The 14:38 paste is a fresh COMPOSITION, not a
+re-slice: containment 0/79 against this register, 1/79 against the FR5
+audit archives (the sole survivor is the section-14 accepted-debt
+framing) and 16/79 against today's 13:44 sibling. The 13:44->14:38
+delta was captured live before paste pruning: it removes the sibling's
+four PowerShell parse-death tails and the 19:11:54 port-refusal boot,
+and adds the 20:05:36 clean boot of the fresh host generation plus the
+section-14/15/16 review set. The four PS tails were dispositioned by
+the #154 wave as user-side parse-death transcriptions of template
+commands (the intended operations all landed as #154); the 20:05:36
+boot tail is real host traffic sharing the console and is graded
+below. Nothing in the paste's log tail is a LOATS ordering defect.
+
+(2) Section-16 module-review verdicts, every row explicit: main.py
+"fail-open on audit verify" FALSIFIED at HEAD (S-17/C-01 refusal gate -
+AuditIntegrityGateError raised at src/loats/main.py:123 before the
+alerts/scheduler/orchestrator legs; break-glass writes its audit row
+and error alert first, ENVIRONMENT=test skips for hermeticity).
+orchestrator.py "exception swallow; modify path gated by flag"
+CONFIRMED-and-ACCEPTED (the 8 s producer window is S-01/ADR-0021;
+trailing modify is gated by settings.enable_trailing_stops at
+src/loats/orchestrator.py:1906, supervised enablement executed 05Oct,
+S-15 observation leg open through span close). openalgo.py "order
+methods lack mode gate" FALSIFIED at HEAD (S-18 runtime gate -
+_enforce_order_mode_gate at src/loats/openalgo.py:639 sync / :667
+async twin; body key injection is S-20, accepted host wire contract at
+:791/:1214). trade_decision.py default-route-off is the by-design
+no-live-routing posture (S-05 audited-attempt semantics). alerts.py
+rows are consistent with the S-12 binary switch plus OPS limiter; the
+cancel path exists and the engagement-scope work stays tracked in the
+telegram free-text routing reference - no register-absent delta.
+database.py matches S-13 (chain restored) with M-02 OPEN (shared-file
+sqlite; the connect kwargs probed exact at src/loats/database.py:656-659).
+rules/strength/strike_selection conform to S-02/S-03/S-06 (RESTORED;
+consumer comments probed tonight at src/loats/rules.py:599/601).
+ta.py/options_math.py match S-08/S-09 (hand-rolled Black-Scholes
+accepted, numba optional). sentiment/rss_validation match M-03 OPEN -
+the paste's non-blocking-gate claim probed exact at
+orchestrator.py:488-514 (fail-advisory detached pass). scheduler.py
+"kill check unused in production" FALSIFIED at HEAD (the R-19 gate
+calls sit at src/loats/scheduler.py:314/:368/:385/:431; the same claim
+was dispositioned in the 07Oct addendum, and the drill's in-window job
+refusals are the production evidence). preflight.py matches the R-08
+structural-probe demarcation (runs before resource init; skipped in
+test environments). Section-16 carries no register-absent deviation;
+every row may be ignored further.
+
+(3) Sections 14 and 15 were dispositioned by the #154 wave hours
+before this paste was composed and re-verified at HEAD tonight. The
+section-14 "should not ship further" set is fully registered: S-17
+(audit-verify-as-warning FALSIFIED - boot refuses), S-18
+(mode-as-label REGISTERED - runtime gate), S-19 (Docker REGISTERED -
+CI-only), S-20 (body-API-key REGISTERED and ACCEPTED). All four named
+section-15 blockers are COMPLETED or CLOSED (C-01, C-02, H-02, H-03);
+halt-not-stopping-APScheduler remains TRUE-and-ACCEPTED (M-15
+posture); the no-go for live order routing REMAINS; the 04Oct
+span-health claim stays operator-side, outside the inspected tree.
+Both sections may be ignored further.
+
+(4) Host hygiene RESOLVED BY EVENTS. The live process table at the
+20:11 IST probe contains neither cited PID (29148, the 8765 holder,
+and 37128, the refused 19:11 generation); a single OpenAlgo
+generation (parent 4208, child 11480, born 20:04:40 IST) now
+exclusively holds BOTH 127.0.0.1:5000 and 127.0.0.1:8765 (netstat
+LISTENING, sole owner per port). Liveness probed 20:1x IST: 5000
+answers HTTP 200; 8765 answers HTTP 426 (upgrade required - the
+websocket endpoint refusing plain HTTP, i.e. alive). The row's
+Stop-Process -Id 37128 instruction is MOOT - the operator's fresh
+20:04 boot replaced both prior generations; their terminal disposition
+is unrecorded here and the load-bearing fact is the exclusive
+single-generation holder now live. The row's discriminator lesson
+(process birth time + command line over port ownership) stands
+unchanged, and the duplicate-recurrence watch (R-08 class) stays.
+
+(5) P1 does NOT re-arm. The 19:58:02 IST supervisor resume
+(loatsNEW venv python -> scripts/run_p5_forward_test.py --resume,
+birth time 19:58:02) is IN-SPAN: the span-family probe at 20:1x IST
+shows p5_forward_test_20261005_145804.json still the only file with
+ended_at null and started_at unchanged (2026-10-05T14:58:04Z), so no
+span succession occurred and the discharged drill obligation does not
+re-arm under its own condition. restarts incremented 7 -> 8 with the
+resume. Counter quartet at probe time: last_sampled_at 14:42:48Z
+(20:12:48 IST, within minutes of the probe), kill_switch_verified
+true, unhandled_exceptions 0, cycles_completed 0 against
+cycles_completed_baseline 30973. Coverage note: the structured LOATS
+log holds no supervisor-lifecycle event class (five-term vocabulary,
+both grep orderings, tonight's two live rotations, zero hits), so the
+resume evidence is the process table plus the snapshot fields - the
+same evidence class prior waves used for restart accounting.
+
+(6) Queue re-probe and remaining order, unchanged by this paste:
+L-03's storm-settled gate stays MET and the flip remains
+operator-gated NEXT build wave (nifty_lot_size Field(25) live-exact at
+src/loats/config/settings.py:221; consumers rules.py:599/601,
+sizing.py:87/90, verify pin scripts/verify_hc_registry.py:466-471).
+M-02, M-03 and L-01 re-probed exact at HEAD and remain UNCHANGED-OPEN
+next build wave. P2 operator items unchanged: TOTP-desync remediation
+(post-market, day 2 consumed) and the Sun 11 Oct Sun-Scan exit-64
+re-check. P3-observation (decision-counter carry across generations)
+unchanged. Docs-only reconciliation addendum; the coupled doc-grading
+classes run on the repo venv before push.
