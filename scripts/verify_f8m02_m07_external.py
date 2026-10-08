@@ -84,10 +84,19 @@ async def _hung() -> None:
 
 
 async def _run_cycle(
-    hang_name: str, raise_name: str | None
+    hang_name: str,
+    raise_name: str | None,
+    window_seconds: float = 0.05,
 ) -> tuple[list[asyncio.Task[object]], BaseException | None]:
     """Run one REAL trading cycle with producer mocks and a create_task
-    spy. Returns (recorded producer tasks, cycle exception or None)."""
+    spy. Returns (recorded producer tasks, cycle exception or None).
+
+    ``window_seconds`` is a scenario parameter, not the behavior under
+    test: the default keeps the F8-H-01 fast window, while the
+    exception-path scenario widens it so the producer's raise cannot
+    lose the schedule race against the window timeout on a contended
+    runner (the raise ends the gather in milliseconds either way).
+    """
     o = TradingOrchestrator()
     producers_mock = {
         name: AsyncMock()
@@ -110,13 +119,13 @@ async def _run_cycle(
     real_create_task = asyncio.create_task
 
     def spy(coro: object, **kwargs: object) -> asyncio.Task[object]:
-        task = real_create_task(coro)  # type: ignore[arg-type]
+        task: asyncio.Task[object] = real_create_task(coro)  # type: ignore[arg-type]
         recorded.append(task)
         return task
 
     ms = MagicMock()
     ms.default_symbol = "NIFTY"
-    ms.producer_window_seconds = 0.05  # F8-H-01: explicit fast window
+    ms.producer_window_seconds = window_seconds  # F8-H-01 window; scenario-set
     error: BaseException | None = None
     with patch.object(o, "_execute_risk_management", new_callable=AsyncMock):
         with (
@@ -154,8 +163,19 @@ def verify_m02() -> None:
 
     # 2. Exception branch: raising market-data sibling must not strand the
     # hung volatility producer (gather does NOT cancel survivors itself).
+    # The 2.0 s window is a scenario parameter: the raise still ends the
+    # gather in milliseconds, but the producer's raise can no longer lose
+    # the schedule race against the window timeout on a contended runner
+    # (08Oct CI: a 350 ms lazy-import stall let the 50 ms timeout win and
+    # the check read the timeout branch instead of the exception branch).
+    # A genuine re-raise regression still fails here: the gather then only
+    # ends at the window timeout, whose path never re-raises.
     recorded, error = asyncio.run(
-        _run_cycle("_execute_volatility_analysis", "_execute_market_data_update")
+        _run_cycle(
+            "_execute_volatility_analysis",
+            "_execute_market_data_update",
+            window_seconds=2.0,
+        )
     )
     ok, detail = _producers_settled(recorded)
     re_raised = isinstance(error, RuntimeError)
