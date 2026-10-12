@@ -2894,3 +2894,83 @@ next build wave. P2 operator items unchanged: TOTP-desync remediation
 re-check. P3-observation (decision-counter carry across generations)
 unchanged. Docs-only reconciliation addendum; the coupled doc-grading
 classes run on the repo venv before push.
+
+## Addendum 2026-10-12 (12:4x IST, paste pasted_content_2026-10-12_07-01-14-504 reconciliation - family section-pool exhaustion; two PS 5.1 tails closed by live read-backs; P1 non-re-arm re-confirmed at restarts 9)
+
+(1) Composition and delta. Fifth member of the 08Oct paste family. The
+consecutive-member diff against the 14:38 sibling carries exactly three
+novel blocks: the 12:19-12:22 IST OpenAlgo host console tail, two PS 5.1
+failure tails, and a remaining-risks block restating the 08Oct queue.
+Sections 16/14/15 and the L-01/M-03/M-02 prose re-slice the 08Oct
+addenda (containment 15/124 vs the sibling, 1/124 vs this register).
+The family's section pool is exhausted - every section the source
+report carries (16, 14, 15, L-01, M-03, M-02, remaining-risks) holds a
+standing explicit disposition in the 07/08Oct addenda - so this
+addendum records the delta and re-probes the queue only; no fresh
+per-finding round runs for the re-sliced sections and their standing
+verdicts carry unchanged.
+
+(2) The two PS 5.1 tails are PARSE-DEATH; each intended operation is
+closed by a live read-back this session. (a) export PATH=... is a
+bash-ism: PS 5.1 has no export cmdlet, the line dies at command
+resolution, nothing executed. Intended operation (venv-first
+interpreter binding for commit-time gates) verified live: the PS 5.1
+assignment form ($env:PATH = "G:\.OA\LOATS-13July2026\LOATS13July2026\.venv\Scripts;" + $env:PATH)
+resolves Get-Command python to the repo venv 3.12.7. (b) the
+branch-protection capture redirected into a literal ... elided argv -
+DirectoryNotFound on the target path, nothing fetched. Intended
+operation verified live: the branches/main/protection GET lands rc=0
+and the full contract reads back intact field-by-field (strict true;
+eleven contexts including benchmark-perf (F9-H-02 gate); approving 1,
+dismiss-stale true, code-owner false, last-push false; enforce-admins
+enabled; force-push, deletions and conversation-resolution disabled;
+restrictions null). Nothing was owed by either tail.
+
+(3) Host tail. Pinned attribution set (strategy-module DB init,
+order-update adapter and WS, auth/brlogin, master-contract download
+and cache hook, catch-up processor): OpenAlgo host-checkout emitters,
+not LOATS source. The 12:20:01 IST quotes failures are the
+pre-first-login session staleness the tail's own first line announces
+("no login since today's session rollover"); the operator's 12:20:58
+IST re-login closes it in-log - broker callback success,
+master-contract refresh in 28 s (110,859 symbols, cache load 4.68 s),
+order-update WS connected, option chain serving by 12:22 IST.
+Ordinary stale-session class with in-log recovery; no breaker storm in
+the tail; no new register row. LOATS-side corroboration: the live span
+quartet is green at the 12:37 IST probe (block 5).
+
+(4) Queue re-probe at HEAD a123df4, all cites probed live this
+session. L-03 NOT executed: nifty_lot_size Field(25) live-exact at
+src/loats/config/settings.py:221; the operator-gated flip (NIFTY 65,
+BANKNIFTY 30, all four cites in one wave) remains NEXT build wave,
+pre-span window per R-05 (earliest valid close 19 Oct 20:28:04 IST).
+M-02/M-03/L-01 re-probed exact and UNCHANGED-OPEN:
+check_same_thread=False at src/loats/database.py:659; the RSS startup
+gate logs-alerts-returns (fail-advisory) at
+src/loats/orchestrator.py:495-522; the dual client classes stand at
+src/loats/openalgo.py:743 (sync) and :1166 (async) with the S-18
+mode-gate twins live at :639/:667. The re-sliced sections' standing
+verdicts, restated so the paste's explicit-state asks are answered in
+one place: C-01, C-02, H-02 and H-03 are COMPLETED/CLOSED;
+audit-verify-as-warning is FALSIFIED at HEAD (S-17 boot refusal);
+mode-as-label is SUPERSEDED by the S-18 runtime order gate; Docker is
+REGISTERED (S-19, CI-only) and the body-key wire contract is
+REGISTERED and ACCEPTED (S-20); halt-does-not-stop-APScheduler is
+TRUE-and-ACCEPTED (M-15 posture); trailing stops stay off (S-15
+supervised-enablement leg through span close); the no-go for live
+order routing REMAINS.
+
+(5) P1 non-re-arm re-confirmed. p5_forward_test_20261005_145804.json
+is still the only span-family member with ended_at null; restarts now
+read 9 (8 at the 08Oct evening probe - one further in-span resume
+between the probes, no span succession). Quartet at the
+2026-10-12T07:07:12Z (12:37 IST) probe: last_sampled_at fresh within
+minutes, kill_switch_verified true, unhandled_exceptions 0. The
+19 Oct 20:28:04 IST close deadline and the R-05 rebuild window are
+unchanged. P3-observation (decision-counter carry across generations)
+re-datumed: routed_decisions 0 with cycles_completed_baseline 0 in the
+current generation - watch-class unchanged, not a divergence flag.
+
+No code, config, or protection change ships in this wave: docs-only
+reconciliation addendum, graded through the register, hygiene and
+format-surface classes on the repo venv.
