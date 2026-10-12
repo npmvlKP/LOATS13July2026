@@ -3091,3 +3091,33 @@ unchanged.
 
 No code, config, or protection change ships in this wave: docs-only
 foreign-edit reconciliation, graded on the repo venv before push.
+
+
+## Addendum 2026-10-12 (21:12 IST, safety-leg waiver landed - the operator-gated Sun-Scan safety ignore-id is executed)
+
+The operator-gated safety waiver queued this morning (the register's
+"the safety leg carries none" finding, mirroring ADR-0010) landed this
+session with the operator's explicit approval: security.yml's
+code-security safety leg now carries `--ignore SFTY-20260902-58666`.
+The flag spelling is safety 3.x's `--ignore` - the queued
+`--ignore-id` name is the retired 2.x spelling and does not exist on
+the pinned safety 3.8.1 (verified against its live help output before
+the edit; the queued intent is unchanged).
+
+Mechanism confirmed where it fires: the code-security job installs
+safety 3.8.1, which pulls nltk 3.10.3 transitively, and the safety DB
+flags it as SFTY-20260902-58666 - the same upstream advisory the
+pip-audit surfaces already waive (CVE-2026-81726 == PYSEC-2026-3740,
+affected <= 3.10.3, no fixed release; the 2026-10-12 PyPI/GHSA
+re-probe still shows 3.10.3 latest, first_patched null). Local
+RED->GREEN proof 2026-10-12 (fresh venv, safety 3.8.1 + transitive
+nltk 3.10.3): unwaived safety check exits 64 with this ID as the only
+finding; the identical scan with the ignore exits 0 ("1 vulnerability
+ignored").
+
+The Sun-Scan nightly is now red-only-when-real: any NEW advisory, or a
+removal-trigger trip (nltk 3.11 / patched 3.10.x upstream, or safety
+dropping nltk), still fails the leg and lifts the ignore in one sweep
+with the pip-audit surfaces. ADR-0010 amended newest-first with the
+same evidence, same commit. Audit item closed - ignorable further as
+an operator queue entry.

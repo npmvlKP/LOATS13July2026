@@ -164,8 +164,22 @@ jobs:
       # `check` command — pin to the verified version (same class of drift the
       # workflow-flag-currency tests guard against).
       - name: Run Safety check
+        # Per ADR-0010 (amended 2026-10-12): safety 3.8.1 pulls nltk>=3.9
+        # transitively, so unlike the pip-audit surfaces this job IS an
+        # environment where the nltk advisory fires; the safety DB carries
+        # the same upstream advisory (CVE-2026-81726 == PYSEC-2026-3740)
+        # under its own alias SFTY-20260902-58666 (affected <= 3.10.3, no
+        # fixed release - 2026-10-12 PyPI/GHSA re-probe). Local RED->GREEN
+        # proof 2026-10-12 (fresh venv, safety 3.8.1 + transitive nltk
+        # 3.10.3): unwaived `safety check` exits 64 with this ID as the
+        # only finding; the identical scan with the ignore exits 0 ("1
+        # vulnerability ignored"). Flag spelling is safety 3.x `--ignore`
+        # (verified against the pinned 3.8.1 help; `--ignore-id` is the
+        # retired 2.x name). Removal triggers mirror ADR-0010: nltk 3.11
+        # / patched 3.10.x published, or safety drops nltk - lift here in
+        # the same sweep as the pip-audit surfaces.
         run: |
-          safety check --save-json safety-report.json
+          safety check --save-json safety-report.json --ignore SFTY-20260902-58666
 
       - name: Upload security reports
         uses: actions/upload-artifact@v7
