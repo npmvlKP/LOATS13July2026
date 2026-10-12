@@ -2974,3 +2974,82 @@ current generation - watch-class unchanged, not a divergence flag.
 No code, config, or protection change ships in this wave: docs-only
 reconciliation addendum, graded through the register, hygiene and
 format-surface classes on the repo venv.
+
+## Addendum 2026-10-12 (16:02 IST, paste pasted_content_2026-10-12_10-22-22-015 reconciliation - post-exhaustion member collapses under the containment probe; one new PS 5.1 tail closed by live read-back; queue re-probe clean at HEAD efe30c3)
+
+Member classification: the mechanized containment probe scores this
+member 92/104 lines contained in the immediate predecessor member
+(pasted_content_2026-10-12_07-01-14, the 12:31 IST paste dispositioned by
+the 12:4x addendum above). It is a subset re-slice arriving after the
+family's section-pool exhaustion was declared; no per-finding re-round
+is opened. The 12-line novel delta decomposes into three blocks, each
+dispositioned below.
+
+(1) PS 5.1 push-delete tail, closed by live read-back: the operator ran
+git push origin --delete docs/paste-1438-reconciliation-08oct and the
+remote answered "remote ref does not exist". Verified live this session:
+git ls-remote --heads origin returns exactly one ref, refs/heads/main at
+the #156 merge commit efe30c3, and the local branch list carries only
+main. The tail is the CORRECT outcome of an already-completed purge (the
+#155 sibling sweep on 12Oct), not a failure; zero lingering merged-wave
+siblings exist on the remote or locally. Closed, no action.
+
+(2) Re-sliced host console tail (12:19-12:22 IST block): already
+contained in the predecessor member and stands dispositioned by the
+12:4x addendum block (3) - OpenAlgo host-checkout emitters throughout
+(pinned attribution set), ordinary stale-session class with in-log
+recovery (re-auth completed 12:20:58 IST, order-update WS connected,
+master contract refreshed 110859 symbols, option chain serving by
+12:22 IST). No LOATS finding; no new register row.
+
+(3) Dependency-overview section, verified claim-by-claim at HEAD
+efe30c3: the runtime dependency set matches pyproject.toml dependencies
+exactly with ONE paste omission (lxml-html-clean>=0.4.5 is declared and
+mirrored in requirements-core.txt); the four dev pins (ruff 0.16.5,
+mypy 2.3.1, bandit 1.9.4, pip-audit 2.10.1) match pyproject exactly;
+requirements-core.txt mirrors the runtime set unpinned on
+numpy/pandas/scipy as claimed; ta and py_vollib remain
+dropped-and-registered (ADR-0003 / ADR-0004); numba remains an optional
+import with version fallback (src/loats/ta.py, declared only as a mypy
+override). The section's CVE-posture verdict "not enough evidence" is
+STALE: the 12Oct Sun-Scan grading completed the evidence (nltk
+CVE-2026-81726 == PYSEC-2026-3740, affected ceiling PyPI 3.10.3, OSV
+false-fixed shape; the pip-audit leg carries the ADR-0010 waiver, the
+safety leg carries none - grep-verified zero in-tree traces of the
+safety advisory id). The dependency/CVE-posture task is COMPLETED as a
+verdict and can be ignored further as an audit item; the one live
+operator action it leaves is the operator-gated safety ignore-id
+mirroring ADR-0010, which rides the Sun-Scan nightly queue item.
+
+(4) Remaining-risks queue block (session-composed), verified
+claim-by-claim against live probes this session at HEAD efe30c3:
+L-03 NOT executed - nifty_lot_size Field(25) live-exact at
+src/loats/config/settings.py:221 and no BANKNIFTY lot field exists yet
+(the flip wave adds it); M-02/M-03/L-01 UNCHANGED-OPEN -
+check_same_thread=False at src/loats/database.py:659, the RSS startup
+gate fail-advisory at src/loats/orchestrator.py:495-522, and the dual
+client classes at src/loats/openalgo.py:743 (sync) / :1166 (async).
+The paste's own cites for these (openalgo.py 638/1061,
+orchestrator.py 488-514) are succession-drifted; the live cites
+recorded here are the reference set. The span quartet is green at the
+16:02 IST probe (p5_forward_test_20261005_145804.json: ended_at null,
+restarts 9, kill_switch_verified true, unhandled_exceptions 0), so the
+19 Oct 20:28:04 IST close deadline and the R-05 rebuild window are
+unchanged. The R-08 recurrence-watch line matches the register posture
+(duplicate-recurrence watch stays, birth-time + command-line
+discriminator). The P2 TOTP re-enroll + vault update item remains
+operator-side and post-market. No divergence exists between the
+paste's queue and the register's queue.
+
+(5) Explicit-state answers to the paste's asks (register convention):
+L-01, M-02, M-03 are NOT completed - OPEN, operator-gated next build
+wave after span close. L-03 NOT executed. The dependency-overview /
+CVE-posture task IS completed (evidence grading done; ignorable
+further as an audit item, safety-waiver decision excepted). C-01,
+C-02, H-02 and H-03 remain COMPLETED/CLOSED per the 12:4x restatement;
+audit-verify stays FALSIFIED-at-HEAD (S-17); the live-routing no-go
+REMAINS.
+
+No code, config, or protection change ships in this wave: docs-only
+reconciliation addendum, graded through the register, hygiene and
+format-surface classes on the repo venv.
