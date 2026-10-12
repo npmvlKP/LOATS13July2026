@@ -5,7 +5,9 @@
 Accepted — 2026-09-06 (amended 2026-09-09: waiver surface lockstep;
 re-affirmed 2026-09-12: live currency re-check, see the closing
 section; re-affirmed 2026-10-04: OSV events-block false-fix triage,
-see the closing section)
+see the closing section; amended 2026-10-12: the safety leg joins the
+waiver with the safety-DB alias SFTY-20260902-58666, see the closing
+section)
 
 ## Context
 
@@ -110,3 +112,32 @@ Both removal triggers verified UNLIFTED against live sources on
 The waiver remains required and current; the surface lockstep and the
 currency pin (tests/test_format_surface_contract.py) stay as decided
 above.
+
+## Safety-leg waiver (2026-10-12)
+
+The security workflow's code-security job installs safety 3.8.1, so -
+unlike every pip-audit surface, where the advisory cannot fire - the
+safety leg IS an environment where nltk 3.10.3 lands transitively and
+the advisory fires: the Sun-Scan nightly red was this known finding,
+not a new one. The safety database carries the same upstream advisory
+(CVE-2026-81726, the PYSEC-2026-3740 record) under its own alias
+SFTY-20260902-58666, affected spec <= 3.10.3; the 2026-10-12 PyPI and
+GHSA re-probe still shows 3.10.3 as the latest release with
+first_patched null, so no removal trigger has lifted.
+
+With the operator's explicit approval (2026-10-12) the same triage now
+extends to the safety leg: `safety check --save-json safety-report.json
+--ignore SFTY-20260902-58666`. The flag spelling is safety 3.x
+`--ignore`, verified against the pinned 3.8.1 help output - the
+retired 2.x name `--ignore-id` does not exist on the pinned release.
+
+Local RED->GREEN proof, 2026-10-12 (fresh venv, safety 3.8.1 with
+transitive nltk 3.10.3, open DB): the unwaived scan exits 64 reporting
+exactly one finding, SFTY-20260902-58666 in nltk 3.10.3; the identical
+scan carrying `--ignore SFTY-20260902-58666` exits 0 reporting
+"1 vulnerability ignored".
+
+Removal triggers are unchanged and shared: nltk 3.11 (or a patched
+3.10.x) published, or safety dropping the nltk dependency. Lift this
+ignore in the same sweep as the pip-audit surfaces (pre-push hook,
+ci.yml, security.yml, HC-11) and retire the lockstep pins together.
