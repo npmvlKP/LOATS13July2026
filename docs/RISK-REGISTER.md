@@ -3053,3 +3053,41 @@ REMAINS.
 No code, config, or protection change ships in this wave: docs-only
 reconciliation addendum, graded through the register, hygiene and
 format-surface classes on the repo venv.
+
+## Addendum 2026-10-12 (16:35 IST, foreign-edit reconciliation - Continuation 9 dual-resume evidence destruction confirmed by artifacts; P3-observation re-datumed)
+
+A foreign working-tree edit appended "Continuation 9 (12 Oct)" (the
+dual-resume split-brain) to
+docs/audit-history/17Sep2026-p5-openalgo-auth-outage.md mid-session.
+Reconciled keep+annotate per discipline, annotated in place. The
+mechanism is CONFIRMED by surviving artifacts: the survivor generation
+claimed the writer at 03:38:22Z (PID 11488), rotated the log at
+03:38:24Z wiping the 00:00-03:38Z window, and rewrote the run JSON with
+zeroed counters. The destruction is CONFIRMED: zero 08-12Oct ROUTE rows
+in audit.log (retained days 01/05/06/07 only), trade_decisions max
+as_of_date 07Oct, no audit.log rotation copy. The destroyed figures
+(the 74-routing climb, the watchdog PIDs, the 07:23:04 IST stamp) are
+marked transcript-only in the annotation; the section's 08:38:22 IST
+figure is corrected there to the measured 03:38:22Z = 09:08:22 IST.
+
+Consequence for the pasted queue's P3-observation: the
+routed_decisions/baseline zeros across generations now carry an
+ATTRIBUTED cause for this span segment (evidence destruction at the
+03:38Z writer claim), superseding pure carry semantics as the
+explanation; the watch-class item is upgraded to a confirmed incident
+with three queued fixes.
+
+Queued as P1-class candidates for the post-span operator-gated wave,
+NOT executed mid-span: (a) a single-resume-owner lock so the watchdog
+yields when the automation has claimed the run, or vice versa;
+(b) audit.log rotation must preserve-not-truncate on supervisor init
+(rotate-with-rename like loats.log); (c) DB-persist decisions at
+routing time so the durable evidence store does not depend on which
+generation survives. The proposed DOCUMENTED_OUTAGE_WINDOWS 08-12Oct
+entry is deferred pending per-day session corroboration against the
+register's existing 08Oct/09Oct closure rows; the pin recipe
+(rotation-mapped first-failure to breaker-close, bounded) applies
+unchanged.
+
+No code, config, or protection change ships in this wave: docs-only
+foreign-edit reconciliation, graded on the repo venv before push.

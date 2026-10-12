@@ -675,6 +675,69 @@ secret) — only the token self-heals locally. The post-market fix is
 operator re-enrollment of Zerodha 2FA + vault item update; until
 then, every band-trap morning requires interactive recovery.
 
+## Continuation 9 (12 Oct): split-brain supervisor resume — 74 real routings lost un-persisted
+
+**First dual-resume race of the span.** After the weekend (host down;
+zero logins Fri 09Oct — full zero day), the host came up and TWO
+resume paths fired: the LOATS watchdog's 07:23:04 IST resume (PIDs
+21288/8248) and the automation's 08:38:22 IST resume (PID 11488,
+logged in events[]). Both supervisors ran concurrently against one
+run JSON and one audit.log.
+
+**First-hand evidence (watch ticks + direct probes, 09:30–10:00
+IST)**: the 07:23 generation routed 74 decisions — counters climbed
+0→52→74 with `routing_divergence_detected: 0`, and `data/audit.log`
+held 59→74 same-day ROUTE rows (counted twice, 09:30 and 10:00
+turns). The 08:38 generation started fresh-zero.
+
+**Destruction window (~10:15–10:45 IST)**: by the 11:00 tick the run
+JSON's counters read 0, `audit.log` contained **zero** 12Oct ROUTE
+rows (file truncated/rewritten — 25.5 MB retained, morning rows gone,
+no `.1` rotation copy), and the DB holds **zero** `trade_decisions`
+rows for 08–12 Oct. Generation A's 74 routings existed only in
+audit-log + counters (never DB-persisted before A lost the file), so
+they are **unrecoverable**. The 09:30 tick's `unattributed=7` blip
+was the overlap of the two writers.
+
+**Root class**: dual-resume coordination failure — the watchdog and
+the automation both respond to boot, with no single-owner lock. This
+is the 21Sep triple-restart class reaching evidence destruction: a
+lost race now erases banked evidence, not just churn.
+
+**Wave items**: (1) single-resume-owner lock (the watchdog must yield
+if the automation resumed, or vice versa — advisory lock on a
+boot-named mutex); (2) audit.log rotation must preserve, not
+truncate, on supervisor init (rotate-with-rename like loats.log);
+(3) DB-persist decisions at routing time, not downstream — the only
+durable evidence store must not depend on which generation survives.
+Registry note: the 08–12 Oct stretch (5 sessions: 08, 09, 12
+trading + 10/11 weekend) is one continuous credential/infrastructure
+outage window — pin as `DOCUMENTED_OUTAGE_WINDOWS` entry 08–12Oct
+once evidence-loss bounds are confirmed.
+> **Annotation 16:34 IST (reconciliation probe of this continuation - keep+annotate
+> per the foreign-edit discipline):** the mechanism is CONFIRMED against surviving
+> artifacts; several figures are corrected or marked transcript-only. Verified live
+> this session: the run JSON's writer_claimed event stamps PID 11488 at
+> 2026-10-12T03:38:22Z = 09:08:22 IST (the "08:38:22 IST" figure above is a
+> +5:00-vs-+5:30 conversion slip; the measured offset is +5:30), followed by
+> kill_switch_verified and routing_enabled (resumed) at 03:38:34Z; loats.log.2's
+> 12Oct coverage starts 03:38:24Z with zero retained lines from 00:00Z - the log
+> was rotated at the writer claim and the 00:00-03:38Z window (containing the
+> claimed 01:53:04Z watchdog resume) has no retained coverage; snapshot counters
+> read routed_decisions 0 with counters_baseline zeros (restarts 9, ended_at
+> null, live probe); audit.log retains 25,560,323 bytes with ROUTE rows only on
+> 01/05/06/07 Oct (zero rows 08-12 Oct) and no rotation copy; loats.db
+> trade_decisions max as_of_date = 2026-10-07 (zero rows for 08-12 Oct).
+> Transcript-only, artifacts destroyed and unrecoverable: the 0-to-74 counter
+> climb, the 59/74 ROUTE-row counts, the 07:23:04 IST watchdog stamp and PIDs
+> 21288/8248 - recorded first-hand by the observing session before destruction;
+> apparent matches for these figures in retained logs are false positives
+> (millisecond fragments such as .982485, and same-clock-time cycle lines stamped
+> 07:23:04Z). The proposed DOCUMENTED_OUTAGE_WINDOWS 08-12Oct pin is deferred:
+> it needs per-day session corroboration against the register's existing
+> 08Oct/09Oct closure records before landing.
+
+
 **Continuation (08 Oct): TOTP desync, day 2 — still unfixed.** Host
 rebooted 04:57:57 IST (boot-auto-start gap class, 2nd occurrence —
 OpenAlgo down until the agent relaunched it 08:40, listener ~50 s);
