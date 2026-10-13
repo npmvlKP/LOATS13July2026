@@ -3121,3 +3121,95 @@ dropping nltk), still fails the leg and lifts the ignore in one sweep
 with the pip-audit surfaces. ADR-0010 amended newest-first with the
 same evidence, same commit. Audit item closed - ignorable further as
 an operator queue entry.
+
+
+## Addendum 2026-10-13 (10:38 IST, paste reconciliation - explicit-state verdicts; the H-01-residual wave recommendation FLIPPED by live-tree evidence)
+
+Provenance: the 13Oct morning paste is a status checklist of the
+04Oct-audit disposition state plus a host-console log slice and one
+novel item (an H-01-residual wave-scope recommendation). The delta vs
+the 12Oct addendum is exactly that novel item and the log slice; both
+get fresh verdicts here. The log lines attribute to the OpenAlgo host
+checkout (traceback paths name G:/.OA/OpenAlgo), not LOATS source: the
+09:28:45 IST INDIA VIX refusal sits inside the host Symtoken rebuild
+window (table deleted 09:28:22 IST, bulk insert completed 09:28:55 IST,
+111,555 rows) - deterministic self-heal by design, same class as the
+08Oct episode; no LOATS finding. The pre-market 03:10-03:45Z escalation
+storm (four CYCLE_FAILURE_BUDGET refusals, all fail-closed; breakers
+closed 04:00:12Z; routing live 04:18Z) was dispositioned same-day.
+
+(1) H-01 residual - FLIPPED, the wave-scope recommendation WITHDRAWN.
+The paste asks to consolidate mods/max_modifications into one Rule-7
+budget owner (persisted per-order count) and states that owner is NOT
+landed. The live tree falsifies that: the persisted per-order owner
+EXISTS and is wired - SQLite modification_counts table (database.py:2227
+get / 2255 increment / 2299 decrement), rules.py:705-742
+(check_modification_limit / reserve_modification / release_modification,
+BEGIN IMMEDIATE reservation, fail-closed on counter-state errors),
+enforced at the modify_order boundary (openalgo.py:1115 reserve before
+the broker call, :1131 release on failure; boundary contract
+openalgo.py:1090-1096). RED-proven: tests/test_rule7_modification_limit.py
+(persistence across connections, race-safe reservation, fail-closed
+state errors) plus the hygiene anchor pin tests/test_repo_hygiene.py:2071.
+The owner landed with the F8-H-02 enforcement; H-01's armed-refusal leg
+landed via the S-18 mode gate. Ignorable further as a consolidation
+task. TRUE remainder, one class smaller: the settings-level alias pair
+(settings.py:225 max_modifications + settings.py:229 mods alias). The
+alias has ZERO enforcement consumers - every enforcement surface reads
+max_modifications (rules.py:714, rules.py:734, orchestrator.py:2317,
+openalgo.py:1091) - and exactly one in-repo consumer, the HC-23
+verifier pin scripts/verify_hc_registry.py:468, plus the documented env
+alias (.env.example:66). Optional alias-retirement (settings field +
+env doc + verifier pin + test sweep) may join the 19Oct wave as
+cleanup; it is a declared-knob removal, not a budget-owner
+consolidation.
+
+(2) Explicit-state answers to the paste's asks (register convention):
+M-01 COMPLETED and live-fired: single-source constant
+latency_budget.py:39 (CYCLE_FAILURE_BUDGET = 500), consumer
+orchestrator.py:547/567, S-14 amendment 05Oct2026; today's four
+escalation attempts all refused fail-closed, zero silent continues.
+Ignorable further. M-02 NOT completed - OPEN, wave item 2:
+database.py:655-660 verified exact at HEAD (timeout 30.0 s, IMMEDIATE
+isolation, check_same_thread=False at :659), second module
+database_async_additions.py live. M-03 NOT completed - OPEN, wave
+item 3: live span orchestrator.py:481-523 (the paste's 486-516 cite is
+succession-shifted); the offline manifest gate runs inline and loud,
+the live drift pass stays advisory/detached, and a gate failure alerts
+and returns while the sentiment leg continues on the unvalidated source
+list. L-01 NOT completed - OPEN, wave item 4: the kill-switch twin
+bodies are verbatim-duplicated (openalgo.py:697-717 vs 720-740), the
+body-key injection is duplicated (791 sync / 1214 async), client
+classes at 743/1166; the paste's line cites (sync 638, async 1061)
+match NO generation of the last three merge SHAs (probed 0a9f580,
+32550bf, 88f999f: 638 is blank, 1061 is _place_smart_order_impl) -
+third-species cite drift; live cites recorded here. L-03 NOT executed
+by design - settings.py:221 still pins 25; the primary circular
+(NSE FAOP70616: NIFTY true lot 65, BANKNIFTY 30) stands and the numeric
+flip stays operator-gated to the 19Oct wave. L-04/L-05: no action, as
+dispositioned (ADR-0020 accepted debt; closed clean). Section 5
+performance: verified live-true, all three cites exact at HEAD
+(settings.py:185 8.0 s window; latency_budget.py:24 1.0 s cadence;
+orchestrator.py:600 reads the single-source constant). Section 6
+security: disposition re-probed - zero eval/pickle/shell=True in src;
+S-20 wire-contract cites match live. Sections 13/15: superseded, no
+action. Section 18 roadmap: with the H-01 owner landed, the only
+residue is the optional alias retirement above.
+
+(3) Split-brain P1 trio re-probed OPEN, queued unchanged: (a) no
+resume-owner lock exists (zero matches in src); (b) no audit.log
+rotation logic exists anywhere in src or scripts - both writers are
+append-mode persistent handles (database.py:976-978,
+database_async_additions.py:565), unbounded growth, rotate-not-truncate
+still owed; (c) routing dispatch persists no durable row
+(trade_decision.py:530-560 writes counters and an HTTP call only;
+trade_decisions rows fire at the strategy layer, database.py:2454 sync
+/ database_async_additions.py:433 async), so the durable evidence store
+still depends on which generation survives.
+
+(4) Wave gate unchanged: 19Oct 20:28:04 IST span close, then the R-05
+shared-venv rebuild window, then the build wave (L-03 numeric flip,
+M-02, M-03, L-01, the P1 trio; optional alias-retirement appended).
+Nothing is wired mid-span. No code, config, or protection change ships
+in this wave: docs-only reconciliation addendum, graded through the
+register, hygiene and format-surface classes on the repo venv.
