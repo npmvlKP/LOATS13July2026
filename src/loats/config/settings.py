@@ -226,8 +226,6 @@ class Settings(BaseSettings):
     max_modifications: int = Field(
         25, description="Maximum allowed Rule 7 modifications per order"
     )
-    # Backward compatibility alias retained in HC-23 external verification.
-    mods: int = Field(25, description="Maximum allowed Rule 7 modifications")
     # CMP Rule 11 position-limit envelope (HC-23). NIFTY = 5 lots, BANKNIFTY
     # = 3 lots (mirrored in rules.check_position_limits).
     max_nifty_positions: int = Field(5, description="Max open positions (NIFTY)")
