@@ -594,7 +594,9 @@ class TradingOrchestrator:
                     )
                     self._consecutive_cycle_failures = 0
                     try:
-                        await alerts.activate_kill_switch(reason=reason)
+                        await alerts.activate_kill_switch(
+                            reason=reason, owner="auto:m01-cycle-budget"
+                        )
                     except Exception:
                         logger.exception(
                             "Cycle-failure-budget kill switch activation failed"

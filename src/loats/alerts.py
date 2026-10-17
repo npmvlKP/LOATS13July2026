@@ -5,7 +5,10 @@ Implements Telegram alerts kill switch functionality circuit breaker protection.
 
 import asyncio
 import html
+import json
+import os
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 from telegram import Bot, Update
@@ -38,6 +41,16 @@ from .utils.resilience import (
 # so bare-env imports (no OPENALGO_API_KEY) stay clean.
 settings: Any = LazySettings()  # LazySettings.__getattr__ proxies to Settings()
 logger = get_logger(__name__)
+
+# P1-R (19-Oct wave): resume-owner lock. The in-memory kill flag dies with
+# the process, so a restart used to silently resume a halted system (and in
+# a dual-resume race each generation resumed independently). The owner lock
+# persists the halt - who activated it, why, when, which pid - so a restart
+# RESTORES the halt instead of forgetting it, a second process sharing the
+# data directory observes the same lock at its order gate, and a /resume by
+# an owner other than the activating owner is refused. Operator
+# break-glass: delete the lock file (documented in the runbook).
+KILL_OWNER_LOCK_PATH = Path("data") / "kill_switch_owner.lock"
 
 # Settings must be accessed after all imports to avoid circular imports
 
@@ -153,6 +166,10 @@ class AlertSystem:
         ``start_polling()``. Now uses ``start_polling()`` separate task avoid
         blocking event loop.
         """
+        # P1-R: restore a persisted halt before anything else runs - the
+        # pre-wave in-memory flag died with the previous process, silently
+        # resuming a halted system on restart.
+        self._restore_resume_owner_lock()
         if not self.application:
             return
         if self._running:
@@ -576,12 +593,21 @@ class AlertSystem:
             logger.error(f"Failed cancel order after retries: {order_id}", exc_info=e)
             return False
 
-    async def activate_kill_switch(self, reason: str = "Manual activation") -> bool:
-        """Activate kill switch stop all trading activities."""
-        if self.kill_switch_active:
+    async def activate_kill_switch(
+        self, reason: str = "Manual activation", owner: str = "manual"
+    ) -> bool:
+        """Activate kill switch stop all trading activities.
+
+        P1-R: ``owner`` is recorded in the persisted resume-owner lock.
+        The lock is written BEFORE the in-memory flag so a crash between
+        the two leaves the halt latched, never silently lost; every
+        rollback path clears the lock again.
+        """
+        if self.is_kill_switch_active():
             logger.warning("Kill switch active.")
             return False
 
+        self._owner_lock_write(owner, reason)
         try:
             self.kill_switch_active = True
             logger.warning(f"Kill switch activated: {reason}")
@@ -591,6 +617,7 @@ class AlertSystem:
             if orders_data is None:
                 # Failed fetch orders, rollback kill switch
                 self.kill_switch_active = False
+                self._owner_lock_clear()
                 logger.error("Failed fetch orders kill switch, rolled back")
                 return False
 
@@ -614,16 +641,47 @@ class AlertSystem:
         except Exception as e:
             logger.error(f"Failed activate kill switch: {e}")
             self.kill_switch_active = False
+            self._owner_lock_clear()
             return False
 
-    async def deactivate_kill_switch(self, reason: str = "Manual deactivation") -> bool:
-        """Deactivate kill switch resume trading activities."""
-        if not self.kill_switch_active:
+    async def deactivate_kill_switch(
+        self, reason: str = "Manual deactivation", owner: str = "manual"
+    ) -> bool:
+        """Deactivate kill switch resume trading activities.
+
+        P1-R: the resume-owner lock is honoured. A resume by an owner
+        other than the one that activated the halt is refused (the refusal
+        alert names the lock holder); auto-activations (owner ``auto:*``)
+        may be resumed from the operator console by design.
+        """
+        lock = self._owner_lock_read()
+        if lock is not None:
+            lock_owner = str(lock.get("owner", "unknown"))
+            operator_override = lock_owner.startswith("auto:")
+            if lock_owner != owner and not operator_override:
+                logger.warning(
+                    "Resume-owner lock held by %s; %s may not resume",
+                    lock_owner,
+                    owner,
+                )
+                escaped_owner = html.escape(lock_owner)
+                try:
+                    await self.send_alert(
+                        f"⚠️ <b>RESUME REFUSED (resume-owner lock)</b>\n\n"
+                        f"<b>Lock holder:</b> {escaped_owner}\n"
+                        f"Resume denied for: {html.escape(owner)}",
+                        "error",
+                    )
+                except Exception:
+                    logger.warning("Resume-refusal alert delivery failed")
+                return False
+        if not self.is_kill_switch_active():
             logger.warning("Kill switch not active.")
             return False
 
         try:
             self.kill_switch_active = False
+            self._owner_lock_clear()
             logger.info(f"Kill switch deactivated: {reason}")
 
             # Escape user-supplied reason prevent HTML injection
@@ -642,8 +700,90 @@ class AlertSystem:
             return False
 
     def is_kill_switch_active(self) -> bool:
-        """Check kill switch active."""
-        return self.kill_switch_active
+        """Check kill switch active (in-memory flag OR persisted owner lock).
+
+        P1-R: the persisted lock makes the halt effective beyond this
+        process - a second LOATS process sharing the data directory
+        observes the same lock at its order gate (split-brain
+        protection), and the start() path restores the halt after a
+        restart instead of silently resuming.
+        """
+        return self.kill_switch_active or self._owner_lock_held()
+
+    # ------------------------------------------------------------------
+    # P1-R resume-owner lock helpers
+    # ------------------------------------------------------------------
+
+    def _restore_resume_owner_lock(self) -> None:
+        """Re-engage the halt if a resume-owner lock is persisted (P1-R).
+
+        Called from start() BEFORE any bot/polling setup so the halt is
+        effective even when Telegram is down. Idempotent: an already-set
+        in-memory flag is left untouched.
+        """
+        lock = self._owner_lock_read()
+        if lock is None:
+            return
+        if not self.kill_switch_active:
+            self.kill_switch_active = True
+            logger.warning(
+                "Kill switch restored from resume-owner lock: owner=%s "
+                "activated_at=%s reason=%s",
+                lock.get("owner"),
+                lock.get("activated_at"),
+                lock.get("reason"),
+            )
+
+    def _owner_lock_read(self) -> dict[str, Any] | None:
+        """Return the persisted resume-owner lock payload, if readable."""
+        try:
+            if not KILL_OWNER_LOCK_PATH.is_file():
+                return None
+            data = json.loads(KILL_OWNER_LOCK_PATH.read_text(encoding="utf-8"))
+            return data if isinstance(data, dict) else None
+        except (OSError, ValueError) as e:
+            logger.warning("Unreadable resume-owner lock: %s", e)
+            return None
+
+    def _owner_lock_held(self) -> bool:
+        """True when a resume-owner lock file is present (halt latched)."""
+        try:
+            return KILL_OWNER_LOCK_PATH.is_file()
+        except OSError:
+            return False
+
+    def _owner_lock_write(self, owner: str, reason: str) -> None:
+        """Persist the resume-owner lock (best-effort; failures log loud).
+
+        A failed write degrades to the pre-P1-R in-memory semantics for
+        THIS process: the halt still engages, it just survives restarts
+        only when the write succeeds.
+        """
+        try:
+            KILL_OWNER_LOCK_PATH.parent.mkdir(parents=True, exist_ok=True)
+            payload = {
+                "owner": owner,
+                "reason": reason,
+                "activated_at": datetime.now(UTC).isoformat(),
+                "pid": os.getpid(),
+            }
+            KILL_OWNER_LOCK_PATH.write_text(
+                json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8"
+            )
+        except OSError as e:
+            logger.error("Failed to write resume-owner lock: %s", e)
+
+    def _owner_lock_clear(self) -> None:
+        """Remove the resume-owner lock (best-effort).
+
+        A failed clear leaves the lock latched: the NEXT restart restores
+        the halt (fail-safe direction) and the operator can delete the
+        file manually.
+        """
+        try:
+            KILL_OWNER_LOCK_PATH.unlink(missing_ok=True)
+        except OSError as e:
+            logger.error("Failed to clear resume-owner lock: %s", e)
 
     def get_circuit_breaker_status(self) -> dict[str, Any]:
         """Get circuit breaker status monitoring.
@@ -672,6 +812,13 @@ class AlertSystem:
         user_id = str(update.effective_user.id)
         return user_id in settings.telegram_admin_ids
 
+    @staticmethod
+    def _telegram_owner(update: Update) -> str:
+        """P1-R: telegram owner identity recorded in the resume-owner lock."""
+        if update.effective_user is not None:
+            return f"tg:{update.effective_user.id}"
+        return "tg:unknown"
+
     # Telegram command handlers
     async def _start(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle /start command."""
@@ -697,7 +844,9 @@ class AlertSystem:
         """Handle /status command."""
         try:
             status = (
-                "🟢 ACTIVE" if not self.kill_switch_active else "🔴 KILL SWITCH ACTIVE"
+                "🟢 ACTIVE"
+                if not self.is_kill_switch_active()
+                else "🔴 KILL SWITCH ACTIVE"
             )
             message = (
                 f"📊 <b>SYSTEM STATUS</b>\n\n"
@@ -755,7 +904,9 @@ class AlertSystem:
                 if context.args
                 else "Manual activation via Telegram"
             )
-            success = await self.activate_kill_switch(reason)
+            success = await self.activate_kill_switch(
+                reason, owner=self._telegram_owner(update)
+            )
 
             if update.message:
                 if success:
@@ -797,7 +948,9 @@ class AlertSystem:
                 if context.args
                 else "Manual deactivation via Telegram"
             )
-            success = await self.deactivate_kill_switch(reason)
+            success = await self.deactivate_kill_switch(
+                reason, owner=self._telegram_owner(update)
+            )
 
             if update.message:
                 if success:
