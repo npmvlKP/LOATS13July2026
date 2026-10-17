@@ -300,30 +300,38 @@ class TestEffectiveSettingsGuard:
 
 class TestOrchestratorWiring:
     @pytest.mark.asyncio
-    async def test_gate_failure_does_not_crash_startup_hook(self):
-        from loats.orchestrator import TradingOrchestrator
+    async def test_gate_failure_raises_fail_closed(self):
+        """M-03: a failed gate REFUSES startup (pre-wave: advisory return)."""
+        from loats.orchestrator import RSSStartupGateError, TradingOrchestrator
 
         orch = TradingOrchestrator()
-        with patch(
-            "loats.rss_validation.run_startup_gate",
-            new_callable=AsyncMock,
-            return_value=False,
+        with (
+            patch(
+                "loats.rss_validation.run_startup_gate",
+                new_callable=AsyncMock,
+                return_value=False,
+            ),
+            pytest.raises(RSSStartupGateError),
         ):
-            # Must not raise even when the gate reports failure.
             await orch._validate_rss_startup_gate()
         assert orch._rss_drift_task is None  # no live pass after gate failure
 
     @pytest.mark.asyncio
-    async def test_gate_exception_does_not_crash_startup_hook(self):
-        from loats.orchestrator import TradingOrchestrator
+    async def test_gate_exception_raises_fail_closed(self):
+        """M-03: a gate error fails closed, chained to the original error."""
+        from loats.orchestrator import RSSStartupGateError, TradingOrchestrator
 
         orch = TradingOrchestrator()
-        with patch(
-            "loats.rss_validation.run_startup_gate",
-            new_callable=AsyncMock,
-            side_effect=RuntimeError("boom"),
+        with (
+            patch(
+                "loats.rss_validation.run_startup_gate",
+                new_callable=AsyncMock,
+                side_effect=RuntimeError("boom"),
+            ),
+            pytest.raises(RSSStartupGateError) as excinfo,
         ):
             await orch._validate_rss_startup_gate()
+        assert isinstance(excinfo.value.__cause__, RuntimeError)
         assert orch._rss_drift_task is None
 
     @pytest.mark.asyncio
