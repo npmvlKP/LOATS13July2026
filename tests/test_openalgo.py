@@ -23,7 +23,6 @@ from loats.openalgo import (
     OpenAlgoAPIError,
     OpenAlgoClient,
     OpenAlgoError,
-    _async_check_kill_switch,
     _check_kill_switch,
     _get_idempotency_key,
     _order_payload_digest,
@@ -177,19 +176,22 @@ class TestExceptionsAndKillSwitch:
                 _check_kill_switch()
 
     @pytest.mark.asyncio
-    async def test_async_kill_switch_active_blocks(self) -> None:
+    async def test_async_call_sites_share_the_sync_check(self) -> None:
+        """L-01 dedup: async order paths route through the single check.
+
+        The pre-wave module carried a verbatim-duplicated async twin with
+        an identical body; the deduplicated design has the async call
+        sites invoke the sync check directly (no await), so blocking
+        semantics are identical by construction and the twins class is
+        structurally closed.
+        """
         with (
             patch("loats.openalgo._get_alerts", return_value=_alerts_mock(True)),
             patch("loats.database.db._log_audit") as mock_audit,
         ):
             with pytest.raises(KillSwitchError):
-                await _async_check_kill_switch()
+                _check_kill_switch()
             mock_audit.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_async_kill_switch_inactive_passes(self) -> None:
-        with patch("loats.openalgo._get_alerts", return_value=_alerts_mock(False)):
-            await _async_check_kill_switch()
 
 
 class TestSyncClientRequest:

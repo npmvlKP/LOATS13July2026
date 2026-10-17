@@ -694,31 +694,30 @@ def _log_mode_gate_block(method: str, mode: str, reason: str) -> None:
         logger.error(f"Failed to write audit log for mode-gate block: {e}")
 
 
+def _inject_body_apikey(kwargs: dict[str, Any], api_key: str) -> None:
+    """Inject ``apikey`` into the POST JSON body in place (L-01 dedup).
+
+    OpenAlgo deployments validate ``apikey`` as a REQUIRED JSON body
+    field (F8-L-03 live verification: header-only auth fails schema on
+    every endpoint with 400 "Missing data for required field"). Inject
+    it into the JSON body so the client works against both body-auth
+    (current deployments) and header-auth deployments. Single shared
+    injection path for the sync and async request pipelines.
+    """
+    json_body = dict(kwargs.pop("json", None) or {})
+    json_body.setdefault("apikey", api_key)
+    kwargs["json"] = json_body
+
+
 def _check_kill_switch() -> None:
-    """Check kill switch active."""
-    alerts = _get_alerts()
-    if alerts.is_kill_switch_active():
-        logger.error("Kill switch active, order placement blocked")
-        # Log audit entry for kill switch activation
-        try:
-            from .database import db
+    """Check kill switch active (single shared implementation, L-01).
 
-            db._log_audit(
-                action="BLOCK",
-                entity_type="order",
-                entity_id="kill_switch_blocked",
-                user="system",
-                metadata={"reason": "Kill switch active"},
-                previous_state=None,
-                new_state={"status": "blocked", "reason": "kill_switch_active"},
-            )
-        except Exception as e:
-            logger.error(f"Failed to write audit log for kill switch block: {e}")
-        raise KillSwitchError("Kill switch active, order placement blocked")
-
-
-async def _async_check_kill_switch() -> None:
-    """Async version: Check kill switch active."""
+    The pre-wave module carried a verbatim-duplicated async twin with the
+    identical body; the deduplicated design has the async order paths
+    invoke this sync check directly -- the inactive path is an in-memory
+    flag/lock read, and the active path's audit write is the same
+    synchronous db call the former twin performed.
+    """
     alerts = _get_alerts()
     if alerts.is_kill_switch_active():
         logger.error("Kill switch active, order placement blocked")
@@ -782,14 +781,7 @@ class OpenAlgoClient:
         client = self._ensure_client()
         url = f"/api/v1/{endpoint.lstrip('/')}"
         if method.upper() == "POST":
-            # OpenAlgo deployments validate `apikey` as a REQUIRED JSON body
-            # field (F8-L-03 live verification: header-only auth fails schema
-            # on every endpoint with 400 "Missing data for required field").
-            # Inject it into the JSON body so the client works against both
-            # body-auth (current deployments) and header-auth deployments.
-            json_body = dict(kwargs.pop("json", None) or {})
-            json_body.setdefault("apikey", self.api_key)
-            kwargs["json"] = json_body
+            _inject_body_apikey(kwargs, self.api_key)
         if idempotency_key is not None:
             headers = dict(kwargs.pop("headers", None) or {})
             headers["Idempotency-Key"] = idempotency_key
@@ -1205,14 +1197,7 @@ class AsyncOpenAlgoClient:
         client = await self._ensure_client()
         url = f"/api/v1/{endpoint.lstrip('/')}"
         if method.upper() == "POST":
-            # OpenAlgo deployments validate `apikey` as a REQUIRED JSON body
-            # field (F8-L-03 live verification: header-only auth fails schema
-            # on every endpoint with 400 "Missing data for required field").
-            # Inject it into the JSON body so the client works against both
-            # body-auth (current deployments) and header-auth deployments.
-            json_body = dict(kwargs.pop("json", None) or {})
-            json_body.setdefault("apikey", self.api_key)
-            kwargs["json"] = json_body
+            _inject_body_apikey(kwargs, self.api_key)
         if idempotency_key is not None:
             headers = dict(kwargs.pop("headers", None) or {})
             headers["Idempotency-Key"] = idempotency_key
@@ -1509,7 +1494,7 @@ class AsyncOpenAlgoClient:
         Note: Circuit breaker is applied without retry to avoid duplicate orders.
         When the circuit is open, this method fails fast with CircuitBreakerOpenError.
         """
-        await _async_check_kill_switch()
+        _check_kill_switch()
         await _async_enforce_order_mode_gate("openalgo.place_order")
         # Use configured rate limits for order operations
         if not await get_order_rate_limiter().acquire():
@@ -1587,7 +1572,7 @@ class AsyncOpenAlgoClient:
         Note: Circuit breaker is applied without retry to avoid duplicate orders.
         When the circuit is open, this method fails fast with CircuitBreakerOpenError.
         """
-        await _async_check_kill_switch()
+        _check_kill_switch()
         await _async_enforce_order_mode_gate("openalgo.place_smart_order")
         # Use configured rate limits for smart order operations
         if not await get_smart_order_rate_limiter().acquire():
@@ -1660,7 +1645,7 @@ class AsyncOpenAlgoClient:
         Note: Circuit breaker is applied without retry to avoid duplicate modifications.
         When the circuit is open, this method fails fast with CircuitBreakerOpenError.
         """
-        await _async_check_kill_switch()
+        _check_kill_switch()
         await _async_enforce_order_mode_gate("openalgo.modify_order")
 
         # CMP Rule 7 (F8-H-02): reserve budget before touching the broker.
@@ -1715,7 +1700,7 @@ class AsyncOpenAlgoClient:
         Note: Circuit breaker is applied without retry to avoid duplicate cancellations.
         When the circuit is open, this method fails fast with CircuitBreakerOpenError.
         """
-        await _async_check_kill_switch()
+        _check_kill_switch()
 
         # Wrap order cancellation in circuit breaker without retry
         async def _cancel_order_impl() -> dict[str, Any]:
