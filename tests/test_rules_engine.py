@@ -6,6 +6,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
+from loats.config import get_settings
 from loats.models import HistoricalData, Signal, SignalType, Trade, TransactionType
 from loats.rules import CMPRulesEngine, RuleType, TradingSession, rules_engine
 
@@ -317,7 +318,11 @@ def test_position_limits_and_circuit_breakers() -> None:
     assert ok is True
     assert info["reason"] == "position_limit_ok"
 
-    many = [_trade(qty=25) for _ in range(5)]
+    # Breach the NIFTY envelope at the CURRENT lot size (5 lots max):
+    # 6 lots' worth of quantity must always exceed 5 * nifty_lot_size,
+    # whatever the exchange-pinned lot is.
+    lot = get_settings().nifty_lot_size
+    many = [_trade(qty=lot) for _ in range(6)]
     ok2, info2 = eng.check_position_limits("NIFTY", many)
     assert ok2 is False
     assert info2["reason"] == "position_limit_exceeded"

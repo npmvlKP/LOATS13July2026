@@ -213,7 +213,11 @@ async def check_f_live_probes() -> None:
         patch.object(engine, "analyzer_routing_enabled", True),
         patch("loats.trade_decision.AsyncOpenAlgoClient", FakeClient),
         patch(
-            "loats.database.db.async_get_trade_decision", AsyncMock(return_value=None)
+            # P1-D: the dispatch point AND the outcome path both consult
+            # the row; the first read finds none (dispatch creates it),
+            # the second finds it (idempotent skip).
+            "loats.database.db.async_get_trade_decision",
+            AsyncMock(side_effect=[None, object()]),
         ),
         patch("loats.database.db.async_create_trade_decision", created),
         patch("loats.database.db.async_log_audit", audit),

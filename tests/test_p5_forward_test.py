@@ -107,8 +107,10 @@ class TestEnabledPath:
             patch.object(engine, "analyzer_routing_enabled", True),
             patch("loats.trade_decision.AsyncOpenAlgoClient", lambda: client),
             patch(
+                # P1-D: dispatch creates the row; the outcome path's re-read
+                # finds it (idempotent skip), so create fires exactly once.
                 "loats.database.db.async_get_trade_decision",
-                AsyncMock(return_value=None),
+                AsyncMock(side_effect=[None, object()]),
             ),
             patch("loats.database.db.async_create_trade_decision", created),
             patch("loats.database.db.async_log_audit", audit),
