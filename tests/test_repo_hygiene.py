@@ -2933,3 +2933,35 @@ class TestBenchmarkGateWired:
         mutated = re.sub(r"^          pip install \.\s*\n", "", block, flags=re.M)
         with pytest.raises(AssertionError, match="install the project"):
             self._assert_gate_wired(mutated)
+
+
+class TestP5WaveStateVerifier:
+    """19-Oct P5 wave: pin scripts/p5_verify_state.py post-wave shapes.
+
+    Runs the verifier's ``--expect post`` mode against the live tree and
+    requires a PASS verdict: HEAD moved off the pre-wave pin and all eight
+    wave shapes (L-03 flip, M-02 single-thread flag absent, M-03 raise,
+    L-01 dedup x2, P1-R/P1-A/P1-D present) hold. Also the scripts-wiring
+    citation surface for the tool.
+    """
+
+    def test_post_wave_shapes_pass(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        script = repo_root / "scripts" / "p5_verify_state.py"
+        assert script.is_file()
+        proc = subprocess.run(
+            [sys.executable, str(script), "--expect", "post", "--json"],
+            capture_output=True,
+            text=True,
+            timeout=120,
+            cwd=repo_root,
+        )
+        assert proc.returncode == 0, f"stdout={proc.stdout}\nstderr={proc.stderr}"
+        payload = json.loads(proc.stdout)
+        assert payload["result"] == "PASS"
+        failed = [
+            c
+            for c in payload["checks"]
+            if c["kind"] == "gate" and c["status"] in ("FAIL", "ERROR")
+        ]
+        assert failed == []
