@@ -550,7 +550,9 @@ async def _async_log_audit(
             # F9-M-01 (TODO-6): hash-chain link, same semantics as the
             # canonical sync writer -- link to the last line's
             # sha256_hash, seeded at the legacy head for grandfathered
-            # files.
+            # files. P1-A: rotate BEFORE the link is read so a rotated-to
+            # file's first entry seeds at None (fresh chain segment).
+            self._rotate_audit_jsonl_locked()
             entry_data["previous_hash"] = self._read_chain_head()
             # Calculate SHA-256 hash over data excluding the hash field
             # itself
