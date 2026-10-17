@@ -651,12 +651,17 @@ class Database:
                         f"Ignoring error closing stale connection: {cleanup_error}"
                     )
                 del self._thread_local.connection
-        # Slow path: open new connection with optimized settings
+        # Slow path: open new connection with optimized settings.
+        # M-02 (19-Oct wave): check_same_thread stays at the sqlite3
+        # default (True) so any cross-thread USE of a connection fails
+        # loud instead of silently racing a shared handle. Every thread
+        # (scheduler, FastAPI worker pool, to_thread delegate) builds its
+        # own thread-local connection here; writers serialize through
+        # SQLite's own IMMEDIATE-transaction locking.
         conn = sqlite3.connect(
             self.db_path,
             timeout=30.0,  # Increased timeout for busy databases
             isolation_level="IMMEDIATE",  # Better concurrency control
-            check_same_thread=False,  # Allow cross-thread usage
         )
         # Apply PRAGMAs exactly once per connection object (F-PERF-1)
         conn_id = id(conn)
@@ -2835,14 +2840,16 @@ class Database:
                 closed_count += 1
             except Exception as e:
                 logger.warning(f"Error closing current thread connection: {e}")
-        # Close all tracked connections other threads
+        # Close all tracked connections from other threads. M-02: with the
+        # sqlite3 default thread-affinity check restored, a foreign-thread
+        # conn.close() raises ProgrammingError and would leak the handle in
+        # the except branch below. Dropping the last reference instead
+        # releases the underlying sqlite handle in connection dealloc, which
+        # - unlike the close() entry point - carries no thread affinity, so
+        # FIX-WINDOWS-SHUTDOWN hygiene is preserved without weakening the
+        # M-02 same-thread operation discipline.
         with self._registry_lock:
-            for thread_id, conn in list(self._thread_registry.items()):
-                try:
-                    conn.close()
-                    closed_count += 1
-                except Exception as e:
-                    logger.warning(f"Error closing connection thread {thread_id}: {e}")
+            closed_count += len(self._thread_registry)
             self._thread_registry.clear()
         # FIX-F-PERF-2: release the persistent audit JSONL handle so no file
         # handle outlives the Database instance (Windows file-lock hygiene).
