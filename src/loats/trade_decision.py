@@ -536,6 +536,12 @@ class TradeDecisionEngine:
         # exactly once per enabled route; the disabled return above fires
         # only on a non-claimed engine and never reaches this line.
         self.routing_counters["routed_decisions"] += 1
+        # P1-D (19-Oct wave): DB-persist at the dispatch point. Log+counter
+        # alone loses the attempt when the process dies before the outcome
+        # resolves (12Oct: 74 routed decisions left zero DB rows). The row
+        # creation is idempotent; the ROUTE outcome row still lands on
+        # resolution via _persist_routing_outcome.
+        await self._persist_routing_outcome_row(trade_decision)
         try:
             async with AsyncOpenAlgoClient() as client:
                 analyzer_response = await client.place_analyzer_request(payload)
@@ -563,26 +569,16 @@ class TradeDecisionEngine:
             await self._persist_routing_outcome(trade_decision, response)
             raise
 
-    async def _persist_routing_outcome(
-        self, trade_decision: TradeDecision, response: dict[str, Any]
-    ) -> dict[str, Any]:
-        """Persist decision + routing outcome to audit trail (SQLite + JSONL).
+    async def _persist_routing_outcome_row(self, trade_decision: TradeDecision) -> None:
+        """Create the ``trade_decisions`` row if missing (F8-H-01 part a).
 
-        F8-H-01: every routed decision must leave (a) a ``trade_decisions``
-        row and (b) a ROUTE audit row whose metadata carries the routing
-        outcome (success / disabled / error). The previous implementation
-        probed for a nonexistent ``db.async_record_trade_decision`` attribute
-        (the registered extension is the private one-arg
-        ``_async_record_trade_decision``), so the preferred branch was dead
-        code and the routing outcome was never audited.
-
-        Idempotent: the orchestrator pre-persists the decision before
-        routing (orchestrator.py ``_execute_cmp_strategy``), so the row is
-        only created when missing.
-
-        Best-effort: if the DB write fails the routing response is still
-        returned so callers can decide whether to fail the orchestrator
-        cycle. Failures are logged loudly for monitoring.
+        P1-D: called at the DISPATCH point so a decision is DB-visible the
+        moment it is routed, not only when its outcome resolves -- a
+        process death between dispatch and outcome leaves the row behind
+        (12Oct: 74 routed decisions left zero DB rows). Idempotent: the
+        orchestrator pre-persists the decision before routing, so the row
+        is only created when missing. Best-effort: failures are logged,
+        never raised into the routing path.
         """
         try:
             existing = await db.async_get_trade_decision(trade_decision.decision_id)
@@ -598,6 +594,29 @@ class TradeDecisionEngine:
             )
             # Don't fail the routing if audit persistence fails
             # but log the error for monitoring
+
+    async def _persist_routing_outcome(
+        self, trade_decision: TradeDecision, response: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Persist decision + routing outcome to audit trail (SQLite + JSONL).
+
+        F8-H-01: every routed decision must leave (a) a ``trade_decisions``
+        row and (b) a ROUTE audit row whose metadata carries the routing
+        outcome (success / disabled / error). The previous implementation
+        probed for a nonexistent ``db.async_record_trade_decision`` attribute
+        (the registered extension is the private one-arg
+        ``_async_record_trade_decision``), so the preferred branch was dead
+        code and the routing outcome was never audited.
+
+        Idempotent: the decision row is created via
+        :meth:`_persist_routing_outcome_row`, which the dispatch point
+        (P1-D) also calls, so the row is only created when missing.
+
+        Best-effort: if the DB write fails the routing response is still
+        returned so callers can decide whether to fail the orchestrator
+        cycle. Failures are logged loudly for monitoring.
+        """
+        await self._persist_routing_outcome_row(trade_decision)
 
         # ROUTE audit row: one per routed decision, carrying the outcome.
         # async_log_audit is the canonical dual-write (SQLite + JSONL) with
