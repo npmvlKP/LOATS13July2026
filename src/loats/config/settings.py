@@ -217,8 +217,9 @@ class Settings(BaseSettings):
         description="List of Telegram user IDs authorized to issue "
         "/kill and /resume commands",
     )
-    # Trading Configuration
-    nifty_lot_size: int = Field(25, description="NIFTY lot size")
+    # Trading Configuration. NSE circular FAOP70616 revises the NIFTY
+    # lot size to 65 (L-03 19-Oct wave flip; BANKNIFTY handled separately).
+    nifty_lot_size: int = Field(65, description="NIFTY lot size")
     # CMP Rule 7 modification ceiling (HC-23). 25 modifications per order
     # (broker-side control mirrored client-side, enforced at the
     # modify_order boundary; F8-H-02).

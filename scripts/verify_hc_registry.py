@@ -463,7 +463,7 @@ def _check_hc23() -> tuple[Verdict, str]:
 
     failures: list[str] = []
     for name, expected in (
-        ("nifty_lot_size", 25),
+        ("nifty_lot_size", 65),
         ("max_ops", 3),
         ("mods", 25),
         ("max_open_positions", 5),
