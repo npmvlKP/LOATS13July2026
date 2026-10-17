@@ -596,9 +596,9 @@ class CMPRulesEngine:
         )
 
         if symbol == "NIFTY":
-            max_allowed = 5 * settings.nifty_lot_size  # 5 lots * 25 = 125
+            max_allowed = 5 * settings.nifty_lot_size  # 5 lots
         elif symbol == "BANKNIFTY":
-            max_allowed = 3 * settings.nifty_lot_size  # 3 lots * 25 = 75
+            max_allowed = 3 * settings.nifty_lot_size  # 3 lots
         else:
             max_allowed = settings.max_position_per_symbol
 

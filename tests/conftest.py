@@ -203,6 +203,21 @@ def configure_test_logging() -> None:
     configure_logging(test_mode=True)
 
 
+@pytest.fixture(autouse=True)
+def _isolate_resume_owner_lock(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """P1-R: point the resume-owner lock at a per-test path.
+
+    Without this, every kill-switch test exercising the real activate /
+    deactivate methods would read and write ``data/kill_switch_owner.lock``
+    in the repo working tree, leaking residue across tests and making the
+    lock-aware ``is_kill_switch_active`` order-dependent.
+    """
+    monkeypatch.setattr(
+        "loats.alerts.KILL_OWNER_LOCK_PATH",
+        tmp_path / "kill_switch_owner.lock",
+    )
+
+
 @pytest.fixture
 def test_settings() -> Settings:
     """Create test settings for temporary paths."""

@@ -463,9 +463,8 @@ def _check_hc23() -> tuple[Verdict, str]:
 
     failures: list[str] = []
     for name, expected in (
-        ("nifty_lot_size", 25),
+        ("nifty_lot_size", 65),
         ("max_ops", 3),
-        ("mods", 25),
         ("max_open_positions", 5),
         ("min_open_positions", 3),
     ):
@@ -590,7 +589,7 @@ HC_CATALOG: list[tuple[str, str, str, bool, Callable[[], tuple[Verdict, str]]]] 
     ("HC-22", "no PYTEST_CURRENT_TEST in src/", "TODO-20", False, _check_hc22),
     (
         "HC-23",
-        "config conformance mods/lot/positions/max_ops/mode",
+        "config conformance lot/positions/max_ops/mode",
         "TODO-17",
         False,
         _check_hc23,

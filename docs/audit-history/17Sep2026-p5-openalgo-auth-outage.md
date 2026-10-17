@@ -714,6 +714,34 @@ Registry note: the 08–12 Oct stretch (5 sessions: 08, 09, 12
 trading + 10/11 weekend) is one continuous credential/infrastructure
 outage window — pin as `DOCUMENTED_OUTAGE_WINDOWS` entry 08–12Oct
 once evidence-loss bounds are confirmed.
+
+## Continuation 10 (16 Oct): graded-stream counter defect pinned — P5-1 (939-attempt under-credit at span close)
+
+**Independent confirmation of the 16Oct digest's P5-1 finding.** The
+graded `routed_decisions` stream is amnesiac across CLI resumes:
+`_effective_resume_baseline` (scripts/run_p5_forward_test.py:452–495)
+sets baseline := predecessor logged total, but the fold
+(:1089, `max(0, live − base)`) floors the stream whenever a fresh
+engine under-produces vs the carried total — and those floors propagate
+into the next resume. The docstring telescope (:455–477,
+"logged + new work") does not hold for CLI resumes.
+
+**Live exhibit (12–16 Oct)**: Monday 12 Oct's split-brain generation
+routed 74 decisions (first-hand: counters climbed 0→74, divergence 0,
+74 audit rows counted twice — Continuation 9); the winning generation's
+zero-activity resume floored the stream to 0, and the 74 never reached
+the DB. Current close: graded stream reads 410 while DB-corroborated
+in-span rows are 1,423 (06Oct 63 + 07Oct 275 + 13Oct 364 + 14Oct 237 +
+16Oct 410) — **939 audited attempts under-credited** at the 19 Oct
+span close if uncorrected.
+
+**Grading rule until fixed**: the DB (`trade_decisions` by
+`as_of_date`) is the store of record; the snapshot counter pair
+(`routed_decisions` / `counters_baseline`) must be cited together with
+the probe timestamp and treated as instrument, not evidence. Proposed
+fix class (digest): baseline := captured live offset
+(`logged − live_at_resume`); the live capture at :1388 already exists
+— :452 ignores it. Wave-owned; this record is read-only evidence.
 > **Annotation 16:34 IST (reconciliation probe of this continuation - keep+annotate
 > per the foreign-edit discipline):** the mechanism is CONFIRMED against surviving
 > artifacts; several figures are corrected or marked transcript-only. Verified live

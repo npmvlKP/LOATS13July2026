@@ -53,6 +53,15 @@ logger = get_logger(__name__)
 settings = None
 
 
+class RSSStartupGateError(RuntimeError):
+    """M-03 (19-Oct wave): the recorded RSS manifest failed startup
+    validation, so the sentiment source list is unvalidated and trading
+    must not start. Fail-closed by design: pre-wave the gate was advisory
+    (log + alert + continue); raising here propagates through
+    TradingOrchestrator.start into the startup path and refuses the run.
+    """
+
+
 async def _fetch_cached_vix() -> float | None:
     """
     Fetch India VIX via cached OpenAlgo quote.
@@ -482,12 +491,16 @@ class TradingOrchestrator:
         """F8-L-05: recorded-fallback RSS feed validation at startup.
 
         The offline manifest validation is authoritative and runs inline:
-        it is deterministic, needs no network, and a structural failure must
-        be loud BEFORE trading starts. The live drift pass is advisory only,
-        so it runs as a DETACHED task -- awaiting it inline would let a dead
-        network stall trading startup for the full per-feed HTTP timeout
-        (3 feeds x ~20s worst case). Failures inside the detached task
-        degrade to WARNING; they can never block or crash startup.
+        it is deterministic, needs no network, and a structural failure is
+        loud BEFORE trading starts. M-03 (19-Oct wave): fail-closed -- the
+        inline gate RAISES :class:`RSSStartupGateError` after the alert
+        attempt, so an unvalidated sentiment source list refuses startup
+        instead of the pre-wave advisory continue. The live drift pass is
+        advisory only, so it runs as a DETACHED task -- awaiting it inline
+        would let a dead network stall trading startup for the full
+        per-feed HTTP timeout (3 feeds x ~20s worst case). Failures inside
+        the detached task degrade to WARNING; they can never block or
+        crash startup.
         """
         try:
             from .rss_validation import run_startup_gate
@@ -496,14 +509,15 @@ class TradingOrchestrator:
         except Exception as exc:
             logger.error("RSS startup gate error: %s", exc)
             # H3 (adversarial review): a gate error is operationally visible
-            # -- alert, but never block startup on the alert path itself.
+            # -- alert first, and never let an alert-path failure mask the
+            # fail-closed raise.
             try:
                 await alerts.send_system_alert(
                     f"RSS startup gate error: {exc}", "error"
                 )
             except Exception:
                 logger.warning("RSS gate alert delivery failed")
-            return
+            raise RSSStartupGateError(f"RSS startup gate error: {exc}") from exc
         if not ok:
             logger.error(
                 "RSS startup gate FAILED: recorded manifest invalid -- sentiment "
@@ -519,7 +533,10 @@ class TradingOrchestrator:
                 )
             except Exception:
                 logger.warning("RSS gate alert delivery failed")
-            return
+            raise RSSStartupGateError(
+                "RSS startup gate FAILED: recorded manifest invalid -- "
+                "sentiment source list unvalidated"
+            )
         self._rss_drift_task = asyncio.create_task(self._rss_live_drift_pass())
 
     async def _rss_live_drift_pass(self) -> None:
@@ -577,7 +594,9 @@ class TradingOrchestrator:
                     )
                     self._consecutive_cycle_failures = 0
                     try:
-                        await alerts.activate_kill_switch(reason=reason)
+                        await alerts.activate_kill_switch(
+                            reason=reason, owner="auto:m01-cycle-budget"
+                        )
                     except Exception:
                         logger.exception(
                             "Cycle-failure-budget kill switch activation failed"

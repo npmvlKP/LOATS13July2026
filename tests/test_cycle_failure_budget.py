@@ -122,7 +122,7 @@ class TestConsecutiveFailureBudget:
                 orch._shutdown_event.set()
             raise RuntimeError("persistent datastore fault")
 
-        async def _true_activate(reason: str = "") -> bool:
+        async def _true_activate(reason: str = "", **kwargs: object) -> bool:
             reasons.append(reason)
             return True
 
@@ -156,7 +156,7 @@ class TestConsecutiveFailureBudget:
                 orch._shutdown_event.set()
             raise RuntimeError("persistent datastore fault")
 
-        async def _refuse(reason: str = "") -> bool:
+        async def _refuse(reason: str = "", **kwargs: object) -> bool:
             escalations["n"] += 1
             return False  # broker unreachable: activation refused
 

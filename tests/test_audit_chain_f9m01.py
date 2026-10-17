@@ -26,6 +26,7 @@ NULL and remain fully verifiable under the grandfathered rule.
 from __future__ import annotations
 
 import json
+import pathlib
 import sqlite3
 from pathlib import Path
 
@@ -330,3 +331,70 @@ class TestSpanSafety:
         cols = [r[1] for r in conn.execute("PRAGMA table_info(audit_log)")]
         conn.close()
         assert cols.count("previous_hash") == 1
+
+
+class TestAuditRotationP1A:
+    """P1-A (19-Oct wave): size-based audit JSONL rotation.
+
+    The rotated-to file starts a FRESH F9-M-01 chain segment (first entry
+    seeds at None) because verify_audit_log_integrity's Layer-2 walk starts
+    every file at previous_line_hash=None -- a cross-file link would read
+    as a broken chain and fire a false CRITICAL.
+    """
+
+    def test_rotation_shifts_file_and_fresh_chain_seeds_none(
+        self, db: Database, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr("loats.database.AUDIT_ROTATE_BYTES", 400)
+        current = tmp_path / "audit.jsonl"
+        _write_entries(db, 2)
+        assert [e["entity_id"] for e in _read_lines(current)] == ["t0", "t1"]
+
+        db.log_audit(
+            action="CREATE",
+            entity_type="trade",
+            entity_id="post-rotate",
+            metadata={"i": 99},
+        )
+
+        rotated = tmp_path / "audit.jsonl.1"
+        assert rotated.exists()
+        assert [e["entity_id"] for e in _read_lines(rotated)] == ["t0", "t1"]
+        fresh = _read_lines(current)
+        assert [e["entity_id"] for e in fresh] == ["post-rotate"]
+        # F9-M-01 contract: a fresh file seeds its own chain segment.
+        assert fresh[0]["previous_hash"] is None
+        # The per-file integrity walk stays green after rotation.
+        assert db.verify_audit_log_integrity() is True
+
+    def test_rotation_keeps_generation_cap(
+        self, db: Database, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr("loats.database.AUDIT_ROTATE_BYTES", 200)
+        for i in range(12):
+            db.log_audit(
+                action="CREATE",
+                entity_type="trade",
+                entity_id=f"t{i}",
+                metadata={"pad": "x" * 80},
+            )
+        assert (tmp_path / "audit.jsonl.3").exists()
+        assert not (tmp_path / "audit.jsonl.4").exists()
+        assert (tmp_path / "audit.jsonl").exists()
+        assert db.verify_audit_log_integrity() is True
+
+    def test_rotation_failure_does_not_block_write(
+        self, db: Database, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr("loats.database.AUDIT_ROTATE_BYTES", 200)
+
+        def _boom(self: pathlib.Path, target: object) -> pathlib.Path:
+            raise OSError("locked by backup")
+
+        monkeypatch.setattr(pathlib.Path, "replace", _boom)
+        _write_entries(db, 2)
+        # The rotation attempt failed, but BOTH audit entries landed and
+        # the chain remains verifiable (oversize file is the acceptable
+        # degradation; a lost entry is not).
+        assert len(_read_lines(tmp_path / "audit.jsonl")) == 2
+        assert db.verify_audit_log_integrity() is True

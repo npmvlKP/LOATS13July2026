@@ -48,6 +48,16 @@ from .utils.lazy_singleton import lazy_singleton
 # Note: aiosqlite is imported locally in async methods where needed
 logger = get_logger(__name__)
 
+# P1-A (19-Oct wave): audit JSONL rotation. The append handle grows
+# data/audit.log without bound (the live span retained 25.5 MB with zero
+# rotation); rotate at AUDIT_ROTATE_BYTES, keeping AUDIT_ROTATE_KEEP
+# generations as audit.log.1 .. audit.log.N. Each rotated-to file starts a
+# FRESH hash-chain segment per the F9-M-01 write-path contract ("the first
+# entry of a fresh file seeds with None") so verify_audit_log_integrity's
+# per-file Layer-2 walk stays green.
+AUDIT_ROTATE_BYTES = 64 * 1024 * 1024
+AUDIT_ROTATE_KEEP = 3
+
 
 def _rollback_on_error[TypeT](fn: Callable[..., TypeT]) -> Callable[..., TypeT]:
     """Roll the thread-local connection back when the wrapped DML raises.
@@ -651,12 +661,17 @@ class Database:
                         f"Ignoring error closing stale connection: {cleanup_error}"
                     )
                 del self._thread_local.connection
-        # Slow path: open new connection with optimized settings
+        # Slow path: open new connection with optimized settings.
+        # M-02 (19-Oct wave): check_same_thread stays at the sqlite3
+        # default (True) so any cross-thread USE of a connection fails
+        # loud instead of silently racing a shared handle. Every thread
+        # (scheduler, FastAPI worker pool, to_thread delegate) builds its
+        # own thread-local connection here; writers serialize through
+        # SQLite's own IMMEDIATE-transaction locking.
         conn = sqlite3.connect(
             self.db_path,
             timeout=30.0,  # Increased timeout for busy databases
             isolation_level="IMMEDIATE",  # Better concurrency control
-            check_same_thread=False,  # Allow cross-thread usage
         )
         # Apply PRAGMAs exactly once per connection object (F-PERF-1)
         conn_id = id(conn)
@@ -814,6 +829,44 @@ class Database:
             except Exception as e:
                 logger.debug(f"Ignoring error closing audit log handle: {e}")
 
+    def _rotate_audit_jsonl_locked(self) -> None:
+        """Size-based rotation of the audit JSONL (caller holds _audit_lock).
+
+        P1-A: shifts audit.log -> audit.log.1 -> ... keeping
+        AUDIT_ROTATE_KEEP generations, then resets the cached chain head so
+        the fresh file seeds its own F9-M-01 chain segment at None (a
+        cross-file link would trip a false CRITICAL in the Layer-2 walk).
+        Rotation failure NEVER blocks the audit write: the oversize file
+        is the acceptable degradation, a lost audit entry is not.
+        """
+        path = Path(self.audit_log_path)
+        try:
+            if self._audit_fh is not None and not self._audit_fh.closed:
+                size = self._audit_fh.tell()
+            elif path.exists():
+                size = path.stat().st_size
+            else:
+                return
+            if size < AUDIT_ROTATE_BYTES:
+                return
+            self._discard_audit_handle()
+            for gen in range(AUDIT_ROTATE_KEEP - 1, 0, -1):
+                src = path.with_name(f"{path.name}.{gen}")
+                if src.exists():
+                    src.replace(path.with_name(f"{path.name}.{gen + 1}"))
+            path.replace(path.with_name(f"{path.name}.1"))
+            # Fresh chain segment: force the next append to re-seed at
+            # None instead of linking into the rotated-away file.
+            self._chain_head = None
+            self._chain_head_loaded = True
+            logger.info(
+                "Audit JSONL rotated at %d bytes (kept %d generation(s))",
+                size,
+                AUDIT_ROTATE_KEEP,
+            )
+        except OSError as e:
+            logger.error("Audit JSONL rotation failed (continuing append): %s", e)
+
     def _scan_chain_head_uncached(self) -> str | None:
         """Scan the JSONL tail-to-head for the last readable sha256_hash.
 
@@ -943,6 +996,10 @@ class Database:
         # None. Legacy files (entries without previous_hash) extend the
         # chain at the legacy head, preserving the legacy prefix verbatim.
         # Atomicity is provided by the _log_audit wrapper's _audit_lock.
+        # P1-A: rotate BEFORE the link is read so a rotated-to file's first
+        # entry seeds at None instead of linking into the rotated-away file
+        # (a cross-file link reads as a broken chain in the Layer-2 walk).
+        self._rotate_audit_jsonl_locked()
         entry.previous_hash = self._read_chain_head()
         # Calculate hash over entry data WITHOUT sha256_hash field
         hash_data = self._model_to_dict(entry)
@@ -2835,14 +2892,16 @@ class Database:
                 closed_count += 1
             except Exception as e:
                 logger.warning(f"Error closing current thread connection: {e}")
-        # Close all tracked connections other threads
+        # Close all tracked connections from other threads. M-02: with the
+        # sqlite3 default thread-affinity check restored, a foreign-thread
+        # conn.close() raises ProgrammingError and would leak the handle in
+        # the except branch below. Dropping the last reference instead
+        # releases the underlying sqlite handle in connection dealloc, which
+        # - unlike the close() entry point - carries no thread affinity, so
+        # FIX-WINDOWS-SHUTDOWN hygiene is preserved without weakening the
+        # M-02 same-thread operation discipline.
         with self._registry_lock:
-            for thread_id, conn in list(self._thread_registry.items()):
-                try:
-                    conn.close()
-                    closed_count += 1
-                except Exception as e:
-                    logger.warning(f"Error closing connection thread {thread_id}: {e}")
+            closed_count += len(self._thread_registry)
             self._thread_registry.clear()
         # FIX-F-PERF-2: release the persistent audit JSONL handle so no file
         # handle outlives the Database instance (Windows file-lock hygiene).

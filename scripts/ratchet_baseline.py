@@ -983,11 +983,16 @@ History (most recent last):
        job body). All other wave files modified in place: scheduler.py
        (the four gates), RISK-REGISTER R-19 row closure + R-16
        live-span re-point + dated 05Oct entry,
-       CMP-SUPERSESSION-REGISTER S-15 enablement cell, drill-runbook
+       531  CMP-SUPERSESSION-REGISTER S-15 enablement cell, drill-runbook
        restart amendment, register closure test. Tree at ceiling 530
        pre-wave (530 == 530), so +1 lands AT 531. Ceiling 530->531.
+  532  19-Oct P5 wave (L-03/M-02/M-03/L-01/P1-R/P1-A/P1-D + optional
+       HC-23 retirement): +1 scripts/p5_verify_state.py (stdlib-only
+       wave-state verifier grading the eight items pre/post). Tree at
+       ceiling 531 pre-wave (531 == 531), so +1 lands AT 532.
+       Ceiling 531->532.
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 531
+TRACKED_FILE_CEILING = 532

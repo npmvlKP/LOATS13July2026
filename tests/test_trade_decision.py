@@ -499,6 +499,39 @@ class TestRouting:
                 except Exception as e:
                     assert "fail" in str(e)
 
+    @pytest.mark.asyncio
+    async def test_dispatch_persists_decision_row_even_on_error(self, td_engine):
+        """P1-D: the decision row is DB-visible AT DISPATCH.
+
+        A process death between dispatch and outcome must still leave the
+        trade_decisions row behind (12Oct: 74 routed decisions left zero
+        DB rows), so the dispatch-point persist runs BEFORE the analyzer
+        call -- pinned here by an analyzer that raises: the row is still
+        created exactly once.
+        """
+        td_engine.analyzer_routing_enabled = True
+        with (
+            patch("loats.trade_decision.db") as mdb,
+            patch("loats.trade_decision.datetime") as mdt,
+        ):
+            mdt.datetime.now.return_value = __import__("datetime").datetime.now(
+                __import__("datetime").timezone.utc
+            )
+            mdt.UTC = __import__("datetime").timezone.utc
+            mdb.async_get_trade_decision = AsyncMock(
+                side_effect=[None, object()]
+            )  # dispatch: no row yet; error path: row exists
+            mdb.async_create_trade_decision = AsyncMock()
+            with patch("loats.trade_decision.AsyncOpenAlgoClient") as mcc:
+                mc = AsyncMock()
+                mc.__aenter__ = AsyncMock(return_value=mc)
+                mc.__aexit__ = AsyncMock(return_value=False)
+                mc.place_analyzer_request = AsyncMock(side_effect=Exception("boom"))
+                mcc.return_value = mc
+                with pytest.raises(Exception, match="boom"):
+                    await td_engine.route_to_analyzer(_make_td())
+            mdb.async_create_trade_decision.assert_awaited_once()
+
 
 class TestQueue:
     @pytest.mark.asyncio
