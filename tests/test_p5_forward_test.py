@@ -816,12 +816,13 @@ class TestResumeBaseline:
             logged_cycles=7,
             logged_counters={"success": 2, "disabled": 1, "error": 0},
         )
-        # F9-M-03 span-integrity: the baseline IS the logged total (pure
-        # carry). The stream continues cumulatively from the log in every
-        # regime: a fresh engine's future deltas add on top of the carried
-        # total, a live>logged engine reproduces exactly ``live``.
-        assert baseline["cycles_completed"] == 7
-        assert baseline["counters"] == {"success": 2, "disabled": 1, "error": 0}
+        # P5-1 (16Oct continuation): the fold baseline is the LIVE OFFSET
+        # ``live_at_resume - logged`` so the fold ``max(0, live - base)``
+        # telescopes to ``logged + (live_now - live_at_resume)``. The
+        # engine-alive regime continues at the carried total (cycles
+        # 10 carried 7 -> offset 3; success 4 carried 2 -> offset 2).
+        assert baseline["cycles_completed"] == 3
+        assert baseline["counters"] == {"success": 2, "disabled": 0, "error": 0}
 
     def test_counter_reset_never_inflates(self) -> None:
         runner = _load_runner()
@@ -834,14 +835,15 @@ class TestResumeBaseline:
             logged_cycles=7,
             logged_counters={"success": 4, "disabled": 1, "error": 0},
         )
-        # Carry, not floor: a post-restart live counter BELOW the logged
-        # total means the fresh engine lost history, not that the history
-        # was never real (it is corroborated by run events + ROUTE rows).
-        # The baseline keeps the logged total so the stream never DROPS;
-        # it can never exceed logged + genuinely new activity either, so
-        # inflation stays impossible.
-        assert baseline["cycles_completed"] == 7
-        assert baseline["counters"] == {"success": 4, "disabled": 1, "error": 0}
+        # Carry as a NEGATIVE fold offset: a post-restart live counter
+        # BELOW the logged total means the fresh engine lost history, not
+        # that the history was never real (it is corroborated by run
+        # events + ROUTE rows). The offset holds the fold at the logged
+        # total -- max(0, 2 - (-5)) == 7 -- until live re-climbs past it:
+        # a hold, never a drop, and never more than logged + genuinely
+        # new activity, so inflation stays impossible.
+        assert baseline["cycles_completed"] == -5
+        assert baseline["counters"] == {"success": -3, "disabled": -1, "error": 0}
 
     def test_cross_process_resume_carries_prior_generations(self) -> None:
         # Regression pin for the 27Sep root cause: every CLI resume is a
@@ -871,9 +873,92 @@ class TestResumeBaseline:
                 "routing_divergence_detected": 0,
             },
         )
-        assert baseline["cycles_completed"] == 2695
-        assert baseline["counters"]["routed_decisions"] == 289
-        assert baseline["counters"]["success"] == 289
+        # The offset carries the prior generations THROUGH the fold:
+        # max(0, live + 289) keeps the 289 audited attempts AND makes
+        # every new attempt visible immediately (the 16Oct P5-1 fix --
+        # the pre-fix pure-carry form left new work invisible until the
+        # fresh engine's live counts overtook the carried total).
+        assert baseline["cycles_completed"] == -2695
+        assert baseline["counters"]["routed_decisions"] == -289
+        assert baseline["counters"]["success"] == -289
+
+    def test_fresh_engine_resume_keeps_stream_cumulative(self, tmp_path: Path) -> None:
+        # P5-1 pin (16Oct continuation exhibit arithmetic): a resumed
+        # span whose log carries routed_decisions=410 and whose fresh
+        # engine has already routed 5 more MUST read 415. The pre-fix
+        # pure-carry baseline folded max(0, 5 - 410) = 0 -- the new
+        # attempts were invisible until live overtook the carry, and the
+        # floored samples propagated into the next resume (12-16 Oct:
+        # graded stream 410 vs DB-corroborated 1,423).
+        runner = _load_runner()
+        run_log = tmp_path / "run.json"
+        start = datetime.datetime.now(datetime.UTC) - datetime.timedelta(days=11)
+        record = {
+            "routing": {"enabled_at_start": True},
+            "started_at": start.isoformat(),
+            "ended_at": None,
+            "unhandled_exceptions": 0,
+            "restarts": 1,
+            "cycles_completed": 300,
+            "cycles_completed_baseline": 3652,
+            "counters": {
+                "success": 405,
+                "disabled": 0,
+                "error": 5,
+                "routed_decisions": 410,
+                "routing_divergence_detected": 0,
+            },
+            "counters_baseline": {
+                "success": 405,
+                "disabled": 0,
+                "error": 5,
+                "routed_decisions": 410,
+                "routing_divergence_detected": 0,
+            },
+            "events": [],
+        }
+        run_log.write_text(json.dumps(record), encoding="utf-8")
+        prior = json.loads(run_log.read_text(encoding="utf-8"))
+        logged_cycles = int(prior.get("cycles_completed") or 0)
+        logged_counters = {
+            key: int(value or 0) for key, value in (prior.get("counters") or {}).items()
+        }
+        raw = {"cycles_completed": 0, "counters": {}}  # fresh engine at resume
+        baseline = runner._effective_resume_baseline(
+            raw, logged_cycles, logged_counters
+        )
+        assert baseline["cycles_completed"] == -logged_cycles
+        system = SimpleNamespace(running=False)
+        with (
+            patch(
+                "loats.orchestrator.orchestrator",
+                SimpleNamespace(cycle_count=6),
+            ),
+            patch(
+                "loats.trade_decision.trade_decision_engine",
+                SimpleNamespace(
+                    get_routing_stats=lambda: {
+                        "success": 5,
+                        "disabled": 0,
+                        "error": 0,
+                        "routed_decisions": 5,
+                        "routing_divergence_detected": 0,
+                    }
+                ),
+            ),
+            patch(
+                "loats.alerts.alerts",
+                SimpleNamespace(is_kill_switch_active=lambda: False),
+            ),
+            patch.object(runner, "_db_divergence_snapshot", lambda _log: None),
+        ):
+            runner._sample_live_activity(system, run_log, baseline)
+
+        data = json.loads(run_log.read_text(encoding="utf-8"))
+        assert data["counters"]["routed_decisions"] == 415
+        assert data["counters"]["success"] == 410
+        assert data["counters"]["error"] == 5
+        assert data["cycles_completed"] == logged_cycles + 6
 
     def test_resume_baseline_keys_superset_of_known_triple(self) -> None:
         # The carried baseline keeps every logged key (including the
