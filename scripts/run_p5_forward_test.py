@@ -450,32 +450,44 @@ def _engine_identity() -> str:
 
 
 def _effective_resume_baseline(
-    raw: dict[str, Any], logged_cycles: int, logged_counters: dict[str, int]
+    raw: dict[str, Any], logged_cycles: int, logged_counters: dict[str, Any]
 ) -> dict[str, Any]:
     """Shift a resumed run so the graded stream continues cumulatively
     from the prior process's last sample.
 
     Span integrity (27Sep root cause, F9-M-03 audited-attempt evidence):
-    a CLI resume is a fresh process whose engine counters start at zero,
-    so the previous ``max(live - logged, 0)`` floor silently DISCARDED
-    every prior generation's audited attempts (the 24-26Sep generation's
-    289 routed decisions vanished from the graded stream at the 26Sep
-    resume; ``cycles_completed`` was generation-local for the same
-    reason). The graded stream is cumulative across the span, so the
-    baseline IS the logged total: the next sample reports
-    ``logged + (live_now - live_at_resume)``, which telescopes to true
-    activity in every regime:
+    a CLI resume is a fresh process whose engine counters start at zero.
+    P5-1 (16Oct continuation): the pre-fix pure-carry baseline fed the
+    LOGGED total straight into the fold's baseline slot, so the fold's
+    ``max(0, live - base)`` floored every sample to 0 until the fresh
+    engine's live counts overtook the carried total -- new work was
+    invisible and the floored values propagated into the next resume
+    (12-16 Oct exhibit: graded stream 410 vs DB-corroborated 1,423).
 
-    - fresh engine (live starts at 0): logged + new work -- exact;
-    - engine alive across the restart (live >= logged at resume):
-      logged + live - logged == live -- the stream jumps to the true
-      total and can never exceed it, so inflation stays impossible;
-    - post-reset counters (live < logged): the stream holds at the
-      carried total until live re-climbs -- a hold, never a drop and
-      never a double-count, because per-sample deltas floor at the
-      baseline and the carried total is corroborated by run events and
-      ROUTE audit rows, never invented here.
+    The fold baseline is therefore the LIVE OFFSET
+    ``live_at_resume - logged`` (negative whenever the engine holds
+    less than the span has already logged), which telescopes the fold
+    exactly:
+
+        max(0, live_now - (live_at_resume - logged))
+            = logged + max(0, live_now - live_at_resume)
+
+    - fresh engine (live starts at 0): logged + new work -- exact, and
+      every new attempt is visible immediately;
+    - engine alive across the resume (live >= logged): the stream
+      reproduces the true total and can never exceed it;
+    - post-reset counters (live < logged): the stream HOLDS at the
+      carried total until live re-climbs -- never a drop, never a
+      double-count, because the carried total is corroborated by run
+      events and ROUTE audit rows, never invented here.
+
+    The offset is FOLD-RELATIVE ONLY: the run log's recorded
+    ``cycles_completed_baseline`` / ``counters_baseline`` fields keep
+    the nonnegative predecessor totals (written by the resume site), so
+    the snapshot pair stays a cumulative instrument reading, not an
+    offset.
     """
+    live_cycles = max(int(raw.get("cycles_completed") or 0), 0)
     live_counters = raw["counters"]
     # Carry EVERY logged key (including the engine-carried F9-C-02
     # divergence flag) so per-key delta arithmetic in
@@ -488,9 +500,13 @@ def _effective_resume_baseline(
         )
     )
     return {
-        "cycles_completed": max(int(logged_cycles), 0),
+        "cycles_completed": live_cycles - max(int(logged_cycles), 0),
         "counters": {
-            key: max(int(logged_counters.get(key, 0)), 0) for key in merged_keys
+            key: (
+                max(int(live_counters.get(key, 0) or 0), 0)
+                - max(int(logged_counters.get(key, 0) or 0), 0)
+            )
+            for key in merged_keys
         },
     }
 
@@ -1394,8 +1410,15 @@ async def _run(
                     run_log,
                     {
                         "restarts": prior_restarts + 1,
-                        "cycles_completed_baseline": baseline["cycles_completed"],
-                        "counters_baseline": dict(baseline["counters"]),
+                        # P5-1: the recorded *_baseline fields keep the
+                        # nonnegative predecessor totals; the (possibly
+                        # negative) fold offset in `baseline` never
+                        # reaches the snapshot.
+                        "cycles_completed_baseline": max(int(logged_cycles), 0),
+                        "counters_baseline": {
+                            key: max(int(value or 0), 0)
+                            for key, value in logged_counters.items()
+                        },
                         "last_sampled_at": _utcnow_iso(),
                     },
                 )
