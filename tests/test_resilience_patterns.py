@@ -1,6 +1,9 @@
 """Test resilience patterns for LOATS13July2026."""
 
+import asyncio
 import time
+from collections.abc import Callable
+from typing import cast
 from unittest.mock import patch
 
 import pytest
@@ -371,3 +374,114 @@ class TestCircuitBreakerRetryComposition:
 
         result = await test_func(1, "test", c=2.5)
         assert result == "1-test-2.5"
+
+
+class TestChainWallClockDeadline:
+    """17Oct wave: cap the whole breaker+retry chain with a wall deadline.
+
+    Regression shape (17Oct 12:45 IST outage): a black-holing listener
+    (accepts TCP, never answers) made every attempt burn the full per-call
+    timeout, so 3 retries x 30 s pinned fetch legs at ~95 s each, the
+    trading cycle went dormant for ~603 s, and the PTB update queue sat
+    blocked behind a /resume handler awaiting its Telegram confirmation
+    for 512 s. The deadline caps the CHAIN while fast failures still
+    retry within the remaining budget.
+    """
+
+    def _cb(self) -> CircuitBreaker:
+        return CircuitBreaker(
+            "deadline-test", CircuitBreakerConfig(failure_threshold=100)
+        )
+
+    async def test_deadline_caps_slow_attempt_chain(self) -> None:
+        cb = self._cb()
+        started = time.monotonic()
+
+        @circuit_breaker_retry_async(
+            cb, RetryConfig(max_attempts=3, base_delay=0.01), total_deadline=0.3
+        )
+        async def slow() -> str:
+            await asyncio.sleep(5)
+            return "never"
+
+        with pytest.raises(TimeoutError):
+            await slow()
+        assert time.monotonic() - started < 3.0
+
+    async def test_fast_failures_retry_within_deadline_then_succeed(self) -> None:
+        cb = self._cb()
+        calls = {"n": 0}
+
+        @circuit_breaker_retry_async(
+            cb, RetryConfig(max_attempts=3, base_delay=0.01), total_deadline=5.0
+        )
+        async def flaky() -> str:
+            calls["n"] += 1
+            if calls["n"] < 3:
+                raise ValueError("transient")
+            return "ok"
+
+        assert await flaky() == "ok"
+        assert calls["n"] == 3
+
+    async def test_deadline_exhaustion_raises_last_exception(self) -> None:
+        cb = self._cb()
+
+        @circuit_breaker_retry_async(
+            cb,
+            RetryConfig(max_attempts=50, base_delay=0.01),
+            total_deadline=0.4,
+        )
+        async def always_fails() -> str:
+            raise ValueError("boom")
+
+        with pytest.raises(ValueError, match="boom"):
+            await always_fails()
+
+    async def test_no_deadline_preserves_legacy_behavior(self) -> None:
+        cb = self._cb()
+
+        @circuit_breaker_retry_async(cb, RetryConfig(max_attempts=2, base_delay=0.01))
+        async def fine() -> str:
+            return "ok"
+
+        assert await fine() == "ok"
+
+    async def test_circuit_open_still_fails_fast_under_deadline(self) -> None:
+        from loats.utils.circuit_breaker import CircuitBreakerOpenError
+
+        cb = CircuitBreaker("open-deadline", CircuitBreakerConfig(failure_threshold=1))
+
+        @circuit_breaker_retry_async(
+            cb, RetryConfig(max_attempts=2, base_delay=0.01), total_deadline=5.0
+        )
+        async def always_fails() -> str:
+            raise ValueError("trip")
+
+        # Attempt 1 fails through the breaker (threshold 1 -> circuit opens);
+        # attempt 2 must fail fast with CircuitBreakerOpenError, deadline or not.
+        with pytest.raises(CircuitBreakerOpenError):
+            await always_fails()
+
+    async def test_preconfigured_compositions_carry_deadline(self) -> None:
+        from loats.utils.resilience import (
+            _request_timeout_deadline,
+            openalgo_circuit_breaker_retry_async,
+            telegram_circuit_breaker_retry_async,
+        )
+
+        async def _probe() -> str:
+            return "ok"
+
+        for composition in (
+            openalgo_circuit_breaker_retry_async,
+            telegram_circuit_breaker_retry_async,
+        ):
+            # The pre-configured instances are DECORATORS; the deadline is
+            # bound onto each wrapper they produce.
+            wrapper = composition(_probe)
+            bound = getattr(wrapper, "total_deadline", None)
+            assert callable(bound), "pre-configured composition lost its deadline"
+            deadline_value: float = cast("Callable[[], float]", bound)()
+            assert deadline_value > 0
+        assert _request_timeout_deadline() > 0
