@@ -786,3 +786,39 @@ class TestThreadSafety:
         assert len(set(keys.values())) <= 5
         with oa._idempotency_lock:
             assert len(oa._idempotency_keys) == 5
+
+
+class TestRequestTimeoutFacets:
+    """17Oct wave: explicit connect/pool facets bound refusal + pool stalls.
+
+    A black-holing listener only exercises the read facet; connect and
+    pool facets must be bounded independently so refused connections and
+    pool exhaustion fail fast instead of riding the full request budget.
+    """
+
+    def test_sync_client_timeout_facets(self) -> None:
+        client = OpenAlgoClient(api_key="k", base_url="http://test")
+        try:
+            http_client = client._ensure_client()
+            facets = http_client.timeout
+            assert isinstance(facets, httpx.Timeout)
+            assert facets.connect == min(5.0, client.timeout)
+            assert facets.pool == min(5.0, client.timeout)
+            assert facets.read == client.timeout
+        finally:
+            if client.client is not None:
+                client.client.close()
+
+    @pytest.mark.asyncio
+    async def test_async_client_timeout_facets(self) -> None:
+        client = AsyncOpenAlgoClient(api_key="k", base_url="http://test")
+        try:
+            http_client = await client._ensure_client()
+            facets = http_client.timeout
+            assert isinstance(facets, httpx.Timeout)
+            assert facets.connect == min(5.0, client.timeout)
+            assert facets.pool == min(5.0, client.timeout)
+            assert facets.read == client.timeout
+        finally:
+            if client.client is not None:
+                await client.client.aclose()

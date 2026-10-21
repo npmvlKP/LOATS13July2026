@@ -739,6 +739,19 @@ def _check_kill_switch() -> None:
         raise KillSwitchError("Kill switch active, order placement blocked")
 
 
+def _request_timeout_facets(total: float) -> httpx.Timeout:
+    """Explicit timeout facets for one outbound OpenAlgo budget.
+
+    A black-holing listener ACCEPTS the TCP connection and never answers,
+    so the read facet is the only bound that fires (17Oct2026 outage):
+    bound connect and pool independently so refusals and pool stalls fail
+    fast instead of riding the full request budget.
+    """
+    safe_total = max(0.001, total)
+    edge = min(5.0, safe_total)
+    return httpx.Timeout(safe_total, connect=edge, pool=edge)
+
+
 class OpenAlgoClient:
     """Client interacting OpenAlgo API."""
 
@@ -752,7 +765,7 @@ class OpenAlgoClient:
     def __enter__(self) -> OpenAlgoClient:
         self.client = httpx.Client(
             base_url=self.base_url,
-            timeout=self.timeout,
+            timeout=_request_timeout_facets(self.timeout),
             headers={"x-api-key": self.api_key},
         )
         return self
@@ -766,7 +779,7 @@ class OpenAlgoClient:
         if self.client is None:
             self.client = httpx.Client(
                 base_url=self.base_url,
-                timeout=self.timeout,
+                timeout=_request_timeout_facets(self.timeout),
                 headers={"x-api-key": self.api_key},
             )
         return self.client
@@ -1168,7 +1181,7 @@ class AsyncOpenAlgoClient:
     async def __aenter__(self) -> AsyncOpenAlgoClient:
         self.client = httpx.AsyncClient(
             base_url=self.base_url,
-            timeout=self.timeout,
+            timeout=_request_timeout_facets(self.timeout),
             headers={"x-api-key": self.api_key},
         )
         return self
@@ -1182,7 +1195,7 @@ class AsyncOpenAlgoClient:
         if self.client is None:
             self.client = httpx.AsyncClient(
                 base_url=self.base_url,
-                timeout=self.timeout,
+                timeout=_request_timeout_facets(self.timeout),
                 headers={"x-api-key": self.api_key},
             )
         return self.client
