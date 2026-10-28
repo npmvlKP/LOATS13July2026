@@ -211,6 +211,7 @@ class TestCachePerformance:
     """Benchmark cache operations performance."""
 
     @pytest.mark.asyncio
+    @pytest.mark.benchmark_wallclock
     async def test_cache_latency(self) -> None:
         """Benchmark cache read/write latency."""
         await cache_manager.initialize()
@@ -227,6 +228,16 @@ class TestCachePerformance:
         # perf_counter swap: keeps the CI-comparable basis (CI
         # pytest-coverage and benchmark-perf grades stay comparable to
         # history).
+        #
+        # 28Oct isolation landing (ADR-0016 sanctioned lever #2,
+        # operator-gated): this stage carries ``benchmark_wallclock`` - the
+        # local pre-push pytest leg deselects the marker (coverage tracing
+        # alone measures ~1.6k writes/s on this host vs the 2,000 threshold;
+        # re-proven 28Oct: 1,586 traced vs a green untraced pair in the same
+        # minute) and CI's advisory benchmark-wallclock job grades it on an
+        # isolated runner with no tracing. The REQUIRED pytest-coverage job
+        # still runs this stage unchanged - server-side enforcement is
+        # complete. Pinned by tests/test_benchmark_wallclock_isolation.py.
         write_rates: list[float] = []
         read_rates: list[float] = []
         for _pass in range(5):
@@ -321,6 +332,7 @@ class TestConcurrentPerformance:
         )
 
     @pytest.mark.asyncio
+    @pytest.mark.benchmark_wallclock
     async def test_concurrent_cache_operations(self) -> None:
         """Benchmark concurrent cache operations."""
         await cache_manager.initialize()
@@ -371,6 +383,12 @@ class TestConcurrentPerformance:
         # under CI/co-tenant load cannot flake the gate. Combined with the
         # median-of-5 basis above, two relaxations (5,000->2,000 and
         # 7,000-9,000->3,000) remain the only threshold spend on this class.
+        #
+        # 28Oct isolation landing: this stage carries ``benchmark_wallclock``
+        # (deselected by the traced local pre-push leg, graded by CI's
+        # advisory benchmark-wallclock job with no tracing; the REQUIRED
+        # pytest-coverage job keeps running it). See
+        # tests/test_benchmark_wallclock_isolation.py.
         assert operations_per_second > 3000, (
             f"Concurrent cache performance too slow: {operations_per_second:.2f} ops/sec (expected > 3000)"
         )
