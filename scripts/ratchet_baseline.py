@@ -991,8 +991,21 @@ History (most recent last):
        wave-state verifier grading the eight items pre/post). Tree at
        ceiling 531 pre-wave (531 == 531), so +1 lands AT 532.
        Ceiling 531->532.
+  533  28Oct dashboard-heartbeat control-room wave: +1
+       tests/test_dashboard_heartbeat.py (store CRUD + user-deletable
+       rows, 5-minute cadence and dispatch pins, Telegram no-cooldown
+       delivery, admin-gated delete/clear commands, glyph pins).
+       All other wave files modified in place: database.py
+       (dashboard_heartbeat store), alerts.py (send_heartbeat +
+       /heartbeats + /delete_heartbeat + /clear_heartbeats),
+       scheduler.py (dashboard_heartbeat job + run_once dispatch),
+       main.py (support-job enumeration), RUNBOOK.md (operator
+       commands), test_single_engine_consolidation.py (support-job
+       id set gains the visibility-only heartbeat). Tree at ceiling
+       532 pre-wave (532 == 532), so +1 lands AT 533. Ceiling
+       532->533.
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 532
+TRACKED_FILE_CEILING = 533

@@ -123,7 +123,26 @@ Check status via Telegram commands:
 | `/positions` | View current positions |
 | `/orders` | View open orders |
 | `/signals` | View recent trading signals |
+| `/heartbeats [count]` | List recent dashboard heartbeat rows (1-20, default 5) |
+| `/delete_heartbeat <id>` | Delete one heartbeat row (admin only) |
+| `/clear_heartbeats` | Delete all heartbeat rows (admin only) |
 | `/help` | Show help message |
+
+### Dashboard Heartbeat (Control Room)
+
+Every 5 minutes the scheduler's `dashboard_heartbeat` job inserts one row
+into the `dashboard_heartbeat` table and delivers the same status card over
+Telegram (market state, kill-switch state, circuit-breaker and per-source
+breaker summary). The beat is deliberately broker-independent and not gated
+on the kill switch, so it keeps flowing -- reporting `kill=ACTIVE` and open
+breakers -- during broker outages and halts, when proof of system liveness
+matters most.
+
+Rows accumulate one per beat; keep the dashboard clean with
+`/delete_heartbeat <id>` (single row) or `/clear_heartbeats` (all rows).
+A `tg=❌` marker in `/heartbeats` means that beat could not be delivered to
+Telegram (the row itself was still persisted); a missing beat with a stale
+timestamp is the dead-system signature the heartbeat exists to expose.
 
 ### Alert Types
 

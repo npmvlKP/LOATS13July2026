@@ -198,6 +198,9 @@ class TestSchedulerDoesNotEmitSignals:
             "market_activation_check",
             "data_cleanup",
             "backtest_sanity_check",
+            # 28Oct2026 control-room wave: visibility-only heartbeat (no
+            # signal production), registered by the Dashboard Option A wave.
+            "dashboard_heartbeat",
         }
         assert "ta_scan" not in ids
         assert "sentiment_scan" not in ids

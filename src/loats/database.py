@@ -248,6 +248,164 @@ class Database:
         finally:
             self._release_connection(conn)
 
+    # ------------------------------------------------------------------
+    # Dashboard heartbeat store (28Oct2026 control-room wave).
+    #
+    # One row per scheduled heartbeat beat (every 5 minutes). The table is
+    # the operator "dashboard" surface of record: rows accumulate while the
+    # system lives, each beat is mirrored to Telegram through the existing
+    # AlertSystem channel, and rows are USER-DELETABLE via the Telegram
+    # admin commands /delete_heartbeat and /clear_heartbeats so the
+    # dashboard can be kept clean without touching the audit trail.
+    # ------------------------------------------------------------------
+
+    def _create_dashboard_tables(self, cursor: sqlite3.Cursor) -> None:
+        """Create the dashboard_heartbeat table if missing."""
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS dashboard_heartbeat (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TEXT NOT NULL,
+                market_open INTEGER NOT NULL,
+                kill_switch_active INTEGER NOT NULL,
+                breakers_open INTEGER NOT NULL,
+                telegram_delivered INTEGER NOT NULL,
+                detail TEXT NOT NULL,
+                message TEXT NOT NULL
+            )
+        """)
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_dashboard_heartbeat_timestamp"
+            " ON dashboard_heartbeat(timestamp)"
+        )
+
+    def record_dashboard_heartbeat(
+        self,
+        *,
+        market_open: bool,
+        kill_switch_active: bool,
+        breakers_open: int,
+        telegram_delivered: bool,
+        detail: str,
+        message: str,
+    ) -> int:
+        """Insert one heartbeat row; return its row id (-1 on failure).
+
+        The timestamp is UTC (ISO-8601, tz-aware) computed at write time,
+        consistent with every other store timestamp in this module.
+        """
+        conn = self._get_connection()
+        try:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                INSERT INTO dashboard_heartbeat (
+                    timestamp, market_open, kill_switch_active,
+                    breakers_open, telegram_delivered, detail, message
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    datetime.now(UTC).isoformat(),
+                    int(market_open),
+                    int(kill_switch_active),
+                    int(breakers_open),
+                    int(telegram_delivered),
+                    detail,
+                    message,
+                ),
+            )
+            conn.commit()
+            return int(cursor.lastrowid) if cursor.lastrowid is not None else -1
+        except Exception as e:
+            logger.error(f"Failed to record dashboard heartbeat: {e}")
+            conn.rollback()
+            return -1
+        finally:
+            self._release_connection(conn)
+
+    def get_dashboard_heartbeats(self, limit: int = 10) -> list[dict[str, Any]]:
+        """Return up to ``limit`` heartbeat rows, newest first."""
+        conn = self._get_connection()
+        try:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT id, timestamp, market_open, kill_switch_active,
+                       breakers_open, telegram_delivered, detail, message
+                FROM dashboard_heartbeat
+                ORDER BY id DESC
+                LIMIT ?
+                """,
+                (max(1, int(limit)),),
+            )
+            rows = cursor.fetchall()
+            return [
+                {
+                    "id": int(row[0]),
+                    "timestamp": row[1],
+                    "market_open": bool(row[2]),
+                    "kill_switch_active": bool(row[3]),
+                    "breakers_open": int(row[4]),
+                    "telegram_delivered": bool(row[5]),
+                    "detail": row[6],
+                    "message": row[7],
+                }
+                for row in rows
+            ]
+        except Exception as e:
+            logger.error(f"Failed to read dashboard heartbeats: {e}")
+            conn.rollback()
+            return []
+        finally:
+            self._release_connection(conn)
+
+    def count_dashboard_heartbeats(self) -> int:
+        """Return the number of heartbeat rows currently retained."""
+        conn = self._get_connection()
+        try:
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM dashboard_heartbeat")
+            row = cursor.fetchone()
+            return int(row[0]) if row is not None else 0
+        except Exception as e:
+            logger.error(f"Failed to count dashboard heartbeats: {e}")
+            conn.rollback()
+            return 0
+        finally:
+            self._release_connection(conn)
+
+    def delete_dashboard_heartbeat(self, heartbeat_id: int) -> bool:
+        """Delete one heartbeat row by id; True when a row was removed."""
+        conn = self._get_connection()
+        try:
+            cursor = conn.cursor()
+            cursor.execute(
+                "DELETE FROM dashboard_heartbeat WHERE id = ?",
+                (int(heartbeat_id),),
+            )
+            conn.commit()
+            return cursor.rowcount > 0
+        except Exception as e:
+            logger.error(f"Failed to delete dashboard heartbeat: {e}")
+            conn.rollback()
+            return False
+        finally:
+            self._release_connection(conn)
+
+    def clear_dashboard_heartbeats(self) -> int:
+        """Delete ALL heartbeat rows; return the number removed."""
+        conn = self._get_connection()
+        try:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM dashboard_heartbeat")
+            conn.commit()
+            return int(cursor.rowcount) if cursor.rowcount > 0 else 0
+        except Exception as e:
+            logger.error(f"Failed to clear dashboard heartbeats: {e}")
+            conn.rollback()
+            return 0
+        finally:
+            self._release_connection(conn)
+
     def initialize(self) -> None:
         """Initialize database schema (public alias for _initialize_database)."""
         self._initialize_database()
@@ -277,6 +435,7 @@ class Database:
         self._create_market_tables(cursor)
         self._create_position_tables(cursor)
         self._create_cmp_tables(cursor)
+        self._create_dashboard_tables(cursor)
         self._create_indexes(cursor)
         conn.commit()
         # Ensure schema is up to date (migrate old databases)
@@ -2980,6 +3139,50 @@ class Database:
     async def async_vacuum(self) -> None:
         """Async wrapper vacuum() avoid blocking event loop."""
         await asyncio.to_thread(self.vacuum)
+
+    # Dashboard heartbeat async wrappers (28Oct2026 control-room wave):
+    # thin to_thread delegates to the canonical sync implementations, the
+    # same pattern as async_cleanup/async_vacuum -- a 5-minute cadence
+    # never justifies a second write path for the same table.
+
+    async def async_record_dashboard_heartbeat(
+        self,
+        *,
+        market_open: bool,
+        kill_switch_active: bool,
+        breakers_open: int,
+        telegram_delivered: bool,
+        detail: str,
+        message: str,
+    ) -> int:
+        """Async wrapper record_dashboard_heartbeat()."""
+        return await asyncio.to_thread(
+            self.record_dashboard_heartbeat,
+            market_open=market_open,
+            kill_switch_active=kill_switch_active,
+            breakers_open=breakers_open,
+            telegram_delivered=telegram_delivered,
+            detail=detail,
+            message=message,
+        )
+
+    async def async_get_dashboard_heartbeats(
+        self, limit: int = 10
+    ) -> list[dict[str, Any]]:
+        """Async wrapper get_dashboard_heartbeats()."""
+        return await asyncio.to_thread(self.get_dashboard_heartbeats, limit)
+
+    async def async_count_dashboard_heartbeats(self) -> int:
+        """Async wrapper count_dashboard_heartbeats()."""
+        return await asyncio.to_thread(self.count_dashboard_heartbeats)
+
+    async def async_delete_dashboard_heartbeat(self, heartbeat_id: int) -> bool:
+        """Async wrapper delete_dashboard_heartbeat()."""
+        return await asyncio.to_thread(self.delete_dashboard_heartbeat, heartbeat_id)
+
+    async def async_clear_dashboard_heartbeats(self) -> int:
+        """Async wrapper clear_dashboard_heartbeats()."""
+        return await asyncio.to_thread(self.clear_dashboard_heartbeats)
 
     async def async_create_signal(self, signal: Signal) -> bool:
         """Async create signal; prefers aiosqlite pool when available."""
