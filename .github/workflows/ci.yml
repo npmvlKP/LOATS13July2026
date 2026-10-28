@@ -388,6 +388,54 @@ jobs:
           path: reports/performance/*.json
           retention-days: 30
 
+  # ----------------------------------------------------------------
+  # benchmark-wallclock (2026-10-28, ADR-0016 sanctioned lever #2 -
+  # suite-context isolation, operator-gated): grades the TWO wall-clock
+  # cache benchmark stages (pytest marker ``benchmark_wallclock``) on an
+  # isolated runner with NO coverage tracing. The local pre-push pytest
+  # leg deselects the marker: coverage.py tracing alone compresses the
+  # shared trading host below the thresholds (07Oct isolation ladder,
+  # re-proven 28Oct: 1,586 writes/s traced vs a green untraced pair in
+  # the same minute), so a local refusal there grades the TRACING, not
+  # the build. Enforcement is NOT narrowed by this job: the REQUIRED
+  # pytest-coverage job keeps running the FULL suite (marker included)
+  # on its isolated runner - server-side enforcement of the complete
+  # set is unchanged - while this job adds a clean no-tracing verdict
+  # and the runner-evidence surface for any future threshold
+  # re-baseline (07Oct threshold doctrine: re-baseline from runner
+  # evidence, never from host data). ADVISORY (not in the required-
+  # context list), same class as repo-hygiene/rss-feeds/ruff-repo-scope:
+  # the required gate for these tests remains pytest-coverage.
+  # Pinned by tests/test_benchmark_wallclock_isolation.py.
+  # ----------------------------------------------------------------
+  benchmark-wallclock:
+    name: benchmark-wallclock
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+      - name: Install dependencies
+        # Editable install: same parity contract as the pytest-coverage
+        # job (the marked stages import the loats package and need the
+        # dev extra's pytest-asyncio).
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+      - name: Run wall-clock cache benchmarks (isolated, no coverage tracing)
+        run: |
+          pytest tests/ -m benchmark_wallclock \
+            --junitxml=pytest-benchmark-report.xml
+      - name: Upload benchmark results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: benchmark-wallclock-results
+          path: pytest-benchmark-report.xml
+          retention-days: 30
+
   docker:
     name: Docker Build
     runs-on: ubuntu-latest

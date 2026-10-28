@@ -1004,8 +1004,20 @@ History (most recent last):
        id set gains the visibility-only heartbeat). Tree at ceiling
        532 pre-wave (532 == 532), so +1 lands AT 533. Ceiling
        532->533.
+  534  28Oct benchmark-isolation wave (ADR-0016 sanctioned lever #2,
+       operator-gated): +1 tests/test_benchmark_wallclock_isolation.py
+       (isolation net: marker registration, marked-pair selection,
+       pre-push deselect, advisory benchmark-wallclock CI job, the
+       required-pytest-coverage full-suite pin). All other wave files
+       modified in place: pyproject.toml (marker registration),
+       tests/test_performance_benchmarks.py (the two wall-clock cache
+       stages marked), .pre-commit-config.yaml (pre-push pytest leg
+       deselects the marker), .github/workflows/ci.yml (advisory
+       benchmark-wallclock job), CONTRIBUTING.md (advisory-job list +
+       dated note). Tree at ceiling 533 pre-wave (533 == 533), so +1
+       lands AT 534. Ceiling 533->534.
 """
 
 from __future__ import annotations
 
-TRACKED_FILE_CEILING = 533
+TRACKED_FILE_CEILING = 534

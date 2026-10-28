@@ -3213,3 +3213,29 @@ M-02, M-03, L-01, the P1 trio; optional alias-retirement appended).
 Nothing is wired mid-span. No code, config, or protection change ships
 in this wave: docs-only reconciliation addendum, graded through the
 register, hygiene and format-surface classes on the repo venv.
+
+Updated 2026-10-28 (benchmark-isolation wave; snapshot HEAD c54f6a5,
+post-#164; live probes 18:51-18:55 IST, repo venv): the 07Oct sanctioned
+lever #2 (suite-context isolation for the wall-clock cache benchmarks,
+operator-gated) is LANDED with the operator's explicit 28Oct approval.
+The two wall-clock cache stages (tests/test_performance_benchmarks.py::
+TestCachePerformance::test_cache_latency and ::TestConcurrentPerformance::
+test_concurrent_cache_operations) carry the newly registered marker
+benchmark_wallclock; the local pre-push pytest leg deselects it
+(-m "not benchmark_wallclock" in .pre-commit-config.yaml); CI grades the
+pair in the new ADVISORY benchmark-wallclock job (isolated ubuntu runner,
+no coverage tracing, fail-closed exit code) while the REQUIRED
+pytest-coverage job keeps running the FULL suite including the marker -
+server-side enforcement of the complete set is unchanged (11 required
+contexts, no protection-contract change). CONTRIBUTING.md documents the
+advisory job and the no-downgrade clause; the isolation net
+(tests/test_benchmark_wallclock_isolation.py: 11 legs incl. a live
+marker-selection proof and RED mutation legs) pins every part; ratchet
+533 -> 534 (one new test file). Fresh before/after on THIS host: the
+traced pair run measured 1,586.30 writes/s median (passes 1516-1793,
+narrow spread) against the 2,000 threshold - deterministic FAIL under
+--cov - and the identical code untraced passed both stages in 2.83s the
+same minute: tracing is the depressant, exactly the 07Oct ladder.
+Thresholds UNTOUCHED (two relaxations remain the total spend; a third
+stays forbidden); any future re-baseline takes the benchmark-wallclock
+CI runner artifact as evidence, never host data.

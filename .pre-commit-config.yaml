@@ -95,7 +95,18 @@ repos:
         entry: pytest
         language: system
         pass_filenames: false
-        args: [--cov, --cov-fail-under=80, --cov-report=term-missing, --cov-report=json]
+        # 28Oct (ADR-0016 sanctioned lever #2, operator-gated): the two
+        # wall-clock cache benchmark stages carry `benchmark_wallclock` and
+        # are deselected HERE - coverage.py tracing alone compresses the
+        # shared trading host's cache throughput below the 2,000 writes/s
+        # threshold (07Oct isolation ladder; re-proven 28Oct: 1,586 writes/s
+        # traced vs a green untraced pair in the same minute). Deselecting
+        # locally does NOT narrow enforcement: the REQUIRED pytest-coverage
+        # CI job keeps running the full suite including the marker on an
+        # isolated runner, and the advisory benchmark-wallclock job grades
+        # the marked pair with no tracing at all. Pinned by
+        # tests/test_benchmark_wallclock_isolation.py.
+        args: [--cov, --cov-fail-under=80, --cov-report=term-missing, --cov-report=json, -m, "not benchmark_wallclock"]
         stages: [pre-push]
 
       - id: per-module-coverage

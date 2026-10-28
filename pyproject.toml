@@ -200,6 +200,18 @@ addopts = "-v"
 # sync APIs) previously shipped invisibly through CI. UserWarning stays
 # non-fatal (third-party noise, e.g. newspaper/nltk).
 filterwarnings = ["error::RuntimeWarning"]
+# ADR-0016 sanctioned lever #2 (suite-context isolation), landed 2026-10-28:
+# the wall-clock cache benchmark stages carry ``benchmark_wallclock`` and are
+# deselected by the local pre-push pytest leg (coverage tracing alone
+# compresses the shared trading host below the thresholds - 07Oct isolation
+# ladder, re-proven 28Oct: 1,586 writes/s traced vs 2,000 threshold, both
+# stages pass untraced). The REQUIRED pytest-coverage CI job keeps running
+# the full suite including this marker (server-side enforcement unchanged);
+# the advisory ``benchmark-wallclock`` CI job grades the marked pair in
+# isolation with no tracing. Pinned by tests/test_benchmark_wallclock_isolation.py.
+markers = [
+    "benchmark_wallclock: wall-clock throughput benchmarks isolated from coverage-traced local runs; graded by CI's benchmark-wallclock job (ADR-0016 lever #2)",
+]
 
 [tool.coverage.run]
 source = ["src"]
