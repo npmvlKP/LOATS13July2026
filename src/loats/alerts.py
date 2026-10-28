@@ -147,6 +147,17 @@ class AlertSystem:
             self.application.add_handler(CommandHandler("positions", self._positions))
             self.application.add_handler(CommandHandler("orders", self._orders))
             self.application.add_handler(CommandHandler("signals", self._signals))
+            # Dashboard heartbeat control-room commands (28Oct2026 wave).
+            # /heartbeats is read-only (same class as /status); the two
+            # deletion commands mutate dashboard state and therefore carry
+            # the same admin gate as /kill and /resume.
+            self.application.add_handler(CommandHandler("heartbeats", self._heartbeats))
+            self.application.add_handler(
+                CommandHandler("delete_heartbeat", self._delete_heartbeat)
+            )
+            self.application.add_handler(
+                CommandHandler("clear_heartbeats", self._clear_heartbeats)
+            )
             self.application.add_handler(CommandHandler("help", self._help))
             self.application.add_handler(
                 MessageHandler(filters.TEXT & ~filters.COMMAND, self._handle_message)
@@ -503,6 +514,22 @@ class AlertSystem:
             logger.error(f"Failed format system alert: {e}")
             return False
 
+    async def send_heartbeat(self, message: str) -> bool:
+        """Deliver one dashboard heartbeat over the existing Telegram channel.
+
+        Deliberately bypasses ``send_alert``'s per-``alert_type`` cooldown:
+        the heartbeat cadence (5 minutes) collides with the 300 s cooldown
+        window, and a suppressed beat would be indistinguishable from a
+        dead system -- the one thing a heartbeat must never be. Uses the
+        same bot, chat and circuit-breaker-protected send path as every
+        other alert (no new integration).
+        """
+        try:
+            return await self._send_telegram_message(message)
+        except Exception as e:
+            logger.error(f"Failed send dashboard heartbeat: {e}")
+            return False
+
     @openalgo_circuit_breaker_retry_async
     async def _safe_get_position_book(self) -> dict[str, Any] | None:
         """Get position book circuit breaker retry protection."""
@@ -831,6 +858,9 @@ class AlertSystem:
                 "/positions View current positions\n"
                 "/orders View open orders\n"
                 "/signals View recent signals\n"
+                "/heartbeats View dashboard heartbeat rows\n"
+                "/delete_heartbeat Delete one heartbeat row (admin)\n"
+                "/clear_heartbeats Delete all heartbeat rows (admin)\n"
                 "/kill Activate kill switch\n"
                 "/resume Resume trading\n"
                 "/help Show help message"
@@ -1055,6 +1085,131 @@ class AlertSystem:
                 await update.message.reply_text(message, parse_mode="HTML")
         except Exception as e:
             logger.error(f"Error /signals command: {e}")
+            if update.message:
+                await update.message.reply_text(f"❌ Error: {e!s}")
+
+    async def _heartbeats(
+        self, update: Update, context: ContextTypes.DEFAULT_TYPE
+    ) -> None:
+        """Handle /heartbeats command: list recent dashboard heartbeat rows."""
+        try:
+            limit = 5
+            if context.args:
+                try:
+                    limit = max(1, min(20, int(context.args[0])))
+                except ValueError:
+                    if update.message:
+                        await update.message.reply_text(
+                            "Usage: /heartbeats [count] (1-20, default 5)"
+                        )
+                    return
+
+            rows = await self.db.async_get_dashboard_heartbeats(limit=limit)
+            total = await self.db.async_count_dashboard_heartbeats()
+
+            if not rows:
+                if update.message:
+                    await update.message.reply_text(
+                        "\uff49 No dashboard heartbeats recorded."
+                    )
+                return
+
+            message = f"\U0001f940 <b>DASHBOARD HEARTBEATS</b> ({total} retained)\n\n"
+            for row in rows:
+                market = "🟢 OPEN" if row["market_open"] else "🔴 CLOSED"
+                kill = "🔴 ACTIVE" if row["kill_switch_active"] else "🟢 off"
+                delivered = "✅" if row["telegram_delivered"] else "❌"
+                message += (
+                    f"<b>#{row['id']}</b> {html.escape(row['timestamp'])}\n"
+                    f"    market={market} kill={kill} "
+                    f"breakers_open={row['breakers_open']} tg={delivered}\n"
+                )
+            message += (
+                "\nDelete one: /delete_heartbeat &lt;id&gt; | "
+                "Delete all: /clear_heartbeats"
+            )
+            if update.message:
+                await update.message.reply_text(message, parse_mode="HTML")
+        except Exception as e:
+            logger.error(f"Error /heartbeats command: {e}")
+            if update.message:
+                await update.message.reply_text(f"❌ Error: {e!s}")
+
+    async def _delete_heartbeat(
+        self, update: Update, context: ContextTypes.DEFAULT_TYPE
+    ) -> None:
+        """Handle /delete_heartbeat command (admin only)."""
+        try:
+            if not self._is_authorized_admin(update):
+                user_id = (
+                    update.effective_user.id if update.effective_user else "unknown"
+                )
+                logger.warning(
+                    "Unauthorized heartbeat delete attempt user: %s", user_id
+                )
+                if update.message:
+                    await update.message.reply_text(
+                        "Unauthorized: You are not authorized to issue this command. "
+                        "Configure TELEGRAM_ADMIN_IDS to include your user ID."
+                    )
+                return
+
+            if not context.args:
+                if update.message:
+                    await update.message.reply_text(
+                        "Usage: /delete_heartbeat <id>\n"
+                        "Run /heartbeats to list row ids."
+                    )
+                return
+
+            try:
+                heartbeat_id = int(context.args[0])
+            except ValueError:
+                if update.message:
+                    await update.message.reply_text(
+                        f"Invalid heartbeat id: {html.escape(context.args[0])}"
+                    )
+                return
+
+            deleted = await self.db.async_delete_dashboard_heartbeat(heartbeat_id)
+            if update.message:
+                if deleted:
+                    await update.message.reply_text(
+                        f"✅ Heartbeat #{heartbeat_id} deleted."
+                    )
+                else:
+                    await update.message.reply_text(
+                        f"\uff49 Heartbeat #{heartbeat_id} not found."
+                    )
+        except Exception as e:
+            logger.error(f"Error /delete_heartbeat command: {e}")
+            if update.message:
+                await update.message.reply_text(f"❌ Error: {e!s}")
+
+    async def _clear_heartbeats(
+        self, update: Update, context: ContextTypes.DEFAULT_TYPE
+    ) -> None:
+        """Handle /clear_heartbeats command (admin only): delete all rows."""
+        try:
+            if not self._is_authorized_admin(update):
+                user_id = (
+                    update.effective_user.id if update.effective_user else "unknown"
+                )
+                logger.warning("Unauthorized heartbeat clear attempt user: %s", user_id)
+                if update.message:
+                    await update.message.reply_text(
+                        "Unauthorized: You are not authorized to issue this command. "
+                        "Configure TELEGRAM_ADMIN_IDS to include your user ID."
+                    )
+                return
+
+            deleted_count = await self.db.async_clear_dashboard_heartbeats()
+            if update.message:
+                await update.message.reply_text(
+                    f"✅ Cleared {deleted_count} heartbeat row(s)."
+                )
+        except Exception as e:
+            logger.error(f"Error /clear_heartbeats command: {e}")
             if update.message:
                 await update.message.reply_text(f"❌ Error: {e!s}")
 
