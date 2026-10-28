@@ -261,6 +261,7 @@ class TradingSystem:
         await scheduler.run_once("market_status_check")
         await scheduler.run_once("data_cleanup")
         await scheduler.run_once("backtest_sanity_check")
+        await scheduler.run_once("dashboard_heartbeat")
 
     async def run_once(self) -> None:
         """Run all non-signal scheduler jobs once for testing.

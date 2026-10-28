@@ -10,6 +10,8 @@ backtest-sanity support jobs, but does NOT emit trading signals.
 
 import asyncio
 import datetime
+import html
+import json
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -206,6 +208,18 @@ class TradingScheduler:
             name="Backtest Sanity Check",
             replace_existing=True,
         )
+        # Dashboard Option A "full heartbeat" (28Oct2026 operator mandate):
+        # one control-room heartbeat row every 5 minutes, each beat also
+        # delivered over the existing Telegram channel. Insertion and
+        # delivery are user-cleanable via /delete_heartbeat and
+        # /clear_heartbeats.
+        self.scheduler.add_job(
+            self.run_dashboard_heartbeat,
+            IntervalTrigger(minutes=5),
+            id="dashboard_heartbeat",
+            name="Dashboard Heartbeat (Control Room)",
+            replace_existing=True,
+        )
 
     async def start(self) -> None:
         """Start scheduler.
@@ -378,6 +392,108 @@ class TradingScheduler:
         finally:
             self.scan_tasks.pop(task_id, None)
 
+    async def run_dashboard_heartbeat(self) -> None:
+        """Dashboard Option A "full heartbeat" (28Oct2026 operator mandate).
+
+        Every 5 minutes: compose a local-status card, deliver it over the
+        EXISTING Telegram channel (``AlertSystem.send_heartbeat``) and
+        insert one user-deletable ``dashboard_heartbeat`` row (deletable
+        via /delete_heartbeat and /clear_heartbeats).
+
+        Deliberately NOT gated on the kill switch and deliberately free of
+        broker calls: the card reads only local scheduler/alert state, so
+        the beat keeps flowing -- reporting kill=ACTIVE and breaker
+        outages -- exactly while broker legs are down, which is when the
+        control room most needs proof the system itself is alive.
+        """
+        task_id = (
+            f"dashboard_heartbeat_{datetime.datetime.now(datetime.UTC).isoformat()}"
+        )
+        try:
+            task = asyncio.create_task(self._dashboard_heartbeat_task())
+            self.scan_tasks[task_id] = task
+            await task
+        except asyncio.CancelledError:
+            logger.info("Dashboard heartbeat task cancelled: %s", task_id)
+        except Exception:
+            logger.exception("Dashboard heartbeat task failed: %s", task_id)
+        finally:
+            self.scan_tasks.pop(task_id, None)
+
+    async def _dashboard_heartbeat_task(self) -> None:
+        """Compose, deliver and persist one heartbeat beat."""
+        market_open = is_market_open()
+        kill_active = alerts.is_kill_switch_active()
+        breaker_status = alerts.get_circuit_breaker_status()
+        open_breakers = sorted(
+            name
+            for name, st in breaker_status.items()
+            if isinstance(st, dict) and st.get("state") == "open"
+        )
+        sources_open = self._open_source_breakers()
+        beat_index = await self.db.async_count_dashboard_heartbeats() + 1
+        market_line = "\U0001f7e2 OPEN" if market_open else "\U0001f534 CLOSED"
+        kill_line = "\U0001f534 ACTIVE" if kill_active else "\U0001f7e2 disengaged"
+        breaker_line = (
+            "\U0001f534 " + html.escape(", ".join(open_breakers))
+            if open_breakers
+            else "\U0001f7e2 all closed"
+        )
+        source_line = (
+            "\U0001f534 " + html.escape(", ".join(sources_open))
+            if sources_open
+            else "\U0001f7e2 all closed"
+        )
+        now_text = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
+        message = (
+            f"\U0001f940 <b>DASHBOARD HEARTBEAT #{beat_index}</b>\n"
+            f"<b>Time:</b> {now_text}\n"
+            f"<b>Market:</b> {market_line}\n"
+            f"<b>Kill switch:</b> {kill_line}\n"
+            f"<b>Breakers:</b> {breaker_line}\n"
+            f"<b>Source breakers:</b> {source_line}"
+        )
+        delivered = await alerts.send_heartbeat(message)
+        detail = json.dumps(
+            {
+                "beat_index": beat_index,
+                "scheduler_running": self.running,
+                "job_count": len(self.get_jobs()),
+                "open_breakers": open_breakers,
+                "open_sources": sources_open,
+            }
+        )
+        row_id = await self.db.async_record_dashboard_heartbeat(
+            market_open=market_open,
+            kill_switch_active=kill_active,
+            breakers_open=len(open_breakers),
+            telegram_delivered=delivered,
+            detail=detail,
+            message=message,
+        )
+        logger.info(
+            "Dashboard heartbeat #%s persisted (row=%s, telegram=%s)",
+            beat_index,
+            row_id,
+            delivered,
+        )
+
+    @staticmethod
+    def _open_source_breakers() -> list[str]:
+        """Names of open per-source breakers; [] when status unavailable."""
+        try:
+            from .utils.per_source_breakers import get_source_breaker_status
+
+            status = get_source_breaker_status()
+            return sorted(
+                name
+                for name, st in status.items()
+                if isinstance(st, dict) and st.get("state") == "open"
+            )
+        except Exception as exc:
+            logger.debug("Source breaker status unavailable: %s", exc)
+            return []
+
     async def run_data_cleanup(self) -> None:
         """Run data cleanup task."""
         # R-19/H-02 (05Oct2026): halt gate -- cleanup writes/vacuum must not
@@ -528,6 +644,8 @@ class TradingScheduler:
                 await self.run_data_cleanup()
             elif job_id == "backtest_sanity_check":
                 await self.run_backtest_sanity_check()
+            elif job_id == "dashboard_heartbeat":
+                await self.run_dashboard_heartbeat()
             else:
                 logger.warning("Unknown job ID: %s", job_id)
         except Exception:

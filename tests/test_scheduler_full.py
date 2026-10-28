@@ -35,6 +35,9 @@ async def test_add_jobs_registers_support_jobs(scheduler):
         "market_activation_check",
         "data_cleanup",
         "backtest_sanity_check",
+        # 28Oct2026 control-room wave: visibility-only heartbeat (no
+        # signal production).
+        "dashboard_heartbeat",
     }
     assert "ta_scan" not in ids
     assert "sentiment_scan" not in ids

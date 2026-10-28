@@ -105,8 +105,9 @@ class TestSchedulerCoverage:
         await scheduler_instance._add_jobs()
 
         # _add_jobs registers market_status_check, market_activation_check,
-        # data_cleanup, and backtest_sanity_check only.
-        assert mock_add_job.call_count == 4
+        # data_cleanup, backtest_sanity_check, and the 28Oct2026
+        # visibility-only dashboard_heartbeat.
+        assert mock_add_job.call_count == 5
 
         # Check that each job was added with correct parameters
         calls = mock_add_job.call_args_list
@@ -121,6 +122,7 @@ class TestSchedulerCoverage:
         assert "market_activation_check" in job_ids
         assert "data_cleanup" in job_ids
         assert "backtest_sanity_check" in job_ids
+        assert "dashboard_heartbeat" in job_ids
         assert "ta_scan" not in job_ids
         assert "sentiment_scan" not in job_ids
 
