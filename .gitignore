@@ -56,6 +56,10 @@ coverage.json
 # Generated pytest junit artifacts (junitxml=<path>.xml and stray suffixed
 # variants like pytest-report.xmlcls observed staged 2026-09-08)
 pytest-report.xml*
+# benchmark-wallclock job's junit artifact (28Oct: running the CI-equivalent
+# validation command locally writes it into the repo root; observed STAGED
+# same day, breaching the tracked-file ceiling until unstaged)
+pytest-benchmark-report.xml*
 
 # IDE and editor files
 .vscode/
