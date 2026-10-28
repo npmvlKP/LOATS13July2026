@@ -105,10 +105,20 @@ All commits must pass the following quality gates:
   `enforce_admins=true`, `allow_force_pushes=false`,
   `allow_deletions=false`. Direct pushes are rejected (GH006); PRs and
   required status checks are mandatory. The repo-hygiene, rss-feeds,
-  ruff-repo-scope, gitleaks and docker jobs run on
+  ruff-repo-scope, gitleaks, benchmark-wallclock and docker jobs run on
   every push/PR but are intentionally NOT in the required-context list
   — they remain advisory signals on main; add a context there only when
-  a job must gate merges. benchmark-perf was promoted by the R-01
+  a job must gate merges. benchmark-wallclock (added 2026-10-28, ADR-0016
+  sanctioned lever #2, operator-gated) runs the `benchmark_wallclock`-
+  marked wall-clock cache benchmarks on an isolated runner with no
+  coverage tracing; the local pre-push pytest hook deselects that marker
+  (tracing alone compresses the shared trading host below the thresholds:
+  1,586 writes/s traced vs the 2,000 writes/s threshold on 28Oct, both
+  stages green untraced in the same minute), while the REQUIRED
+  pytest-coverage job keeps running the full suite including the marker
+  — server-side enforcement of the complete set is unchanged. Any future
+  threshold re-baseline for this class takes CI runner evidence, never
+  host data (07Oct threshold doctrine). benchmark-perf was promoted by the R-01
   decision (b) wave (ADR-0021, 2026-09-30 checkpoint): the job renamed
   to `benchmark-perf (F9-H-02 gate)` and added to the required list in
   the same wave per ADR-0016 §Decision.2. The context string IS the
